@@ -1,0 +1,286 @@
+✔ 能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 dispatch；项目角色零注入 (17.3098ms)
+✔ role_activity_log 数据面：只读、脱敏、字段/坏行如实；role_status 带 lastActivityAt (46.6998ms)
+✔ 工具注册面：幕僚注入 role_activity_log/terminate_role_run/redispatch_task；未注入即不存在 (2.2648ms)
+✔ 工具注册面（2026-11-02）：project_state/project_note/request_version_decision 注入才注册 (0.3928ms)
+W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":false,"originRoleId":"convener","entries":[{"sessionId":"eb0bd224-7293-4062-bb48-4af59da6264b","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"71f0f518-c6d4-4a1e-aa4e-3b4ed5862e0b","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"75e0b750-5866-4b74-b4dc-c275518d8014","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流
+✔ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (224.9242ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 671.7186
+
+✔ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (713.3125ms)
+W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["revise","select"],"missingEvidence":false,"originRoleId":"rapporteur","entries":[{"sessionId":"822eb196-ea0e-4c13-82f0-8091ece55fce","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"d146124f-917c-4388-aaf8-391f3e5595bf","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"c3a6fc2b-66fe-4f00-b639-3491a9c6e0d2","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"ab0a1834-f704-4944-9e77-d2de791b54a2","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场
+✔ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (348.1296ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 783.2771
+
+✔ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (821.7676ms)
+W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":true,"originRoleId":"convener","entries":[{"sessionId":"1bbe35c0-0d98-4b03-8823-fbe58c3a816c","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"d933b28b-7677-4db0-a918-84dd73b58b86","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托
+✔ W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托 (174.1436ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 605.2952
+
+✔ W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托 (644.6317ms)
+✔ B1 materials失败fail-closed：不呈现卡、declined+notPresented+真实原因、pending清零且旧id不可重试 (29.8279ms)
+✔ B2 materials失败竞争：prepare在途关闭委托⇒恰一次呈现，迟到失败不双结算，客户可接管 (51.735ms)
+✔ B3/B4 execution无有效决定⇒既有chiefWaiting回退不变；respond闸manualTakeoverRequired且关闭后可结算 (30.4968ms)
+✔ B5 materials失败原因非空且如实：保留prepare错误原文，空错误也不得退化为回退文案 (1.2128ms)
+✔ W3 默认Core→默认CodexChat本地HTTP：真实git_query与同实例surface库存；native旁路拒绝而FS仍unknown (275.7589ms)
+W52 isolated unknown actor child output W52_W3_ACTUAL_UNKNOWN_ASSERTIONS_COMPLETED {"coreSessionId":"0f80210f-ab34-4dd6-abfd-f3cd8b5bfa85","phase":"disposed","coverage":"unknown","factoryProvenance":"custom-override","nativeToolRegistry":"unknown"}
+✔ W3 创建中普通库存与实际revision可见；custom工厂伪CodexChat来源经真实Core仍unknown (39.2229ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 470.3916
+
+✔ W3 创建中普通库存与实际revision可见；custom工厂伪CodexChat来源经真实Core仍unknown (510.672ms)
+▶ W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+  ✔ enumerated (53.6734ms)
+W52 W5 primary failure selected AssertionError [ERR_ASSERTION]: [{"role":"chief","step":0,"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_dispatch_task","ans_role_status","ans_contract_check","ans_doc_format","ans_evidence_check","ans_session_tail","ans_role_activity_log","ans_terminate_role_run","ans_redispatch_task","ans_project_state","ans_governance_matrix","ans_project_note","ans_close_created_task"],"toolResponses":[]},{"role":"chief","step":1,"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_dispatch_task","ans_role_status","ans_contract_check","ans_doc_format","ans_evidence_check","ans_session_tail","ans_role_activity_log","ans_terminate_role_run","ans_redispatch_task","ans_project_state","ans_governance_matrix","ans_project_note","ans_close_created_task"],"toolResponses":["dispatch_task：任务**未能派发**（回执：stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]
+
+0 !== 1
+
+    at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:892:18)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:801:7)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+  ✖ selected (6053.8563ms)
+  ✔ cancelled (44.9892ms)
+  ✔ changed (44.531ms)
+  ✔ model-source (39.8419ms)
+W52 W5 primary failure commit-race AssertionError [ERR_ASSERTION]: Observed the actual dispatch/ledger await lease, without stubbing the append
+
+false !== true
+
+    at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:873:20)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:801:7)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+  ✖ commit-race (42.3183ms)
+✖ W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝 (6280.4769ms)
+▶ W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+  ✔ unmanaged (163.4746ms)
+  ✔ unmanaged-system (89.9771ms)
+W52 W10 primary failure before cleanup required AssertionError [ERR_ASSERTION]: The required scope comes from an actual accepted customer turn and child ledger, not a fixture marker
+    at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1007:14)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:958:89)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+  ✖ required (36.4908ms)
+  ✔ unknown (19.9198ms)
+✖ W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind (310.5782ms)
+W52 actual strong dispatch gate checks completed {"target":"worker","creating":[{"hostHandleId":"22cad3e1-8907-4773-8d8c-472545f92d26","taskId":"t-mweie3ax-547fa2c7"}],"workerRequests":0,"targetTasks":[],"chiefHasAssignment":false,"replies":["dispatch_task：任务**未能派发**（回执：worker-freeze stage=prepare code=trunk-verify-failed parentTaskId=t-mweie3ax-547fa2c7 runId=run-hub-e14d1e1ee82989163f2d1728bb43744da827cff8465160e3：effective-manifest-missing）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}
+✔ W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP (545.8347ms)
+W52 actual strong dispatch gate checks completed {"target":"verifier","creating":[{"hostHandleId":"225c7662-dd54-4366-9721-6a0bedb23381","taskId":"t-mweie3qu-b8f45405"}],"workerRequests":0,"targetTasks":[],"chiefHasAssignment":false,"replies":["dispatch_task：任务**未能派发**（回执：chief-hub-review-owner-required：新的质检任务须由幕僚创建，未登记任务。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}
+✔ W23 Convener不能越Chief新建普通Verifier，零任务零HTTP (541.2403ms)
+W52 actual strong dispatch gate checks completed {"target":"review","creating":[{"hostHandleId":"dbe6ff66-3f0f-4628-b871-7d0d45f1ec32","taskId":"t-mweie459-2bd28447"}],"workerRequests":0,"targetTasks":[],"chiefHasAssignment":false,"replies":["dispatch_task：任务**未能派发**（回执：chief-hub-review-owner-required：新的质检任务须由幕僚创建，未登记任务。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}
+✔ W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP (530.3699ms)
+✔ W16 打开拒绝保队列不自旋；stop后的晚到通知不重开，显式open恢复 (230.1285ms)
+✔ W16 在途open跨stop不安装晚到handle，真实dispose后保队列等待显式重试 (2.3609ms)
+✔ W17 写后fallback经公开Pipeline登记实际字节；既有hook false保原拒绝 (46.4338ms)
+W52 isolated unknown actor child output W52 W19 actual custom Core binding [{"sessionId":"830d255c-d58c-4943-9ed3-a7e6d9ff5e2b","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"0c5ca7ba-88bd-4ba3-8979-a20bdc27176f","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"6ee9d582-5ed7-4284-9b0d-54786d00f634","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"}]
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (533.6494ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 982.1857
+
+✖ failing tests:
+
+test at test\桌面应用\chief-workflow.test.ts:1348:1
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (533.6494ms)
+  AssertionError [ERR_ASSERTION]: The actual creator receipt must supply notification source
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1438:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (1024.7776ms)
+✔ W20 默认Core/Chat产品真实报告落账并到chief 普通 (349.2019ms)
+✔ W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争 (409.7365ms)
+
+  #  C:\Users\51054\AppData\Local\Programs\nodejs\node.exe[8480]: void __cdecl node::CleanupQueue::Add(Callback, void *) at src\cleanup_queue-inl.h:24
+  #  Assertion failed: (insertion_info.second) == (true)
+
+----- Native stack trace -----
+
+ 1: 00007FF6399E6536 node::SetAbortHandler+54
+ 2: 00007FF6399E60E7 node::MultiIsolatePlatform::DisposeIsolate+781383
+ 3: 00007FF639AFD5C3 node::SetCppgcReference+356435
+ 4: 000001775190F77E 
+
+----- JavaScript stack trace -----
+
+1: destroyTracking (node:internal/async_hooks:344:3)
+2: promiseInitHookWithDestroyTracking (node:internal/async_hooks:338:3)
+3: realpath (node:internal/fs/promises:1894:24)
+4: readGitHostProtectionRequirement (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/src/provider/trunk/impl/git-command.ts:986:96)
+
+
+ℹ tests 34
+ℹ suites 0
+ℹ pass 28
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14422.4593
+
+✖ failing tests:
+
+test at test\桌面应用\chief-workflow.test.ts:801:15
+✖ selected (6053.8563ms)
+  AssertionError [ERR_ASSERTION]: [{"role":"chief","step":0,"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_dispatch_task","ans_role_status","ans_contract_check","ans_doc_format","ans_evidence_check","ans_session_tail","ans_role_activity_log","ans_terminate_role_run","ans_redispatch_task","ans_project_state","ans_governance_matrix","ans_project_note","ans_close_created_task"],"toolResponses":[]},{"role":"chief","step":1,"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_dispatch_task","ans_role_status","ans_contract_check","ans_doc_format","ans_evidence_check","ans_session_tail","ans_role_activity_log","ans_terminate_role_run","ans_redispatch_task","ans_project_state","ans_governance_matrix","ans_project_note","ans_close_created_task"],"toolResponses":["dispatch_task：任务**未能派发**（回执：stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:892:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:801:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:801:15
+✖ commit-race (42.3183ms)
+  AssertionError [ERR_ASSERTION]: Observed the actual dispatch/ledger await lease, without stubbing the append
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:873:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:801:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:958:97
+✖ required (36.4908ms)
+  AssertionError [ERR_ASSERTION]: The required scope comes from an actual accepted customer turn and child ledger, not a fixture marker
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1007:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:958:89)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:1348:1
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (1024.7776ms)
+  AssertionError [ERR_ASSERTION]: W52 W19 actual custom Core binding [{"sessionId":"830d255c-d58c-4943-9ed3-a7e6d9ff5e2b","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"0c5ca7ba-88bd-4ba3-8979-a20bdc27176f","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"6ee9d582-5ed7-4284-9b0d-54786d00f634","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"}]
+  ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (533.6494ms)
+  ℹ tests 1
+  ℹ suites 0
+  ℹ pass 0
+  ℹ fail 1
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  ℹ duration_ms 982.1857
+  
+  ✖ failing tests:
+  
+  test at test\桌面应用\chief-workflow.test.ts:1348:1
+  ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (533.6494ms)
+    AssertionError [ERR_ASSERTION]: The actual creator receipt must supply notification source
+        at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1438:12)
+        at async Test.run (node:internal/test_runner/test:1409:7)
+        at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: undefined,
+      expected: true,
+      operator: '==',
+      diff: 'simple'
+    }
+  
+  
+  1 !== 0
+  
+      at isolateUnknownCoreCase (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:72:60)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1349:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -254,6 +254,10 @@ entries:
   - kind: file
     path: test/测试/fixed-path-full-chain.test.ts
     purpose: fixed 两条路径确定性全链集成测试（B29 触及）
+  # --- Delta-B0-1（2026-11-13，B0 派发/客户协调者授权）：B0 会话结构保护骨架——补登 1 个精确测试文件（test/桌面应用/session-structure.test.ts），逐文件授权，无目录级授权 ---
+  - kind: file
+    path: test/桌面应用/session-structure.test.ts
+    purpose: B0 会话结构保护骨架——导出面/导入图/体量预算/openRoleSession 工具面快照（session.ts 重构批次保护层）
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

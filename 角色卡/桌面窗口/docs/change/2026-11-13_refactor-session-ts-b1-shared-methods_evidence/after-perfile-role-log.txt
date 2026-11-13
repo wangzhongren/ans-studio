@@ -1,0 +1,13 @@
+✔ 脱敏：凭据/令牌/项目外绝对路径/换行与 200 字截断 (1.1397ms)
+✔ 追加/读取：字段白名单、since/limit、坏行跳过、非法角色 id fail-closed (17.4099ms)
+✔ 非法角色 id：返回失败（不落盘、不抛） (0.7763ms)
+✔ 轮转：超过上限时保留 .1，读取仍按旧→新返回最近条目 (7.878ms)
+✔ SessionManager 观察器：会话消息/工具/终局自动写日志（脱敏），角色无需上报 (166.2555ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2046.0913

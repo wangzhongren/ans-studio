@@ -1,0 +1,18 @@
+✔ 验收 facts 暴露 unverified/legacy/evidenceMismatch；P0 不伪造通过 (0.7915ms)
+✔ ageMs：快照数值进入队列视图；缺失/非法旧快照按 0（不虚构等待） (1.0297ms)
+✔ ageText：≥1 分钟才显示人话等待（zh/en 一致语义） (0.157ms)
+✔ blockedView：「为什么没动」＝队首类别 + 阻塞原因（target-busy / origin-missing / session-closed / network） (0.2276ms)
+✔ queueGroups：运行中/排队分组仍单一来源，ageMs 随条目透出 (0.1281ms)
+✔ 接线钉子：session 快照 → main 透传 → chat-store → QueuePanel 字段端到端 (0.7602ms)
+✔ settled(failed) 终态行：可见文本 = 人话 summary；errorCode 不进入可见行 (0.7677ms)
+✔ 请求失败系统行（delivery-note）：按系统行渲染；zh/en 人话、无技术细节 (0.2377ms)
+✔ i18n 目录：三条请求状态文案中英成对、非空、en-US 零 Han、无技术细节 (0.2218ms)
+✔ 接线钉子：主进程用同一组 i18n key 发 delivery-note；Service settled.detail 带 errorCode/attempts/replaySafe (0.3931ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 127.4652

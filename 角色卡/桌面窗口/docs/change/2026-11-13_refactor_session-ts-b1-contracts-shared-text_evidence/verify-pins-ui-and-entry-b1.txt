@@ -1,0 +1,25 @@
+✔ 验收 facts 暴露 unverified/legacy/evidenceMismatch；P0 不伪造通过 (0.8041ms)
+✔ ageMs：快照数值进入队列视图；缺失/非法旧快照按 0（不虚构等待） (1.0093ms)
+✔ ageText：≥1 分钟才显示人话等待（zh/en 一致语义） (0.1579ms)
+✔ blockedView：「为什么没动」＝队首类别 + 阻塞原因（target-busy / origin-missing / session-closed / network） (0.2145ms)
+✔ queueGroups：运行中/排队分组仍单一来源，ageMs 随条目透出 (0.1297ms)
+✔ 接线钉子：session 快照 → main 透传 → chat-store → QueuePanel 字段端到端 (0.6946ms)
+✔ settled(failed) 终态行：可见文本 = 人话 summary；errorCode 不进入可见行 (0.7509ms)
+✔ 请求失败系统行（delivery-note）：按系统行渲染；zh/en 人话、无技术细节 (0.2333ms)
+✔ i18n 目录：三条请求状态文案中英成对、非空、en-US 零 Han、无技术细节 (0.2156ms)
+✔ 接线钉子：主进程用同一组 i18n key 发 delivery-note；Service settled.detail 带 errorCode/attempts/replaySafe (0.391ms)
+✔ 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实 (269.2212ms)
+✔ 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存） (261.2973ms)
+✔ listProject 附带 activeRuns（pinned/draft 摘要；draft 不算可发起） (23.7828ms)
+✔ requestRunChange：无 pinned run / 多 pinned run / 无可呈现会话 ⇒ 如实失败（不伪造成功） (10.784ms)
+✔ requestRunChange（真实链路）：convener 会话呈现 run-change 卡，客户答 continue-frozen 后落账 (53.486ms)
+✔ 跨层源码钉：main handler / preload 桥 / platform 类型 / U1 旧按钮已移除（低层 API 保留）/ 触发点接线 (6.9003ms)
+✔ requestRunChange（真实客户卡通道 + 替我决策开启）：三模式卡呈现客户、不代选；客户作答后按 customer 落账 (97.2004ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 992.2621

@@ -1,0 +1,130 @@
+✔ O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文） (362.3331ms)
+✔ O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建 (215.4678ms)
+✔ O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发） (501.3954ms)
+✔ O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重 (465.6107ms)
+✔ O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次 (404.5658ms)
+✔ O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支 (1.5688ms)
+✔ F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话） (93.4602ms)
+✔ F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装） (49.6187ms)
+✔ G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡 (213.6263ms)
+✔ G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建 (204.2143ms)
+✔ G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md (211.214ms)
+✔ G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对） (208.0241ms)
+✔ G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响 (199.3048ms)
+✔ G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞 (1.8769ms)
+✔ 指令提交：确认面板字段（原文/动作/范围/期限/confirmable/开关快照）；确认后 durable 落账 + 回执 + 双视图 (35.8895ms)
+✔ 指令取消：不落账、无回执、directiveCancelled；未知 id 为 expired；关窗 cancelAll (56.4093ms)
+✔ 输入式撤销：@审批 撤销 #id 经确认后调 runtime.revoke；同 target/active；回执与列表刷新；跨 target/终态直接回错 (123.2668ms)
+✔ 高危复核：approval 宽命令/forever 未勾选拒绝且面板保持；勾选后落账 (40.7493ms)
+✔ AC-13 2×2：decision 项目级 select-recommended 仅在「开关关闭」时高危；flow 范围无该高危 (129.5168ms)
+✔ 幂等与重推：同 clientMessageId 同文只开一张面板、返回同一 id；replayPending 复用同一 requestId (36.4945ms)
+✔ 项目切换：未决面板取消、不销毁旧运行时；切回后同一运行内 session 指令仍 active (60.1368ms)
+✖ sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道 (48.2353ms)
+✔ sendSession target fail-closed：缺失/非法/跨项目/角色不在清单/无效引擎均不落账、不投递、不回退 (5.0326ms)
+✖ sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变） (4.3979ms)
+✔ sendSession：未命中标记时普通消息行为逐字不变（含图片校验路径仍在） (4.4989ms)
+✖ sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席） (5.0514ms)
+✔ 控制器：自然语言解释成功 ⇒ 面板预填 AI 解释；解释器收到 target/正文/原文/项目/角色/引擎；确认后落账 (31.2144ms)
+✔ 控制器：解释失败 ⇒ 回退现有面板（confirmable=false、未识别片段）；伪造确认也不落账 (21.8715ms)
+✔ 控制器：撤销快路径不调用解释器；确认后 durable revoked (22.2973ms)
+✖ sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账 (4009.4589ms)
+✖ sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂 (4009.6667ms)
+✔ preload：directive:state 注册即同步回放缓存；订阅后续推送；取消订阅保留顶层缓存监听 (2.9167ms)
+✔ 冻结形状：五个 IPC/preload 名、directivesEnabled 握手、应用运行级 sessionId、Q9 旧读者三值 (5.2887ms)
+✔ 2026-11-05 BUG-5 精化：仅「已收口/同回合」抑制；blocked 后新回合真实报告必须投递 (0.4463ms)
+✔ L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照 (354.4785ms)
+✔ L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文） (50.2047ms)
+✔ L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (355.1236ms)
+✔ L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态） (46.5213ms)
+✔ 状态准确性（主进程）：投递开跑的后台轮次 — 真实快照 busy 如实外推；状态派生/徽标纯逻辑见 test/桌面UI/status.test.ts (750.1951ms)
+✔ 状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts (52.4729ms)
+✔ 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测 (0.9605ms)
+✔ F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递 (840.1706ms)
+✔ G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回 (383.2159ms)
+✔ P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(mode=ui-only)、不改队列、不投模型 (187.8184ms)
+✔ G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束） (392.7256ms)
+✔ G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn (291.612ms)
+✔ 2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 store）⇒ 自动重投到原角色/原 runtime (341.9806ms)
+✔ 2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delivery.end 成功后 ⇒ 移除且不重投 (270.9164ms)
+✔ 2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队；settle 后按序投递给同一角色（图片原引用） (215.796ms)
+✔ 2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供 (42.1916ms)
+✔ 2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写） (30.2248ms)
+✔ 2026-10-26 view_image 集成：真实 openRoleSession + 真实 view_image 工具 ⇒ 本轮内排队、settle 后把同一 PromptImage 投给同一角色 (296.481ms)
+✔ 2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/损坏 store 不崩；多项目/多角色键隔离 (293.3517ms)
+ℹ tests 53
+ℹ suites 0
+ℹ pass 48
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9312.3868
+
+✖ failing tests:
+
+test at test\桌面应用\directive-input.test.ts:483:1
+✖ sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道 (48.2353ms)
+  AssertionError [ERR_ASSERTION]: 命中即有确认面板
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:498:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\directive-input.test.ts:575:1
+✖ sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变） (4.3979ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /图片/. Input:
+  
+  '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:590:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。',
+    expected: /图片/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\directive-input.test.ts:629:1
+✖ sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席） (5.0514ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /能力不可用/. Input:
+  
+  '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:650:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。',
+    expected: /能力不可用/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\directive-input.test.ts:767:1
+✖ sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账 (4009.4589ms)
+  Error: waitFor 超时
+      at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:41:49)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:794:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\桌面应用\directive-input.test.ts:815:1
+✖ sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂 (4009.6667ms)
+  Error: waitFor 超时
+      at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:41:49)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:837:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

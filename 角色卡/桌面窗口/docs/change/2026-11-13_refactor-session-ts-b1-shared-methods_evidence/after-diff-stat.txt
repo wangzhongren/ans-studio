@@ -1,0 +1,31 @@
+## git diff --stat (HEAD=cf63cc7; includes B1 segment 1 + 2)
+ app/desktop/session.ts | 1357 +++++-------------------------------------------
+ 1 file changed, 127 insertions(+), 1230 deletions(-)
+
+## git diff --numstat
+127	1230	app/desktop/session.ts
+
+## git status --short
+ M app/desktop/session.ts
+ M test/桌面应用/session-structure.test.ts
+ M 角色卡/桌面窗口/boundary.md
+ M 角色卡/桌面窗口/boundary.yaml
+?? app/desktop/session/
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b1-shared-methods_evidence/
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor_session-ts-b1-contracts-shared-text.md
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor_session-ts-b1-contracts-shared-text_evidence/
+?? 角色卡/项目管理/docs/change/2026-11-13_boundary-delta_B0-session-structure.md
+
+## wc -l app/desktop/session.ts (before segment2 = 12,421 per segment-1 record; after:)
+12388 app/desktop/session.ts
+
+## shared modules (wc -l)
+   10 app/desktop/session/shared/clock.ts
+   68 app/desktop/session/shared/inventory.ts
+   40 app/desktop/session/shared/keys.ts
+   16 app/desktop/session/shared/notifier.ts
+   87 app/desktop/session/shared/roles.ts
+   14 app/desktop/session/shared/session-views.ts
+   87 app/desktop/session/shared/tasks-store.ts
+  173 app/desktop/session/shared/text.ts
+  495 total

@@ -1,0 +1,360 @@
+{
+  "generatedAt": "2026-11-13T04:59:47.308Z",
+  "repo": "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1",
+  "source": "git show HEAD:app/desktop/session.ts（cf63cc7，B1 起点）",
+  "methodCount": 22,
+  "normalization": "仅应用 adaptationsApplied 中的 receiver/state 适配；随后行级 trim + 折叠连续空白 + 去空行",
+  "allFunctionsIdenticalUnderDocumentedAdaptations": true,
+  "sessionTsLines": 12388,
+  "modules": {
+    "keys": "app/desktop/session/shared/keys.ts",
+    "clock": "app/desktop/session/shared/clock.ts",
+    "roles": "app/desktop/session/shared/roles.ts",
+    "session-views": "app/desktop/session/shared/session-views.ts",
+    "notifier": "app/desktop/session/shared/notifier.ts",
+    "tasks-store": "app/desktop/session/shared/tasks-store.ts",
+    "inventory": "app/desktop/session/shared/inventory.ts"
+  },
+  "results": [
+    {
+      "method": "sessionKey",
+      "module": "app/desktop/session/shared/keys.ts",
+      "headSourceLines": "1968-1970",
+      "targetLines": "11-13",
+      "adaptationsApplied": [],
+      "normalizedSha256Head": "00fa4e45faaab75c82c09f02096c2cbc24f83dd1ca6bf50fe5ed5bd3d55bbd23",
+      "normalizedSha256Target": "00fa4e45faaab75c82c09f02096c2cbc24f83dd1ca6bf50fe5ed5bd3d55bbd23",
+      "identical": true
+    },
+    {
+      "method": "targetKey",
+      "module": "app/desktop/session/shared/keys.ts",
+      "headSourceLines": "1971-1980",
+      "targetLines": "26-35",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.sessionKey → 同模块函数",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.activeEntry() → 只读状态回调",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.activeRoleId 两次读取 → 状态回调 + 类型断言（无运行时效果）",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.sessions.keys() → 只读状态回调",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.rebuildChains.keys() → 只读状态回调",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "17c3e3ca10769db215cd2be942afc9ddcf6ca48e500f09a2613116b894f6d919",
+      "normalizedSha256Target": "17c3e3ca10769db215cd2be942afc9ddcf6ca48e500f09a2613116b894f6d919",
+      "identical": true
+    },
+    {
+      "method": "queueKey",
+      "module": "app/desktop/session/shared/keys.ts",
+      "headSourceLines": "8102-8104",
+      "targetLines": "38-40",
+      "adaptationsApplied": [],
+      "normalizedSha256Head": "2b5d12f5c74a1a04f959274a83fc0e5a39ca1695d87b6aab780fb321de7cae4b",
+      "normalizedSha256Target": "2b5d12f5c74a1a04f959274a83fc0e5a39ca1695d87b6aab780fb321de7cae4b",
+      "identical": true
+    },
+    {
+      "method": "now",
+      "module": "app/desktop/session/shared/clock.ts",
+      "headSourceLines": "1949-1951",
+      "targetLines": "8-10",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.deps.X → deps.X（端口参数）",
+          "hits": 2
+        }
+      ],
+      "normalizedSha256Head": "d4b49c830e7c5ae6a9ae40770ac394227719692bfc4f55d266b082070c9e990f",
+      "normalizedSha256Target": "d4b49c830e7c5ae6a9ae40770ac394227719692bfc4f55d266b082070c9e990f",
+      "identical": true
+    },
+    {
+      "method": "handbackOwnerRoleId",
+      "module": "app/desktop/session/shared/roles.ts",
+      "headSourceLines": "5299-5308",
+      "targetLines": "24-33",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.deps.X → deps.X（端口参数）",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "6d19a128416373f5db2c0f4ac2032cba223fc587bcbd6903d5bbe95d15b63630",
+      "normalizedSha256Target": "6d19a128416373f5db2c0f4ac2032cba223fc587bcbd6903d5bbe95d15b63630",
+      "identical": true
+    },
+    {
+      "method": "chiefTaskRoleIdOf",
+      "module": "app/desktop/session/shared/roles.ts",
+      "headSourceLines": "5316-5320",
+      "targetLines": "36-40",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.deps.X → deps.X（端口参数）",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "766d1eab92a2e5e9a68c4c8a1f4033286f0544993cf8d782684e6373d1c8ee61",
+      "normalizedSha256Target": "766d1eab92a2e5e9a68c4c8a1f4033286f0544993cf8d782684e6373d1c8ee61",
+      "identical": true
+    },
+    {
+      "method": "dispatcherRoleIdOf",
+      "module": "app/desktop/session/shared/roles.ts",
+      "headSourceLines": "7851-7853",
+      "targetLines": "46-48",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.handbackOwnerRoleId → 模块函数 + deps",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "b1eb22a4558d559166cfc42ade736bc3e899f606a86b55cd84c9977c8369835a",
+      "normalizedSha256Target": "b1eb22a4558d559166cfc42ade736bc3e899f606a86b55cd84c9977c8369835a",
+      "identical": true
+    },
+    {
+      "method": "resolveProofFlowIds",
+      "module": "app/desktop/session/shared/roles.ts",
+      "headSourceLines": "8077-8079",
+      "targetLines": "54-56",
+      "adaptationsApplied": [],
+      "normalizedSha256Head": "603791abb51563a240c522511851f5a12178ba8bb362d77699bdafbaf65c9bf7",
+      "normalizedSha256Target": "603791abb51563a240c522511851f5a12178ba8bb362d77699bdafbaf65c9bf7",
+      "identical": true
+    },
+    {
+      "method": "findListingForFeedback",
+      "module": "app/desktop/session/shared/roles.ts",
+      "headSourceLines": "8082-8091",
+      "targetLines": "59-68",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.deps.X → deps.X（端口参数）",
+          "hits": 2
+        }
+      ],
+      "normalizedSha256Head": "b7f4895418932676272327b078bce1f29b6a9573b76476f07eed22a1037cf3f9",
+      "normalizedSha256Target": "b7f4895418932676272327b078bce1f29b6a9573b76476f07eed22a1037cf3f9",
+      "identical": true
+    },
+    {
+      "method": "roleDisplayName",
+      "module": "app/desktop/session/shared/roles.ts",
+      "headSourceLines": "8094-8099",
+      "targetLines": "71-76",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.findListingForFeedback → 模块函数 + deps",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "672c70d246c72dbf457f4ac9ba4734d272172af17d73433d68cce6d36a0f4f81",
+      "normalizedSha256Target": "672c70d246c72dbf457f4ac9ba4734d272172af17d73433d68cce6d36a0f4f81",
+      "identical": true
+    },
+    {
+      "method": "refreshListingNow",
+      "module": "app/desktop/session/shared/roles.ts",
+      "headSourceLines": "3549-3558",
+      "targetLines": "78-87",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.deps.X → deps.X（端口参数）",
+          "hits": 2
+        }
+      ],
+      "normalizedSha256Head": "4997f5cebcf43670e7927ad0a995813404ab4781d2eba108e1211227c44211ea",
+      "normalizedSha256Target": "4997f5cebcf43670e7927ad0a995813404ab4781d2eba108e1211227c44211ea",
+      "identical": true
+    },
+    {
+      "method": "contextInfo",
+      "module": "app/desktop/session/shared/session-views.ts",
+      "headSourceLines": "2085-2089",
+      "targetLines": "10-14",
+      "adaptationsApplied": [],
+      "normalizedSha256Head": "25b11a0a18c74c73df2b44fb80382d3ce2af4e5cd234ad98357365b447b1473a",
+      "normalizedSha256Target": "25b11a0a18c74c73df2b44fb80382d3ce2af4e5cd234ad98357365b447b1473a",
+      "identical": true
+    },
+    {
+      "method": "emitDeliveryNote",
+      "module": "app/desktop/session/shared/notifier.ts",
+      "headSourceLines": "7856-7859",
+      "targetLines": "12-16",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.deps.X → deps.X（端口参数）",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "60b115e3cffbcfe5f4c4816f2773a71fb1d836c24e06a90e98d38cc2be5a8527",
+      "normalizedSha256Target": "60b115e3cffbcfe5f4c4816f2773a71fb1d836c24e06a90e98d38cc2be5a8527",
+      "identical": true
+    },
+    {
+      "method": "rememberTaskCreator",
+      "module": "app/desktop/session/shared/tasks-store.ts",
+      "headSourceLines": "5312-5314",
+      "targetLines": "24-26",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.taskCreators → 模块单例状态",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "c9dccdabab03bad3cba8f4e0a7743602ea88c9c4c777a6276b4a8d303552db2e",
+      "normalizedSha256Target": "c9dccdabab03bad3cba8f4e0a7743602ea88c9c4c777a6276b4a8d303552db2e",
+      "identical": true
+    },
+    {
+      "method": "readTasks",
+      "module": "app/desktop/session/shared/tasks-store.ts",
+      "headSourceLines": "5323-5330",
+      "targetLines": "29-36",
+      "adaptationsApplied": [],
+      "normalizedSha256Head": "b0bcebd5221ecffaf497bf694858bf522db8ceffd0aa37caa1bc09b00e70f891",
+      "normalizedSha256Target": "b0bcebd5221ecffaf497bf694858bf522db8ceffd0aa37caa1bc09b00e70f891",
+      "identical": true
+    },
+    {
+      "method": "isFixedTask",
+      "module": "app/desktop/session/shared/tasks-store.ts",
+      "headSourceLines": "5333-5338",
+      "targetLines": "39-44",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.readTasks → 同模块函数",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "7b7844b8efada890c35b4e2748c033ab48cae0e3c320f13a6e6d3b5629d71eec",
+      "normalizedSha256Target": "7b7844b8efada890c35b4e2748c033ab48cae0e3c320f13a6e6d3b5629d71eec",
+      "identical": true
+    },
+    {
+      "method": "appendTaskStateResult",
+      "module": "app/desktop/session/shared/tasks-store.ts",
+      "headSourceLines": "5399-5404",
+      "targetLines": "47-52",
+      "adaptationsApplied": [],
+      "normalizedSha256Head": "b1030f029c1912cf82c67bfaa4f324bb297fb83d54bbb0e1682c33ce05b4350b",
+      "normalizedSha256Target": "b1030f029c1912cf82c67bfaa4f324bb297fb83d54bbb0e1682c33ce05b4350b",
+      "identical": true
+    },
+    {
+      "method": "appendTaskState",
+      "module": "app/desktop/session/shared/tasks-store.ts",
+      "headSourceLines": "5405-5407",
+      "targetLines": "54-56",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.appendTaskStateResult → 同模块函数",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "c84c070c6162dbd35c2e8a199227718821b7288de4b87b01c32122e006a68f3c",
+      "normalizedSha256Target": "c84c070c6162dbd35c2e8a199227718821b7288de4b87b01c32122e006a68f3c",
+      "identical": true
+    },
+    {
+      "method": "recordTaskFailure",
+      "module": "app/desktop/session/shared/tasks-store.ts",
+      "headSourceLines": "5409-5415",
+      "targetLines": "58-64",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.readTasks → 同模块函数",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.appendTaskState → 同模块函数",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.now() → 时钟回调",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "2381bba964cd312c5ae92912133013ea100185aa793635c60ed72ca04a5077e2",
+      "normalizedSha256Target": "2381bba964cd312c5ae92912133013ea100185aa793635c60ed72ca04a5077e2",
+      "identical": true
+    },
+    {
+      "method": "appendRoleActivity",
+      "module": "app/desktop/session/shared/tasks-store.ts",
+      "headSourceLines": "5418-5431",
+      "targetLines": "73-87",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.lastRoleActivity → 显式状态参数",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.now() → 时钟回调",
+          "hits": 1
+        },
+        {
+          "adaptation": "appendRoleActivity 的 at → state.now()（状态面时钟）",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "5ec2ac18125bf125cbd79f17255952ca7aee624691568612486f82c50eec7078",
+      "normalizedSha256Target": "5ec2ac18125bf125cbd79f17255952ca7aee624691568612486f82c50eec7078",
+      "identical": true
+    },
+    {
+      "method": "inventoryChanged",
+      "module": "app/desktop/session/shared/inventory.ts",
+      "headSourceLines": "1653-1663",
+      "targetLines": "55-65",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.observedInventoryRoots → 显式状态参数",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.inventoryPublicationErrors → 显式状态参数",
+          "hits": 2
+        }
+      ],
+      "normalizedSha256Head": "32ff9cbbaca135eb5603359696cdb95d3396afb405dd369b0739bd10f2358aa4",
+      "normalizedSha256Target": "32ff9cbbaca135eb5603359696cdb95d3396afb405dd369b0739bd10f2358aa4",
+      "identical": true
+    },
+    {
+      "method": "publishDeliveryInventory",
+      "module": "app/desktop/session/shared/inventory.ts",
+      "headSourceLines": "1664-1666",
+      "targetLines": "66-68",
+      "adaptationsApplied": [
+        {
+          "adaptation": "this.observedInventoryRoots → 显式状态参数",
+          "hits": 1
+        },
+        {
+          "adaptation": "this.inventoryChanged → 模块函数 + state",
+          "hits": 1
+        }
+      ],
+      "normalizedSha256Head": "bea71063fae624df1b941faf15a2c4cd49a85fdd77902f36bf4a95ef33085462",
+      "normalizedSha256Target": "bea71063fae624df1b941faf15a2c4cd49a85fdd77902f36bf4a95ef33085462",
+      "identical": true
+    }
+  ]
+}

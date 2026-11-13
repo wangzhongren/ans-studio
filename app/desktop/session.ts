@@ -75,7 +75,7 @@ import type { ChiefDecisionExecutionContext, DecidePendingRequestFn, SelectRunCh
 import type { RoleSessionHandle, RoleSessionAbortResult, RoleSessionSendOptions, TaskGitShellRuntimeInput } from "../../src/pipeline/orchestration/run-role.ts";
 import { readRoleCapabilityProtectionScope, inspectRoleSessionOpenFailure, registerVersionedDocumentAfterWrite } from "../../src/pipeline/orchestration/run-role.ts";
 import type { GitHostOpenFailureRef } from "../../src/pipeline/orchestration/trunk-runtime.ts";
-import { createGitRoleRuntime, createDirectRoleRuntime, recordTaskObservation, prepareCreatedTaskClose, freezeExecutionRun, readRunRoleContext, prepareRoleDispatch, beginGitHostAction, endGitHostAction, recordGitHostInventory, inspectAssignedTask, recordGitHostInterruption, prepareAssignedTaskWriteScope, prepareParentTaskRef, collectDispatchBaselineFacts, resolveDeliveryAssignment, classifyClosedTaskNotice, prepareRunChange, finalizeRunChange, prepareControllerResume, inspectQueuedControllerResume, prepareControllerStop, finalizeControllerStop, type ControllerStopHostPlan, type RunChangeHostPlan } from "../../src/pipeline/orchestration/trunk-runtime.ts";
+import { createGitRoleRuntime, createDirectRoleRuntime, recordTaskObservation, prepareCreatedTaskClose, freezeExecutionRun, readRunRoleContext, prepareRoleDispatch, beginGitHostAction, endGitHostAction, inspectAssignedTask, recordGitHostInterruption, prepareAssignedTaskWriteScope, prepareParentTaskRef, collectDispatchBaselineFacts, resolveDeliveryAssignment, classifyClosedTaskNotice, prepareRunChange, finalizeRunChange, prepareControllerResume, inspectQueuedControllerResume, prepareControllerStop, finalizeControllerStop, type ControllerStopHostPlan, type RunChangeHostPlan } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import { createRuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions, type RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
 import {
   createDirectiveInterpreter as realCreateDirectiveInterpreter,
@@ -204,7 +204,7 @@ import {
   type VersionDecisionRequest,
   type VersionDecisionResult,
 } from "../../src/model/project-state.ts";
-import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
+import { formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
 import { docsForFlow, formatMechanicalRejection, humanRejection, makeMechanicalRejection, rejectionMapSnapshot, technicalRejectionCode, type MechanicalRejection } from "../../src/common/编排/mechanical-rejection.ts";
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
@@ -350,49 +350,80 @@ import { buildEffectiveProjectConfig } from "./project.ts";
 // 改从共享模块**只读导入**并**原样转出**（公开面 `RuntimeKind` 不变、行为逐字不变）。
 export type { RuntimeKind };
 
-/**
- * 会话事件外推的**信封**（B-2，2026-10-12）：多会话并存后，事件必须携带**它属于哪个角色**
- * （渲染侧按 projectRoot/runtime/roleId 分发——不带标识会串消息）。源报告只保留公开安全投影，raw handback不进入此传输类型。
- */
-export type DesktopOrchestrationEvent = SessionEvent | Omit<HandbackEvent, 'handback'>;
-export type PersistenceScope = { projectRoot: string; roleId: string; runtime: RuntimeKind };
-export type PersistenceReply<T> = { ok: true; version: 1; scope: PersistenceScope; value: T } | { ok: false; version: 1; scope?: PersistenceScope; code: 'INVALID_REQUEST' | 'PROJECT_NOT_ACTIVE' | 'SESSION_NOT_AVAILABLE' | 'SNAPSHOT_EXPIRED' | 'UNSUPPORTED'; message: string };
-export type PersistenceCapabilities = { mode: 'enabled' | 'disabled' | 'unknown-live'; reportSaveSupported: boolean; deliveryHistorySaveSupported: boolean; querySupported: boolean };
-export interface PersistenceValues { retryReportSave: ReportSaveResultV1; getReportSaveState: ReportSaveStateV1; retryDeliveryHistorySave: DeliverySaveResultV1; getDeliveryReceipt: DeliveryReceiptQueryV1; getSessionPersistence: PersistenceCapabilities }
-export type PersistenceUpdated = { version: 1; scope: PersistenceScope; change: RuntimePersistenceChangeV1 };
-export interface SessionEventEnvelope {
-  /** Display correlation only, captured from the original client delivery. */
-  clientMessageId?: string;
-  roleId: string;
-  projectRoot: string;
-  runtime: RuntimeKind;
-  event: DesktopOrchestrationEvent;
-}
+// ——————————————— B1（2026-11-13，session.ts 重构；方案 docs/planning/2026-11-13_refactor_session-ts_plan-v1.md §5 B1） ———————————————
+// 顶层类型/接口已**逐字迁入** `./session/contracts/**`（session-types / persistence / tasks / deps），
+// 11 个顶层纯函数迁入 `./session/shared/text.ts` 与 `./session/shared/inventory.ts`；
+// 22 个类方法（B1 提交 2/2）迁入 `./session/shared/{keys,clock,roles,session-views,notifier,tasks-store,inventory}.ts`，
+// 类内保留同名同签名同可见性的薄委托。本文件保留 barrel + `SessionManager`。
+// 导出面 51 符号（值 6 + 类型 45）与既有导入路径逐字不变；搬移审计证据见
+// 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b1-contracts-shared-text_evidence/ 与
+// 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b1-shared-methods_evidence/。
+import type {
+  DesktopOrchestrationEvent, SessionEventEnvelope, GovernanceClientProjectionV1, SessionOpenRequest,
+  InternalSessionOpenRequest, ActiveRunView, EffectiveConfigInfo, SessionMessageMetadata, SessionTarget,
+  OpenResult, SendResult, DeliveryQueuePersistenceOutcome, DeliveryQueuePersistenceFacts, StopResult,
+  WithdrawResult, RebuildSessionResult, RedeliverResult, DeliveryAssignment, DeliveryOrigin,
+  ActualDispatchSource, ControllerDisposalLease, LiveSession, ControllerResumeDelivery, DeliveryItem,
+  PersistedDeliveryItemV1, DeliveryQueueRestoreReport, InstallationCapabilityTool,
+  InstallationEffectRefusalObservation, DesktopSessionInventoryFact, DesktopRunStopFact,
+  DesktopControllerStopFact, DesktopProjectExecutionInventory,
+} from "./session/contracts/session-types.ts";
+import type {
+  PersistenceScope, PersistenceReply, PersistenceCapabilities, PersistenceValues, PersistenceUpdated,
+} from "./session/contracts/persistence.ts";
+import type {
+  BackgroundTaskView, BackgroundTasksListReply, BackgroundTaskReadInput, BackgroundTaskReadReply,
+  BackgroundTaskStopInput, BackgroundTaskStopReply, TaskListView, TaskRestoreReport, TerminateRoleRunInput,
+  TerminateRoleRunResult, RedispatchTaskInput, RedispatchTaskResult, CloseTaskInput, CloseTaskResult,
+  NativeProjectRegistration,
+} from "./session/contracts/tasks.ts";
+import type { SessionManagerDeps } from "./session/contracts/deps.ts";
+import {
+  shortenText, isAppTaskClientMessageId, APP_TASK_CLIENT_MESSAGE_ID_PREFIX, boundTurnText, filePrint,
+  isAssistantTextEvent, isProjectRelativeFileRef, latestVersionedDoc, shouldSuppressStarTaskReport,
+} from "./session/shared/text.ts";
+import {
+  desktopProjectExecutionInventory, registerDesktopSessionManager, inventoryChanged, publishDeliveryInventory,
+  desktopSessionManagers as inventorySessionManagers,
+  type SessionInventoryState,
+} from "./session/shared/inventory.ts";
+// B1 提交 2/2（2026-11-13）：22 个类方法已**逐字迁入** `./session/shared/*`（keys/clock/roles/session-views/
+// notifier/tasks-store/inventory），类内保留同名同签名同可见性的**薄委托**（私有方法名仍是实例物理面，
+// 供测试结构化 cast 访问）。shared 模块只导入 contracts/其他 shared/既有 src 依赖，不导入 feature 模块。
+import { sessionKey, targetKey, queueKey, type TargetKeyState } from "./session/shared/keys.ts";
+import { now } from "./session/shared/clock.ts";
+import {
+  handbackOwnerRoleId, chiefTaskRoleIdOf, dispatcherRoleIdOf, resolveProofFlowIds,
+  findListingForFeedback, roleDisplayName, refreshListingNow,
+} from "./session/shared/roles.ts";
+import { contextInfo } from "./session/shared/session-views.ts";
+import { emitDeliveryNote } from "./session/shared/notifier.ts";
+import {
+  taskCreators, rememberTaskCreator, readTasks, isFixedTask, appendTaskStateResult, appendTaskState,
+  recordTaskFailure, appendRoleActivity,
+} from "./session/shared/tasks-store.ts";
 
-/**
- * 治理反馈的**客户投影**（2026-10-25 UI/UX 评审 A3/A4，设计
- * `角色卡/桌面窗口/docs/design/2026-10-25_plan_chat-panel-adjustments.md`）：
- * 附在 `prompt-input` 消息事件的 `detail.clientProjection` 上，供渲染侧只显示客户可读信息；
- * 内部原文仍在 `detail.text`（审计/可折叠），本结构**不含**内部正文。字段可选：缺失时渲染侧
- * 按既有文本归类，行为与现在一致。`fingerprint` 供 UI 合并连续同内容状态行（×N）。
- */
-export interface GovernanceClientProjectionV1 {
-  version: 1;
-  kind: "governance-feedback";
-  /** 稳定指纹：sha256(canonical{kind, sourceRoleId, statusCode, flowIds(排序), reportPath, governancePath, textHash})。 */
-  fingerprint: string;
-  sourceRole: { roleId: string; displayName: string };
-  /** 机器可读状态：Proof 为四值终局/unknown；非 Proof 内部反馈为 internal-feedback。 */
-  statusCode: "completed" | "failed" | "aborted" | "timed_out" | "unknown" | "internal-feedback";
-  /** 与任务正文一致的状态文本（应用生成，非伪造）。 */
-  statusText: string;
-  flowIds?: string[];
-  /** 仅 Proof 指针任务提供。 */
-  reportPath?: string;
-  governancePath?: string;
-  /** 客户侧动作：报告已就绪（可打开/等待验收卡）或等待 Lead 汇总。 */
-  action: "report-ready" | "await-lead-summary";
-}
+// —— 51 导出面（方案附录 B）：值 6 + 类型 45。既有导入路径（src/model 等）的转出保持原位置（见上下）。 ——
+export { shouldSuppressStarTaskReport } from "./session/shared/text.ts";
+export { desktopProjectExecutionInventory, subscribeDesktopExecutionInventory } from "./session/shared/inventory.ts";
+export type {
+  DesktopOrchestrationEvent, SessionEventEnvelope, GovernanceClientProjectionV1, SessionOpenRequest,
+  ActiveRunView, EffectiveConfigInfo, SessionMessageMetadata, SessionTarget, OpenResult, SendResult,
+  DeliveryQueuePersistenceOutcome, DeliveryQueuePersistenceFacts, StopResult, WithdrawResult,
+  RebuildSessionResult, RedeliverResult, PersistedDeliveryItemV1, DeliveryQueueRestoreReport,
+  InstallationCapabilityTool, InstallationEffectRefusalObservation, DesktopSessionInventoryFact,
+  DesktopProjectExecutionInventory,
+} from "./session/contracts/session-types.ts";
+export type {
+  PersistenceScope, PersistenceReply, PersistenceCapabilities, PersistenceValues, PersistenceUpdated,
+} from "./session/contracts/persistence.ts";
+export type {
+  BackgroundTaskView, BackgroundTasksListReply, BackgroundTaskReadInput, BackgroundTaskReadReply,
+  BackgroundTaskStopInput, BackgroundTaskStopReply, TaskListView, TaskRestoreReport, TerminateRoleRunInput,
+  TerminateRoleRunResult, RedispatchTaskInput, RedispatchTaskResult, CloseTaskInput, CloseTaskResult,
+  NativeProjectRegistration,
+} from "./session/contracts/tasks.ts";
+export type { SessionManagerDeps } from "./session/contracts/deps.ts";
 
 /**
  * 同时**保活**的会话数上限（B-2 路线 a 的 LRU 上限；设计建议 3）。超出即淘汰**最久未用**者
@@ -401,963 +432,8 @@ export interface GovernanceClientProjectionV1 {
  */
 export const MAX_LIVE_SESSIONS = 3;
 
-/** 点角色开聊天时的参数（无任何范围/授权字段——授权来自导入项目这个动作）。 */
-export interface SessionOpenRequest {
-  projectRoot: string;
-  roleId: string;
-  runtime: RuntimeKind;
-  /** Host dispatch only; public openSession strips this field and the ledger is rechecked. */
-  taskId?: string;
-}
-
-/**
- * T3 B8.1（2026-11-11，RR3 根因 `fixed-dispatch-target-opened-legacy`）：**进程内部**的打开请求扩展。
- * `forcedWorkflowMode` 只供固定路径/投递机在内部打开**固定任务**的目标会话时强制会话级 workflow 模式
- * （fixed 派发的目标会话必须是 fixed）。它不是公共 `SessionOpenRequest`/IPC 契约的一部分——`openSession`
- * 仍只透传 projectRoot/roleId/runtime，渲染侧无法携带；用户点角色打开/legacy 调用不传，行为逐字不变。
- */
-interface InternalSessionOpenRequest extends SessionOpenRequest {
-  /** 仅内部投递/固定路由使用；仅 `"fixed"` 在 trio 项目生效（否则忽略，走既有 task/chat 解析）。 */
-  forcedWorkflowMode?: WorkflowMode;
-}
-
-/**
- * 2026-10-31（run-change 触发）：active run 的只读摘要（`activeRunViews` 返回；UI「契约变更 · 重开 run」
- * 入口据此启用/禁用并显示原因）。字段全部来自 manifest，不读正文、不伪装 pinned。
- */
-export interface ActiveRunView {
-  runId: string;
-  flowId: string;
-  state: "draft" | "pinned";
-  pinnedAt?: string;
-  rosterVersion?: number;
-  roles?: string[];
-  documents: Array<{ kind: string; path: string; sha256?: string }>;
-}
-
 /** run-change 三模式的**类型**再导出（形状唯一来源仍是 `run-manifest.ts`；界面/conftest 不复制形状）。 */
 export type { RunChangeMode } from "../../src/common/编排/run-manifest.ts";
-
-/**
- * 生效配置来源与接受状态（供界面**如实呈现**；界面只读此结构、不另作判定）。
- *  · kind="ans"               → 用了项目 `.ans/project.json`（accepted 时应 pin-backed）；
- *  · kind="builtin-fallback"  → 无 `.ans`，回退运行期同意（登记的非-pin 例外）；
- *  · kind="ans-invalid"       → `.ans` 存在但不可用 → fail-closed 未接受（**不回退**运行期同意）。
- */
-export interface EffectiveConfigInfo {
-  kind: ConfigSourceKind;
-  accepted: boolean;
-  /** 生效 acceptance 的来源说明（未接受时为空——如实，不留貌似有证据的说明）。 */
-  acceptanceSource: string;
-  /** pin 条数（如实展示：有 pin 才是 pin-backed）。 */
-  pinCount: number;
-  /** fail-closed 降级原因（accepted:true 无 pin；或 `.ans` 不可解析）。 */
-  reason?: string;
-}
-
-export interface SessionMessageMetadata {
-  clientMessageId?: string;
-  /** **应用代客户推进治理流程**（2026-10-18 客户修正）：后台投递标记——不抢 `activeRoleId`/当前 pane，
-   *  边界陈旧重建也按「非用户发起」处理。仅桌面主进程内部使用（渲染侧传了也不构成任何权限）。 */
-  background?: boolean;
-  /**
-   * **投递类别**（2026-10-26 客户真机反馈）：`system` = 治理唤醒（交付核证/协调/自动推进）——入队时按
-   * `DeliveryItem kind:"system"` 记类（UI 队列显示「系统」、不可撤回），不再冒充客户消息。缺省 `message`
-   * （真实客户消息语义逐字不变）。仅桌面主进程内部使用；渲染侧/客户输入不构成权限。
-   */
-  kind?: "system";
-}
-
-export interface SessionTarget { projectRoot?: string; roleId: string; runtime?: RuntimeKind }
-
-export interface OpenResult {
-  runtime?: RuntimeKind;
-  projectRoot?: string;
-  profileRevision?: number;
-  ok: boolean;
-  error?: string;
-  /** 续接等情形的说明（ok=true 时也可能有）。 */
-  note?: string;
-  /** 本次会话生效的配置来源与接受状态（供界面如实呈现）。 */
-  config?: EffectiveConfigInfo;
-  /**
-   * 是否**续接**了已保活的会话（B-2）：true = 句柄与模型上下文原样保留；false = 本次新建。
-   */
-  resumed?: boolean;
-  /** 桌面 resumed=复用活句柄；recovered=引擎确证原生恢复成功；fresh=新上下文，恢复失败时带 warning。 */
-  contextSource?: "resumed" | "recovered" | "fresh";
-  /** 引擎实际恢复失败或其他上下文警告。 */
-  contextWarning?: string;
-}
-
-export interface SendResult {
-  ok: boolean;
-  /** Observed facts for this exact invocation. ACK is not input acceptance. */
-  turnId?: string;
-  clientMessageId?: string;
-  inputAccepted?: true;
-  outcome?: RuntimeTurnOutcome;
-  /** Original handle is still current, not a promise that provider cleanup has finished. */
-  sessionCurrent?: boolean;
-  error?: string;
-  /** L-1：本次消息**已入队**（角色忙）——按到达序在当前任务结束后执行；`position` 为排队位次（1 起）。 */
-  queued?: boolean;
-  /** 入队位次（`queued:true` 时给出）。 */
-  position?: number;
-  /**
-   * **同一应用任务已投递/已入队，本次没有再次投递**（2026-10-25 真机重复投递修复）：
-   * 仅对带稳定 `clientMessageId`（`ans-app-task:` 前缀）的应用任务成立——同文＝同一任务，
-   * 重建前后至多投递一次；真实客户消息不走此判据（同文重复发送仍是两个意图）。
-   */
-  duplicate?: true;
-  /**
-   * **客户授权平面（C1，2026-11-03）**：命中 `@审批`/`@决策` 标记且落账成功——本次不产生角色轮次
-   * （`turnId`/`inputAccepted`/`outcome`/`sessionCurrent` 均不设置）。`id` 为账本 `d-<seq>`。
-   */
-  directive?: { id: string; target: "approval" | "decision" };
-  /**
-   * **仅取消/关窗**：`{ok:false,error,directiveCancelled:true}`——Composer 据此恢复草稿；
-   * 未落账、未投递、无「已记录」回执。
-   */
-  directiveCancelled?: true;
-}
-
-export interface DeliveryQueuePersistenceOutcome {
-  completedSeq: number; committedSeq: number; failureCount: number;
-  lastError?: { seq: number; code: string; path: string };
-}
-export interface DeliveryQueuePersistenceFacts extends DeliveryQueuePersistenceOutcome {
-  managerId: string;
-  path?: string; armed: boolean; enqueuedSeq: number; pending: number;
-  knownProducers: { openChains: number; deliveryClaims: number; handbackCommits: number };
-}
-export interface StopResult {
-  ok: boolean;
-  note: string;
-  /** A finite queue-write barrier, not proof that all external/late producers have stopped. */
-  deliveryQueuePersistence?: DeliveryQueuePersistenceOutcome & { managerId: string; targetSeq: number; pending: number; armed: boolean; path?: string };
-}
-
-/** P1-1（2026-10-13 客户裁定）：撤回一条**未投递**排队消息的结果——`summary` 供聊天流如实一行
- *  「已撤回排队消息：〈摘要〉」；失败（不在队列/已在投递中）如实给 `error`，绝不假装撤掉。 */
-export interface WithdrawResult {
-  ok: boolean;
-  summary?: string;
-  error?: string;
-}
-
-// —————————————— 会话级后台任务聚合（2026-10-25，桌面任务面板 B） ——————————————
-//
-// 运行时 `RoleSession` 已提供三个**可选**方法（`listBackgroundTasks?/readBackgroundTask?/stopBackgroundTask?`，
-// `src/model/runtime.ts`），编排 `RoleSessionHandle` 原样透传。本层只做**按项目×引擎的聚合与精确寻址**：
-//  · 任务表/日志/pid 只在各会话内存，**不缓存、不持久化、不伪造**；跨会话聚合只是一次读取的快照拼接；
-//  · 会话句柄没有 `listBackgroundTasks` ⇒ 跳过该角色；该项目×引擎没有任何会话具备能力 ⇒ 空列表 +
-//    `unavailable:true`（UI 据此区分「当前没有任务」与「该运行时/会话不支持」）；
-//  · read/stop 一律以 `projectRoot+roleId+runtime` 精确寻址；找不到会话或能力缺席如实失败；
-//  · 底层 stop 的 `{ok:false, reason:"unknown-task"|"closed"|"timeout"}` 与异常**不吞、不改写为成功**。
-
-/** 聚合列表中的单条任务：运行时快照 + 所属角色/引擎（同一项目×引擎可聚合多个角色）。 */
-export interface BackgroundTaskView extends BackgroundTaskSnapshot {
-  roleId: string;
-  runtime: RuntimeKind;
-}
-
-/** 列表回执：`unavailable` 区分「没有任务」与「没有具备能力的活会话」。参数非法时 `ok:false`。 */
-export type BackgroundTasksListReply =
-  | { ok: true; projectRoot: string; runtime: RuntimeKind; tasks: BackgroundTaskView[]; unavailable: boolean }
-  | { ok: false; error: string };
-
-/** 读取日志入参（寻址三元组与 taskId 必填；`stream`/`tailLines` 与运行时契约同名同义）。 */
-export interface BackgroundTaskReadInput {
-  projectRoot: string;
-  runtime: RuntimeKind;
-  roleId: string;
-  taskId: string;
-  stream?: "stdout" | "stderr" | "both";
-  tailLines?: number;
-}
-
-/** 读取回执：成功包底层结果（同一引用）；未知任务（底层 `undefined`）/无会话/无能力如实失败，不伪造内容。 */
-export type BackgroundTaskReadReply = { ok: true; result: BackgroundTaskReadResult } | { ok: false; error: string };
-
-/** 停止入参（寻址同上；`force` 同 `stop_background_task`）。 */
-export interface BackgroundTaskStopInput {
-  projectRoot: string;
-  runtime: RuntimeKind;
-  roleId: string;
-  taskId: string;
-  force?: boolean;
-}
-
-/**
- * 停止回执：底层结果**原样**返回（成功 / `unknown-task` / `closed` / `timeout`，不改写成成功）。
- * 桌面层额外两种如实失败：找不到会话 ⇒ `reason:"closed"`（会话不可用）；句柄无能力 ⇒ `reason:"unavailable"`。
- */
-export type BackgroundTaskStopReply =
-  | BackgroundTaskStopResult
-  | { ok: false; reason: "unavailable"; message: string };
-
-// （A-5：finalize 面已删——提议/确认/手动收口不复存在；产物收尾由编排在 settle 后自动完成，见文件头。）
-
-// —————————————— B 批（2026-10-28）：任务/汇报/日志的桌面数据面 ——————————————
-
-/** 任务列表回执（只读；坏行数如实给出，不隐藏）。 */
-export interface TaskListView {
-  projectRoot: string;
-  tasks: TaskCardView[];
-  errors: number;
-  unclosed: number;
-}
-
-/** 重启恢复回执（未关闭任务展示；未投递任务重新入队；失败保留/如实计数）。 */
-export interface TaskRestoreReport {
-  restored: number;
-  skipped: number;
-  taskIds: string[];
-  /** C 批：重启时标记 orphaned 的未决申请数。 */
-  orphanedRequests?: number;
-  /** C 批：重启时标记 expired 的未决审批数。 */
-  expiredApprovals?: number;
-  /** 2026-11-02：重启对账的版本决策数（executing→executed）。 */
-  versionDecisionsReconciled?: number;
-  /** 2026-11-02：重启后标记 uncertain 的版本决策数（含 resolved-without-execution-record）。 */
-  versionDecisionsUncertain?: number;
-}
-
-export interface TerminateRoleRunInput {
-  projectRoot: string;
-  roleId: string;
-  runtime: RuntimeKind;
-  taskId?: string;
-  force?: boolean;
-}
-
-/** 终止回执（B-08）：子进程树/退出信号/部分写入如实；`terminationConfirmed=false` ⇒ 不自动重派。 */
-export interface TerminateRoleRunResult {
-  ok: boolean;
-  roleId: string;
-  terminationConfirmed: boolean;
-  childProcesses: number;
-  childProcessesStopped: number;
-  /** 后台任务终止的底层结果（如实；`kill-timeout` 不得当已停止）。 */
-  childResults: { taskId: string; ok: boolean; reason?: string; exitCode?: number; signal?: string }[];
-  partialArtifacts: string[];
-  /** B-08：已从 `temp/<role>/` 物理移入 `temp/<role>/staging/<隔离批次>/` 的产物（项目相对路径）。 */
-  isolatedArtifacts: string[];
-  /** B-08：隔离根（项目相对路径；无部分产物时不创建）。 */
-  stagingDir?: string;
-  /** B-07：是否已确保目标角色使用 fresh 会话（重建/新会话）；重派前置。 */
-  sessionFresh: boolean;
-  /** 轮次中止回执（运行时不支持/失败如实）。 */
-  abort: { ok: boolean; supported: boolean; error?: string };
-  message?: string;
-}
-
-export interface RedispatchTaskInput {
-  projectRoot: string;
-  taskId: string;
-  /** 目标角色（缺省沿用原任务目标）。 */
-  to?: string;
-}
-
-/** 重派回执（B-07/B-08）：仅 safety=safe 才产生新任务；否则如实升级、零自动重派。 */
-export interface RedispatchTaskResult {
-  ok: boolean;
-  taskId?: string;
-  retryOf?: string;
-  safety: RedispatchSafetyDecision["safety"];
-  autoAllowed: boolean;
-  reasons: string[];
-  message: string;
-  /** B-07：目标是否已 fresh 会话（重建或首次自动新开）。 */
-  sessionFresh?: boolean;
-  /** 连续 2 次仍卡死：是否已提交应用申请/决策卡（唯一推荐）。 */
-  escalated?: boolean;
-  requestId?: string;
-  selected?: string;
-}
-
-/** 幕僚收口任务（accepted/rework/rejected；B-03 `task.closed`）。 */
-export interface CloseTaskInput {
-  projectRoot: string;
-  taskId: string;
-  outcome: "accepted" | "rework" | "rejected";
-  note?: string;
-}
-
-export interface CloseTaskResult {
-  ok: boolean;
-  taskId: string;
-  outcome?: "accepted" | "rework" | "rejected";
-  message: string;
-}
-
-export interface NativeProjectRegistration {
-  selectionId: string;
-  selectedRoot: string;
-  projectRoot: string;
-  source: "native-directory-selection";
-  selectedAt: string;
-  listingGeneration: number;
-}
-
-export interface SessionManagerDeps {
-  /** Native selection + successful same-root listing only; never renderer/model metadata. */
-  getRegisteredProjectLifecycle?: (projectRoot: string) => NativeProjectRegistration | undefined;
-  prepareChiefDecisionEvidence?: (input: {
-    projectRoot: string; originRoleId: string; request: CustomerInputRequest; metadata?: CustomerInputMetadata;
-  }) => Promise<ChiefDecisionBasis>;
-
-  /** 建会话（缺省为编排的 openRoleSession；注入以便单测）。入参形状镜像编排当前的公开输入
-   *  （`customerInput`/`autoRepin`；`genesisFinalize`/`operatorChannel` 随 A-4 已删）。 */
-  openRoleSession: (
-    input: {
-      roleId: string;
-      project: ProjectConfig;
-      runtime?: RuntimeKind;
-      chiefDecisionContext?: ChiefDecisionExecutionContext;
-      decidePendingRequest?: DecidePendingRequestFn;
-      routineShellPolicy?: RoutineShellPolicy;
-      taskId?: string;
-      scope?: undefined;
-      /**
-       * **T3 B4.2（2026-11-10，AC-21 / T-09）：fixed 会话的任务级 Git 写注入位**——
-       * `{ classifyShellDetailed, port }`（分类器 = 门禁引擎 Service 出口同一函数引用；端口 = 桌面真实
-       * Git，`acquireCriticalSection` 与 B3 发布合并同一把项目级锁）。**仅 fixed 会话**由本层注入；
-       * legacy 会话不传（字段缺席、行为逐字不变）。本层**不传** taskId/写集事实——scope 由编排从
-       * `task.created` + basis/`change.scope-decided` 解析（桌面不采信模型自报）；不可解析 ⇒ 编排不注入
-       * scope ⇒ Git 写一律拒（fail-closed）。
-       */
-      taskGit?: TaskGitShellRuntimeInput;
-      /** **客户确认制交互通道**（A-1/A-3）：仅内置治理角色（su）会话注入（见 SessionManager.open）。 */
-      customerInput?: CustomerInputFn;
-      /** **下载申请能力**（2026-11-04 download-requests W-1）：每会话注入；未注入 ⇒ `request_download` 不注册。 */
-      requestDownload?: RequestDownloadFn;
-      /** **派发任务能力**（H-1）：仅内置治理角色（su）会话注入（见 SessionManager.open 与 routeDispatch）。 */
-      dispatchTask?: DispatchTaskFn;
-      /**
-       * **view_image 投递能力**（2026-10-26）：工具读取的图片作为**下一轮用户提示的图片附件**排队给
-       * 同一角色（全部角色会话注入；目标在开会话时定格）。实现经既有 `SessionManager.send`：角色忙
-       * （工具在本轮内）⇒ 按到达序入队，settle 后投递；失败如实回执。编排原样转交运行时核心；
-       * 未注入 ⇒ `view_image` 工具不注册（结构性 fail-closed）。
-       */
-      viewImage?: ViewImageFn;
-      /**
-       * **需求变更申请能力**（2026-10-26 request_requirement_change）：仅**统筹（schedule）/提案
-       * （proposal）**会话注入（客户纠正：审批卡由这两个角色发起/持有）；项目角色、其它治理角色与
-       * single/su 不注入（能力缺席 = 工具不注册 = 最强 fail-closed）。编排再按治理职能收口；本层只把
-       * 项目根/发起角色/引擎补入后透传。**申请 ≠ 批准**：审批在 decision 卡，主理只在批准后执行意图变更。
-       */
-      requestRequirementChange?: RequestRequirementChangeFn;
-      /** 2026-11-02（全局任务状态）：`project_state` 只读能力；全部内置治理角色注入（含旧 su）。 */
-      projectState?: ProjectStateFn;
-      /** 2026-11-02：`project_note` 受控备注能力；仅 trio chief 注入。 */
-      projectNote?: ProjectNoteFn;
-      /** 2026-11-02：`request_version_decision` 版本决策能力；仅 trio chief 注入。 */
-      requestVersionDecision?: RequestVersionDecisionFn;
-      /** **role_status 数据源**（G-2/W1，仅 chief/su 注入；形状＝契约家 `RoleStatusFn`）。 */
-      roleStatus?: RoleStatusFn;
-      /** **contract_check 只读数据源**（3.2；所有角色注入）。 */
-      contractCheck?: ContractCheckFn;
-      /** **doc_format 只读数据源**（2026-11-09 文档格式权威说明；所有角色注入；`contractCheck` 相邻）。 */
-      docFormat?: DocFormatFn;
-      /** **evidence_check 只读数据源**（3.4；所有角色注入）。 */
-      evidenceCheck?: EvidenceCheckFn;
-      /** **session_tail 数据源**（G-2/W1，仅 chief/su 注入；形状＝契约家 `SessionTailFn`）。 */
-      sessionTail?: SessionTailFn;
-      /** **技能安装能力**（G-4/I3，仅 su 注入；形状＝契约家 `InstallSkillFn`——检验/激活/回执、不写盘）。
-       *  编排透传（`AdapterCapabilities` 同名字段）落地前被静默忽略（我方透传就位，等待其承接——登记）。 */
-      installSkill?: InstallSkillFn;
-      /** **技能卸载能力**（G-4/I3，仅 su 注入；形状＝契约家 `UninstallSkillFn`）。 */
-      uninstallSkill?: UninstallSkillFn;
-      /** **外来 MCP 安装能力**（G-4 V2，仅 su 注入；形状＝契约家 `InstallMcpFn`）。编排透传落地前被静默忽略。 */
-      installMcp?: InstallMcpFn;
-      /** **外来 MCP 卸载能力**（G-4 V2，仅 su 注入；形状＝契约家 `UninstallMcpFn`）。 */
-      uninstallMcp?: UninstallMcpFn;
-      /** **(a) 操作者确认通道（I-1 arm）**：**项目角色** ⇒ 编排装配 (c)/(b)/(a) 三层链；
-       *  **全部内置治理角色（`role.builtIn === true`，含 trio 五人）** ⇒ 经下方 `shellOperatorOnly` 装配审批档
-       *  （客户 2026-10-19 新规则：所有角色都有 shell 权限（含读写与任意命令），一律提交审批）。判据见 `open()`。 */
-      shellOperatorChannel?: OperatorChannelFn;
-      /** **(c) 规则集实件（I-1 补丁，2026-10-12）**：仅**项目角色**会话注入（同判据走三层链）。 */
-      shellArming?: DesktopShellArming;
-      /** **内置治理角色审批档（客户 2026-10-17 裁定，2026-10-19 新规则扩至全部内置治理角色）**：
-       *  仅 `role.builtIn === true` 的会话注入——(c) 只读白名单免审批，`risky`/`review`/`deny` 一律交客户/
-       *  判断 agent 逐条批准（deny 也可批准）；**不接 (b)**（不自审）。shell 可读写、可执行任意命令，审批链是
-       *  唯一控制（命令副作用不受文件写门禁约束）。
-       *  形状＝编排 `AssembleOperatorShellGateOptions`（`Omit<…, "project">`，只读导入、不另立第二形状）。
-       *  缺省/缺件 ⇒ 不传 ⇒ 不 arm（能力缺席 = fail-closed，绝不放宽）。 */
-      shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
-      /** **旧只读档（客户裁定 2026-10-12）**：类型保留以兼容其他调用方/测试；**桌面自 2026-10-17 起不再注入**
-       *  （全部内置治理角色改走审批档）。与 `shellOperatorOnly` 同时出现 ⇒ 编排不 arm（互斥守卫）。 */
-      shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
-      /** **升级卡呈现端**（2026-10-31 shell 判拒升级方案 v1.3 §6.4）：本层按每会话包装后透传；
-       *  缺省 ⇒ 不传 ⇒ 编排不创建 registry、`request_shell_escalation` 不注册。 */
-      shellEscalationPresenter?: ShellEscalationPresentFn;
-      /**
-       * **stable 写入一次性许可**（2026-11-04 trunk-amendment-model D1/F16）：run-role gate 的
-       * **同步候选 permit**；`stableWriteDecision` 仍以 C2b 已安装许可快照为唯一权威。缺省 ⇒
-       * 编排保留既有确认制路径（S3 分阶段接线），不新增无确认直写。
-       */
-      stablePermitOf?: (relPath: string) => StableWritePermit | undefined;
-      /**
-       * **Batch 3.5 / C1d：三提交能力**（`openRoleSession` 按会话角色门控后转交适配器；注入才注册）：
-       * · `submitVersionChange`：product/rapporteur；`submitRefactor`/`requestStableWrite`：convener；
-       * · 工具只提交请求，不批准/不发卡/不签发许可（客户主权）。未注入 ⇒ 工具不存在（fail-closed）。
-       */
-      gitQuery?: GitQueryFn;
-      gitCandidate?: GitCandidateFn;
-      gitPublish?: GitPublishFn;
-      selectRunChange?: SelectRunChangeFn;
-      completeTeamPlan?: CompleteTeamPlanFn;
-      activateRoleDocuments?: ActivateRoleDocumentsFn;
-      closeCreatedTask?: CloseCreatedTaskFn;
-      submitVersionChange?: SubmitVersionChangeFn;
-      submitRefactor?: SubmitRefactorFn;
-      requestStableWrite?: RequestStableWriteFn;
-    },
-    deps: { createAdapter: RuntimeAdapterFactory },
-  ) => Promise<RoleSessionHandle>;
-  createRuntimeAdapterFactory?: RuntimeAdapterFactoryBuilder;
-  runtimeOptions?: RuntimeAdapterFactoryOptions;
-  /**
-   * **「替我审」每会话判断闭包工厂**（2026-10-17 PM 评审 §5.1/§十一）：缺省 ⇒ 不注入判断能力。
-   * 主进程/Interface 注入真实 `createShellJudge`（经编排 Pipeline 公共出口），测试可注入桩件。
-   * 会话用**与请求会话同一份** `runtimeOptions` 与 `createAdapter` 工厂构造；会话 dispose 即清。
-   */
-  createShellJudge?: (opts: {
-    project: ProjectConfig;
-    runtime: RuntimeKind;
-    runtimeOptions?: RuntimeAdapterFactoryOptions;
-    createAdapter: RuntimeAdapterFactory;
-  }) => ShellJudgeFn;
-  /**
-   * **「替我决策」每会话判断闭包工厂**（2026-10-18 双开关评审 §8.2）：缺省 ⇒ 不注入判断能力。
-   * 主进程/Interface 注入真实 `createGovernanceJudge`（经编排 Pipeline 公共出口），测试可注入桩件。
-   * 只在 trio 且客户交互通道已注入的会话构造；用**与请求会话同一份** `runtimeOptions`/`createAdapter`，
-   * 会话 dispose 即清（与 `shellJudge` 一并）。
-   */
-  createGovernanceJudge?: (opts: {
-    project: ProjectConfig;
-    runtime: RuntimeKind;
-    runtimeOptions?: RuntimeAdapterFactoryOptions;
-    createAdapter: RuntimeAdapterFactory;
-  }) => GovernanceJudgeFn;
-  /**
-   * **下载运行时工厂**（2026-11-04 download-requests C1/F2）：B1 冻结的每会话运行时
-   * `createDownloadRequestRuntime(options)`；缺省由 Interface 注入真实实现，测试可注入桩件。
-   * 每会话一份（绑定 roleId/runtime/present/takeDownloadDirective/appVersion）；不按项目缓存。
-   */
-  createDownloadRuntime?: (options: DownloadRequestOptions) => DownloadRequestRuntime;
-  /** G8 A epoch 所需应用版本（`app/main.ts` 传 `app.getVersion()`）；缺失 ⇒ 不注入下载能力（fail-closed）。 */
-  downloadAppVersion?: string;
-  /**
-   * **下载预授权消费者读取**（R3/F13）：由 Interface 从既有 `directiveInput` 的窄访问器取得
-   * （同一项目 `CustomerDirectiveRuntime.takeDownloadDirective`，不新建第二运行时/账本）。
-   * 缺省/返回 undefined ⇒ 不注入下载能力（fail-closed）。
-   */
-  getDownloadDirectiveConsumer?: (projectRoot: string) => TakeDownloadDirectiveFn | undefined;
-  /**
-   * **客户授权平面自然语言解释器工厂**（2026-11-04 客户直修）：缺省经编排 Pipeline 公共出口
-   * `govern-session.ts::createDirectiveInterpreter`（桌面不直接导入私有 `common/编排/`）。
-   * 与两个 judge 同一套 runtimeOptions/adapter 工厂；缺省真实实现，测试可注入桩件。
-   */
-  createDirectiveInterpreter?: typeof realCreateDirectiveInterpreter;
-  prepareRuntimeProfile?: (runtime: RuntimeKind) => Promise<void>;
-  createPiAdapterFactory: (
-    project: ProjectConfig,
-    shellGate?: ShellGate,
-  ) => (gate: WriteGate) => RuntimeAdapter;
-  createDemoAdapter: (opts: { gate: WriteGate; boundary: import("../../src/model/boundary.ts").BoundarySection1 }) => RuntimeAdapter;
-  getListing: (projectRoot: string) => ProjectListing | undefined;
-  /** 构造 ProjectConfig（真实实现 `buildProjectConfig`）。第 4 参为**项目治理边界路径**（取自 `.ans`；
-   *  无则空串——见 `buildEffectiveProjectConfig`）。 */
-  buildProjectConfig: (
-    listing: ProjectListing,
-    acceptance: Acceptance,
-    env?: Record<string, string | undefined>,
-    governanceBoundaryPath?: string,
-  ) => ProjectConfig;
-  /**
-   * 载入有效配置（`.ans` 优先）。缺省为跨角色共享载入器 `loadEffectiveConfig`
-   * （`src/common/shared/config-loader.ts`，pm 属主）——**只读导入、不复制**。注入以便单测。
-   */
-  loadEffectiveConfig?: (opts: LoadConfigOptions) => Promise<LoadedConfig>;
-  /**
-   * 会话事件外推（**带 roleId 信封**，B-2）：多会话并存时渲染侧按角色分发（不带标识会串消息）。
-   * `event` 为编排导出的 `OrchestrationEvent`（= 既有 `SessionEvent` + 编排在 `settled` 时追加的
-   * `handback` 回交事件，设计 §10.8）——**类型从编排导入，不在此另立一份**。
-   */
-  emitEvent: (envelope: SessionEventEnvelope) => void;
-  emitPersistenceChange?: (update: PersistenceUpdated) => void;
-  /**
-   * **队列变化外推**（L-1 可见性）：某角色队列的**摘要快照**——主进程据此推渲染侧（该角色的队列行 +
-   * 左树「N 待办」徽标）。**只在变化时**发；空数组＝清空显示。缺省 ⇒ 界面无队列行（不影响入队本身）。
-   */
-  emitRoleState?: (info: {
-    roleId: string;
-    projectRoot: string;
-    runtime: RuntimeKind;
-    profileRevision: number;
-    contextSource?: OpenResult["contextSource"];
-    contextWarning?: string;
-    busy: boolean;
-    summaries: string[];
-    /** 结构化的排队条目（右栏「待办 / 队列」组用；来源/摘要/入队时间＋**撤回/展开定位键** `id`（= dedupKey）
-     *  与入队即定格的全文 `full`——**与 summaries 同源**，不另造数据源；G-2 起 `kind` 含第四类 `system`）。
-     *  P0（2026-10-30）：`ageMs` = 该条等待时长（显示「为什么没动」）。 */
-    queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string; ageMs: number }[];
-    /** **正在跑的那条投递**（若该轮由队列投递开跑且未结束）；null = 无（直接 send 的一轮不属于队列条目）。 */
-    running: { kind: string; sourceRoleId: string; summary: string; at: string; ageMs?: number } | null;
-    /** **P0 队列可见性（2026-10-30）**：队首类别（空队列 ⇒ null）、阻塞原因、当前回合 id。
-     *  客户/界面据此看出「为什么没动」；`origin-missing` = 忙态无在跑回合（停止可复位）。 */
-    headKind?: string | null;
-    blockedReason?: "target-busy" | "origin-missing" | "session-closed" | "network" | null;
-    activeTurnId?: string | null;
-  }) => void;
-  /**
-   * shell 命令级闸（设计 §7.2）——**已装配 gate** 的注入接缝（历史形状，保留）。
-   *
-   * I-1（2026-10-12，**客户已裁定 arm**）之后：桌面交给编排的是 **(a) 通道**（见下 `shellOperatorChannel`），
-   * 由编排装配 (c)(b)(a) 后**自己把 gate 交给 pi 适配器工厂**；本字段保留给「调用方直接持有一个已装配
-   * `ShellGate`」的场景（测试/将来装配形态）。**缺省 ⇒ 不传** ⇒ Pi 适配器不注册 `run_shell`（能力缺席 =
-   * 最强 fail-closed，§7.5.1）。注：arm 只对 **pi 运行时**有效——demo 路径无 shell 入口。
-   */
-  shellGate?: ShellGate;
-  /**
-   * **(a) 操作者确认通道**（I-1，2026-10-12；客户裁定「现在开放 shell…如果 su 觉得危险可以让客户决定」；
-   * 客户新规则 2026-10-19：所有角色都有 shell 权限（含读写与任意命令），一律提交审批）——
-   * 桌面把既有「看命令原文 + 放行/拒绝」对话框（`createDesktopOperatorChannel`；拒绝为默认与取消项）交给
-   * **编排**：**项目角色** ⇒ (c)/(b)/(a) 三层 `ShellGate`（`buildShellGate` 的 `operatorChannel` 即本通道）；
-   * **全部内置治理角色** ⇒ 本通道作为 `shellOperatorOnly.operatorChannel` 装配**审批档**（见下）。
-   * 判据 `role.builtIn`，见 `open()`。
-   */
-  shellOperatorChannel?: DesktopOperatorChannelFn;
-  /**
-   * **(c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权）**——与 `shellOperatorChannel` **同一接线面**
-   * 透传：编排 `openRoleSession({ shellArming })` 用它装配 (c) 层（`classifyShell` + `rules`；缺省 ⇒ 编排
-   * 对「规则集未注入」一律拒绝）。**只对项目角色**传三层链字段（内置治理角色不接 (b)/(a) 三层链）。
-   * 主进程用 `operator-channel.ts::buildDesktopShellArming()` 构造，**两件同备才 arm**（加载失败 ⇒ 连 (a)
-   * 也不注入）。
-   *
-   * **同一份实件也供全部内置治理角色审批档**（客户 2026-10-17 裁定、2026-10-19 新规则扩展）：`open()` 对
-   * `role.builtIn === true` 的会话经 `shellOperatorOnly` **复用本对象**交给编排装配审批档——单一来源、与
-   * 项目角色永不漂移；缺省 ⇒ 内置治理角色也不 arm（能力缺席 = fail-closed）。
-   */
-  shellArming?: DesktopShellArming;
-  /**
-   * **升级卡呈现端**（2026-10-31 shell 判拒升级方案 v1.3 §6.4）：应用级 presenter（主进程每窗口
-   * `createShellEscalationPresenter` 构造）；本层按**每会话**包装——并入会话生命周期（`lifetime`：会话
-   * 终止/重建/dispose）与当前轮（`turn`：轮次停止/中止）信号后透传，使挂起升级卡即时失效（默认拒绝，
-   * fail-closed）。缺省 ⇒ 不注入 ⇒ 编排不创建 registry、`request_shell_escalation` 不注册。
-   */
-  shellEscalationPresenter?: ShellEscalationPresentFn;
-  /**
-   * **客户交互通道**（A-1/A-3/A-5）——`request_confirmation` / `request_choice` 的呈现与裁决回传。
-   * **缺省 ⇒ 不注入** ⇒ 编排侧该会话进入确认制所需的前提不存在（两工具不注册、gate 旧语义）——
-   * 且本层未接通道时**绝不悄悄放行**（通道缺席即 fail-closed）。**仅内置治理角色（su）会话注入**。
-   *
-   * 桌面由主进程用 `app/desktop/customer-input.ts::createCustomerInputChannel`（presenter 把请求推为
-   * 聊天流里的交互卡 + per-window pending Map 校验回包）构造后注入。**通道本身不含任何判定**
-   * （发行 writeSet 在编排 `confirmed-writes.ts`；写不写在 gate/工具）。
-   */
-  customerInput?: DesktopCustomerInputFn;
-  /**
-   * **版本变更/冻结/stable/重构/trunk 桌面栈**（2026-11-04 trunk-amendment-model D1）：
-   * 由 Interface 每项目构建并注入；缺省 ⇒ 本层不注入 `stablePermitOf`/不接 appointment-write 钩子
-   * （能力缺席 = fail-closed，旧行为）。本层只调用其公开方法，不做冻结/许可/trunk 判定。
-   */
-  getVersionChangeStack?: (projectRoot: string) => VersionChangeStack | undefined;
-  /**
-   * **需求变更申请能力**（2026-10-26 `request_requirement_change`）：绑定项目的应用侧实现（`projectRoot`、
-   * 发起角色 `requesterRoleId` 与会话引擎 `runtime` 由本层按会话补入；工具载荷只带
-   * flowId?/intentId?/changeKind/summary/rationale/impact?/proposedIntentPatch?）。
-   * 校验、同 flow 去重、票据、发起方会话审批卡通道、主理执行任务与系统行全在实现内。
-   * **仅统筹/提案（`governanceFunction ∈ {schedule, proposal}`）会话注入**——项目角色与其他治理角色不注入；
-   * 编排再按治理职能收口。缺省 ⇒ 不注入 ⇒ 工具不注册（结构性 fail-closed）。
-   * **申请 ≠ 批准**：主理不审批、只在批准后执行意图变更。
-   */
-  requestRequirementChange?: (
-    projectRoot: string,
-    requesterRoleId: string,
-    runtime: RuntimeKind,
-    input: RequestRequirementChangeInput,
-  ) => Promise<RequestRequirementChangeResult>;
-  /**
-   * **实时重枚举并刷新共享角色缓存（2026-10-13 首轮寻址修复）**：`routeDispatch` 缓存 miss 时调用一次——
-   * 实现应为「与界面 `listProject` **同一路径**读盘枚举 + 更新**同一份**共享缓存」（Interface 层给出）。
-   * 缺省 ⇒ miss 时按原口径如实拒绝（不重枚举；测试替身可省）。
-   */
-  refreshListing?: (projectRoot: string) => Promise<void>;
-  /**
-   * **看护观察转发（G-2/W1）**：事件消费循环里的结构化事实（settled 终局 / 命令超时限 F-1 事实 / 真实活动）
-   * 同步转发给看护器（`watchdog.ts` 的 `observe`）。**缺省 ⇒ 无看护**（核心治理零依赖——一切照旧）。
-   * 本层绝不因看护回调抛错而影响会话/投递（调用点自带隔离）。
-   */
-  watchdogObserver?: (projectRoot: string, observation: WatchdogObservation) => void;
-  /**
-   * **挂起确认数快照（G-2/W1）**：两确认通道（su 交互卡 / shell 卡）＋恢复卡的按角色挂起视图（主进程合并
-   * 注入；静默谓词与「正确等待不报」排除用）。**缺省 ⇒ 恒 0**（测试替身可省）。
-   */
-  watchdogPendingConfirmations?: () => { total: number; byRole: Map<string, number> };
-  /** **看护只读统计**（G-2/W1；role_status 的「看护」行数据面——`watchdog.ts` 的 `stats`）。缺省 ⇒ 该行
-   *  如实记「未接线」。 */
-  watchdogStats?: (projectRoot: string) => import("./watchdog.ts").WatchdogStats | undefined;
-  /**
-   * **投递队列持久化文件路径**（2026-10-20 客户要求：应用重启后任务自动续跑，不是只给 Lead 提示）。
-   * 由 Interface 提供（`<userData>/ans/delivery-queue.json`）——**绝不写项目文件、不写 `.env`**。
-   * 缺省 ⇒ 不持久化（旧行为零变化）。enqueue/claim/delivery.end/drain 时原子写（tmp+rename，失败只诊断）；
-   * 启动/项目导入时用 `restorePersistedDeliveries()` 重新入队并按既有 drain 路径自动重投。
-   */
-  deliveryQueueStorePath?: string;
-  /**
-   * **演示运行时（demo）的自动投递开关**（2026-11-05 真机缺陷「又卡住」修复）。
-   * demo 适配器执行内置演示脚本（对 `src/evil.ts` 的越界写，用于演示"写前被拒"）；若投递机自动为
-   * 未打开的 demo 目标开会话，该回合必然被门禁拒绝，失败结果再经回交/派发级联成 blocked。
-   * 生产（Interface）置 `false`：demo 会话只由用户亲手打开、只投给已存在的会话；缺省 `true`
-   * （测试/演示宿主维持既有自动开启语义）。
-   */
-  demoRuntimeAutoDeliver?: boolean;
-  /**
-   * **P2 网络状态门（2026-10-30）**：主进程权威（`net.isOnline` 采样 + 渲染/power 提示）经 Interface 注入；
-   * 离线期间**不认领新的模型投递**（队列保留、`blockedReason:"network"` 可见），恢复后按既有顺序 drain。
-   * 缺省 ⇒ 视为在线（旧行为零变化）。
-   */
-  networkGate?: NetworkGate;
-  /** **时钟（G-2；注入以便单测）**；缺省 `Date.now`。 */
-  now?: () => number;
-}
-
-// —————————————— G-2/W5：恢复提议（`propose_recovery`）的载荷与回执 ——————————————
-//
-// **形状单一来源＝契约家 `src/model/runtime.ts`**（`ProposeRecoveryPayload` / `RecoveryReceipt` /
-// `ProposeRecoveryFn` / `RoleStatusFn` / `SessionTailFn`；编排 `common/编排/watchdog.ts` 同名转发——
-// 本文件从彼处只读导入，**不自立第二份形状**）。模型输入一律不可信：本层对载荷**全量重校验**。
-
-/** `rebuild-session` 恢复动作的结果（W4 公共入口）。 */
-export interface RebuildSessionResult {
-  ok: boolean;
-  error?: string;
-  resumed?: boolean;
-  contextSource?: OpenResult["contextSource"];
-  contextWarning?: string;
-}
-
-/** `redeliver` 恢复动作的结果（W4 队列重试 nudge）。 */
-export interface RedeliverResult {
-  ok: boolean;
-  message: string;
-}
-
-/** 一个**保活**中的角色会话（B-2：每角色一个句柄 + LRU）。 */
-type DeliveryAssignment = Extract<Awaited<ReturnType<typeof resolveDeliveryAssignment>>, { ok: true }>["value"];
-interface DeliveryOrigin {
-  assignmentRejectionCode?: string;
-  taskId?: string;
-  assignment?: DeliveryAssignment;
-  inputAccepted?: true;
-  /** Immutable identities from this turn's actual host handback input, never from message text. */
-  creatorReports?: readonly { taskId: string; roleId: string; reportId: string; turnId: string }[];
-  outcome?: RuntimeTurnOutcome;
-  clientMessageId?: string;
-  turnId?: string;
-  settled: boolean;
-  /** 本轮由哪类投递开跑（settle 后「收尾推进」据此只认回交轮）。 */
-  kind?: DeliveryItem["kind"];
-  /** 本轮关联的治理流程 id（dispatch/handback 条目携带；去重；多流程批次按集合处理）。 */
-  flowIds?: string[];
-  /** 回交轮携带的证据路径（≤10，供验收汇总任务引用）。 */
-  handbackEvidence?: string[];
-}
-
-interface ActualDispatchSource { entry: LiveSession; origin: DeliveryOrigin }
-interface ControllerDisposalLease { projectRoot: string; leaseId: string; operationId: string; kind: "session-dispose"; hostHandleIds: readonly string[] }
-
-interface LiveSession {
-  eventConsumerDone?: Promise<void>;
-  eventConsumerFailed?: true;
-  unsubscribePersistence?: () => void;
-  readonly origins: { byTurn: Map<string, DeliveryOrigin>; running?: DeliveryOrigin };
-  readonly roleId: string;
-  readonly runtime: RuntimeKind;
-  readonly profileRevision: number;
-  readonly interactionState: { lifetime: AbortController; turn: AbortController };
-  readonly handle: RoleSessionHandle;
-  readonly assignedTaskId?: string;
-  /** Exact accepted assignment, never a latest-role lookup or a model-supplied task ID. */
-  boundAssignment?: DeliveryAssignment;
-  /** 建会话时的项目根——换项目重开同一角色前须先释放旧句柄（角色 id 可能跨项目同名）。 */
-  readonly projectRoot: string;
-  readonly config: EffectiveConfigInfo;
-  /** T3 B8.1（2026-11-11）：建会话时定格的会话级 workflow 模式（fixed/legacy）。固定派发据此判断既有
-   *  目标会话是否需要安全重绑（`openInternalUnsafe` 的 forced fixed 分支）；用户/legacy 打开只记录，不改变行为。 */
-  readonly sessionWorkflowMode: WorkflowMode;
-  /** LRU 使用序号（越大越近；open/续接时刷新）。 */
-  lastUsed: number;
-  /**
-   * **本会话是否确认制**（内置治理角色 su + 客户交互通道已接线注入——见 `openInternal` 的判据）：
-   * 只有确认制会话的 gate 收窄到「客户确认才发行的 writeSet」，重建才会**清零已发行写权**。
-   * F-5-opt1（2026-10-16 客户批准）据此决定重建后是否向模型排「写权不自动保留」注记。
-   */
-  confirmGated: boolean;
-  /** **是否有轮次在跑**（E-1/H-1 排队判据）：send 成功置真、收到该角色的 `settled` 事件置假。 */
-  busy: boolean;
-  /**
-   * **本轮起始时刻**（ms epoch；G-2/W1）：busy 置真时同步定格——看护信号 #1「轮次逼近超时」的 elapsed 基准
-   * （90% × 生效时限；求值与运行时核心 `resolveRuntimeTimeouts` 单一来源同源，见 watchdog.ts）。
-   * 读取方一律以 `busy === true` 为先决条件（置假路径不强制清零——防漏改不引入误报）。
-   */
-  busySince?: number;
-  /**
-   * **上一轮是否被「请求中止」**（2026-10-20 链式治理推进的早失败护栏）：`abort()`（客户停止 / 看护
-   * 自动中止）置真，下一轮开始置空。链式推进在「会话仍活着、不在跑、无排队投递」时允许短宽限后如实失败；
-   * 但被中止的回合**不算正常结束**——继续有界轮询等下一次投递/重试（真机：看护中止后由后续投递写出 YAML）。
-   */
-  lastTurnAborted?: boolean;
-  /**
-   * **O-1（2026-10-12）：本会话持有的边界快照**——开会话时定格的参与文件（绝对路径）与各自**内容哈希**。
-   * 任一处变了 ⇒ 本会话的规则集已陈旧（真机：su 改好 boundary.yaml 后，活会话仍按开会话时解析的旧边界
-   * 拒写）——`boundaryDiff` 检出后**作废重建**。信号只来自读盘哈希（**不得**靠界面推测）。
-   */
-  boundaryPaths: string[];
-  boundaryPrints: Record<string, string>;
-  /**
-   * **G-4 裁定⑤（2026-10-16 客户批准）**：本会话定格的「该角色已安装技能」参与文件集
-   * （`docs/skills/<name>/` 的 `SKILL.md`＋`install.md` **绝对路径**；开会话/重建当刻按登记推导一次，
-   * 检查时由 `boundaryDiff` 以**同一推导**重算当前集合、比对集合差——新增/移除/内容编辑 ⇒ 陈旧）。
-   * **零技能＝空数组**（既有指纹语义逐字不变）。
-   */
-  skillPaths: string[];
-  /**
-   * **当前轮投递给该角色的文本**（PM 评审 §8.1：≤4KB，内存内；判断 agent 的 `turnText` 输入）。
-   * 每次真实投递（直发/出队/派发/回交）写入；**不展示、不入审计**；会话销毁即清。
-   */
-  lastUserText?: string;
-  /**
-   * **W6-B 真机阻塞修复**：等待「本会话下一轮 settle」的解析器（`waitForRoleSettle` 登记）。
-   * settled 到达或会话被 dispose 时逐个结算（true/false）并清空；不跨轮残留。
-   */
-  settleWaiters?: Set<(settled: boolean) => void>;
-  /** **每会话判断闭包**（编排 `createShellJudge`；同一份 `runtimeOptions`/`createAdapter` 工厂）。
-   *  会话 dispose 即清（PM 评审 §十一）。 */
-  shellJudge?: ShellJudgeFn;
-  /**
-   * **「替我审批/决策」每会话判断闭包**（编排 `createGovernanceJudge`，2026-10-18 双开关评审 §8.2）：
-   * 只在 trio + 客户交互通道已接的会话构造；与 `shellJudge` 同一份 `runtimeOptions`/`createAdapter`。
-   * 会话 dispose 即清；缺失 ⇒ 通道按「判断能力缺席」回落原卡（fail-closed，绝不代批）。
-   */
-  governanceJudge?: GovernanceJudgeFn;
-  /**
-   * **每会话下载运行时**（2026-11-04 download-requests C1/F2）：`open()` 创建，
-   * `disposeEntry` 中 `await dispose()` 中止在途下载并释放执行槽；缺省 ⇒ 本会话无下载能力。
-   */
-  downloadRuntime?: DownloadRequestRuntime;
-  /**
-   * **需求变更审批卡通道**（2026-10-26 客户纠正）：仅**统筹（schedule）/提案（proposal）**会话构造，
-   * 绑定本会话的客户卡上下文（roleId/signal/治理模型/判断闭包）与 `onPresented`。应用能力
-   * `request_requirement_change` 经它呈现 `cardKind="decision"` 审批卡；decision 卡角色/结构仍由共享
-   * `validateDecisionCardRequest` 单一来源校验（统筹/提案在其白名单内），发起方不能作答（作答只来自
-   * 客户/独立判断 agent）。
-   */
-  requirementChangeCard?: (
-    request: CustomerInputRequest,
-    metadata?: CustomerInputMetadata,
-    onPresented?: () => void,
-  ) => Promise<CustomerInputOutcome> | CustomerInputOutcome;
-  /**
-   * 2026-11-02（版本决策）：chief 会话的**原始**客户卡上下文构造（含 roleId/sessionSignal/judge/turnText）。
-   * 只被 `requestVersionDecision` 使用；调用方必须经 `withRequestLifecycle` 落 request.*（不绕过审计）。
-   */
-  governedCardContext?: (
-    request: CustomerInputRequest,
-    extras?: { onPresented?: () => void; acceptanceReport?: AcceptanceReportDisplayV1 },
-  ) => Parameters<DesktopCustomerInputFn>[1];
-}
-
-/** 一次**系统投递**（E-1 回交投 su / H-1 派发投目标角色 / L-1 客户消息）——投递机的队列条目（**一套机，多调用方**）。 */
-type ControllerResumeDelivery = { expected: NonNullable<DispatchTaskPayload["resumeController"]>; resumeKey: string; basisDigest: string };
-interface DeliveryItem {
-  /** Host-sealed expected tuple and actual prepare receipt; not a model permission. */
-  controllerResume?: ControllerResumeDelivery;
-  queueEntryId?: string;
-  lastAttempt?: { state: "blocked" | "failed"; code: string; at: string };
-  /** Captured host notification source, never a model-supplied authority receipt. */
-  notificationSource?: Extract<import("../../src/model/trunk.ts").DirectActionSource, { kind: "role-direct" }>;
-  /** Undefined only for direct send; queued system messages freeze their original assignment or explicit absence. */
-  systemAssignment?: DeliveryAssignment | null;
-  report?: RuntimeReportSnapshotV1;
-  liveReport?: RuntimeLiveReportViewV1;
-  liveDurability?: 'memory-only' | 'unknown-live';
-  deliveryId?: string;
-  safeText?: string;
-  attemptId?: string;
-  clientMessageId?: string;
-  runtime: RuntimeKind;
-  /**
-   * 投递类别：`handback` 回交 / `dispatch` 派发 / `message` 客户消息 / **`system` 系统消息**
-   * （G-2/W2，2026-10-16 客户批准——看护告警、收束提示与恢复回执，经**同一套投递机**真投递给 su；
-   * **不可撤回**（归入治理流只读面）、去重键由看护自持命名空间（`watchdog\0…`）与 handback/dispatch 键隔离；
-   * 来源标注恒空（呈现面按文首 `[系统·<子类>] ` 定格标记归类——桌面UI tool-rows.js 已在树））。
-   */
-  kind: "handback" | "dispatch" | "message" | "system";
-  /** 目标角色 id（回交→su；派发/客户消息→被派角色）。 */
-  targetRoleId: string;
-  /** 治理流程 id（2026-10-18 收尾推进）：dispatch/handback 条目携带；客户消息/系统消息缺席。 */
-  flowId?: string;
-  /** B 批：星形任务 id（dispatch/handback 条目携带；旧 flow/客户消息缺席）。 */
-  taskId?: string;
-  /** 发起者（回交=产出角色；派发=派发者 su；客户消息=本端的当前角色）。 */
-  sourceRoleId: string;
-  /** 投递输入正文（**入队时定格**；重试用同一份，不重渲染）。 */
-  text: string;
-  /** 队列行用的一句摘要（L-1 可见性；**绝不**当作已执行呈现）。 */
-  summary: string;
-  /** 去重键（回交=`handbackKey`；派发=内容键，见 `routeDispatch` 的写明；客户消息=每次一条，独立键）。 */
-  dedupKey: string;
-  /** 入队时间（ISO；入队即定格——右栏「待办 / 队列」组显示用；**绝不**当作执行时间）。 */
-  enqueuedAt: string;
-  /**
-   * **P0-1（2026-10-13 客户批准）**：随条目**入队即定格**的整包载荷（`PromptOptions`，契约单一来源
-   * `src/model/runtime.ts`；投递时组合编排来源与 ACK 回调，images 数组保持原引用。
-   * 缺省（undefined）= 无图片；纯文本也明确传本轮 handback.required。
-   */
-  opts?: PromptOptions;
-  handback?: TaskHandback;
-  batchItems?: readonly DeliveryItem[];
-  /**
-   * **P0 收尾不变量（2026-10-30）**：该投递的终态记账（`delivery.end`/`delivery.failed`）是否已落——
-   * settle 收尾与 send promise 续段可能先后到达；**恰一次**，不重复、不静默。
-   */
-  terminalRecorded?: boolean;
-}
-
-/**
- * **持久化投递队列的磁盘形状**（2026-10-20 客户要求：重启后任务自动续跑）。
- * 只存 **JSON 安全字段**：`opts`（含图片/回调）、活动 `batchItems`、attempt 标识不落盘——恢复时按原文本
- * 重新投递（任务文本自足，允许模型续做/重做）。`state:"in-flight"` 表示崩溃/退出时正在投递的条目，
- * 重启后按 queued 重投一次。
- */
-export interface PersistedDeliveryItemV1 {
-  key: { projectRoot: string; roleId: string; runtime: RuntimeKind };
-  item: {
-    kind: DeliveryItem["kind"];
-    runtime: RuntimeKind;
-    targetRoleId: string;
-    sourceRoleId: string;
-    text: string;
-    summary: string;
-    dedupKey: string;
-    enqueuedAt: string;
-    flowId?: string;
-    /** B 批：星形任务 id（重启续投保持同一任务关联）。 */
-    taskId?: string;
-    queueEntryId?: string;
-    controllerResume?: ControllerResumeDelivery;
-    systemAssignment?: DeliveryAssignment | null;
-    notificationSource?: Extract<import("../../src/model/trunk.ts").DirectActionSource, { kind: "role-direct" }>;
-    deliveryId?: string;
-    /** 应用任务的稳定身份（2026-10-25）：跨重启恢复后与新的同任务调用相认（「已投递」标记本身只在内存）。 */
-    clientMessageId?: string;
-    handback?: TaskHandback;
-    report?: RuntimeReportSnapshotV1;
-    liveReport?: RuntimeLiveReportViewV1;
-    liveDurability?: "memory-only" | "unknown-live";
-  };
-  state: "queued" | "in-flight";
-  enqueuedAt: string;
-}
-
-/** `restorePersistedDeliveries()` 的如实报告（Interface 据此落 Lead 系统行「已恢复 N 条并重投」）。 */
-export interface DeliveryQueueRestoreReport {
-  restored: number;
-  skipped: number;
-  items: {
-    projectRoot: string;
-    roleId: string;
-    runtime: RuntimeKind;
-    kind: DeliveryItem["kind"];
-    summary: string;
-  }[];
-}
-
-/** 队列摘要用的一句短句（L-1 可见性；仅呈现，不参与任何判定）。 */
-function shortenText(s: string, n: number): string {
-  const flat = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
-  return flat.length > n ? `${flat.slice(0, n)}…` : flat;
-}
-
-/**
- * **应用任务稳定身份前缀**（2026-10-25 真机重复投递修复：「role-readiness 派发任务」在重建前后
- * 出现两条 user 消息、账本却只有一条 `dispatch.accepted`）。
- *
- * 应用派发的任务（派发/验收/协调/意图交接等）没有调用方自带的稳定 id；`sendBackground` 每次入队都用
- * 随机键时，同一任务的两次应用侧调用（两条链路/一次重试）会被当成两条独立消息重复投递。本层为这类
- * 任务生成**内容稳定键**（项目+目标角色+引擎+正文 sha256，或派发的既有内容 `dedupKey` sha256）：
- *  · 同任务同键——重建后续投、应用侧重复调用、重启后恢复的队列项都能认出来，**至多投递一次**；
- *  · 真实客户消息不生成该键（渲染侧 UUID 或缺失）——「同文重复发送是两个意图」的语义逐字不变；
- *  · 显式**重新入队**（`enqueueDelivery`，如返工后同文再派）会清除「已投递」标记——返工回路仍可用。
- *
- * 前缀只用于本层身份判别（不构成权限/授权语义）；渲染侧传来的任意 `clientMessageId` 不会命中该前缀
- * （随机 UUID），因此不会被误当成应用任务。
- */
-const APP_TASK_CLIENT_MESSAGE_ID_PREFIX = "ans-app-task:";
-/** 「已投递」应用任务标记的内存上界（FIFO 淘汰；防长跑进程无界增长）。 */
-const MAX_DELIVERED_APP_TASK_IDS = 1024;
-
-function isAppTaskClientMessageId(value: unknown): value is string {
-  return typeof value === "string" && value.startsWith(APP_TASK_CLIENT_MESSAGE_ID_PREFIX) && value.length > APP_TASK_CLIENT_MESSAGE_ID_PREFIX.length;
-}
-
-/** 「替我审」`turnText` 上界（PM 评审 §8.1：≤4KB；超出截断，不据此 manual）。 */
-const TURN_TEXT_MAX_BYTES = 4096;
-
-/** 把投递文本收敛到 ≤4KB（UTF-8）；不切断多字节字符。 */
-function boundTurnText(text: string): string {
-  const raw = typeof text === "string" ? text : "";
-  const buf = Buffer.from(raw, "utf8");
-  if (buf.length <= TURN_TEXT_MAX_BYTES) return raw;
-  let end = TURN_TEXT_MAX_BYTES;
-  // 退到 UTF-8 字符边界（continuation byte 为 10xxxxxx）。
-  while (end > 0 && (buf[end] & 0xc0) === 0x80) end -= 1;
-  return buf.subarray(0, end).toString("utf8");
-}
-
-/**
- * **有界等待（意图交接投递用）**：超时返回 `{timedOut:true}`；底层 promise 继续（不取消、不伪造结果）。
- * 与既有应用侧时限模式同口径——只保证回执必然返回。
- */
-function withStageDeadline<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-): Promise<{ timedOut: false; value: T } | { timedOut: true }> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<{ timedOut: true }>((resolve) => {
-    timer = setTimeout(() => resolve({ timedOut: true }), Math.max(1, timeoutMs));
-    (timer as { unref?: () => void }).unref?.();
-  });
-  return Promise.race([promise.then((value) => ({ timedOut: false as const, value })), timeout]).finally(() => {
-    if (timer !== undefined) clearTimeout(timer);
-  });
-}
-
-/** O-1：单个文件的**内容指纹**（sha256）。
- *  **Q-1（2026-10-12）**：热路径加 **mtime+size 缓存**——未变文件只 `stat`、不重读重哈希（防读盘风暴）；
- *  文件变了（mtime/size 任一不同）才重读重哈希。不存在/读失败记 `<missing>`（清缓存——下次出现要拿到真值）。 */
-const filePrintCache = new Map<string, { mtimeMs: number; size: number; print: string }>();
-async function filePrint(absPath: string): Promise<string> {
-  try {
-    const st = await fs.promises.stat(absPath);
-    const hit = filePrintCache.get(absPath);
-    if (hit !== undefined && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.print;
-    const print = createHash("sha256").update(await fs.promises.readFile(absPath)).digest("hex");
-    filePrintCache.set(absPath, { mtimeMs: st.mtimeMs, size: st.size, print });
-    return print;
-  } catch {
-    filePrintCache.delete(absPath);
-    // `<missing>` 哨兵：G-1 必读引用同用本函数探测——非 sha256 值（含本哨兵）在 `planDispatchDelivery`
-    // 判据内天然按「文件不存在」处理（fail-closed；投递侧无需再映射）。
-    return "<missing>";
-  }
-}
 
 /**
  * **`[系统·安装]`：能力安装/卸载完成后的定格系统行文首**（PM 冻结符号，G-4 2026-10-16）——**技能（I3）
@@ -1368,94 +444,21 @@ async function filePrint(absPath: string): Promise<string> {
  */
 export const CAPABILITY_INSTALL_SYSTEM_PREFIX = "[系统·安装]";
 
-/** 非 assistant 正文的 `detail.source`（系统行/投递状态/推理/工具展示/长度提示——不记入反馈镜像）。 */
-const NON_ASSISTANT_DETAIL_SOURCES: ReadonlySet<string> = new Set([
-  "delivery-note",
-  "prompt-input",
-  "delivery-receipt",
-  "delivery-boundary",
-  "reasoning",
-  "reasoning-diagnostic",
-  "tool-display-diagnostic",
-  "server-tools",
-  "length-followup",
-  "length-degrade",
-  "system",
-]);
+/** 「已投递」应用任务标记的内存上界（FIFO 淘汰；防长跑进程无界增长）。 */
+const MAX_DELIVERED_APP_TASK_IDS = 1024;
 
-/**
- * assistant 正文判定（2026-10-18 live 修正）：`message` 且 summary 非空；`detail` 缺省或**不是**
- * 系统行/工具事件（带 `display` 的普通 assistant 文本照记）。工具事件按 `toolCallId`/`toolName`/`call`
- * 键排除；detail 结构无法确认（非对象）时不记（fail-closed，避免把系统行当正文）。
- */
-function isAssistantTextEvent(ev: OrchestrationEvent): ev is Exclude<OrchestrationEvent, HandbackEvent> {
-  if (ev.kind !== "message") return false;
-  if (typeof ev.summary !== "string" || ev.summary.trim() === "") return false;
-  const detail = ev.detail;
-  if (detail === undefined) return true;
-  if (typeof detail !== "object" || detail === null) return false;
-  const record = detail as Record<string, unknown>;
-  if (typeof record.source === "string" && NON_ASSISTANT_DETAIL_SOURCES.has(record.source)) return false;
-  if ("toolCallId" in record || "toolName" in record || "call" in record) return false;
-  return true;
-}
+/** 会话管理器注册表：最小公共面（`executionInventoryFacts`）由 `./session/shared/inventory.ts` 定义并持有
+ *  单例（登记经 `registerDesktopSessionManager`）；门面保留 `SessionManager` 强类型视图，用于跨实例只读访问
+ *  `observedHandles`/`controllerDisposalOwners`/`runChangeOperations` 等私有面。
+ *  运行时是**同一 Set 实例**（注册与库存聚合共享单例语义）。 */
+const desktopSessionManagers = inventorySessionManagers as unknown as Set<SessionManager>;
 
 /**
  * 会话管理器（B-2：**每角色一个保活句柄** + 上限 LRU）：点角色即开、多轮直发；
  * **切走不 dispose、切回直接续**；超出 `MAX_LIVE_SESSIONS` 时淘汰最久未用者。
  */
-export type InstallationCapabilityTool = "install_skill" | "uninstall_skill" | "install_mcp" | "uninstall_mcp";
-/** Plain observations of an actual refused callback invocation; never effect-scope authority. */
-export interface InstallationEffectRefusalObservation {
-  bindingId: string; toolName: InstallationCapabilityTool; projectRoot: string; actorRoleId: string; runtime: RuntimeKind;
-  observedAt: string; coreSessionId?: string; toolTurnId?: string; activeTurnId?: string; originKind?: string;
-  disposition: "refused-before-activation"; reasonCode: "effect-scope-unproven";
-}
-
-export interface DesktopSessionInventoryFact {
-  hostHandleId: string; projectRoot: string; roleId: string; runtime: RuntimeKind; kind: "role" | "bounded-chief";
-  phase: "creating" | "live" | "open-failed" | "disposing" | "disposed" | "dispose-failed";
-  coreSessionId?: string; taskId?: string; runId?: string;
-  openFailureRef?: GitHostOpenFailureRef;
-  toolSurface?: RuntimeSessionToolSurfaceFacts; lifecycle?: RuntimeSessionLifecycleFacts;
-  errors: string[];
-}
-type DesktopRunStopFact = NonNullable<Parameters<typeof recordGitHostInventory>[0]["runStops"]>[number];
-type DesktopControllerStopFact = NonNullable<Parameters<typeof recordGitHostInventory>[0]["controllerStops"]>[number];
-export interface DesktopProjectExecutionInventory {
-  source: "desktop-session-manager"; projectRoot: string; observedAt: string; revision: number;
-  coverage: "unknown"; reasons: string[]; sessions: DesktopSessionInventoryFact[];
-  pendingOpens: string[]; queuedDispatches: Array<{ queueEntryId: string; roleId: string; runtime: RuntimeKind; taskId?: string; kind: string;
-    sourceRoleId: string; notificationSource?: DeliveryItem["notificationSource"]; notificationSourceState: "recorded" | "unknown";
-    operationId?: string; systemAssignmentTaskId?: string; systemAssignmentState: "bound" | "unassigned" | "unknown" | "not-system";
-    lastAttempt: NonNullable<DeliveryItem["lastAttempt"]> | { state: "unknown" } }>;
-  activeDeliveries: Array<{ roleId: string; runtime: RuntimeKind; taskId?: string; kind: string }>;
-  deliveryQueuePersistence: DeliveryQueuePersistenceFacts[];
-  runStops: DesktopRunStopFact[];
-  controllerStops: DesktopControllerStopFact[];
-}
-const desktopSessionManagers = new Set<SessionManager>();
-let desktopExecutionRevision = 0;
-const inventoryListeners = new Set<(event: { projectRoot: string; revision: number; reason: string }) => void>();
-/** Host coordination only. Listeners receive ordinary change facts, never a permission or effect handle. */
-export function subscribeDesktopExecutionInventory(listener: (event: { projectRoot: string; revision: number; reason: string }) => void): () => void {
-  inventoryListeners.add(listener); return () => { inventoryListeners.delete(listener); };
-}
-export function desktopProjectExecutionInventory(projectRoot: string): DesktopProjectExecutionInventory {
-  const result: DesktopProjectExecutionInventory = { source: "desktop-session-manager", projectRoot, observedAt: new Date().toISOString(),
-    revision: desktopExecutionRevision, coverage: "unknown", reasons: ["Historical processes and sessions outside the registered desktop handles are unproven", "Tool registry observations do not prove filesystem confinement"],
-    sessions: [], pendingOpens: [], queuedDispatches: [], activeDeliveries: [], deliveryQueuePersistence: [], runStops: [], controllerStops: [] };
-  for (const manager of desktopSessionManagers) {
-    const part = manager.executionInventoryFacts(projectRoot);
-    result.sessions.push(...part.sessions); result.pendingOpens.push(...part.pendingOpens);
-    result.queuedDispatches.push(...part.queuedDispatches); result.activeDeliveries.push(...part.activeDeliveries);
-    result.deliveryQueuePersistence.push(...part.deliveryQueuePersistence); result.runStops.push(...part.runStops); result.controllerStops.push(...part.controllerStops);
-  }
-  return result;
-}
-
 export class SessionManager {
-  private readonly inventoryRegistration = (() => { desktopSessionManagers.add(this); return true; })();
+  private readonly inventoryRegistration = (() => { registerDesktopSessionManager(this); return true; })();
   private readonly managerId = randomUUID();
   private runStopGeneration = 0;
   private readonly fencedRunTasks = new Map<string, Set<string>>();
@@ -1650,19 +653,16 @@ export class SessionManager {
     }
   }
 
+  /** 库存变更（薄委托 → `shared/inventory.ts`；observedRoots/发布失败表经显式状态面传入）。 */
   private inventoryChanged(projectRoot: string, reason: string): void {
-    this.observedInventoryRoots.add(projectRoot);
-    desktopExecutionRevision++;
-    const published = recordGitHostInventory(desktopProjectExecutionInventory(projectRoot));
-    if (published.ok) this.inventoryPublicationErrors.delete(projectRoot);
-    else {
-      this.inventoryPublicationErrors.set(projectRoot, published.code);
-      createDiagnosticLogger({ component: "desktop.session", projectRoot }).record("host-inventory.publish.failed", { reasonCode: published.code });
-    }
-    for (const listener of inventoryListeners) { try { listener({ projectRoot, revision: desktopExecutionRevision, reason }); } catch { /* observer failure never creates authority */ } }
+    inventoryChanged(projectRoot, reason, this.inventoryState);
   }
   private publishDeliveryInventory(reason: string): void {
-    for (const projectRoot of this.observedInventoryRoots) this.inventoryChanged(projectRoot, reason);
+    publishDeliveryInventory(reason, this.inventoryState);
+  }
+  /** 库存函数的显式状态面（同一 Set/Map 实例；方案 §3.6 归属 run-change，B1 不搬状态）。 */
+  private get inventoryState(): SessionInventoryState {
+    return { observedInventoryRoots: this.observedInventoryRoots, inventoryPublicationErrors: this.inventoryPublicationErrors };
   }
   executionInventoryFacts(projectRoot: string): Pick<DesktopProjectExecutionInventory, "sessions" | "pendingOpens" | "queuedDispatches" | "activeDeliveries" | "deliveryQueuePersistence" | "runStops" | "controllerStops"> {
     const sessions: DesktopSessionInventoryFact[] = [];
@@ -1819,8 +819,8 @@ export class SessionManager {
   private readonly activeDeliveries = new Map<string, DeliveryItem>();
   /** B 批：星形任务 id（内存索引；派发/恢复/列表时登记——回交路由用同步判定，保持事件顺序）。 */
   private readonly starTaskIds = new Set<string>();
-  /** 2026-10-29（方案 v2.1 §5.4/M9）：任务创建者内存索引（`task.created.from`）——报告按创建者路由。 */
-  private readonly taskCreators = new Map<string, "chief" | "convener">();
+  /** 2026-10-29（方案 v2.1 §5.4/M9）：任务创建者内存索引（`task.created.from`）——报告按创建者路由。
+   *  B1 提交 2/2：状态随 `rememberTaskCreator` 迁入 `./session/shared/tasks-store.ts`（模块单例，见导入）。 */
   /** B 批：已写入 `task.reported` 的键（`taskId\0turnId|摘要`；防同轮重复事件）。 */
   private readonly reportedTaskKeys = new Set<string>();
   /** B-07：连续卡死升级卡（按链根去重；同一链只提交一次）。 */
@@ -1945,9 +945,9 @@ export class SessionManager {
 
   // —————————————— G-2（W1）：看护的观察/活动转发与时钟 ——————————————
 
-  /** 时钟（注入以便单测；缺省 Date.now——与会话时间戳、投递入队时间同源）。 */
+  /** 时钟（薄委托 → `shared/clock.ts`；注入以便单测；缺省 Date.now——与会话时间戳、投递入队时间同源）。 */
   private now(): number {
-    return this.deps.now ? this.deps.now() : Date.now();
+    return now(this.deps);
   }
 
   /** 转发一条结构化事件给看护器（隔离：看护回调抛错绝不影响会话/投递——看护永不阻断判定链）。 */
@@ -1965,18 +965,19 @@ export class SessionManager {
     this.observeWatchdog(projectRoot, { kind: "activity", reason });
   }
 
+  /** 会话键（薄委托 → `shared/keys.ts`）。 */
   private sessionKey(projectRoot: string, roleId: string, runtime: RuntimeKind): string {
-    return `${projectRoot}\u0000${roleId}\u0000${runtime}`;
+    return sessionKey(projectRoot, roleId, runtime);
   }
+  /** 目标键（薄委托 → `shared/keys.ts`；只读状态回调保持原求值时机与次数）。 */
   private targetKey(target: string | SessionTarget): string | undefined {
-    if (typeof target !== "string" && target.projectRoot && target.runtime) return this.sessionKey(target.projectRoot, target.roleId, target.runtime);
-    let roleId = target;
-    if (typeof target !== "string") roleId = target.roleId;
-    const active = this.activeEntry();
-    if (active?.roleId === roleId && this.activeRoleId !== null) return this.activeRoleId;
-    const matches = [...new Set([...this.sessions.keys(), ...this.rebuildChains.keys()])].filter((key) => key.split("\u0000")[1] === roleId);
-    if (matches.length === 1) return matches[0];
-    return undefined;
+    const state: TargetKeyState = {
+      activeEntry: () => this.activeEntry(),
+      activeRoleId: () => this.activeRoleId,
+      sessionKeys: () => this.sessions.keys(),
+      rebuildChainKeys: () => this.rebuildChains.keys(),
+    };
+    return targetKey(target, state);
   }
   profileRevision(runtime: RuntimeKind): number { return this.profileRevisions.get(runtime) ?? 0; }
   profileChanged(runtime: RuntimeKind): number {
@@ -2082,10 +1083,9 @@ export class SessionManager {
       return { ok: false, reason: "unavailable", message: error instanceof Error ? error.message : String(error) };
     }
   }
+  /** 上下文来源投影（薄委托 → `shared/session-views.ts`；纯投影）。 */
   private contextInfo(handle: RoleSessionHandle): Pick<OpenResult, "contextSource" | "contextWarning"> {
-    if (handle.contextSource === "resumed") return { contextSource: "recovered", contextWarning: handle.contextWarning };
-    if (handle.contextSource === "recovered") return { contextSource: "fresh", contextWarning: handle.contextWarning ?? mainT("main.session.contextRecoveryFailed") };
-    return { contextSource: "fresh", contextWarning: handle.contextWarning };
+    return contextInfo(handle);
   }
 
   /**
@@ -3547,14 +2547,7 @@ export class SessionManager {
    * 有 ⇒ 验收检查推迟到下一次事件，避免在交付完成前抢跑派 Proof；不制造第二份状态。
    */
   async refreshListingNow(projectRoot: string): Promise<boolean> {
-    if (this.deps.refreshListing === undefined) return false;
-    try {
-      await this.deps.refreshListing(projectRoot);
-      return true;
-    } catch (error) {
-      createDiagnosticLogger({ component: "desktop.session", projectRoot }).error("project.listing.refresh.failed", error);
-      return false;
-    }
+    return refreshListingNow(projectRoot, this.deps);
   }
 
   /**
@@ -5297,44 +4290,27 @@ export class SessionManager {
    * 枚举不到 → null（投递机按既有「目标未枚举」路径保留待重试，绝不静默丢）。
    */
   private handbackOwnerRoleId(projectRoot: string): string | null {
-    const listing = this.deps.getListing(projectRoot);
-    if (!listing) return null;
-    if ((listing.governanceModel ?? "single") === "trio") {
-      const convener = listing.roles.find((r) => r.governanceFunction === "schedule");
-      return convener !== undefined ? convener.roleId : null;
-    }
-    const id = typeof listing.primaryRoleId === "string" ? listing.primaryRoleId : "";
-    return id !== "" ? id : null;
+    return handbackOwnerRoleId(projectRoot, this.deps);
   }
 
   /** B 批：任务/汇报主链的幕僚角色 id（**只认真实 chief**，不把旧 liaison 别名算作星形主链）。 */
   /** 登记任务创建者（读盘重放/新建/重派共用；缺字段的旧记录按 chief 兼容）。 */
   private rememberTaskCreator(taskId: string, created: { from?: "chief" | "convener" } | undefined): void {
-    this.taskCreators.set(taskId, created?.from === "convener" ? "convener" : "chief");
+    rememberTaskCreator(taskId, created);
   }
 
   private chiefTaskRoleIdOf(projectRoot: string): string | null {
-    const listing = this.deps.getListing(projectRoot);
-    if (!listing || (listing.governanceModel ?? "single") !== "trio") return null;
-    return listing.roles.find((r) => r.governanceFunction === "chief")?.roleId ?? null;
+    return chiefTaskRoleIdOf(projectRoot, this.deps);
   }
 
   /** B 批：任务/汇报状态读取（坏行跳过；读失败按空状态 + 诊断，不阻塞）。 */
   private async readTasks(projectRoot: string): Promise<TaskReplay> {
-    try {
-      return await readTaskState(projectRoot);
-    } catch (error) {
-      createDiagnosticLogger({ component: "desktop.session", projectRoot }).error("tasks.read.failed", error);
-      return { records: new Map(), events: [], errors: [], unclosed: [] };
-    }
+    return readTasks(projectRoot);
   }
 
   /** T3 B1：该任务是否为 fixed 任务（`task.created.workflowId` 命名空间；固定路径无 legacy run 绑定）。 */
   private async isFixedTask(projectRoot: string, taskId: string | undefined): Promise<boolean> {
-    const id = typeof taskId === "string" ? taskId.trim() : "";
-    if (id === "") return false;
-    const record = (await this.readTasks(projectRoot)).records.get(id);
-    return record?.created?.workflowId !== undefined;
+    return isFixedTask(projectRoot, taskId);
   }
 
   /**
@@ -5397,21 +4373,14 @@ export class SessionManager {
 
   /** B 批：追加任务事件；失败只记诊断并返回 false（调用方决定是否 fail-closed）。 */
   private async appendTaskStateResult(projectRoot: string, event: TaskStateEvent): ReturnType<typeof recordTaskObservation> {
-    const result = await recordTaskObservation({ projectRoot, event });
-    if (!result.ok) createDiagnosticLogger({ component: "desktop.session", projectRoot }).error("tasks.append.failed", new Error(result.message),
-      { taskId: "taskId" in event ? event.taskId : undefined, reasonCode: result.code });
-    return result;
+    return appendTaskStateResult(projectRoot, event);
   }
   private async appendTaskState(projectRoot: string, event: TaskStateEvent): Promise<boolean> {
-    return (await this.appendTaskStateResult(projectRoot, event)).ok;
+    return appendTaskState(projectRoot, event);
   }
 
   private async recordTaskFailure(projectRoot: string, taskId: string, summary: string): Promise<boolean> {
-    const created = (await this.readTasks(projectRoot)).records.get(taskId)?.created;
-    if (created === undefined) return false;
-    return this.appendTaskState(projectRoot, taskEvent("task.reported", {
-      taskId, from: created.to, status: "failed", summary: shortenSummary(`应用观察到失败：${summary}`),
-    }, () => new Date(this.now())));
+    return recordTaskFailure(projectRoot, taskId, summary, () => this.now());
   }
 
   /** B 批：每角色运行日志观察器（应用侧写，不依赖角色上报；失败只诊断、绝不打断事件循环）。 */
@@ -5420,14 +4389,7 @@ export class SessionManager {
     roleId: string,
     input: { kind: string; summary: string; tool?: string; status?: string; taskId?: string; turnId?: string; ref?: string },
   ): Promise<void> {
-    this.lastRoleActivity.set(`${projectRoot}\u0000${roleId}`, { at: this.now(), kind: input.kind, summary: input.summary });
-    // 返回可等待的追加链：调用方若需要「返回即已落盘/可读」（如升级裁决）必须 await；
-    // 其余观察器路径保持 fire-and-forget（不阻塞会话事件泵）。
-    return appendRoleLog(projectRoot, roleId, input).then((result) => {
-      if (!result.ok) {
-        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role-log.append.failed", new Error(result.message));
-      }
-    });
+    return appendRoleActivity(projectRoot, roleId, input, { lastRoleActivity: this.lastRoleActivity, now: () => this.now() });
   }
 
   /** 从会话事件提取摘要并写运行日志（消息/工具/轮次终局；不写事件 detail 原文）。 */
@@ -7849,13 +6811,12 @@ export class SessionManager {
    * 正常路径由 `open()` 的能力注入保证；此处只做防御性再校验（绝不静默换人）。
    */
   private dispatcherRoleIdOf(projectRoot: string): string | null {
-    return this.handbackOwnerRoleId(projectRoot);
+    return dispatcherRoleIdOf(projectRoot, this.deps);
   }
 
   /** 投递进展的**系统行**（首选进目标/请求者的 pane；首选未知时退回兜底角色）——如实、不静默。 */
   private emitDeliveryNote(projectRoot: string, runtime: RuntimeKind, preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
-    const roleId = preferredRoleId !== null && preferredRoleId !== "" ? preferredRoleId : fallbackRoleId;
-    this.deps.emitEvent({ roleId, projectRoot, runtime, event: { kind: "message", summary, detail: { source: "delivery-note" } } });
+    emitDeliveryNote(projectRoot, runtime, preferredRoleId, fallbackRoleId, summary, this.deps);
   }
 
   /** 治理反馈客户投影的登记键：`queueKey` + 文本 sha256（回显文本需逐字一致才命中；不猜）。 */
@@ -8075,32 +7036,22 @@ export class SessionManager {
    * flow（有界；读不到 ⇒ 空集，只给通用目录指针）。**只读**，不猜验收结论、不伪造报告版本。
    */
   private resolveProofFlowIds(_projectRoot: string, hinted?: readonly string[]): string[] {
-    return [...new Set((hinted ?? []).filter((id): id is string => typeof id === "string" && id !== ""))].slice(0, 3);
+    return resolveProofFlowIds(_projectRoot, hinted);
   }
 
   /** `mirrorGovernanceFeedback` 的 listing 查找：精确命中优先；miss 时按斜杠变体再查（仅查找，不改 key）。 */
   private findListingForFeedback(projectRoot: string): ProjectListing | undefined {
-    const direct = this.deps.getListing(projectRoot);
-    if (direct !== undefined) return direct;
-    for (const variant of [projectRoot.replace(/\\/g, "/"), projectRoot.replace(/\//g, "\\")]) {
-      if (variant === projectRoot) continue;
-      const found = this.deps.getListing(variant);
-      if (found !== undefined) return found;
-    }
-    return undefined;
+    return findListingForFeedback(projectRoot, this.deps);
   }
 
   /** 角色显示名（listing 的 `displayName`；无则 roleId）——用于派发正文来源与治理反馈文案。 */
   private roleDisplayName(projectRoot: string, roleId: string): string {
-    const listing = this.findListingForFeedback(projectRoot);
-    const role = listing?.roles.find((r) => r.roleId === roleId);
-    const name = (role as { displayName?: unknown } | undefined)?.displayName;
-    return typeof name === "string" && name.trim() !== "" ? name.trim() : roleId;
+    return roleDisplayName(projectRoot, roleId, this.deps);
   }
 
   /** 队列键：项目 × 目标角色（一套机对多个目标；空目标=主入口暂未枚举到——每次尝试时重解析）。 */
   private queueKey(projectRoot: string, targetRoleId: string, runtime: RuntimeKind): string {
-    return `${projectRoot}\u0000${targetRoleId}\u0000${runtime}`;
+    return queueKey(projectRoot, targetRoleId, runtime);
   }
 
   /** 应用任务的**内容稳定键**（2026-10-25）：同项目×目标×引擎×正文 ⇒ 同键；任一变化 ⇒ 新键。 */
@@ -8438,7 +7389,7 @@ export class SessionManager {
       if (item.kind === "dispatch") this.activeDispatchKeys.add(item.dedupKey);
       if (typeof item.taskId === "string" && item.taskId !== "") {
         this.starTaskIds.add(item.taskId);
-        if (this.taskCreators.get(item.taskId) === undefined) {
+        if (taskCreators.get(item.taskId) === undefined) {
           const restored = (await this.readTasks(projectRoot)).records.get(item.taskId)?.created;
           if (restored !== undefined) this.rememberTaskCreator(item.taskId, restored);
         }
@@ -8774,7 +7725,7 @@ export class SessionManager {
       const starTask = typeof hb.taskId === "string" && hb.taskId !== "" && this.starTaskIds.has(hb.taskId);
       const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
       const convenerRoleId = this.handbackOwnerRoleId(projectRoot);
-      const taskCreator = starTask ? this.taskCreators.get(hb.taskId!) : undefined;
+      const taskCreator = starTask ? taskCreators.get(hb.taskId!) : undefined;
       // 2026-10-24（治理协调，设计 v1 §6.2/§6.3）：**按来源**选回交目标——
       //  · 内置治理角色（Draft/Steward/Crew/Proof；编排 `suppressHandback` 正常不发，这里只做防御路由）
       //    → Lead（`primaryRoleId`），Lead 自身不自我回交；single/su 保持旧行为（内置来源不自我回交）。
@@ -9972,7 +8923,7 @@ ${formatted}` };
       }
     }
     this.starTaskIds.add(taskId);
-    this.taskCreators.set(taskId, fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief");
+    taskCreators.set(taskId, fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief");
     this.appendRoleActivity(projectRoot, fromRoleId, {
       kind: "task.created",
       summary: `派发任务 #${taskId} → ${targetRoleId}：${shortenSummary(task)}`,
@@ -10499,7 +9450,7 @@ ${formatted}` };
       }
     }
     this.starTaskIds.add(taskId);
-    this.taskCreators.set(taskId, fromRoleId === convenerId ? "convener" : "chief");
+    taskCreators.set(taskId, fromRoleId === convenerId ? "convener" : "chief");
     this.appendRoleActivity(projectRoot, fromRoleId, {
       kind: "task.created",
       summary: `派发任务 #${taskId} → ${targetRoleId}：${shortenSummary(task)}`,
@@ -13434,58 +12385,4 @@ ${formatted}` };
     });
     diagnostic.record("delivery.claim.end", { state: sent.kind, count: batchCount });
   }
-}
-
-/**
- * BUG-5 精化（2026-11-05，真机缺陷）：星形任务回交的报告抑制判据。
- * 仅两种情况抑制：①任务已**收口**（closed，终态）；②**同一回合**（turnId 相同）已报告（重复）。
- * `blocked` 报告不是终态——此后**新回合**的真实报告（如重试完成/更完整回执）必须投递；
- * 旧实现「已有任何报告即抑制」曾在演示缺陷中用假 blocked 报告吞掉真实 worker 报告。
- * 无 turnId 的旧载荷不做回合级抑制（跨回合重复由回交去重键与账本 reportKey 兜底）。
- */
-export function shouldSuppressStarTaskReport(input: {
-  closed: boolean;
-  priorTurnIds: readonly (string | undefined)[];
-  turnId?: string;
-}): boolean {
-  if (input.closed) return true;
-  const turnId = typeof input.turnId === "string" && input.turnId !== "" ? input.turnId : undefined;
-  if (turnId === undefined) return false;
-  return input.priorTurnIds.some((prior) => prior === turnId);
-}
-
-/** 项目相对文件引用（报告证据路径白名单形状；拒绝绝对/盘符/`..`）。 */
-function isProjectRelativeFileRef(value: string): boolean {
-  const text = value.trim();
-  if (text === "" || text.startsWith("/") || text.includes("\\") || /^[a-zA-Z]:/.test(text)) return false;
-  return text.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
-}
-
-/**
- * 最新版本化文档发现（T3 B3 固定卡 `documentRefs`/A12 证据用）：
- * `<dir>/<flowId>-<suffix>-vN.md` 中 N 最大；缺失/不可读 ⇒ undefined（调用方 fail-closed）。
- */
-async function latestVersionedDoc(
-  projectRoot: string,
-  dir: string,
-  flowId: string,
-  suffix: string,
-): Promise<{ name: string; version: number } | undefined> {
-  let names: string[];
-  try {
-    names = await fs.promises.readdir(path.join(projectRoot, dir));
-  } catch {
-    return undefined;
-  }
-  const escaped = flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`^${escaped}-${suffix}-v(\\d+)\\.md$`);
-  let best: { name: string; version: number } | undefined;
-  for (const name of names) {
-    const match = pattern.exec(name);
-    if (match === null) continue;
-    const version = Number(match[1]);
-    if (!Number.isSafeInteger(version) || version < 1) continue;
-    if (best === undefined || version > best.version) best = { name, version };
-  }
-  return best;
 }
