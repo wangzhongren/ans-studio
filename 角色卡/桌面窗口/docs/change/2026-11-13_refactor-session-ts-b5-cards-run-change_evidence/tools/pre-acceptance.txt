@@ -1,0 +1,47 @@
+// app/desktop/session/cards/acceptance-facts.ts
+// B5（2026-11-13，session.ts 重构；方案 docs/planning/2026-11-13_refactor_session-ts_plan-v1.md
+// §3.2 / §3.3 / §5 B5、附录 A cards 组）：验收 judge 事实与验收拒绝计数（L4，模块内拆分）。
+// 2 个类方法（enrichAcceptanceJudgeContext/countAcceptanceRejections）自 app/desktop/session.ts
+// **逐字搬移**（含 JSDoc）：方法体零改动（唯一文本适配：正文内联 `import("…src/model/runtime.ts")`
+// 的相对深度随模块目录调整，见记录化归一化）；类外壳重建原 receiver 面——
+//  · 只读事实构造：产品意图 / 最新名单 / 最新 D3 / 质检报告 / criteria 证据（不伪造、不改裁决权）；
+//  · 已迁出的 readTasks 经同名同义委托 → shared/tasks-store；deps 只读切片（runtimeOptions）。
+// 可见性 private → 模块内 public 仅为门面委托可调用（不进入公开导出面）。
+// 与 cards.ts 的分配：appointment-write 应用侧校验（appointmentWriteApplicationRejection，需 D3/名单
+// 读取与任务账本）按任务口径留在 cards.ts；本文件只收验收 judge 事实与验收计数（记录 §7 偏差 3）。
+
+import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import { createToolDisplayContext } from "../../../../src/common/runtime-core/tool-display.ts";
+import { createDiagnosticLogger } from "../../../../src/common/shared/diagnostics.ts";
+import { readIntentEntryFacts } from "../../../../src/common/shared/intent-entry-contract.ts";
+import { checkEvidence, deriveAcceptanceFact, loadCriteria } from "../../../../src/common/编排/evidence-check.ts";
+import { findActiveRun, loadPinnedRoster, pinnedDocsSummary } from "../../../../src/common/编排/run-manifest.ts";
+import { loadLatestRoster } from "../../../../src/common/编排/workflow-preconditions.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../../../src/model/runtime.ts";
+import type { AcceptanceReportDisplayV1 } from "../../customer-input.ts";
+import type { AcceptanceFact, CustomerInputMetadata, CustomerInputOutcome, CustomerInputRequest, GovernanceJudgeContext, TaskStateEvent } from "../../../../src/model/runtime.ts";
+import { declaredConfirmPaths, declaredPathBodies } from "../../../../src/common/编排/confirmed-writes.ts";
+import { stableWritePathOf } from "../../../../src/common/门禁引擎/versioned-doc-guard.ts";
+import { mainT } from "../../i18n.ts";
+import { appointmentStableWriteInputs, buildStableBoundaryRisk, mergeAcknowledgements, type VersionChangeStack } from "../../version-change.ts";
+import type { TaskReplay } from "../../../../src/common/编排/task-state.ts";
+import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
+import type { SessionManagerDeps } from "../contracts/deps.ts";
+import { now } from "../shared/clock.ts";
+import { emitDeliveryNote } from "../shared/notifier.ts";
+import { readTasks } from "../shared/tasks-store.ts";
+
+/** 验收 judge 事实与验收拒绝计数（原 SessionManager 2 方法的同签名实现）。 */
+export class AcceptanceFacts {
+  private readonly deps: SessionManagerDeps;
+  constructor(deps: SessionManagerDeps) { this.deps = deps; }
+
+  /** 原 `SessionManager.readTasks` 的同义委托（→ shared/tasks-store.ts；签名/行为逐字一致）。 */
+  private async readTasks(projectRoot: string): Promise<TaskReplay> { return readTasks(projectRoot); }
+  /* shared 同名同义委托（→ shared/*；与门面同名委托调用同一函数、同一入参）。 */
+  private now(): number { return now(this.deps); }
+  private emitDeliveryNote(projectRoot: string, runtime: RuntimeKind, preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
+    emitDeliveryNote(projectRoot, runtime, preferredRoleId, fallbackRoleId, summary, this.deps);
+  }

@@ -1,0 +1,23 @@
+# B5 第二段逐文件门槛（spec reporter 末次汇总块）
+
+version-decision | version-decision.test.ts | 15 | 15 | 0 | 0 | 0 | 2624.7044 | 0
+version-change | version-change.test.ts | 46 | 42 | 4 | 0 | 0 | 8465.3788 | 1 diff(added=0,removed=0)
+run-change | run-change.test.ts | 4 | 4 | 0 | 0 | 0 | 576.5119 | 0
+run-change-trigger | run-change-trigger.test.ts | 10 | 1 | 9 | 0 | 0 | 1279.3709 | 1 diff(added=0,removed=0)
+run-change-entry | run-change-entry.test.ts | 5 | 5 | 0 | 0 | 0 | 612.9964 | 0
+acceptance-evidence | acceptance-evidence.test.ts | 3 | 3 | 0 | 0 | 0 | 569.349 | 0
+acceptance-proposal-path | acceptance-proposal-path.test.ts | 7 | 7 | 0 | 0 | 0 | 1969.1712 | 0
+acceptance-return-card | acceptance-return-card.test.ts | 10 | 10 | 0 | 0 | 0 | 1373.6484 | 0
+optional-acceptance | optional-acceptance.test.ts | 6 | 6 | 0 | 0 | 0 | 1488.2472 | 0
+pending-card-restart | pending-card-restart.test.ts | 1 | 1 | 0 | 0 | 0 | 499.5651 | 0
+turn-lease | turn-lease.test.ts | 4 | 4 | 0 | 0 | 0 | 1241.6886 | 0
+request-timeout-wiring | request-timeout-wiring.test.ts | 3 | 3 | 0 | 0 | 0 | 950.79 | 0
+directive-decision | directive-decision.test.ts | 8 | 8 | 0 | 0 | 0 | 434.9081 | 0
+customer-authorization-plane-integration | test/测试/customer-authorization-plane-integration.test.ts | 6 | 6 | 0 | 0 | 0 | 568.2298 | 0
+full-桌面应用 | full-desktop-app.log | 845 | 774 | 69 | 2 | 0 | 441838.3114 | 1
+full-桌面UI | full-desktop-ui.log | 443 | 443 | 0 | 0 | 0 | 7187.8519 | 0
+knownred-runtime-core | knownred-runtime-core.log | 604 | 567 | 33 | 0 | 4 | 50609.0754 | 1
+knownred-gates | knownred-gates.log | 577 | 571 | 5 | 0 | 1 | 93929.1194 | 1
+knownred-orchestration | knownred-orchestration.log | 1373 | 1347 | 24 | 0 | 2 | 140396.3168 | 1
+knownred-orchestration-git-trunk-store | knownred-orchestration-git-trunk-store.log | 13 | 13 | 0 | 0 | 0 | 58369.3501 | 0
+version-change-integration(extra) | test/测试/version-change-integration.test.ts | 12 | 3 | 9 | 0 | 0 | 961.901 | 1 diff(added=0,removed=0; clean 9970c3d baseline)
