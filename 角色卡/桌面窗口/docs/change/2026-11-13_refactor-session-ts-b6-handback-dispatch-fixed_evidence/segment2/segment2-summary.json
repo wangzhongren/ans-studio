@@ -1,0 +1,412 @@
+{
+  "generatedAt": "2026-11-13T09:22:31.036Z",
+  "gates": {
+    "handback-delivery": {
+      "file": "test/桌面应用/handback-delivery.test.ts",
+      "tests": 18,
+      "suites": 0,
+      "pass": 16,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 8208.284,
+      "failnames": 2,
+      "failnameDiff": {
+        "canonicalFile": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b6\\角色卡\\桌面窗口\\docs\\change\\2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence\\segment2\\gates\\handback-delivery-baseline-failnames.txt",
+        "actualFile": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b6\\角色卡\\桌面窗口\\docs\\change\\2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence\\segment2\\gates\\handback-delivery-failnames.txt",
+        "canonicalCount": 2,
+        "actualCount": 2,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      }
+    },
+    "chat-handback-integration": {
+      "file": "test/测试/chat-handback-integration.test.ts",
+      "tests": 3,
+      "suites": 0,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 662.3416,
+      "failnames": 0
+    },
+    "star-routing": {
+      "file": "test/桌面应用/star-routing.test.ts",
+      "tests": 10,
+      "suites": 0,
+      "pass": 3,
+      "fail": 7,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 2016.7511,
+      "failnames": 7,
+      "failnameDiff": {
+        "canonicalFile": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b6\\角色卡\\桌面窗口\\docs\\change\\2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence\\segment2\\gates\\star-routing-baseline-failnames.txt",
+        "actualFile": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b6\\角色卡\\桌面窗口\\docs\\change\\2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence\\segment2\\gates\\star-routing-failnames.txt",
+        "canonicalCount": 7,
+        "actualCount": 7,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      }
+    },
+    "fixed-path-routing": {
+      "file": "test/桌面应用/fixed-path-routing.test.ts",
+      "tests": 13,
+      "suites": 0,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1489.5116,
+      "failnames": 0
+    },
+    "fixed-path-full-chain": {
+      "file": "test/测试/fixed-path-full-chain.test.ts",
+      "tests": 3,
+      "suites": 0,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 4287.8876,
+      "failnames": 0
+    },
+    "dispatch-fresh-enum": {
+      "file": "test/桌面应用/dispatch-fresh-enum.test.ts",
+      "tests": 2,
+      "suites": 0,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 991.2831,
+      "failnames": 0
+    },
+    "b101-fixed-dispatch-task-binding": {
+      "file": "test/桌面应用/b101-fixed-dispatch-task-binding.test.ts",
+      "tests": 11,
+      "suites": 0,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1237.8553,
+      "failnames": 0
+    },
+    "b111-fixed-closed-handback-drain": {
+      "file": "test/桌面应用/b111-fixed-closed-handback-drain.test.ts",
+      "tests": 5,
+      "suites": 0,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 792.4272,
+      "failnames": 0
+    },
+    "b3-fixed-baseline-pathb": {
+      "file": "test/桌面应用/b3-fixed-baseline-pathb.test.ts",
+      "tests": 10,
+      "suites": 0,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 4336.5585,
+      "failnames": 0
+    },
+    "b3-fixed-cards-panel": {
+      "file": "test/桌面应用/b3-fixed-cards-panel.test.ts",
+      "tests": 8,
+      "suites": 0,
+      "pass": 8,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 905.7157,
+      "failnames": 0
+    },
+    "b3-release-merge-desktop": {
+      "file": "test/桌面应用/b3-release-merge-desktop.test.ts",
+      "tests": 7,
+      "suites": 0,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 6233.6169,
+      "failnames": 0
+    },
+    "b3-workflow-git-real": {
+      "file": "test/桌面应用/b3-workflow-git-real.test.ts",
+      "tests": 9,
+      "suites": 0,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 5861.2463,
+      "failnames": 0
+    },
+    "b31-fixed-release-auto-desktop": {
+      "file": "test/桌面应用/b31-fixed-release-auto-desktop.test.ts",
+      "tests": 9,
+      "suites": 0,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 6778.9833,
+      "failnames": 0
+    },
+    "b42-task-git-port-desktop": {
+      "file": "test/桌面应用/b42-task-git-port-desktop.test.ts",
+      "tests": 8,
+      "suites": 0,
+      "pass": 8,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 2663.3522,
+      "failnames": 0
+    },
+    "b51-fixed-workflow-wiring": {
+      "file": "test/桌面应用/b51-fixed-workflow-wiring.test.ts",
+      "tests": 14,
+      "suites": 0,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1846.7665,
+      "failnames": 0
+    },
+    "b61-chat-entry-fixed": {
+      "file": "test/桌面应用/b61-chat-entry-fixed.test.ts",
+      "tests": 9,
+      "suites": 0,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 593.528,
+      "failnames": 0
+    },
+    "b71-fixed-fail-closed": {
+      "file": "test/桌面应用/b71-fixed-fail-closed.test.ts",
+      "tests": 7,
+      "suites": 0,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 594.7956,
+      "failnames": 0
+    },
+    "b81-fixed-dispatch-forced-session": {
+      "file": "test/桌面应用/b81-fixed-dispatch-forced-session.test.ts",
+      "tests": 6,
+      "suites": 0,
+      "pass": 6,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1117.286,
+      "failnames": 0
+    },
+    "b82-fixed-workflow-binding-handback": {
+      "file": "test/桌面应用/b82-fixed-workflow-binding-handback.test.ts",
+      "tests": 11,
+      "suites": 0,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1115.8808,
+      "failnames": 0
+    },
+    "g1-copy-and-nails": {
+      "file": "test/测试/g1-verify/g1-copy-and-nails.test.ts",
+      "tests": 5,
+      "suites": 0,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 159.3969,
+      "failnames": 0
+    },
+    "g1-dispatch-wiring": {
+      "file": "test/测试/g1-verify/g1-dispatch-wiring.test.ts",
+      "tests": 5,
+      "suites": 0,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 2321.0923,
+      "failnames": 0
+    },
+    "g1-extraction-render": {
+      "file": "test/测试/g1-verify/g1-extraction-render.test.ts",
+      "tests": 13,
+      "suites": 0,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 153.1361,
+      "failnames": 0
+    }
+  },
+  "fullDesktop": {
+    "桌面应用": {
+      "file": "full-desktop-app.log",
+      "tests": 845,
+      "suites": 0,
+      "pass": 773,
+      "fail": 70,
+      "cancelled": 2,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 437653.6906,
+      "failnames": 72,
+      "failnameDiff": {
+        "canonicalFile": "角色卡/测试/docs/change/2026-11-13_refactor-session-ts-b0_evidence/12b-baseline-desktop-app-failnames.txt",
+        "actualFile": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b6\\角色卡\\桌面窗口\\docs\\change\\2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence\\segment2\\full-desktop-app-failnames.txt",
+        "canonicalCount": 72,
+        "actualCount": 72,
+        "added": [
+          "申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl"
+        ],
+        "removed": [
+          "重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等"
+        ],
+        "sameSet": false
+      }
+    },
+    "桌面UI": {
+      "file": "full-desktop-ui.log",
+      "tests": 443,
+      "suites": 0,
+      "pass": 443,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 6502.9589,
+      "failnames": 0
+    }
+  },
+  "knownred": {
+    "runtime-core": {
+      "file": "knownred-runtime-core.log",
+      "tests": 604,
+      "suites": 0,
+      "pass": 567,
+      "fail": 33,
+      "cancelled": 0,
+      "skipped": 4,
+      "todo": 0,
+      "duration_ms": 15460.8212,
+      "failnames": 33,
+      "failnameDiff": {
+        "canonicalFile": "角色卡/测试/docs/change/2026-11-13_refactor-session-ts-b0_evidence/04a-knownred-runtime-core-33.txt",
+        "actualFile": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b6\\角色卡\\桌面窗口\\docs\\change\\2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence\\segment2\\knownred-runtime-core-failnames.txt",
+        "canonicalCount": 33,
+        "actualCount": 33,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      }
+    },
+    "gates": {
+      "file": "knownred-gates.log",
+      "tests": 577,
+      "suites": 0,
+      "pass": 571,
+      "fail": 5,
+      "cancelled": 0,
+      "skipped": 1,
+      "todo": 0,
+      "duration_ms": 76051.1956,
+      "failnames": 5,
+      "failnameDiff": {
+        "canonicalFile": "角色卡/测试/docs/change/2026-11-13_refactor-session-ts-b0_evidence/04b-knownred-gates-5.txt",
+        "actualFile": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b6\\角色卡\\桌面窗口\\docs\\change\\2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence\\segment2\\knownred-gates-failnames.txt",
+        "canonicalCount": 5,
+        "actualCount": 5,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      }
+    },
+    "orchestration": {
+      "file": "knownred-orchestration.log",
+      "tests": 1373,
+      "suites": 0,
+      "pass": 1347,
+      "fail": 24,
+      "cancelled": 0,
+      "skipped": 2,
+      "todo": 0,
+      "duration_ms": 25845.0768,
+      "failnames": 24,
+      "failnameDiff": {
+        "canonicalFile": "角色卡/测试/docs/change/2026-11-13_refactor-session-ts-b0_evidence/04c-knownred-orchestration-24.txt",
+        "actualFile": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b6\\角色卡\\桌面窗口\\docs\\change\\2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence\\segment2\\knownred-orchestration-failnames.txt",
+        "canonicalCount": 24,
+        "actualCount": 24,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      }
+    },
+    "orchestration-git-trunk-store": {
+      "file": "knownred-orchestration-git-trunk-store.log",
+      "tests": 13,
+      "suites": 0,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 57619.1677,
+      "failnames": 0
+    },
+    "orchestrationCombined": {
+      "tests": 1386,
+      "pass": 1360,
+      "fail": 24,
+      "cancelled": 0,
+      "skipped": 2,
+      "duration_ms": 83464.2
+    }
+  },
+  "flakeDisclosure": []
+}

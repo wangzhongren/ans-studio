@@ -1,0 +1,5 @@
+# canonical: 角色卡/测试/docs/change/2026-11-13_refactor-session-ts-b0_evidence/04b-knownred-gates-5.txt (5 names)
+# actual: 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence/segment2/knownred-gates-failnames.txt (5 names)
+ADDED=0
+REMOVED=0
+

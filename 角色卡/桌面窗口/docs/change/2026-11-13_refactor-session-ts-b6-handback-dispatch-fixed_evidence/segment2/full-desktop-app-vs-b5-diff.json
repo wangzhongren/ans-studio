@@ -1,0 +1,11 @@
+{
+  "canonicalFile": "角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b5-cards-run-change_evidence/segment2/full-desktop-app-failnames.txt",
+  "actualFile": "角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b6-handback-dispatch-fixed_evidence/segment2/full-desktop-app-failnames.txt",
+  "canonicalCount": 71,
+  "actualCount": 72,
+  "added": [
+    "申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl"
+  ],
+  "removed": [],
+  "sameSet": false
+}
