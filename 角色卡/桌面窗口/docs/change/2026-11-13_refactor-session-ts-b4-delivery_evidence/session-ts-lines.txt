@@ -1,0 +1,4 @@
+app/desktop/session.ts: 9118 行（HEAD e9d5783 = 10,252；B4 搬出后）
+app/desktop/session/delivery/queue.ts: 1276 行
+app/desktop/session/delivery/store.ts: 423 行
+session.ts 净变化：154	1288	app/desktop/session.ts

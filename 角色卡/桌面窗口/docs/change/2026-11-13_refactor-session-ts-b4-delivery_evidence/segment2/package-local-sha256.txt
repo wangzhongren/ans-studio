@@ -1,0 +1,1 @@
+303b7d902ede8dbdec76c5354564dc8da249e4ba9fa0ecd31c278c47c7075df6 *release-output/local/ANS-Studio-2.0.0-win-x64.zip

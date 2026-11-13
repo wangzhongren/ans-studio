@@ -1,0 +1,44 @@
+# B4 失败名机械对照（baseline=e9d5783 干净 HEAD，工作树 .tmp-b4/baseline-wt；final=B4 候选）
+
+- 结论：全部套件失败名逐名一致（零新增失败）
+- 口径：node --test；chief-workflow 两端均加 --test-force-exit（B2/B3 同口径）；其余同命令同超时。
+
+## message-queue
+- baseline: tests=20 pass=20 fail=0 cancelled=0
+- final:    tests=20 pass=20 fail=0 cancelled=0
+- failure-name diff: NO_DIFF
+
+## boundary-refresh
+- baseline: tests=14 pass=14 fail=0 cancelled=0
+- final:    tests=14 pass=14 fail=0 cancelled=0
+- failure-name diff: NO_DIFF
+
+## directive-input
+- baseline: tests=19 pass=14 fail=5 cancelled=0
+- final:    tests=19 pass=14 fail=5 cancelled=0
+- failure-name diff: NO_DIFF
+
+## chief-workflow
+- baseline: tests=66 pass=58 fail=8 cancelled=0
+- final:    tests=66 pass=58 fail=8 cancelled=0
+- failure-name diff: NO_DIFF
+
+## handback-delivery
+- baseline: tests=18 pass=16 fail=2 cancelled=0
+- final:    tests=18 pass=16 fail=2 cancelled=0
+- failure-name diff: NO_DIFF
+
+## h-scope-audit（补充）
+- baseline: tests=7 pass=4 fail=3 cancelled=0
+- final:    tests=7 pass=4 fail=3 cancelled=0
+- failure-name diff: NO_DIFF（范围②/范围③补＋⑤/范围⑥，逐名一致）
+
+## session.test.ts（补充）
+- baseline: tests=7 pass=6 fail=1 cancelled=0
+- final:    tests=7 pass=6 fail=1 cancelled=0
+- failure-name diff: NO_DIFF（AC-8 doc-format 索引字节 pin，既有失败，与 delivery 无关）
+
+## g4 e-handler.test.ts（补充·普通夹具冒烟）
+- baseline: tests=6 pass=5 fail=1 cancelled=0
+- final:    tests=6 pass=5 fail=1 cancelled=0
+- failure-name diff: NO_DIFF（护栏矩阵「无轮次」用例，既有失败，与 delivery 无关）

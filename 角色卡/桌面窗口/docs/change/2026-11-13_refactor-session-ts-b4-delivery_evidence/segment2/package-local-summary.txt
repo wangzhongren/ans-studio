@@ -1,0 +1,37 @@
+# B4 第二段 Windows 打包冒烟摘要
+日期：2026-11-13
+命令：npm run package:local（= npm run build:renderer && electron-builder --config electron-builder.yml --publish never -c.directories.output=release-output/local）
+EXIT=0；未发布/未上传；release-output 由 .gitignore 忽略，未入 git。
+
+## 环境接线（披露）
+- 工作树本身无 node_modules；创建临时目录 junction node_modules -> C:\Users\51054\Desktop\work\ans-studio\node_modules 后运行，完成后已用 cmd rmdir 移除（仅删 junction，主仓库 node_modules/junction 完好）。
+- 主仓库/工作树 dependencies 与 devDependencies 哈希逐字相同（electron 44.7.0 / electron-builder 26.15.3 / vite 8.3.4）。
+
+## 关键输出（摘自 package-local.log）
+  [32m✓ built in 3.95s[39m
+    • electron-builder  version=26.15.3 os=10.0.26300
+    • loaded configuration  file=C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\refactor-session-ts-b4\electron-builder.yml
+    • skipped dependencies rebuild  reason=npmRebuild is set to false
+    • packaging       platform=win32 arch=x64 electron=44.7.0 appOutDir=release-output\local\win-unpacked
+    • downloaded      label=electron progress=100%
+    • asar usage is disabled — this is strongly not recommended  solution=enable asar and use asarUnpack to unpack files that must be externally available
+    • searching for node modules  pm=npm searchDir=C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\refactor-session-ts-b4
+    • cannot find path for dependency  dependencies=["@earendil-works/pi-mcp@undefined","yaml@undefined","zod@undefined","json-schema-to-ts@undefined","@earendil-works/chord@undefined","@earendil-works/pi-agent-core@undefined","@earendil-works/pi-ai@undefined","@earendil-works/pi-codemode@undefined","@earendil-works/pi-tui@undefined","@silvia-odwyer/photon-node@undefined","brace-expansion@undefined","chalk@undefined","cross-spawn@undefined","diff@undefined","grok-mermaid@undefined","highlight.js@undefined","hosted-git-info@undefined","ignore@undefined","jiti@undefined","minimatch@undefined","proper-lockfile@undefined","quickjs-wasi@undefined","semver@undefined","typebox@undefined","undici@undefined","@hono/node-server@undefined","ajv-formats@undefined","ajv@undefined","content-type@undefined","cors@undefined","eventsource-parser@undefined","eventsource@undefined","express-rate-limit@undefined","express@undefined","hono@undefined","jose@undefined","json-schema-typed@undefined","pkce-challenge@undefined","raw-body@undefined","zod-to-json-schema@undefined"]
+    • asar usage is disabled — this is strongly not recommended  solution=enable asar and use asarUnpack to unpack files that must be externally available
+    • signing with signtool.exe  path=release-output\local\win-unpacked\ANS Studio.exe
+    • building        target=zip arch=x64 file=release-output\local\ANS-Studio-2.0.0-win-x64.zip
+
+## 产物
+  zip: release-output/local/ANS-Studio-2.0.0-win-x64.zip
+  size: 169187132 bytes
+  sha256: 303b7d902ede8dbdec76c5354564dc8da249e4ba9fa0ecd31c278c47c7075df6
+  win-unpacked: 416M
+  zip 文件条目数: 2532（unzip -l 共 2538 行，含表头/表尾）
+  抽查条目:
+    246302208  2026-11-13 15:36   ANS Studio.exe
+        83599  2026-11-13 14:52   resources/app/app/main.ts
+          597  2026-11-13 15:36   resources/app/app/renderer/dist/index.html
+
+## 非致命告警（如实披露）
+- electron-builder 报 cannot find path for dependency（34 个 pi 生态传递依赖 version 显示 undefined）；exit 0，zip 正常产出。疑为 @earendil-works/pi-coding-agent 依赖元数据的既有形态，非本批代码改动引起；未改配置绕过。
+- vite 报 chunk >500kB / INEFFECTIVE_DYNAMIC_IMPORT（构建告警，非失败）。
