@@ -1,0 +1,100 @@
+# Test matrix (development feedback) — 开发期三平台测试反馈通道
+#
+# 用途：
+#   仅手动触发（workflow_dispatch），在 macOS arm64 / macOS x64 / Windows x64 三个原生
+#   runner 上执行 typecheck 与有界全量测试（627 个 test/**/*.test.ts 文件，串行），
+#   并把测试输出保留为工件（test-ci-output.log），供开发期采集三平台基线反馈。
+#
+# 背景（为什么需要这个独立 workflow）：
+#   发布 workflow（release.yml）以「冻结 tag + overlay」为源：src/common/装配/release-policy.mjs
+#   的 selectOverlay 只放行显式列名的文件与 src/common/装配/、test/装配/ 两个目录；重构后
+#   app/desktop/session/** 下的新生产文件不在 v2.0.0 冻结 overlay 白名单，release-prepare.mjs
+#   会按设计 fail-closed（Unreviewed production overlay）。因此在新 tag 之前，发布 workflow
+#   无法充当三平台测试反馈通道；本文件只提供开发期反馈，不触碰发布链路。
+#
+# 非目标（明确声明）：
+#   - 不改 release.yml：发布 workflow 保持原样（冻结 tag + overlay 发布门禁不动）；
+#   - 不放宽发布门禁：本 workflow 不替代、不参与发布验证。发布权威测试命令仍是
+#     release.yml 的 `node --test --test-concurrency=1 "test/**/*.test.ts"`；本文件中的
+#     --test-timeout=300000 只把挂起变成可命名的失败，不跳过、不放宽任何断言；
+#   - 不发布：无 tag、无打包、无 release-prepare/overlay、无 Release 资产、无写权限
+#     （仅 contents: read）；
+#   - 仅开发反馈：通过与否只表示该 ref 的开发期测试状态，不构成任何发布放行结论。
+#
+# 触发：仅 workflow_dispatch（手动）。输入 ref 指定被测 ref（分支/tag/commit），默认 main。
+# 矩阵、Node 版本、git config、依赖安装与 typecheck 命令均与 release.yml 逐项对齐。
+name: Test matrix (development feedback)
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref to test (branch, tag or commit)
+        required: false
+        default: main
+permissions:
+  contents: read
+concurrency:
+  group: test-ci-${{ inputs.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: mac
+            arch: arm64
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+          - os: windows-2025
+            platform: win
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - name: Preserve repository byte identity on native runners
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          git config --global core.longpaths true
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          registry-url: https://registry.npmjs.org
+      - name: Install exact locked dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Ensure cross-platform ripgrep for POSIX integration tests
+        shell: bash
+        run: |
+          if command -v rg >/dev/null 2>&1; then
+            rg --version
+            exit 0
+          fi
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install ripgrep
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            choco install ripgrep -y --no-progress
+            export PATH="/c/ProgramData/chocolatey/bin:$PATH"
+          else
+            sudo apt-get update && sudo apt-get install -y ripgrep
+          fi
+          rg --version
+      - name: Full regression tests (bounded; development feedback)
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test --test-concurrency=1 --test-timeout=300000 "test/**/*.test.ts" 2>&1 | tee test-ci-output.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs-${{ matrix.platform }}-${{ matrix.arch }}
+          path: test-ci-output.log
+          if-no-files-found: warn
