@@ -1,0 +1,310 @@
+{
+  "generatedAt": "2026-11-13T08:31:46.835Z",
+  "gates": {
+    "version-decision": {
+      "file": "version-decision.test.ts",
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 2624.7044,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "version-change": {
+      "file": "version-change.test.ts",
+      "tests": 46,
+      "pass": 42,
+      "fail": 4,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 8465.3788,
+      "exit": 1,
+      "failnameDiff": {
+        "suite": "version-change",
+        "tap": "角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b5-cards-run-change_evidence/segment2/gate-version-change.log",
+        "canonicalCount": 4,
+        "actualCount": 4,
+        "missingInActual": [],
+        "extraVsCanonical": [],
+        "sameSet": true
+      }
+    },
+    "run-change": {
+      "file": "run-change.test.ts",
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 576.5119,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "run-change-trigger": {
+      "file": "run-change-trigger.test.ts",
+      "tests": 10,
+      "pass": 1,
+      "fail": 9,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1279.3709,
+      "exit": 1,
+      "failnameDiff": {
+        "suite": "run-change-trigger",
+        "tap": "角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b5-cards-run-change_evidence/segment2/gate-run-change-trigger.log",
+        "canonicalCount": 9,
+        "actualCount": 9,
+        "missingInActual": [],
+        "extraVsCanonical": [],
+        "sameSet": true
+      }
+    },
+    "run-change-entry": {
+      "file": "run-change-entry.test.ts",
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 612.9964,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "acceptance-evidence": {
+      "file": "acceptance-evidence.test.ts",
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 569.349,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "acceptance-proposal-path": {
+      "file": "acceptance-proposal-path.test.ts",
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1969.1712,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "acceptance-return-card": {
+      "file": "acceptance-return-card.test.ts",
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1373.6484,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "optional-acceptance": {
+      "file": "optional-acceptance.test.ts",
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1488.2472,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "pending-card-restart": {
+      "file": "pending-card-restart.test.ts",
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 499.5651,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "turn-lease": {
+      "file": "turn-lease.test.ts",
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1241.6886,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "request-timeout-wiring": {
+      "file": "request-timeout-wiring.test.ts",
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 950.79,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "directive-decision": {
+      "file": "directive-decision.test.ts",
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 434.9081,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "customer-authorization-plane-integration": {
+      "file": "test/测试/customer-authorization-plane-integration.test.ts",
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 568.2298,
+      "exit": 0,
+      "failnameDiff": null
+    },
+    "version-change-integration": {
+      "file": "test/测试/version-change-integration.test.ts（追加抽查，非显式清单）",
+      "tests": 12,
+      "pass": 3,
+      "fail": 9,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 961.901,
+      "exit": 1,
+      "failnameDiff": {
+        "baselineCount": 9,
+        "actualCount": 9,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      },
+      "baseline": "clean 9970c3d worktree run (baseline-9970c3d-version-change-integration.log)",
+      "note": "B0 full baseline (c234e79, 191 names) also contains all 9"
+    }
+  },
+  "fullDesktop": {
+    "桌面应用": {
+      "file": "full-desktop-app.log",
+      "tests": 845,
+      "pass": 774,
+      "fail": 69,
+      "cancelled": 2,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 441838.3114,
+      "exit": 1,
+      "failnameDiff": {
+        "baselineCount": 72,
+        "finalCount": 71,
+        "added": [],
+        "removed": [
+          "重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等"
+        ],
+        "sameSet": false
+      }
+    },
+    "桌面UI": {
+      "file": "full-desktop-ui.log",
+      "tests": 443,
+      "pass": 443,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 7187.8519,
+      "exit": 0
+    }
+  },
+  "knownred": {
+    "runtime-core": {
+      "file": "knownred-runtime-core.log",
+      "tests": 604,
+      "pass": 567,
+      "fail": 33,
+      "cancelled": 0,
+      "skipped": 4,
+      "todo": 0,
+      "duration_ms": 50609.0754,
+      "exit": 1,
+      "failnameDiff": {
+        "canonicalCount": 33,
+        "actualCount": 33,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      }
+    },
+    "gates": {
+      "file": "knownred-gates.log",
+      "tests": 577,
+      "pass": 571,
+      "fail": 5,
+      "cancelled": 0,
+      "skipped": 1,
+      "todo": 0,
+      "duration_ms": 93929.1194,
+      "exit": 1,
+      "failnameDiff": {
+        "canonicalCount": 5,
+        "actualCount": 5,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      }
+    },
+    "orchestration": {
+      "file": "knownred-orchestration.log",
+      "tests": 1373,
+      "pass": 1347,
+      "fail": 24,
+      "cancelled": 0,
+      "skipped": 2,
+      "todo": 0,
+      "duration_ms": 140396.3168,
+      "exit": 1,
+      "failnameDiff": {
+        "canonicalCount": 24,
+        "actualCount": 24,
+        "added": [],
+        "removed": [],
+        "sameSet": true
+      }
+    },
+    "orchestration-git-trunk-store": {
+      "file": "knownred-orchestration-git-trunk-store.log",
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 58369.3501,
+      "exit": 0
+    }
+  },
+  "flakeDisclosure": []
+}

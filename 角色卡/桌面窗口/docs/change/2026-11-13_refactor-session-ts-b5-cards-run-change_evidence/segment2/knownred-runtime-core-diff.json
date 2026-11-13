@@ -1,0 +1,9 @@
+{
+  "suite": "runtime-core",
+  "tap": "角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b5-cards-run-change_evidence/segment2/knownred-runtime-core.log",
+  "canonicalCount": 33,
+  "actualCount": 33,
+  "missingInActual": [],
+  "extraVsCanonical": [],
+  "sameSet": true
+}

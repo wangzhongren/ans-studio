@@ -1,0 +1,127 @@
+// app/desktop/session/cards/version-decisions.ts
+// B5（2026-11-13，session.ts 重构；方案 docs/planning/2026-11-13_refactor_session-ts_plan-v1.md
+// §3.2 / §3.3 / §3.6 / §5 B5、附录 A cards 组）：版本决策全链与恢复（L4，模块内拆分；feature 白名单
+// card-gateway / evidence）。
+// 17 个类方法（versionDecisionSubjectKey/isVersionDecisionRequestIdForSubject/findPendingVersionDecision/
+// pendingRequestIdsForFlow/countPriorVersionDecisions/buildVersionDecisionFacts/versionDecisionCardLabels/
+// decidedByText/formatTargetVersions/stripVersionDecisionPrefix/nextVersionFlowId/
+// mapVersionDecisionRawOutcome/appendVersionDecisionAudit/emitVersionDecisionResolved/
+// requestVersionDecision/restoreVersionDecisions/restoreRequestState）自 app/desktop/session.ts **逐字搬移**
+// （含 JSDoc）：方法体零改动；类外壳重建原 receiver 面——
+//  · versionDecisionPending/versionDecisionChains 与 cards/cards.ts 的 CardsState 是**同一实例**（Cards
+//    单 owner 创建；本模块经 `Cards` 引用读写，不造第二份状态）；
+//  · cards 模块内同义委托：withRequestLifecycle/notifyRequest → Cards 同名方法；
+//  · 已迁出的 shared 方法经同名同义委托 → shared/*；未迁出的 findLiveRuntime 经端口注入；
+//  · 验收拒绝计数 countAcceptanceRejections 委托同目录 acceptance-facts（模块内拆分）。
+// 可见性 private → 模块内 public 仅为门面委托可调用（不进入公开导出面）。
+
+import { createDiagnosticLogger } from "../../../../src/common/shared/diagnostics.ts";
+import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
+import { shortenSummary, taskEvent, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
+import { buildProjectStateView, deriveActiveRunFromManifests, scanRunManifestsForState, scanVersionedDocsForFlow } from "../../../../src/common/编排/project-state.ts";
+import {
+  buildVersionDecisionCard,
+  collectResolvedWithoutExecution,
+  mapVersionDecisionAnswer,
+  planVersionDecisionExecution,
+  supersededCloseReason,
+  validateVersionDecisionContext,
+  validateVersionDecisionRequest,
+  versionDecisionAttempt,
+  versionDecisionCardToRequest,
+  versionDecisionRequestId,
+  type VersionDecisionCardLabels,
+  type VersionDecisionRequestSubject,
+} from "../../../../src/common/编排/version-decision.ts";
+import { validateDecisionCardRequest } from "../../../../src/common/编排/decision-card.ts";
+import { closeRun, ensureDraftRun, readRunManifest } from "../../../../src/common/编排/run-manifest.ts";
+import { VERSION_DECISION_SCHEMA, type ProjectStateDocKind, type ProjectStateView, type VersionDecisionDecidedBy, type VersionDecisionErrorCode, type VersionDecisionFacts, type VersionDecisionRequest, type VersionDecisionResult } from "../../../../src/model/project-state.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../../../src/model/runtime.ts";
+import type { CustomerInputMetadata, CustomerInputOutcome, CustomerInputRequest, TaskStateEvent, VersionDecisionEvent } from "../../../../src/model/runtime.ts";
+import { directiveIdFromOperatorId } from "../../directive-input.ts";
+import { mainT } from "../../i18n.ts";
+import type { SessionManagerDeps } from "../contracts/deps.ts";
+import type { LiveSession } from "../contracts/session-types.ts";
+import { now } from "../shared/clock.ts";
+import { sessionKey } from "../shared/keys.ts";
+import { emitDeliveryNote } from "../shared/notifier.ts";
+import { chiefTaskRoleIdOf } from "../shared/roles.ts";
+import { appendTaskState, readTasks } from "../shared/tasks-store.ts";
+import type { AcceptanceFacts } from "./acceptance-facts.ts";
+import type { Cards } from "./cards.ts";
+
+/** 2026-11-02（版本决策）：slug 校验（与 model/runtime.ts 单一来源一致）与系统行前缀（原 session.ts 常量）。 */
+const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
+const VERSION_DECISION_SYSTEM_PREFIX = "[系统·版本决策] ";
+
+/** 版本决策方法读取的跨模块只读状态面（同一实例；方案 §3.6 归属其他模块）。 */
+export interface VersionDecisionRefs {
+  sessions: ReadonlyMap<string, LiveSession>;
+  lastGovernanceRuntime: ReadonlyMap<string, RuntimeKind>;
+}
+
+/** 尚未迁出（B5 范围外）的门面方法端口；门面以箭头回调注入，参数逐位原样转发。 */
+export interface VersionDecisionPorts {
+  findLiveRuntime(projectRoot: string, roleId: string): RuntimeKind | undefined;
+}
+
+/** 版本决策全链与恢复（原 SessionManager 17 方法的同签名实现）。 */
+export class VersionDecisions {
+  private readonly cards: Cards;
+  private readonly refs: VersionDecisionRefs;
+  private readonly port: VersionDecisionPorts;
+  private readonly deps: SessionManagerDeps;
+  private readonly acceptance: AcceptanceFacts;
+  constructor(cards: Cards, refs: VersionDecisionRefs, port: VersionDecisionPorts, deps: SessionManagerDeps, acceptance: AcceptanceFacts) {
+    this.cards = cards;
+    this.refs = refs;
+    this.port = port;
+    this.deps = deps;
+    this.acceptance = acceptance;
+  }
+
+  private get sessions(): ReadonlyMap<string, LiveSession> { return this.refs.sessions; }
+  private get lastGovernanceRuntime(): ReadonlyMap<string, RuntimeKind> { return this.refs.lastGovernanceRuntime; }
+  private get versionDecisionPending(): Map<string, string> { return this.cards.state.versionDecisionPending; }
+  private get versionDecisionChains(): Map<string, Promise<void>> { return this.cards.state.versionDecisionChains; }
+
+  /* shared 同名同义委托（→ shared/*）。 */
+  private sessionKey(projectRoot: string, roleId: string, runtime: RuntimeKind): string { return sessionKey(projectRoot, roleId, runtime); }
+  private now(): number { return now(this.deps); }
+  private chiefTaskRoleIdOf(projectRoot: string): string | null { return chiefTaskRoleIdOf(projectRoot, this.deps); }
+  private emitDeliveryNote(projectRoot: string, runtime: RuntimeKind, preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
+    emitDeliveryNote(projectRoot, runtime, preferredRoleId, fallbackRoleId, summary, this.deps);
+  }
+  private async readTasks(projectRoot: string): Promise<TaskReplay> { return readTasks(projectRoot); }
+  private async appendTaskState(projectRoot: string, event: TaskStateEvent): Promise<boolean> { return appendTaskState(projectRoot, event); }
+
+  /* cards 模块内同义委托（同一实现、同一入参）。 */
+  private withRequestLifecycle(
+    projectRoot: string,
+    sourceRoleId: string,
+    request: CustomerInputRequest,
+    metadata: CustomerInputMetadata | undefined,
+    raw: (request: CustomerInputRequest, context: Parameters<import("../../customer-input.ts").DesktopCustomerInputFn>[1], metadata?: CustomerInputMetadata) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined,
+    buildContext: (request: CustomerInputRequest, extras?: { onPresented?: () => void; acceptanceReport?: import("../../customer-input.ts").AcceptanceReportDisplayV1; judgeNotice?: string }) => Parameters<import("../../customer-input.ts").DesktopCustomerInputFn>[1],
+    requestIdOverride?: string,
+    lifecycle?: { notify?: "default" | "resolved-only" | "none"; signal?: AbortSignal; judgeNotice?: string; onPresented?: () => void },
+  ): Promise<CustomerInputOutcome | null | undefined> {
+    return this.cards.withRequestLifecycle(projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle);
+  }
+  private notifyRequest(
+    projectRoot: string,
+    requestId: string,
+    sourceRoleId: string,
+    title: string,
+    event: "created" | "presented" | "resolved",
+    detail?: string,
+    after?: Promise<unknown>,
+  ): Promise<void> {
+    return this.cards.notifyRequest(projectRoot, requestId, sourceRoleId, title, event, detail, after);
+  }
+  private countAcceptanceRejections(events: readonly TaskStateEvent[], flowId: string): number {
+    return this.acceptance.countAcceptanceRejections(events, flowId);
+  }
+
+  /* 尚未迁出的门面方法端口（参数逐位原样转发）。 */
+  private findLiveRuntime(projectRoot: string, roleId: string): RuntimeKind | undefined { return this.port.findLiveRuntime(projectRoot, roleId); }

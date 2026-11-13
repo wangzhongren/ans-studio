@@ -1,0 +1,178 @@
+// app/desktop/session/run-change.ts
+// B5（2026-11-13，session.ts 重构；方案 docs/planning/2026-11-13_refactor_session-ts_plan-v1.md
+// §3.3 / §3.6 / §5 B5、附录 A run-change 组）：run 停止栅栏、精确控制器停止、执行库存事实（L2，
+// feature 白名单 []）。
+// 9 个类方法（runTaskIsFenced/selectRunChangeForHandle/completeTeamPlanForHandle/ownedRunStopMembers/
+// executeOwnedRunStop/resumeDeferredRunChanges/executionInventoryFacts/controllerProducerFacts/
+// stopExactController）自 app/desktop/session.ts **逐字搬移**（含 JSDoc）：方法体零改动；类外壳重建原
+// receiver 面——
+//  · 方案 §3.6 run-change 的 10 个状态字段**由本模块单 owner 持有并创建**（RunChangeState）；门面仅保留
+//    同一实例访问器（测试 cast 与未迁出的生命周期方法按原名访问），不造第二份状态；
+//  · `observedInventoryRoots`/`inventoryPublicationErrors` 仍经 `shared/inventory.ts` 的
+//    `SessionInventoryState` 访问（同一 Set/Map 实例，无第二份状态）；
+//  · 跨实例协调经 `shared/inventory.ts` 的同一管理器注册表（同进程各 SessionManager 的结构化只读面）；
+//  · 已迁出的 shared 方法经同名同义委托 → shared/*；delivery 尚未迁出的方法（waitForRunStopDeliveryClaims/
+//    finishStopPersistence/deliveryQueuePersistenceFacts）经门面同名委托（manager.*，L2 不导入 L3 delivery）。
+// 可见性 private → 模块内 public 仅为门面委托可调用（不进入公开导出面）。
+// 依赖规则（结构测试 R-c）：L2 run-change 只可导入 L0（contracts/shared）与外部 src；不得导入 barrel/feature。
+// 源码钉子兼容：`ownedRunStopMembers`/`executeOwnedRunStop`/`resumeDeferredRunChanges` 三条方法声明前保留
+// 注明原 `private` 声明文本的定位注释（chief-workflow 顺序钉按方法边界切片；断言语义不变）。
+
+import { createDiagnosticLogger } from "../../../src/common/shared/diagnostics.ts";
+import type { RuntimeKind } from "../../../src/common/shared/runtime-shared.ts";
+import { isRuntimeSessionDrained } from "../../../src/model/runtime.ts";
+import type { CompleteTeamPlanFn, SelectRunChangeFn } from "../../../src/model/runtime.ts";
+import { beginGitHostAction, endGitHostAction, finalizeControllerStop, finalizeRunChange, inspectAssignedTask, prepareControllerStop, prepareRunChange, type RunChangeHostPlan } from "../../../src/pipeline/orchestration/trunk-runtime.ts";
+import type { RoleSessionHandle } from "../../../src/pipeline/orchestration/run-role.ts";
+import type { ActualDispatchSource, ControllerDisposalLease, DeliveryOrigin, DeliveryQueuePersistenceFacts, DesktopControllerStopFact, DesktopProjectExecutionInventory, DesktopRunStopFact, DesktopSessionInventoryFact, LiveSession, StopResult } from "./contracts/session-types.ts";
+import type { SessionManagerDeps } from "./contracts/deps.ts";
+import { now } from "./shared/clock.ts";
+import type { TerminateRoleRunInput, TerminateRoleRunResult } from "./contracts/tasks.ts";
+import { sessionKey } from "./shared/keys.ts";
+import { emitDeliveryNote } from "./shared/notifier.ts";
+import { appendRoleActivity } from "./shared/tasks-store.ts";
+import { desktopSessionManagers as inventorySessionManagers, inventoryChanged, type SessionInventoryState } from "./shared/inventory.ts";
+
+/** 队列认领记录的只读形状（原 `drainClaimRecords` 元素的最小子集；类型来源 delivery/queue，L2 不导入 L3）。 */
+interface DrainClaimRow {
+  projectRoot: string;
+  taskIds?: readonly string[];
+  owner?: ActualDispatchSource;
+}
+
+/**
+ * run-change 模块单 owner 的状态（方案 §3.6 run-change 的 10 个字段）。
+ * 前 8 项由本模块创建；后 2 项（inventoryPublicationErrors/observedInventoryRoots）是
+ * `shared/inventory.ts` 的 `SessionInventoryState` 访问的**同一实例**（不得双写）。
+ */
+export interface RunChangeState {
+  runStopGeneration: number;
+  readonly fencedRunTasks: Map<string, Set<string>>;
+  readonly fencedRuns: Map<string, Set<string>>;
+  readonly runStopFacts: Map<string, { projectRoot: string; fact: DesktopRunStopFact }>;
+  readonly controllerStopFacts: Map<string, { projectRoot: string; fact: DesktopControllerStopFact }>;
+  readonly controllerDisposalOwners: Set<ControllerDisposalLease>;
+  readonly deferredRunChanges: Map<string, { plan: RunChangeHostPlan; entry: LiveSession; origin: DeliveryOrigin; controller: AbortController }>;
+  readonly runChangeOperations: Map<string, { plan: RunChangeHostPlan; controller: AbortController }>;
+  readonly inventoryPublicationErrors: Map<string, string>;
+  readonly observedInventoryRoots: Set<string>;
+}
+
+/** run-change 方法读取的跨模块只读状态面（同一实例；延迟取值，两阶段装配）。 */
+export interface RunChangeRefs {
+  sessions: ReadonlyMap<string, LiveSession>;
+  observedHandles: ReadonlyMap<string, { fact: DesktopSessionInventoryFact; handle?: RoleSessionHandle }>;
+  openChains: ReadonlyMap<string, Promise<void>>;
+  lastRoleActivity: Map<string, { at: number; kind: string; summary: string }>;
+  managerId: string;
+  deliveryQueues(): ReadonlyMap<string, import("./contracts/session-types.ts").DeliveryItem[]>;
+  activeDeliveries(): ReadonlyMap<string, import("./contracts/session-types.ts").DeliveryItem>;
+  drainClaimRecords(): ReadonlySet<DrainClaimRow>;
+  taskDeliveryCommits(): ReadonlyMap<string, { done: Promise<void>; finish: () => void }>;
+  taskHandbackCommits(): ReadonlyMap<string, Promise<void>>;
+}
+
+/** 尚未迁出（B5 范围外）的门面方法端口；门面以箭头回调注入，参数逐位原样转发。 */
+export interface RunChangePorts {
+  deliveryQueuePersistenceFacts(): DeliveryQueuePersistenceFacts;
+}
+
+/** 同进程其他 SessionManager 暴露给 run-change 的结构化只读面（与门面同一实例；跨实例协调用）。 */
+interface RunChangePeer {
+  managerId: string;
+  observedHandles: ReadonlyMap<string, { fact: DesktopSessionInventoryFact; handle?: RoleSessionHandle }>;
+  openChains: ReadonlyMap<string, Promise<void>>;
+  sessions: ReadonlyMap<string, LiveSession>;
+  deliveryStoreArmed: boolean;
+  deliveryPersistSeq: number;
+  fencedRunTasks: Map<string, Set<string>>;
+  fencedRuns: Map<string, Set<string>>;
+  runStopGeneration: number;
+  runStopFacts: Map<string, { projectRoot: string; fact: DesktopRunStopFact }>;
+  controllerStopFacts: Map<string, { projectRoot: string; fact: DesktopControllerStopFact }>;
+  controllerDisposalOwners: Set<ControllerDisposalLease>;
+  inventoryPublicationErrors: ReadonlyMap<string, string>;
+  taskDeliveryCommits: Map<string, { done: Promise<void>; finish: () => void }>;
+  taskHandbackCommits: Map<string, Promise<void>>;
+  runChangeOperations: Map<string, { plan: RunChangeHostPlan; controller: AbortController }>;
+  executionInventoryFacts(projectRoot: string): Pick<DesktopProjectExecutionInventory, "sessions" | "pendingOpens" | "queuedDispatches" | "activeDeliveries" | "deliveryQueuePersistence" | "runStops" | "controllerStops">;
+  inventoryChanged(projectRoot: string, reason: string): void;
+  ownsControllerDisposal(handle: RoleSessionHandle, lease: ControllerDisposalLease): boolean;
+  disposeObservedHandle(handle: RoleSessionHandle, heldLease?: ControllerDisposalLease): Promise<void>;
+  disposeEntry(roleId: string, entry: LiveSession, heldLease?: ControllerDisposalLease): Promise<string | null>;
+  waitForRunStopDeliveryClaims(input: { projectRoot: string; taskIds: readonly string[]; signal?: AbortSignal; caller?: ActualDispatchSource }): Promise<{ status: "wait-complete"; count: number } | { status: "blocked"; code: string }>;
+  finishStopPersistence(result: StopResult): Promise<StopResult>;
+  controllerProducerFacts(projectRoot: string, taskId: string, caller: ActualDispatchSource): DesktopControllerStopFact["knownProducers"] | undefined;
+}
+
+/** 管理器注册表的 run-change 强类型视图（与 shared/inventory 单例同一 Set 实例）。 */
+const desktopSessionManagers = inventorySessionManagers as unknown as Set<RunChangePeer>;
+
+/** run 停止栅栏、精确控制器停止、执行库存事实（原 SessionManager 9 方法的同签名实现）。 */
+export class RunChange {
+  readonly state: RunChangeState;
+  private readonly refs: RunChangeRefs;
+  private readonly port: RunChangePorts;
+  private readonly deps: SessionManagerDeps;
+  constructor(refs: RunChangeRefs, port: RunChangePorts, deps: SessionManagerDeps) {
+    this.refs = refs;
+    this.port = port;
+    this.deps = deps;
+    this.state = {
+      runStopGeneration: 0,
+      fencedRunTasks: new Map<string, Set<string>>(),
+      fencedRuns: new Map<string, Set<string>>(),
+      runStopFacts: new Map<string, { projectRoot: string; fact: DesktopRunStopFact }>(),
+      controllerStopFacts: new Map<string, { projectRoot: string; fact: DesktopControllerStopFact }>(),
+      controllerDisposalOwners: new Set<ControllerDisposalLease>(),
+      deferredRunChanges: new Map<string, { plan: RunChangeHostPlan; entry: LiveSession; origin: DeliveryOrigin; controller: AbortController }>(),
+      runChangeOperations: new Map<string, { plan: RunChangeHostPlan; controller: AbortController }>(),
+      inventoryPublicationErrors: new Map<string, string>(),
+      observedInventoryRoots: new Set<string>(),
+    };
+  }
+
+  /* 原实例状态的本类视图（同一对象；方案 §3.6 单 owner）。 */
+  private get runStopGeneration(): number { return this.state.runStopGeneration; }
+  private set runStopGeneration(value: number) { this.state.runStopGeneration = value; }
+  private get fencedRunTasks(): Map<string, Set<string>> { return this.state.fencedRunTasks; }
+  private get fencedRuns(): Map<string, Set<string>> { return this.state.fencedRuns; }
+  private get runStopFacts(): Map<string, { projectRoot: string; fact: DesktopRunStopFact }> { return this.state.runStopFacts; }
+  private get controllerStopFacts(): Map<string, { projectRoot: string; fact: DesktopControllerStopFact }> { return this.state.controllerStopFacts; }
+  private get controllerDisposalOwners(): Set<ControllerDisposalLease> { return this.state.controllerDisposalOwners; }
+  private get deferredRunChanges(): Map<string, { plan: RunChangeHostPlan; entry: LiveSession; origin: DeliveryOrigin; controller: AbortController }> { return this.state.deferredRunChanges; }
+  private get runChangeOperations(): Map<string, { plan: RunChangeHostPlan; controller: AbortController }> { return this.state.runChangeOperations; }
+  private get inventoryPublicationErrors(): Map<string, string> { return this.state.inventoryPublicationErrors; }
+  private get observedInventoryRoots(): Set<string> { return this.state.observedInventoryRoots; }
+
+  /* 跨模块只读状态（同一实例；延迟取值）。 */
+  private get sessions(): ReadonlyMap<string, LiveSession> { return this.refs.sessions; }
+  private get observedHandles(): ReadonlyMap<string, { fact: DesktopSessionInventoryFact; handle?: RoleSessionHandle }> { return this.refs.observedHandles; }
+  private get openChains(): ReadonlyMap<string, Promise<void>> { return this.refs.openChains; }
+  private get managerId(): string { return this.refs.managerId; }
+  private get deliveryQueues(): ReadonlyMap<string, import("./contracts/session-types.ts").DeliveryItem[]> { return this.refs.deliveryQueues(); }
+  private get activeDeliveries(): ReadonlyMap<string, import("./contracts/session-types.ts").DeliveryItem> { return this.refs.activeDeliveries(); }
+  private get drainClaimRecords(): ReadonlySet<DrainClaimRow> { return this.refs.drainClaimRecords(); }
+  private get taskDeliveryCommits(): ReadonlyMap<string, { done: Promise<void>; finish: () => void }> { return this.refs.taskDeliveryCommits(); }
+  private get taskHandbackCommits(): ReadonlyMap<string, Promise<void>> { return this.refs.taskHandbackCommits(); }
+  private deliveryQueuePersistenceFacts(): DeliveryQueuePersistenceFacts { return this.port.deliveryQueuePersistenceFacts(); }
+
+  /** 库存函数的显式状态面（同一 Set/Map 实例；方案 §3.6 run-change 单 owner）。 */
+  get inventoryState(): SessionInventoryState {
+    return { observedInventoryRoots: this.state.observedInventoryRoots, inventoryPublicationErrors: this.state.inventoryPublicationErrors };
+  }
+  inventoryChanged(projectRoot: string, reason: string): void { inventoryChanged(projectRoot, reason, this.inventoryState); }
+
+  /* shared 同名同义委托（→ shared/*；与门面同名委托调用同一函数、同一入参）。 */
+  private sessionKey(projectRoot: string, roleId: string, runtime: RuntimeKind): string { return sessionKey(projectRoot, roleId, runtime); }
+  private now(): number { return now(this.deps); }
+  private emitDeliveryNote(projectRoot: string, runtime: RuntimeKind, preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
+    emitDeliveryNote(projectRoot, runtime, preferredRoleId, fallbackRoleId, summary, this.deps);
+  }
+  private appendRoleActivity(
+    projectRoot: string,
+    roleId: string,
+    input: { kind: string; summary: string; tool?: string; status?: string; taskId?: string; turnId?: string; ref?: string },
+  ): Promise<void> {
+    return appendRoleActivity(projectRoot, roleId, input, { lastRoleActivity: this.refs.lastRoleActivity, now: () => this.now() });
+  }

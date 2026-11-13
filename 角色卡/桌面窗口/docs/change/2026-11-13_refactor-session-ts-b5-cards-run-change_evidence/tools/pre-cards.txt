@@ -1,0 +1,182 @@
+// app/desktop/session/cards/cards.ts
+// B5（2026-11-13，session.ts 重构；方案 docs/planning/2026-11-13_refactor_session-ts_plan-v1.md
+// §3.2 / §3.3 / §3.6 / §5 B5、附录 A cards 组）：应用卡呈现 + 申请生命周期 + 方案升级 + 任命/stable +
+// run-change 卡（L4，feature 白名单 card-gateway / evidence）。
+// 24 个类方法（interpretDirective/requestRequirementChangeDecision/requestRunChangeDecision/
+// pickGovernedCardEntry/presentAppCard/presentVersionChangeCard/presentAmendmentItemCard/
+// presentStableWriteCard/noteVersionChange/noteVersionChangeInitiator/reportPlanEscalation/
+// afterPlanEscalation/afterStableWrite/enrichAppointmentWriteBoundaryCard/afterAppointmentWriteApproved/
+// activeRunViews/proposalCardFrozenRejection/pendingVersionChangesFor/offerRunChangeOnFrozenContract/
+// requestIdFor/notifyRequest/recordRequestPresented/appointmentWriteApplicationRejection/
+// withRequestLifecycle）自 app/desktop/session.ts **逐字搬移**（含 JSDoc）：方法体零改动；类外壳重建原
+// receiver 面——
+//  · 方案 §3.6 cards 的 7 个状态字段**由本模块单 owner 持有并创建**（CardsState；version-decisions 经
+//    同一实例引用读写 versionDecisionPending/versionDecisionChains）；门面仅保留同一实例访问器；
+//  · 已迁出的 shared 方法经同名同义委托 → shared/*（与门面委托同一函数、同一入参）；
+//  · 未迁出的门面方法（findLiveRuntime/activeRuntimeFor/enqueueDelivery/drainQueue）经 `CardsPorts`
+//    回调注入，参数逐位原样转发；fixed 卡钩子（prepareFixedAppointmentCardRequest/
+//    recordFixedCardWorkflowResolution）经 `FixedCardHooks`（card-gateway）注入；
+//  · `collectFixedProposalDocumentRefs` 直接调用已迁出的 Evidence 实例（白名单内下层 L1）；
+//  · 验收事实（enrichAcceptanceJudgeContext）委托同目录 acceptance-facts（模块内拆分）。
+// 可见性 private → 模块内 public 仅为门面委托可调用（不进入公开导出面）。
+// 依赖规则（结构测试 R-c）：L4 cards 只可导入 L0、card-gateway（L3）、evidence（L1）与模块内文件。
+
+import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import { createDiagnosticLogger } from "../../../../src/common/shared/diagnostics.ts";
+import { RUNTIME_KINDS, type RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
+import { shortenSummary, taskEvent, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
+import { declaredConfirmPaths, declaredPathBodies } from "../../../../src/common/编排/confirmed-writes.ts";
+import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../../../../src/common/编排/mechanical-rejection.ts";
+import { ENV_BOOTSTRAP_ROLE_ID, loadLatestRoster } from "../../../../src/common/编排/workflow-preconditions.ts";
+import { applyRunChange, buildRunChangeCard, findActiveRun, findNewerContractDocs, listRunManifestsResult, mapRunChangeAnswer, pinnedDocsSummary, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../../../src/common/编排/run-manifest.ts";
+import { stableWritePathOf } from "../../../../src/common/门禁引擎/versioned-doc-guard.ts";
+import { isBuiltInGovernanceRoleId } from "../../../../src/service/boundary/resolve-boundary.ts";
+import { createRuntimeAdapterFactory } from "../../../../src/pipeline/orchestration/run-role.ts";
+import { createDirectiveInterpreter as realCreateDirectiveInterpreter, DIRECTIVE_INTERPRET_SUPPORTED_RUNTIMES } from "../../../../src/pipeline/orchestration/govern-session.ts";
+import type { DirectiveInterpretRequest, DirectiveInterpretResult } from "../../../../src/model/directive.ts";
+import type { CustomerInputMetadata, CustomerInputOutcome, CustomerInputRequest, PlanEscalationInput, PlanEscalationResult, TaskStateEvent, WorkflowDocumentRef, WorkflowStage } from "../../../../src/model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES } from "../../../../src/model/runtime.ts";
+import type { VersionDecisionDecidedBy } from "../../../../src/model/project-state.ts";
+import type { StableWriteRecord, VersionChangeRecord } from "../../../../src/model/version-change.ts";
+import type { AmendmentItemOutcome, VcaCardOutcome } from "../../../../src/pipeline/orchestration/version-change-runtime.ts";
+import type { StableWriteCardOutcome } from "../../../../src/pipeline/orchestration/stable-write-runtime.ts";
+import { directiveIdFromOperatorId } from "../../directive-input.ts";
+import { mainT } from "../../i18n.ts";
+import { buildEffectiveProjectConfig } from "../../project.ts";
+import { prepareIntent as prepareFixedIntent } from "../../../../src/common/编排/workflow-service.ts";
+import { activeFixedWorkflowIdFor, markFixedProposalCardRequested, resolveFixedPathMode } from "../../workflow.ts";
+import { buildPlanEscalationCard } from "../../plan-escalation.ts";
+import {
+  appointmentStableWriteInputs,
+  buildAmendmentItemCard,
+  buildStableBoundaryRisk,
+  buildStableWriteCard,
+  buildVersionChangeCard,
+  mergeAcknowledgements,
+  toAmendmentItemOutcome,
+  toStableWriteOutcome,
+  toVersionChangeOutcome,
+  validateStableWriteCardShape,
+  type AmendmentItemPresentation,
+  type StableWritePreview,
+  type VersionChangeStack,
+} from "../../version-change.ts";
+import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn } from "../../customer-input.ts";
+import type { SessionManagerDeps } from "../contracts/deps.ts";
+import type { ActiveRunView, DeliveryItem, LiveSession } from "../contracts/session-types.ts";
+import { now } from "../shared/clock.ts";
+import { sessionKey } from "../shared/keys.ts";
+import { emitDeliveryNote } from "../shared/notifier.ts";
+import { chiefTaskRoleIdOf, handbackOwnerRoleId } from "../shared/roles.ts";
+import { appendRoleActivity, appendTaskState, readTasks } from "../shared/tasks-store.ts";
+import type { Evidence } from "../evidence.ts";
+import type { FixedCardHooks } from "../card-gateway.ts";
+import type { LoadConfigOptions, LoadedConfig } from "../../../../src/common/shared/config-loader.ts";
+import { AcceptanceFacts } from "./acceptance-facts.ts";
+
+/** 2026-11-02（版本决策）：slug 校验（与 model/runtime.ts 单一来源一致）。 */
+const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
+
+/** cards 模块单 owner 的状态（方案 §3.6 cards 的 7 个字段；version-decisions 经同一实例引用其 2 项）。 */
+export interface CardsState {
+  readonly planEscalations: Map<string, Promise<void>>;
+  readonly planEscalationPrompted: Set<string>;
+  readonly requestNotifiedKeys: Set<string>;
+  readonly requestPresentedKeys: Set<string>;
+  readonly versionDecisionPending: Map<string, string>;
+  readonly versionDecisionChains: Map<string, Promise<void>>;
+  readonly runChangeAutoPrompted: Set<string>;
+}
+
+/** cards 方法读取的跨模块只读状态面（同一实例；方案 §3.6 归属其他模块）。 */
+export interface CardsRefs {
+  sessions: ReadonlyMap<string, LiveSession>;
+  lastGovernanceRuntime: ReadonlyMap<string, RuntimeKind>;
+  lastRoleActivity: Map<string, { at: number; kind: string; summary: string }>;
+  loadEffectiveConfig: (opts: LoadConfigOptions) => Promise<LoadedConfig>;
+}
+
+/** 尚未迁出（B5 范围外）的门面方法端口；门面以箭头回调注入，参数逐位原样转发、返回原样返回。 */
+export interface CardsPorts {
+  findLiveRuntime(projectRoot: string, roleId: string): RuntimeKind | undefined;
+  activeRuntimeFor(projectRoot: string): RuntimeKind | undefined;
+  enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void;
+  drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void>;
+}
+
+/** 应用卡呈现 + 申请生命周期 + 方案升级 + 任命/stable + run-change 卡（原 SessionManager 24 方法的同签名实现）。 */
+export class Cards {
+  readonly state: CardsState;
+  private readonly refs: CardsRefs;
+  private readonly port: CardsPorts;
+  private readonly deps: SessionManagerDeps;
+  private readonly evidence: Evidence;
+  private readonly acceptance: AcceptanceFacts;
+  private readonly fixedHooks: FixedCardHooks;
+  constructor(refs: CardsRefs, port: CardsPorts, deps: SessionManagerDeps, evidence: Evidence, acceptance: AcceptanceFacts, fixedHooks: FixedCardHooks) {
+    this.refs = refs;
+    this.port = port;
+    this.deps = deps;
+    this.evidence = evidence;
+    this.acceptance = acceptance;
+    this.fixedHooks = fixedHooks;
+    this.state = {
+      planEscalations: new Map<string, Promise<void>>(),
+      planEscalationPrompted: new Set<string>(),
+      requestNotifiedKeys: new Set<string>(),
+      requestPresentedKeys: new Set<string>(),
+      versionDecisionPending: new Map<string, string>(),
+      versionDecisionChains: new Map<string, Promise<void>>(),
+      runChangeAutoPrompted: new Set<string>(),
+    };
+  }
+
+  private get sessions(): ReadonlyMap<string, LiveSession> { return this.refs.sessions; }
+  private get lastGovernanceRuntime(): ReadonlyMap<string, RuntimeKind> { return this.refs.lastGovernanceRuntime; }
+  private get planEscalations(): Map<string, Promise<void>> { return this.state.planEscalations; }
+  private get planEscalationPrompted(): Set<string> { return this.state.planEscalationPrompted; }
+  private get requestNotifiedKeys(): Set<string> { return this.state.requestNotifiedKeys; }
+  private get requestPresentedKeys(): Set<string> { return this.state.requestPresentedKeys; }
+  private get runChangeAutoPrompted(): Set<string> { return this.state.runChangeAutoPrompted; }
+  private get loadEffectiveConfig(): (opts: LoadConfigOptions) => Promise<LoadedConfig> { return this.refs.loadEffectiveConfig; }
+
+  /* shared 同名同义委托（→ shared/*；与门面同名委托调用同一函数、同一入参）。 */
+  private sessionKey(projectRoot: string, roleId: string, runtime: RuntimeKind): string { return sessionKey(projectRoot, roleId, runtime); }
+  private now(): number { return now(this.deps); }
+  private handbackOwnerRoleId(projectRoot: string): string | null { return handbackOwnerRoleId(projectRoot, this.deps); }
+  private chiefTaskRoleIdOf(projectRoot: string): string | null { return chiefTaskRoleIdOf(projectRoot, this.deps); }
+  private emitDeliveryNote(projectRoot: string, runtime: RuntimeKind, preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
+    emitDeliveryNote(projectRoot, runtime, preferredRoleId, fallbackRoleId, summary, this.deps);
+  }
+  private async readTasks(projectRoot: string): Promise<TaskReplay> { return readTasks(projectRoot); }
+  private async appendTaskState(projectRoot: string, event: TaskStateEvent): Promise<boolean> { return appendTaskState(projectRoot, event); }
+  private appendRoleActivity(
+    projectRoot: string,
+    roleId: string,
+    input: { kind: string; summary: string; tool?: string; status?: string; taskId?: string; turnId?: string; ref?: string },
+  ): Promise<void> {
+    return appendRoleActivity(projectRoot, roleId, input, { lastRoleActivity: this.refs.lastRoleActivity, now: () => this.now() });
+  }
+
+  /* 尚未迁出的门面方法端口（参数逐位原样转发）。 */
+  private findLiveRuntime(projectRoot: string, roleId: string): RuntimeKind | undefined { return this.port.findLiveRuntime(projectRoot, roleId); }
+  private activeRuntimeFor(projectRoot: string): RuntimeKind | undefined { return this.port.activeRuntimeFor(projectRoot); }
+  private enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void { this.port.enqueueDelivery(projectRoot, targetRoleId, item); }
+  private async drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> { return this.port.drainQueue(projectRoot, targetRoleId, runtime); }
+  private collectFixedProposalDocumentRefs(projectRoot: string, flowId: string) { return this.evidence.collectFixedProposalDocumentRefs(projectRoot, flowId); }
+  private prepareFixedAppointmentCardRequest(projectRoot: string, flowId: string, request: CustomerInputRequest) {
+    return this.fixedHooks.prepareFixedAppointmentCardRequest(projectRoot, flowId, request);
+  }
+  private recordFixedCardWorkflowResolution(input: Parameters<FixedCardHooks["recordFixedCardWorkflowResolution"]>[0]): Promise<void> {
+    return this.fixedHooks.recordFixedCardWorkflowResolution(input);
+  }
+  private enrichAcceptanceJudgeContext(
+    projectRoot: string,
+    request: CustomerInputRequest,
+    metadata: CustomerInputMetadata | undefined,
+    sourceRoleId: string,
+  ): Promise<{ metadata: CustomerInputMetadata | undefined; display?: AcceptanceReportDisplayV1 }> {
+    return this.acceptance.enrichAcceptanceJudgeContext(projectRoot, request, metadata, sourceRoleId);
+  }

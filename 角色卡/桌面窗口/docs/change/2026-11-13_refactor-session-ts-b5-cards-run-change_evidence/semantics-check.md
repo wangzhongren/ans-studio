@@ -1,0 +1,18 @@
+# B5 语义核对表（指令顺序 / 主权卡 / 版本决策 / run-change 三重触发）
+
+日期：2026-11-13。证据来源：`moved-methods.json`（52/52 方法体 sha256 相等）、`final/` 日志、干净
+9970c3d 基线对照（`baseline/` 与 `failure-name-diff.txt`）。
+
+| # | 语义 | 证据 | 结论 |
+| --- | --- | --- | --- |
+| 1 | **`@决策` 指令消费顺序**：`customer-input.ts` 中 `tryApplyDirectiveDecision(entry)` 必须先于 `isChiefBusinessCard(entry)` 分支（B3-1 修复，约 2206–2211 行） | `git status`：`app/desktop/customer-input.ts` **未修改**；`final/directive-decision.log` **8/8 通过**；`final/customer-authorization-plane-integration.log` **6/6 通过**；`nail-directive-input.log` 5 项既有失败与基线**逐名一致（NO_DIFF）** | ✅ 保持 |
+| 2 | **指令归属解析**：`operatorId:"directive:<id>"` 先于 judge/customer（Q9 A），不伪造 presented.to | `requestRunChangeDecision`/`requestVersionDecision`/`withRequestLifecycle` 方法体 sha256 相等（`moved-methods.json`）；`version-decision.log` 中「版本修改（客户指令 Q9 A）」用例通过；`customer-authorization…`（Q9 归属）通过 | ✅ 保持 |
+| 3 | **主权卡判定/客户卡呈现/作答**：应用卡只呈现、不代选；申请生命周期 created→presented→resolved 顺序与 abort/晚到答案语义 | `presentAppCard`/`withRequestLifecycle`/`presentVersionChangeCard`/`presentAmendmentItemCard`/`presentStableWriteCard` 方法体 sha256 相等；`final/acceptance-return-card.log` 10/10、`final/acceptance-proposal-path.log` 7/7、`final/acceptance-evidence.log` 3/3、`final/b3-fixed-cards-panel.log` 8/8、`final/pending-card-restart.log` 1/1、`final/optional-acceptance.log` 6/6、`nail-request-status.log` 4/4、`final/download-request.log` 7/8（1 项既有失败，基线逐名一致） | ✅ 保持 |
+| 4 | **方案升级卡**：同一 flow 至多一张在途卡；呈现≠客户结论；修订方案投递 | `reportPlanEscalation`/`afterPlanEscalation` sha256 相等；`planEscalationPrompted` 状态由 `Cards` 单 owner（同一实例） | ✅ 保持 |
+| 5 | **版本决策 replay/幂等**：check-then-set 串行链、`decision-pending`、executing→executed/uncertain、重启恢复（F5/孤儿排除/幂等） | `requestVersionDecision`/`restoreVersionDecisions`/`restoreRequestState`/`findPendingVersionDecision` 等方法体 sha256 相等；`final/version-decision.log` **15/15 通过**（含「重启对账」「未决 decision-pending」「重启恢复」「R1-e 坏 manifest」「requestId 前缀碰撞」） | ✅ 保持 |
+| 6 | **run-change 三重触发·显式入口** | `final/run-change-entry.log` **5/5 通过**（含 `this.requestRunChangeDecision({` 源码钉与三模式真实通道用例）；`run-change.log` **4/4 通过** | ✅ 保持 |
+| 7 | **run-change 三重触发·冻结冲突**（提案卡冻结 → 先 offer run-change，提案卡 notPresented 拒发） | `proposalCardFrozenRejection`/`offerRunChangeOnFrozenContract`（cards.ts）sha256 相等；`run-change-trigger.log` 基线/最终均为 1 pass / 9 fail **逐名一致（NO_DIFF）**（既有失败集，见 failure-name-diff.txt） | ✅ 保持（零新增） |
+| 8 | **run-change 三重触发·自动触发**：同一 pinned run 只自动弹一次（`runChangeAutoPrompted`）；无会话不占名额；AC-17 在途 VCA 抑制 | 同上 sha 相等；`runChangeAutoPrompted` 状态由 `Cards` 单 owner；`run-change-trigger` 已知红集与基线一致 | ✅ 保持 |
+| 9 | **run 停止栅栏/精确控制器停止**：fence 先于执行、五项身份校验、claims/commits 等待、持久化 cutoff、finalize 顺序；native absent 允许/present-changed 拒绝 | `final/chief-workflow.log` 中 **W4 桌面 run-stop 用例通过**（含 `readSessionModule("run-change")` 的方法边界顺序钉 `private ownedRunStopMembers → private async executeOwnedRunStop → private resumeDeferredRunChanges`、C8 drain 断言、错误码保留）；`stopExactController`/`executeOwnedRunStop`/`ownedRunStopMembers` sha256 相等 | ✅ 保持 |
+| 10 | **库存单实例**：`observedInventoryRoots`/`inventoryPublicationErrors` 由 `shared/inventory` 的 `SessionInventoryState` 访问，不得双写 | `RunChange` 单 owner 创建两集合；门面 `inventoryState` getter → `runChange.inventoryState`；`Delivery` 构造以同一实例引用注入（代码核对）；`session-structure.log` 工具面快照 7 角色通过；`chief-workflow` W4（cast 直写 `runStopFacts`/`deliveryStoreArmed`）通过 | ✅ 单实例 |
+| 11 | **源码钉子 14 文件**：读取方式零改动（`readSessionSource`/`readSessionModule`），断言语义不变 | `final/nail-*.log`：boundary-refresh 14/14、evidence-markers 1/1、queue-status 5/5、request-status 4/4、dispatch-fresh-enum 2/2、hot-path 3/3、interface 8/8、g1 5/5、governance-matrix 18/18；directive-input 14/5、h-scope-audit 4/3、chief-workflow 58/8 与基线**逐名一致**；run-change-entry 5/5、pending-card-restart 1/1 | ✅ 保持 |

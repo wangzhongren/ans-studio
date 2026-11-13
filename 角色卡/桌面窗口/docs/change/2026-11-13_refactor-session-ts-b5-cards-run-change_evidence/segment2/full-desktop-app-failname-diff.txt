@@ -1,0 +1,6 @@
+# baseline: 12b-baseline-desktop-app-failnames.txt (72 names)
+# final: segment2/full-desktop-app.log (71 names)
+ADDED=0
+REMOVED=1
+
+- 重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等
