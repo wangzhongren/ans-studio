@@ -1,0 +1,5 @@
+branch: release/v2.0.0-blockers-8
+HEAD: e0c5e015b9a6004cfdbbea6717c22a7b0d3a9426
+origin/main: e0c5e015b9a6004cfdbbea6717c22a7b0d3a9426
+node: v24.22.1
+date: 2026-11-12T19:10:08+08:00

@@ -1,0 +1,21 @@
+[PROBE send] su 先忙 failsLeft=1 t=1794482090158
+[PROBE send] su HB failsLeft=1 t=1794482090181
+[PROBE intermediate sent.su] ["先忙"]
+[PROBE send] su HB failsLeft=0 t=1794482090188
+[PROBE diag] {"at":"2026-11-12T11:14:50.179Z","level":"info","pid":49688,"component":"desktop.delivery","event":"delivery.claim.start","projectRoot":"/proj","roleId":"su","state":"handback","queueDepth":2}
+[PROBE diag] {"at":"2026-11-12T11:14:50.180Z","level":"info","pid":49688,"component":"desktop.delivery","event":"delivery.start","projectRoot":"/proj","roleId":"su","state":"handback","count":2,"queueDepth":0}
+[PROBE diag] {"at":"2026-11-12T11:14:50.181Z","level":"info","pid":49688,"component":"desktop.delivery","event":"delivery.claim.end","projectRoot":"/proj","roleId":"su","state":"handback","count":2}
+[PROBE diag] {"at":"2026-11-12T11:14:50.182Z","level":"info","pid":49688,"component":"desktop.delivery","event":"delivery.failed","projectRoot":"/proj","roleId":"su","state":"handback","count":2}
+[PROBE diag] {"at":"2026-11-12T11:14:50.186Z","level":"info","pid":49688,"component":"desktop.delivery","event":"delivery.claim.start","projectRoot":"/proj","roleId":"su","state":"handback","queueDepth":1}
+[PROBE diag] {"at":"2026-11-12T11:14:50.187Z","level":"info","pid":49688,"component":"desktop.delivery","event":"delivery.start","projectRoot":"/proj","roleId":"su","state":"handback","count":1,"queueDepth":0}
+[PROBE diag] {"at":"2026-11-12T11:14:50.188Z","level":"info","pid":49688,"component":"desktop.delivery","event":"delivery.claim.end","projectRoot":"/proj","roleId":"su","state":"handback","count":1}
+[PROBE diag] {"at":"2026-11-12T11:14:50.189Z","level":"info","pid":49688,"component":"desktop.delivery","event":"delivery.end","projectRoot":"/proj","roleId":"su","ok":true,"state":"handback","count":1}
+✔ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (69.452ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 517.1025

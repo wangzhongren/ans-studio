@@ -8717,7 +8717,28 @@ export class SessionManager {
     return flowIds.length === 1 ? flowIds[0] : undefined;
   }
 
+  /** **坏形状防御（v2.0.0 B8 回归修复）**：按 `TaskHandback` 契约校验必要字段类型。
+   *  真机形态是事件载荷缺失（`handback: undefined`）——修复前 `handleHandback` 先读 `hb.taskId` ⇒
+   *  TypeError 被事件消费环兜底为通用「会话事件流异常」，专用「形状不符」防线失效。
+   *  `roleId`/`status`/`summary`/`evidence`/`at` 是 `handbackKey`/渲染/落账的最小必要面；
+   *  可选字段若出现也按契约校验类型。坏形状一律交给 `commitHandback` 既有 fail-closed 分支。 */
+  private isTaskHandbackShape(value: unknown): value is TaskHandback {
+    if (value === null || typeof value !== "object") return false;
+    const hb = value as Partial<Record<keyof TaskHandback, unknown>>;
+    if (typeof hb.roleId !== "string") return false;
+    if (hb.status !== "completed" && hb.status !== "blocked" && hb.status !== "unreported" && hb.status !== "failed" && hb.status !== "aborted") return false;
+    if (typeof hb.summary !== "string") return false;
+    if (!Array.isArray(hb.evidence) || !hb.evidence.every((item) => typeof item === "string")) return false;
+    if (typeof hb.at !== "string") return false;
+    if (hb.taskId !== undefined && typeof hb.taskId !== "string") return false;
+    if (hb.turnId !== undefined && typeof hb.turnId !== "string") return false;
+    if (hb.round !== undefined && typeof hb.round !== "number") return false;
+    return true;
+  }
+
   private handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live', flowId?: string): Promise<boolean> {
+    // 形状防御必须在读 `hb.taskId` **之前**（v2.0.0 B8：此前坏载荷会抛 TypeError，退化为事件流异常）。
+    if (!this.isTaskHandbackShape(hb)) return this.commitHandback(projectRoot, runtime, hb, report, liveReport, liveDurability, flowId);
     if (!hb.taskId) return this.commitHandback(projectRoot, runtime, hb, report, liveReport, liveDurability, flowId);
     const key = `${projectRoot}\u0000${hb.taskId}`;
     // Consecutive real turns of one task can finish before the prior detached report is registered.
@@ -8735,7 +8756,7 @@ export class SessionManager {
     diagnostic.record("report.received", { outcome: hb?.status });
     let pendingKey: string | undefined;
     try {
-      if (!hb || typeof hb !== "object" || typeof (hb as { roleId?: unknown }).roleId !== "string") {
+      if (!this.isTaskHandbackShape(hb)) {
         this.emitDeliveryNote(projectRoot, runtime,
           this.handbackOwnerRoleId(projectRoot),
           mainT("main.common.unknownRole"),
@@ -13175,7 +13196,11 @@ ${formatted}` };
     const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
     const handbackOwner = this.handbackOwnerRoleId(projectRoot);
     let batchCount = 1;
-    if (headIndex === 0 && resolvedTarget === chiefRoleId && item.kind === "handback" && item.handback && !item.deliveryId) {
+    // v2.0.0 B8 回归修复：合批目标 = **回交主人**（single=`primaryRoleId`/trio=Convener）**或**幕僚
+    // chief——与 `e71501c` 之前一致；该提交把 `handbackOwner` 分支误删为仅 chief（注释与渲染分支仍按
+    // 两者写），导致单模型（su）队首连续回交逐条投递、队列不清空。owner 未枚举到 ⇒ 只按 chief 判。
+    const batchesForHandbackOwner = handbackOwner !== null && resolvedTarget === handbackOwner;
+    if (headIndex === 0 && (batchesForHandbackOwner || resolvedTarget === chiefRoleId) && item.kind === "handback" && item.handback && !item.deliveryId) {
       while (batchCount < q.length && q[batchCount].kind === "handback" && q[batchCount].handback) batchCount += 1;
     }
     let text = item.text;
