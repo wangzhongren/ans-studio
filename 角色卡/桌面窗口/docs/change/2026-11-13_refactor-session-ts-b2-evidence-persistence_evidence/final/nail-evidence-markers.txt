@@ -1,0 +1,9 @@
+✔ 验收 facts 暴露 unverified/legacy/evidenceMismatch；P0 不伪造通过 (0.676ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 89.3018

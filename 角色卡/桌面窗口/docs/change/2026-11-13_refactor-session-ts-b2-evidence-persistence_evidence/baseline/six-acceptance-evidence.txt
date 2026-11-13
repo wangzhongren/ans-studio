@@ -1,0 +1,11 @@
+✔ P4.1/P4.5：AcceptanceFact.priority 来自 criteria；sidecar p0:false 不降级；P0 缺 sidecar 不通过 (31.1078ms)
+✔ P4.4：criteriaRef 显式 path+sha+version；无 ref 不取 latest (8.4848ms)
+✔ P4.4/F1–F3/F5：真实会话 evidence_check——collection 路由、角色范围、路径、flow 绑定 (110.2091ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3019.956

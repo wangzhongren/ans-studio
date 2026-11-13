@@ -1,0 +1,13 @@
+✔ ageMs：快照数值进入队列视图；缺失/非法旧快照按 0（不虚构等待） (1.1997ms)
+✔ ageText：≥1 分钟才显示人话等待（zh/en 一致语义） (0.1646ms)
+✔ blockedView：「为什么没动」＝队首类别 + 阻塞原因（target-busy / origin-missing / session-closed / network） (0.2142ms)
+✔ queueGroups：运行中/排队分组仍单一来源，ageMs 随条目透出 (0.1239ms)
+✔ 接线钉子：session 快照 → main 透传 → chat-store → QueuePanel 字段端到端 (0.5837ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 196.7769

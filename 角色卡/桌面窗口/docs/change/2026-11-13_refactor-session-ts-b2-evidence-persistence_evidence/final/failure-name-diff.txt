@@ -1,0 +1,31 @@
+B2 failure-name diff: clean 7519e6f baseline vs final tree
+rule: set of lines starting with the failure marker (timings stripped); header "failing tests:" excluded
+
+six-acceptance-evidence.txt            baseline_fail= 0 final_fail= 0 NO_DIFF
+six-b21-basis-gate-desktop.txt         baseline_fail= 0 final_fail= 0 NO_DIFF
+six-doc-format-all-roles.txt           baseline_fail= 0 final_fail= 0 NO_DIFF
+six-pending-card-restart.txt           baseline_fail= 0 final_fail= 0 NO_DIFF
+six-replay-safe-retry.txt              baseline_fail= 0 final_fail= 0 NO_DIFF
+six-task-restart.txt                   baseline_fail= 1 final_fail= 1 NO_DIFF
+structure.txt                          baseline_fail= 0 final_fail= 0 NO_DIFF
+source-aggregator.txt                  baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-boundary-refresh.txt              baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-chief-workflow.txt                baseline_fail= 8 final_fail= 8 NO_DIFF
+nail-directive-input.txt               baseline_fail= 5 final_fail= 5 NO_DIFF
+nail-dispatch-fresh-enum.txt           baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-evidence-markers.txt              baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-g1-copy-and-nails.txt             baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-governance-matrix.txt             baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-h-scope-audit.txt                 baseline_fail= 3 final_fail= 3 NO_DIFF
+nail-hot-path.txt                      baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-interface.txt                     baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-message-queue.txt                 baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-queue-status.txt                  baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-request-status.txt                baseline_fail= 0 final_fail= 0 NO_DIFF
+nail-run-change-entry.txt              baseline_fail= 0 final_fail= 0 NO_DIFF
+
+ALL_NO_DIFF
+
+extra (not in commanded gate, direct persistence coverage):
+handback-delivery.txt                  baseline_fail= 2 final_fail= 2 NO_DIFF
+  (clean 7519e6f baseline obtained by temporary file swap; restored sha256 verified identical)

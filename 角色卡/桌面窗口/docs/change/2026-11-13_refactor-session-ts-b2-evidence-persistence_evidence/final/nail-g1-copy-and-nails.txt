@@ -1,0 +1,13 @@
+✔ 代码级钉子（独立）：session.ts 无本地副本实现/调用、无内嵌派发模板；接线走编排三件套 (4.0391ms)
+✔ 代码级钉子（独立）：su 预授权写目录恰为四棵（docs/su + docs/contracts + docs/skills + docs/mcp）——workflow.md 不在其中 (5.7553ms)
+✔ 卡文本独立反向断言（含非空洞验证）：含 docs/workflow.md 的小句不得声称免确认/直接写/预授权 (0.3912ms)
+✔ 卡文本独立复核（J-1 守卫语义）：含 授权/获准/放行 的小句全部为否定式；「原地改」小句全部为否定式（各带非空洞验证） (0.5124ms)
+✔ 卡文本正向在场性（独立短语清单）：G-1/A3 关键纪律逐字落卡 (0.1365ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 159.9716

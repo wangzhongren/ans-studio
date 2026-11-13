@@ -1,0 +1,74 @@
+✔ 范围①：su 预授权目录字面量恰为四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp） (1.9483ms)
+✖ 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su (3.8316ms)
+✔ 范围③（源码切片）：applySkillChange 与 makeSkillReceiptTool 全切片零 request_confirmation/零客户通道调用 (3.5137ms)
+✔ 范围③（行为）：真实装配 su 会话——install_skill 全链执行且客户通道零调用（无二次卡） (55.394ms)
+✖ 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册 (0.822ms)
+✔ 范围④：工具面无删除原语；卸载链源码不含 unlink/rm/删除调用（文件保留——E 域行为侧互证） (2.8213ms)
+✖ 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用 (3.6266ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 4
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 493.4465
+
+✖ failing tests:
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:42:1
+✖ 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su (3.8316ms)
+  AssertionError [ERR_ASSERTION]: installMcp 透传判据＝能力矩阵（唯一）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b2/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:66:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:168:1
+✖ 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册 (0.822ms)
+  AssertionError [ERR_ASSERTION]: installSkill 透传判据＝能力矩阵（唯一）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b2/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:170:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:204:1
+✖ 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用 (3.6266ms)
+  AssertionError [ERR_ASSERTION]: test/claude-adapter/session.test.ts 不得引用任何 .probe 模块
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b2/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:233:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

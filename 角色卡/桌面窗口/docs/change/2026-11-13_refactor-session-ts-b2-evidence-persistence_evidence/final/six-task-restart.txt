@@ -1,0 +1,20 @@
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2032.2144ms)
+✔ 任务已收口：恢复不重投；列表显示 closed (107.544ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2569.3893
+
+✖ failing tests:
+
+test at test\桌面应用\task-restart.test.ts:57:1
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2032.2144ms)
+  Error: 等待超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:21:47)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:88:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

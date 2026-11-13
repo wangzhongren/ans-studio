@@ -1,0 +1,16 @@
+✔ 导出面·运行时层：import(session.ts) 的键集合恰为 6 个值导出（类型导出运行时不存在） (1.0411ms)
+✔ 导出面·类型层：45 个类型导出经 import type 全量导入（编译期由 typecheck 钉住） (0.0835ms)
+✔ 模块边界·真实扫描：导入图无环 + 分层/白名单（B0 单文件 vacuous，但扫描器有真实输入） (12.4862ms)
+✔ 模块边界·规则引擎自测：合成夹具能抓环、L0→feature、同层越界与未分类模块（防永远空转） (0.6119ms)
+✔ 体量预算·barrel：session.ts 行数 <= B2 收紧基线 12,388（不得增长） (1.7679ms)
+✔ 体量预算·session/**/*.ts：单模块 <= 1,500 行（目录尚不存在 → 当前 vacuous） (1.3763ms)
+✔ 工具面快照·与冻结清单一致：7 角色经真实 SessionManager/openRoleSession 注入的工具名与顺序不变 (119.1197ms)
+✔ 工具面快照·捕获稳定：每角色两次独立 fixture/manager 捕获逐字相同（无随机顺序） (182.6507ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 749.6451

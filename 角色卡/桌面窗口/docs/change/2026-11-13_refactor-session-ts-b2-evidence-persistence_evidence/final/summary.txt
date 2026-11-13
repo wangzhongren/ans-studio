@@ -1,0 +1,45 @@
+START six-acceptance-evidence 13:34:28
+EXIT six-acceptance-evidence 0 13:34:29
+START six-b21-basis-gate-desktop 13:34:29
+EXIT six-b21-basis-gate-desktop 0 13:34:30
+START six-doc-format-all-roles 13:34:30
+EXIT six-doc-format-all-roles 1 13:34:30
+START six-replay-safe-retry 13:34:30
+EXIT six-replay-safe-retry 0 13:34:31
+START six-task-restart 13:34:31
+EXIT six-task-restart 1 13:34:33
+START six-pending-card-restart 13:34:33
+EXIT six-pending-card-restart 0 13:34:34
+START structure 13:34:34
+EXIT structure 0 13:34:35
+START source-aggregator 13:34:35
+EXIT source-aggregator 0 13:34:35
+START nail-evidence-markers 13:34:35
+EXIT nail-evidence-markers 0 13:34:35
+START nail-queue-status 13:34:35
+EXIT nail-queue-status 0 13:34:35
+START nail-request-status 13:34:35
+EXIT nail-request-status 0 13:34:36
+START nail-boundary-refresh 13:34:36
+EXIT nail-boundary-refresh 0 13:34:39
+START nail-chief-workflow 13:34:39
+EXIT nail-chief-workflow 1 13:35:54
+START nail-directive-input 13:35:54
+EXIT nail-directive-input 1 13:36:03
+START nail-dispatch-fresh-enum 13:36:03
+EXIT nail-dispatch-fresh-enum 0 13:36:04
+START nail-hot-path 13:36:04
+EXIT nail-hot-path 0 13:36:05
+START nail-interface 13:36:05
+EXIT nail-interface 0 13:36:05
+START nail-message-queue 13:36:05
+EXIT nail-message-queue 0 13:36:11
+START nail-run-change-entry 13:36:11
+EXIT nail-run-change-entry 0 13:36:12
+START nail-g1-copy-and-nails 13:36:12
+EXIT nail-g1-copy-and-nails 0 13:36:12
+START nail-h-scope-audit 13:36:12
+EXIT nail-h-scope-audit 1 13:36:13
+START nail-governance-matrix 13:36:13
+EXIT nail-governance-matrix 0 13:36:14
+DONE 13:36:14

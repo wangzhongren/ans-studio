@@ -1,0 +1,2 @@
+session.ts lines (wc -l): before=12388 after=11756
+structure budget: 13491 -> 12388; final count <= budget: yes

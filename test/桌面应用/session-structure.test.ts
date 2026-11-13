@@ -15,8 +15,8 @@
 //     **B0 现状**：`session/` 目录尚不存在，图只有 barrel 一个节点 ⇒ 无环/分层规则当前为 vacuous；
 //     但“扫描器确有真实输入”（barrel 的静态 import 被解析到）与“规则引擎本身有效”（合成夹具证明
 //     能抓环、抓 L0→feature、抓同层越界、抓未分类模块）两层自测保证它不是永远空转。
-//  3) 文件体量预算：`session.ts` 以 c234e79 的冻结行数 **13,491（wc -l 口径）** 为上限（不得增长；
-//     当前实测 = 基线）。未来 `app/desktop/session/**/*.ts` 单模块 ≤1,500 行（目录不存在 → vacuous）。
+//  3) 文件体量预算：`session.ts` 上限按**当前实际行数**收紧（B2 起 12,388，`wc -l` 口径；不得增长；
+//     只降不升，后续批次继续按当前实际收紧）。未来 `app/desktop/session/**/*.ts` 单模块 ≤1,500 行。
 //     这是预算而不是目标：B7 才把 `session.ts` 压到 ≤50 行、门面 ≤800 行；B1–B6 只要求“不增长”。
 //  4) openRoleSession 工具面快照脚手架（B7 前逐批对比用）：确定性 fixture（**真实 SessionManager** →
 //     真实编排 `openRoleSession` → 运行时核心 `buildGovernedTools`；唯一替身是**可脚本化 demo provider
@@ -503,10 +503,11 @@ test("模块边界·规则引擎自测：合成夹具能抓环、L0→feature、
 
 // ─────────────────────────────── 文件体量预算 ───────────────────────────────
 
-/** c234e79（B0 起点，= origin/main）的 `app/desktop/session.ts` 冻结行数，`wc -l` 口径 = 13,491。
- *  `countLogicalLines` 与之同口径（去掉结尾换行后按 `\n` 计数）；**只设上限，不得增长**。
+/** `app/desktop/session.ts` 的**当前实际行数**上限（`wc -l` 口径），只降不升。
+ *  B0（c234e79）冻结值 13,491；B1 结束实测 12,388，B2 起按该实际值收紧（12,388），
+ *  后续批次完成搬出后继续按当前实测收紧。`countLogicalLines` 与之同口径（去掉结尾换行后按 `\n` 计数）。
  *  这是 B0–B6 的“不回涨”预算；B7 的目标（session.ts ≤50 行、index.ts ≤800 行）另行验收。 */
-const SESSION_TS_FROZEN_BASELINE_LINES = 13491;
+const SESSION_TS_FROZEN_BASELINE_LINES = 12388;
 /** 未来 `app/desktop/session/` 目录下模块的单文件预算（方案 §6.2/§6.3 R11）。 */
 const SESSION_MODULE_MAX_LINES = 1500;
 
@@ -515,7 +516,7 @@ function countLogicalLines(text: string): number {
   return normalized.length === 0 ? 0 : normalized.split("\n").length;
 }
 
-test("体量预算·barrel：session.ts 行数 <= c234e79 冻结基线 13,491（不得增长）", () => {
+test("体量预算·barrel：session.ts 行数 <= B2 收紧基线 12,388（不得增长）", () => {
   const actual = countLogicalLines(fs.readFileSync(path.join(REPO_ROOT, SESSION_BARREL_REL), "utf8"));
   assert.ok(actual > 0, "session.ts 不得为空");
   assert.ok(actual <= SESSION_TS_FROZEN_BASELINE_LINES,
