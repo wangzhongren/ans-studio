@@ -1,0 +1,1 @@
+B4 搬出的 27 个方法（queue 20 / store 7）方法体及新模块内：setTimeout/setInterval/setImmediate/.unref 出现次数 = 0（两端 grep 均为空）。

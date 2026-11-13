@@ -1,0 +1,581 @@
+{
+  "generatedAt": "2026-11-13T07:15:33.460Z",
+  "source": "git show HEAD:app/desktop/session.ts (e9d5783 = origin/main, contains B0-B3)",
+  "adaptations": [
+    "receiver/state: 类外壳同名成员重建 this 面（delivery 单 owner 状态 / shared 同名同义委托 / 未迁出门面方法端口 / DeliverySink 发送端口）",
+    "visibility: private -> 模块内 public（仅门面委托可调用；不进入公开导出面）",
+    "inline import depth: queueDirectNotification 的 Extract<import(\"...src/model/trunk.ts\")> 相对路径随模块目录深度调整（../../ -> ../../../）"
+  ],
+  "methodCount": 27,
+  "allIdenticalUnderDocumentedAdaptations": true,
+  "methods": [
+    {
+      "name": "deliveryIsStopped",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 761,
+      "sourceEndLine": 763,
+      "targetStartLine": 262,
+      "targetEndLine": 264,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "2c741a986557b6335f5c14882f6550eeb193f9049bdead850a440bfb3d898e94",
+      "targetTextSha256": "3347b73ff05610ad80da0ca9fac4d9d51cef52fa5f537050b1a40164c5de1589",
+      "sourceNormalizedSha256": "3347b73ff05610ad80da0ca9fac4d9d51cef52fa5f537050b1a40164c5de1589",
+      "targetNormalizedSha256": "3347b73ff05610ad80da0ca9fac4d9d51cef52fa5f537050b1a40164c5de1589",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "71d3318256ec09d0b5d4e36067764c1167f66781c0e12fb0b5368d63e4eeb1f0",
+      "targetBodySha256": "71d3318256ec09d0b5d4e36067764c1167f66781c0e12fb0b5368d63e4eeb1f0",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "deliveryLifecycle",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 764,
+      "sourceEndLine": 766,
+      "targetStartLine": 267,
+      "targetEndLine": 269,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "3c36049efa94a6d2d18b158d2e83557db8397f42360bd2d7a865b3750cb1f379",
+      "targetTextSha256": "02f61ca8192c13f71ff0f0e301aa472a2cc04d00d467aa20cafb14865880f7eb",
+      "sourceNormalizedSha256": "02f61ca8192c13f71ff0f0e301aa472a2cc04d00d467aa20cafb14865880f7eb",
+      "targetNormalizedSha256": "02f61ca8192c13f71ff0f0e301aa472a2cc04d00d467aa20cafb14865880f7eb",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "9fefd9216a1022053146df1b9b6346c0328392283f314d415256863f7a76a051",
+      "targetBodySha256": "9fefd9216a1022053146df1b9b6346c0328392283f314d415256863f7a76a051",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "resumeDelivery",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 767,
+      "sourceEndLine": 769,
+      "targetStartLine": 272,
+      "targetEndLine": 274,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "b41f2c192fe22fbd62769621c98aae6da4c1025f0f90620e48e1061575d3da72",
+      "targetTextSha256": "87010a7a798c660fd9d63f7a064f5dbb77c2d2ac2939a28943f7d299970ecf45",
+      "sourceNormalizedSha256": "87010a7a798c660fd9d63f7a064f5dbb77c2d2ac2939a28943f7d299970ecf45",
+      "targetNormalizedSha256": "87010a7a798c660fd9d63f7a064f5dbb77c2d2ac2939a28943f7d299970ecf45",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "3bf4c6ad405b4368fee0147a1c90f569706cc0e0b35baccf31afc5c0f947f300",
+      "targetBodySha256": "3bf4c6ad405b4368fee0147a1c90f569706cc0e0b35baccf31afc5c0f947f300",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "queueDirectNotification",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 1651,
+      "sourceEndLine": 1668,
+      "targetStartLine": 277,
+      "targetEndLine": 294,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)",
+        "inline import depth: ../../src -> ../../../src (module directory is one level deeper)"
+      ],
+      "sourceTextSha256": "0a1a1e97573a1597aecb34ab0c9c04213766fbb5c7060ccfbe3c53323cd36946",
+      "targetTextSha256": "d2019e67615e7da6468a6e4e5e887b5bf099515745d9ee5443bba6e4d5f73930",
+      "sourceNormalizedSha256": "adeac702f7deeae22af6dc5b7e219bfd90e9248c4df1a9d92db07a72378debc1",
+      "targetNormalizedSha256": "adeac702f7deeae22af6dc5b7e219bfd90e9248c4df1a9d92db07a72378debc1",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "4a87d8ba3a8ae8b51d8c74ba5e4320a2b02511fe216f5aae97c65623d4f8dd7a",
+      "targetBodySha256": "4a87d8ba3a8ae8b51d8c74ba5e4320a2b02511fe216f5aae97c65623d4f8dd7a",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "forceResetDeliveryState",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 4094,
+      "sourceEndLine": 4147,
+      "targetStartLine": 297,
+      "targetEndLine": 350,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "22c9ed67aa021b44bb919af2aafa9b845549971636a17f9c6f19f206024a7498",
+      "targetTextSha256": "87d608c0d8d2a16c3a7bb723e5290f19d06f24f4a408bbf489312679ac58d86d",
+      "sourceNormalizedSha256": "87d608c0d8d2a16c3a7bb723e5290f19d06f24f4a408bbf489312679ac58d86d",
+      "targetNormalizedSha256": "87d608c0d8d2a16c3a7bb723e5290f19d06f24f4a408bbf489312679ac58d86d",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "7568aff45981b8aa90a9aa06202198cbd59a8eaf38fd3686eadc1d93dec5eabc",
+      "targetBodySha256": "7568aff45981b8aa90a9aa06202198cbd59a8eaf38fd3686eadc1d93dec5eabc",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "appTaskClientMessageId",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6151,
+      "sourceEndLine": 6157,
+      "targetStartLine": 353,
+      "targetEndLine": 359,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "aa4306b249cebcc43fe4e633be403e59725157550a03abf8032e4916aa8e210e",
+      "targetTextSha256": "e16ad383e87cf033912a52a46f8ffc7d5b9091286d96b70c80691a34a1738f70",
+      "sourceNormalizedSha256": "e16ad383e87cf033912a52a46f8ffc7d5b9091286d96b70c80691a34a1738f70",
+      "targetNormalizedSha256": "e16ad383e87cf033912a52a46f8ffc7d5b9091286d96b70c80691a34a1738f70",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "b0ccc0d0b03edaa3d150ccf432c22af1034cee2f84b9c24e6ecf40e0b25f9f68",
+      "targetBodySha256": "b0ccc0d0b03edaa3d150ccf432c22af1034cee2f84b9c24e6ecf40e0b25f9f68",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "appTaskClientMessageIdFromSeed",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6159,
+      "sourceEndLine": 6163,
+      "targetStartLine": 362,
+      "targetEndLine": 366,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "f410954a0cc13dc14357f75e41978d419609ab67375e8fb362ee117f84f39c87",
+      "targetTextSha256": "4aa5449c52a8baefd01e338a5fa656168493417358b56e47288d9024a711fbc1",
+      "sourceNormalizedSha256": "4aa5449c52a8baefd01e338a5fa656168493417358b56e47288d9024a711fbc1",
+      "targetNormalizedSha256": "4aa5449c52a8baefd01e338a5fa656168493417358b56e47288d9024a711fbc1",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "fc23b9fd29351dcc4bf48474d224a3f2e760166a662a949ca25901c5b78f0bc6",
+      "targetBodySha256": "fc23b9fd29351dcc4bf48474d224a3f2e760166a662a949ca25901c5b78f0bc6",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "appDispatchClientMessageId",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6165,
+      "sourceEndLine": 6169,
+      "targetStartLine": 369,
+      "targetEndLine": 373,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "e88013f57b659243374a5eb39eb38c7d544f4b2b35f96fe610e56ff9ef3ed110",
+      "targetTextSha256": "e2e2b2a4349281fcbea5e994a5273e0202cd0854d4c63b2c130f4b050df2ebd4",
+      "sourceNormalizedSha256": "e2e2b2a4349281fcbea5e994a5273e0202cd0854d4c63b2c130f4b050df2ebd4",
+      "targetNormalizedSha256": "e2e2b2a4349281fcbea5e994a5273e0202cd0854d4c63b2c130f4b050df2ebd4",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "97a3963db2d1f1241cd303a74d6ea0cd5f5450cf64cc934f896401c43bb561dc",
+      "targetBodySha256": "97a3963db2d1f1241cd303a74d6ea0cd5f5450cf64cc934f896401c43bb561dc",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "rememberAppTaskDelivered",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6171,
+      "sourceEndLine": 6180,
+      "targetStartLine": 376,
+      "targetEndLine": 385,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "b60840b5b6b0757374316035cde39c3b80971da34dea8336c6cdf25c28d62461",
+      "targetTextSha256": "12144bfc2e484ce60806b9340310a4949a94a14bbb786937bc8eeaa9938c56a4",
+      "sourceNormalizedSha256": "12144bfc2e484ce60806b9340310a4949a94a14bbb786937bc8eeaa9938c56a4",
+      "targetNormalizedSha256": "12144bfc2e484ce60806b9340310a4949a94a14bbb786937bc8eeaa9938c56a4",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "b16b6dce5f0363e55fdb28e328f849a942169d1efedc46d98c424f97d010368a",
+      "targetBodySha256": "b16b6dce5f0363e55fdb28e328f849a942169d1efedc46d98c424f97d010368a",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "pendingAppTaskDelivery",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6182,
+      "sourceEndLine": 6197,
+      "targetStartLine": 388,
+      "targetEndLine": 403,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "de1af041057eb2255983493e231b9d14f609d6e3fa4661cb5d986fade83d9f17",
+      "targetTextSha256": "0f29848d4285bf11ac0361161a9f99237a734aa58be5626706c167c17369b74a",
+      "sourceNormalizedSha256": "0f29848d4285bf11ac0361161a9f99237a734aa58be5626706c167c17369b74a",
+      "targetNormalizedSha256": "0f29848d4285bf11ac0361161a9f99237a734aa58be5626706c167c17369b74a",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "9b619a46fdbdb3f38fe3545fbc93a6fea8cd5fdc7835f8a5d2d3c5dcf451a2a9",
+      "targetBodySha256": "9b619a46fdbdb3f38fe3545fbc93a6fea8cd5fdc7835f8a5d2d3c5dcf451a2a9",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "enqueueDelivery",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6199,
+      "sourceEndLine": 6218,
+      "targetStartLine": 406,
+      "targetEndLine": 425,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "350ee6689833c32800bc9c74e9e28850504d8e0e7784e91e7c3467f78a86da70",
+      "targetTextSha256": "198360e39136009827971c9c284149680b73bf1121a34d01ec6cdc95756afd09",
+      "sourceNormalizedSha256": "198360e39136009827971c9c284149680b73bf1121a34d01ec6cdc95756afd09",
+      "targetNormalizedSha256": "198360e39136009827971c9c284149680b73bf1121a34d01ec6cdc95756afd09",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "c0a4d4535b940e36b7055043536580d34d411918814e4775e65eec138e20dbe2",
+      "targetBodySha256": "c0a4d4535b940e36b7055043536580d34d411918814e4775e65eec138e20dbe2",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "withdraw",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6521,
+      "sourceEndLine": 6570,
+      "targetStartLine": 428,
+      "targetEndLine": 477,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "4b50056d47f560ebb443456d268702542a8167b12cf6931455d3dbc97b6731ba",
+      "targetTextSha256": "4b50056d47f560ebb443456d268702542a8167b12cf6931455d3dbc97b6731ba",
+      "sourceNormalizedSha256": "4b50056d47f560ebb443456d268702542a8167b12cf6931455d3dbc97b6731ba",
+      "targetNormalizedSha256": "4b50056d47f560ebb443456d268702542a8167b12cf6931455d3dbc97b6731ba",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "c59772ab93fc6dd002bc447948f09cbad769c4bc39a159ba382e48ba4d0525a2",
+      "targetBodySha256": "c59772ab93fc6dd002bc447948f09cbad769c4bc39a159ba382e48ba4d0525a2",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "notifyRoleState",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6572,
+      "sourceEndLine": 6622,
+      "targetStartLine": 480,
+      "targetEndLine": 530,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "3ed2f3077fc6af5fca20fe5022d24efae2b048137d4f366c9d38ee20612c0399",
+      "targetTextSha256": "1b79d4f09a6afa5389a77a9bf88a8659d60d9ccac10d50e5b70b7dae7f16c4a9",
+      "sourceNormalizedSha256": "1b79d4f09a6afa5389a77a9bf88a8659d60d9ccac10d50e5b70b7dae7f16c4a9",
+      "targetNormalizedSha256": "1b79d4f09a6afa5389a77a9bf88a8659d60d9ccac10d50e5b70b7dae7f16c4a9",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "9bded2f23b532ab3186c1f789e62ea99069ea83f563582d83d8a1acabcfdc5fd",
+      "targetBodySha256": "9bded2f23b532ab3186c1f789e62ea99069ea83f563582d83d8a1acabcfdc5fd",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "broadcastRoleStates",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 6624,
+      "sourceEndLine": 6629,
+      "targetStartLine": 533,
+      "targetEndLine": 538,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "d92857835c0540de34b211b5f6cd8624a7ac8ce0b1ab499c4ef1a4c9e88e5323",
+      "targetTextSha256": "d92857835c0540de34b211b5f6cd8624a7ac8ce0b1ab499c4ef1a4c9e88e5323",
+      "sourceNormalizedSha256": "d92857835c0540de34b211b5f6cd8624a7ac8ce0b1ab499c4ef1a4c9e88e5323",
+      "targetNormalizedSha256": "d92857835c0540de34b211b5f6cd8624a7ac8ce0b1ab499c4ef1a4c9e88e5323",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "d2b657606f6a084d20f373b9cff5a66bb60080446e3f9d5611babb332576ab3e",
+      "targetBodySha256": "d2b657606f6a084d20f373b9cff5a66bb60080446e3f9d5611babb332576ab3e",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "redeliverNudge",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 9422,
+      "sourceEndLine": 9460,
+      "targetStartLine": 541,
+      "targetEndLine": 579,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "c5596ed6d0e4b87eebbe09bf2089b01bca41eec766e4c58567c27d7153abe39f",
+      "targetTextSha256": "c5596ed6d0e4b87eebbe09bf2089b01bca41eec766e4c58567c27d7153abe39f",
+      "sourceNormalizedSha256": "c5596ed6d0e4b87eebbe09bf2089b01bca41eec766e4c58567c27d7153abe39f",
+      "targetNormalizedSha256": "c5596ed6d0e4b87eebbe09bf2089b01bca41eec766e4c58567c27d7153abe39f",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "cd0f812b374b91f2bcdf0c2cbfd9c4f2f6da6b95429c29fa85ed5fcad43070b7",
+      "targetBodySha256": "cd0f812b374b91f2bcdf0c2cbfd9c4f2f6da6b95429c29fa85ed5fcad43070b7",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "drainAllQueuesFor",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 9563,
+      "sourceEndLine": 9574,
+      "targetStartLine": 582,
+      "targetEndLine": 593,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "da187a8d7352819ce8c3ae2b7a666567166fb0c4ad22953706a7ff05d4f03b3f",
+      "targetTextSha256": "28ad559d0efe8d69ba3d6df0f1daab18ca36ee1f74baef9dd38a2564af568cc2",
+      "sourceNormalizedSha256": "28ad559d0efe8d69ba3d6df0f1daab18ca36ee1f74baef9dd38a2564af568cc2",
+      "targetNormalizedSha256": "28ad559d0efe8d69ba3d6df0f1daab18ca36ee1f74baef9dd38a2564af568cc2",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "a14dc6723cd9d1433194e17ff8e84e78c4adae08488007524a20355d6adea3e2",
+      "targetBodySha256": "a14dc6723cd9d1433194e17ff8e84e78c4adae08488007524a20355d6adea3e2",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "drainPiQueuesAcrossProjects",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 9576,
+      "sourceEndLine": 9584,
+      "targetStartLine": 596,
+      "targetEndLine": 604,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "40998039b6530a10dbc7140440eb48621b3f77b931115a1fae694abe613ce04a",
+      "targetTextSha256": "0cefe56146d4317f321ac6afd005350117830567fddf9fa2651eba7845d780a4",
+      "sourceNormalizedSha256": "0cefe56146d4317f321ac6afd005350117830567fddf9fa2651eba7845d780a4",
+      "targetNormalizedSha256": "0cefe56146d4317f321ac6afd005350117830567fddf9fa2651eba7845d780a4",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "b4fb7aef0bafdb2e45cfd096f2dbf05b6c5d86c67c76dd32c4255ffffcfba578",
+      "targetBodySha256": "b4fb7aef0bafdb2e45cfd096f2dbf05b6c5d86c67c76dd32c4255ffffcfba578",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "waitForRunStopDeliveryClaims",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 9586,
+      "sourceEndLine": 9615,
+      "targetStartLine": 607,
+      "targetEndLine": 636,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "79657d92dc3e2ec88dcb6f5098e2fcd862e3b2b2a049eee669dae7d31d3c4ab9",
+      "targetTextSha256": "79657d92dc3e2ec88dcb6f5098e2fcd862e3b2b2a049eee669dae7d31d3c4ab9",
+      "sourceNormalizedSha256": "79657d92dc3e2ec88dcb6f5098e2fcd862e3b2b2a049eee669dae7d31d3c4ab9",
+      "targetNormalizedSha256": "79657d92dc3e2ec88dcb6f5098e2fcd862e3b2b2a049eee669dae7d31d3c4ab9",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "39e0532f0a1d97e2e5c17df142bc4905e5217d2278cf4f15129beec2dff37ccf",
+      "targetBodySha256": "39e0532f0a1d97e2e5c17df142bc4905e5217d2278cf4f15129beec2dff37ccf",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "drainQueue",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 9617,
+      "sourceEndLine": 9641,
+      "targetStartLine": 639,
+      "targetEndLine": 663,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "b82fcd76c73f858fd3718e8ce997a1dab8a8cb3980b0fa4c0205fc8eea6385aa",
+      "targetTextSha256": "1d5ac25e9de4d10fd14837581cbeba6ed89aa91e0252f384bb6632b033c97e4d",
+      "sourceNormalizedSha256": "1d5ac25e9de4d10fd14837581cbeba6ed89aa91e0252f384bb6632b033c97e4d",
+      "targetNormalizedSha256": "1d5ac25e9de4d10fd14837581cbeba6ed89aa91e0252f384bb6632b033c97e4d",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "8723dda9c496463c6552255122c7a296eeab7210bb4eb8e92fbca9e2be30812f",
+      "targetBodySha256": "8723dda9c496463c6552255122c7a296eeab7210bb4eb8e92fbca9e2be30812f",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "drainQueueUnsafe",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/queue.ts",
+      "sourceStartLine": 9643,
+      "sourceEndLine": 10251,
+      "targetStartLine": 666,
+      "targetEndLine": 1274,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "57ba9dc0efc1d08ba5416390ecd4082561b12b646a6defbbd6e1ca27978a3aed",
+      "targetTextSha256": "2c12d8b5310319cbac7f04c18060bf99624f96e08e2fa70cad9fc21cb60574f0",
+      "sourceNormalizedSha256": "2c12d8b5310319cbac7f04c18060bf99624f96e08e2fa70cad9fc21cb60574f0",
+      "targetNormalizedSha256": "2c12d8b5310319cbac7f04c18060bf99624f96e08e2fa70cad9fc21cb60574f0",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "50b2ee1a6e4387e1ec45b104a09cfb1d1dfc047669ced598ca287bf91d0a070b",
+      "targetBodySha256": "50b2ee1a6e4387e1ec45b104a09cfb1d1dfc047669ced598ca287bf91d0a070b",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "persistableDeliveryItem",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/store.ts",
+      "sourceStartLine": 6222,
+      "sourceEndLine": 6252,
+      "targetStartLine": 118,
+      "targetEndLine": 148,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "70fac566f0f9ac3a299f83aae59d0ced9ed43a76d21e78613bf6e7916960c368",
+      "targetTextSha256": "0f53ff8a670b242568ffda31705d0cf5ecbaab37a67b1f05da634d2dfc3ab6fe",
+      "sourceNormalizedSha256": "0f53ff8a670b242568ffda31705d0cf5ecbaab37a67b1f05da634d2dfc3ab6fe",
+      "targetNormalizedSha256": "0f53ff8a670b242568ffda31705d0cf5ecbaab37a67b1f05da634d2dfc3ab6fe",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "8739c9a1b8b32edc7c4bd8a019dee51d402c2ddbb621224a140e146789233670",
+      "targetBodySha256": "8739c9a1b8b32edc7c4bd8a019dee51d402c2ddbb621224a140e146789233670",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "deliveryStoreItems",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/store.ts",
+      "sourceStartLine": 6254,
+      "sourceEndLine": 6274,
+      "targetStartLine": 151,
+      "targetEndLine": 171,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "d6322f2c89e2eb4c33e50f949047cac884aa78a0fd5c947230f998253b3191dc",
+      "targetTextSha256": "1c78a768ac8e941d5c8be3bacad4c4b9a7a75935d8142c564fc30f7277af458d",
+      "sourceNormalizedSha256": "1c78a768ac8e941d5c8be3bacad4c4b9a7a75935d8142c564fc30f7277af458d",
+      "targetNormalizedSha256": "1c78a768ac8e941d5c8be3bacad4c4b9a7a75935d8142c564fc30f7277af458d",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "21b83123df8a8aae6b81d43f53ad6ff4c9790672cf772d4c906907e535a20cb0",
+      "targetBodySha256": "21b83123df8a8aae6b81d43f53ad6ff4c9790672cf772d4c906907e535a20cb0",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "deliveryQueuePersistenceFacts",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/store.ts",
+      "sourceStartLine": 6276,
+      "sourceEndLine": 6281,
+      "targetStartLine": 174,
+      "targetEndLine": 179,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "60c4da34ade3f51f58999e90f2def0c883a667af49459678244f5788e9193b83",
+      "targetTextSha256": "d68bd0b94ea0e774073889cde7a24f71b0ecd4f37fa6e2a941e8c2f50ecff5e1",
+      "sourceNormalizedSha256": "d68bd0b94ea0e774073889cde7a24f71b0ecd4f37fa6e2a941e8c2f50ecff5e1",
+      "targetNormalizedSha256": "d68bd0b94ea0e774073889cde7a24f71b0ecd4f37fa6e2a941e8c2f50ecff5e1",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "6ca6513422bac18d08a3755fcbeb81e4c05063e0f5ae44718e7f4a8611399c42",
+      "targetBodySha256": "6ca6513422bac18d08a3755fcbeb81e4c05063e0f5ae44718e7f4a8611399c42",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "finishStopPersistence",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/store.ts",
+      "sourceStartLine": 6283,
+      "sourceEndLine": 6293,
+      "targetStartLine": 182,
+      "targetEndLine": 192,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "93b99a8211cb165a8b2127e1a8c2eaf86326219d9a310c06e8952a0facc06d6b",
+      "targetTextSha256": "33c1da853401d23eee1c31fc1591985db9114c15c40578674f76dc11cb059b4e",
+      "sourceNormalizedSha256": "33c1da853401d23eee1c31fc1591985db9114c15c40578674f76dc11cb059b4e",
+      "targetNormalizedSha256": "33c1da853401d23eee1c31fc1591985db9114c15c40578674f76dc11cb059b4e",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "a854c781a473ff5b5da3c00737d0a911832334c72dd51b094344a133c8d40d00",
+      "targetBodySha256": "a854c781a473ff5b5da3c00737d0a911832334c72dd51b094344a133c8d40d00",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "persistDeliveryQueues",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/store.ts",
+      "sourceStartLine": 6295,
+      "sourceEndLine": 6322,
+      "targetStartLine": 195,
+      "targetEndLine": 222,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "18894d23ca3fbe0ff85d766d452acf66ca81811725f2bc21eb0ba1d3d3f1d371",
+      "targetTextSha256": "e2a52069a4ae48b2333dde1b5c0874546803127aeafcc157917dc0d0df205aae",
+      "sourceNormalizedSha256": "e2a52069a4ae48b2333dde1b5c0874546803127aeafcc157917dc0d0df205aae",
+      "targetNormalizedSha256": "e2a52069a4ae48b2333dde1b5c0874546803127aeafcc157917dc0d0df205aae",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "7a66ecb6f666f66510d5d62e3572c754ed52a4b36d9b4b63082c39d14455134f",
+      "targetBodySha256": "7a66ecb6f666f66510d5d62e3572c754ed52a4b36d9b4b63082c39d14455134f",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "parsePersistedDeliveryItem",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/store.ts",
+      "sourceStartLine": 6324,
+      "sourceEndLine": 6398,
+      "targetStartLine": 225,
+      "targetEndLine": 299,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "6f7e3c2503f78894d8306b9bbd118f1cb90086a3544f0f85657bc9c965dfe3ad",
+      "targetTextSha256": "40991b3799a4125e0d8e6448d4ee8aa3a268a8834fb5b590a5d3756b80458dd7",
+      "sourceNormalizedSha256": "40991b3799a4125e0d8e6448d4ee8aa3a268a8834fb5b590a5d3756b80458dd7",
+      "targetNormalizedSha256": "40991b3799a4125e0d8e6448d4ee8aa3a268a8834fb5b590a5d3756b80458dd7",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "98b5de0e02579cdbaa6536c0fb79d0c0c4a22ee1526fdc36e3fe4fef73072024",
+      "targetBodySha256": "98b5de0e02579cdbaa6536c0fb79d0c0c4a22ee1526fdc36e3fe4fef73072024",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    },
+    {
+      "name": "restorePersistedDeliveries",
+      "group": "delivery",
+      "target": "app/desktop/session/delivery/store.ts",
+      "sourceStartLine": 6400,
+      "sourceEndLine": 6519,
+      "targetStartLine": 302,
+      "targetEndLine": 421,
+      "adaptations": [
+        "visibility: private -> module public (declaration prefix only)"
+      ],
+      "sourceTextSha256": "7553180d0544206f0ddd4d36d6e26232969e01233b8d0727ab25d0cfc2410a49",
+      "targetTextSha256": "7553180d0544206f0ddd4d36d6e26232969e01233b8d0727ab25d0cfc2410a49",
+      "sourceNormalizedSha256": "7553180d0544206f0ddd4d36d6e26232969e01233b8d0727ab25d0cfc2410a49",
+      "targetNormalizedSha256": "7553180d0544206f0ddd4d36d6e26232969e01233b8d0727ab25d0cfc2410a49",
+      "identicalUnderDocumentedAdaptations": true,
+      "sourceBodySha256": "586a8cfb46aa068e55a03d118af7207f69cb7faea6705bb9f19f4eae70c3f5cd",
+      "targetBodySha256": "586a8cfb46aa068e55a03d118af7207f69cb7faea6705bb9f19f4eae70c3f5cd",
+      "bodyIdentical": true,
+      "facadeDelegationPresent": true
+    }
+  ]
+}

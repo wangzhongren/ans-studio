@@ -1,0 +1,179 @@
+{
+  "generatedAt": "2026-11-13T07:39:26.739Z",
+  "remainingGates": {
+    "queue-recovery-e2e": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 1221.9472
+    },
+    "network-state-e2e": {
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 1781.5324
+    }
+  },
+  "confirm": {
+    "message-queue": {
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 5608.7685
+    },
+    "handback-delivery": {
+      "tests": 18,
+      "pass": 16,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 10292.2474,
+      "failnameDiff": {
+        "baselineCount": 2,
+        "finalCount": 2,
+        "added": [],
+        "removed": []
+      }
+    },
+    "queue-visibility": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 604.9744
+    },
+    "queue-withdraw-lru": {
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 2619.1226
+    },
+    "replay-safe-retry": {
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 851.104
+    },
+    "abort-unwedge": {
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 993.7716
+    },
+    "b101-fixed-dispatch-task-binding": {
+      "tests": 11,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 939.8169
+    },
+    "b111-fixed-closed-handback-drain": {
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 794.0242
+    },
+    "turn-lease": {
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 1277.8474
+    }
+  },
+  "fullDesktop": {
+    "桌面应用": {
+      "tests": 845,
+      "pass": 774,
+      "fail": 69,
+      "cancelled": 2,
+      "skipped": 0,
+      "duration_ms": 443206.5296,
+      "failnameDiff": {
+        "baselineCount": 72,
+        "finalCount": 71,
+        "added": [],
+        "removed": [
+          "重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等"
+        ]
+      }
+    },
+    "桌面UI": {
+      "tests": 443,
+      "pass": 443,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 7557.0165
+    }
+  },
+  "knownRed": {
+    "runtime-core": {
+      "tests": 604,
+      "pass": 567,
+      "fail": 33,
+      "cancelled": 0,
+      "skipped": 4,
+      "duration_ms": 65294.0189,
+      "failnameDiff": {
+        "baselineCount": 33,
+        "finalCount": 33,
+        "added": [],
+        "removed": []
+      }
+    },
+    "门禁引擎": {
+      "tests": 577,
+      "pass": 571,
+      "fail": 5,
+      "cancelled": 0,
+      "skipped": 1,
+      "duration_ms": 93050.8408,
+      "failnameDiff": {
+        "baselineCount": 5,
+        "finalCount": 5,
+        "added": [],
+        "removed": []
+      }
+    },
+    "编排(137文件)": {
+      "tests": 1373,
+      "pass": 1347,
+      "fail": 24,
+      "cancelled": 0,
+      "skipped": 2,
+      "duration_ms": 140135.6835,
+      "failnameDiff": {
+        "baselineCount": 24,
+        "finalCount": 24,
+        "added": [],
+        "removed": []
+      }
+    },
+    "编排-git-trunk-store": {
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 57470.6583
+    }
+  }
+}

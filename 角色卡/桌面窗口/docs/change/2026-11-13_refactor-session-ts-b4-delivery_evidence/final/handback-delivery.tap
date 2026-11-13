@@ -1,0 +1,146 @@
+TAP version 13
+# Subtest: E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）
+ok 1 - E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）
+  ---
+  duration_ms: 205.1469
+  type: 'test'
+  ...
+# Subtest: E-1 去重：同一条回交重复到达（重放）→ **只投递一次**
+ok 2 - E-1 去重：同一条回交重复到达（重放）→ **只投递一次**
+  ---
+  duration_ms: 198.1079
+  type: 'test'
+  ...
+# Subtest: E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+ok 3 - E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+  ---
+  duration_ms: 530.9064
+  type: 'test'
+  ...
+# Subtest: P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投
+ok 4 - P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投
+  ---
+  duration_ms: 466.8943
+  type: 'test'
+  ...
+# Subtest: 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢
+ok 5 - 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢
+  ---
+  duration_ms: 79.1587
+  type: 'test'
+  ...
+# Subtest: 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序
+ok 6 - 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序
+  ---
+  duration_ms: 125.9166
+  type: 'test'
+  ...
+# Subtest: 常规检查宿主政策实际注入项目角色，su不接委托免确认
+ok 7 - 常规检查宿主政策实际注入项目角色，su不接委托免确认
+  ---
+  duration_ms: 4.048
+  type: 'test'
+  ...
+# Subtest: E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢）
+ok 8 - E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢）
+  ---
+  duration_ms: 355.4899
+  type: 'test'
+  ...
+# Subtest: 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+ok 9 - 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+  ---
+  duration_ms: 310.9261
+  type: 'test'
+  ...
+# Subtest: E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损）
+ok 10 - E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损）
+  ---
+  duration_ms: 362.6359
+  type: 'test'
+  ...
+# Subtest: C Window merges source saved-before-business and retry Promise/change orders into one enqueue
+ok 11 - C Window merges source saved-before-business and retry Promise/change orders into one enqueue
+  ---
+  duration_ms: 62.2255
+  type: 'test'
+  ...
+# Subtest: C frozen batch retries keep members and delivery ID while later reports stay separate
+ok 12 - C frozen batch retries keep members and delivery ID while later reports stay separate
+  ---
+  duration_ms: 123.0465
+  type: 'test'
+  ...
+# Subtest: C possible provider start and unknown failure do not automatically prompt again
+ok 13 - C possible provider start and unknown failure do not automatically prompt again
+  ---
+  duration_ms: 188.5774
+  type: 'test'
+  ...
+# Subtest: C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire
+ok 14 - C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire
+  ---
+  duration_ms: 33.3788
+  type: 'test'
+  ...
+# Subtest: C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs
+ok 15 - C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs
+  ---
+  duration_ms: 60.0575
+  type: 'test'
+  ...
+# Subtest: F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次
+ok 16 - F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次
+  ---
+  duration_ms: 437.0963
+  type: 'test'
+  ...
+# Subtest: 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+not ok 17 - 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+  ---
+  duration_ms: 3239.714
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b4\\test\\桌面应用\\handback-delivery.test.ts:659:1'
+  failureType: 'testCodeFailure'
+  error: '等待实际事件超时'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'fail'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b4/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:59:10)
+    runNextTicks (node:internal/process/task_queues:65:5)
+    listOnTimeout (node:internal/timers:644:9)
+    process.processTimers (node:internal/timers:618:7)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b4/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:671:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+not ok 18 - B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+  ---
+  duration_ms: 3096.9327
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b4\\test\\桌面应用\\handback-delivery.test.ts:700:1'
+  failureType: 'testCodeFailure'
+  error: '等待实际事件超时'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'fail'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b4/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:59:10)
+    runNextTicks (node:internal/process/task_queues:65:5)
+    listOnTimeout (node:internal/timers:644:9)
+    process.processTimers (node:internal/timers:618:7)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b4/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:738:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 16
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10306.8249
