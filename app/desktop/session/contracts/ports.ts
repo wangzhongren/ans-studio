@@ -9,9 +9,10 @@
 
 import type { DispatchAdvisory } from "../../../../src/common/编排/dispatch-advisories.ts";
 import type { TaskHandback } from "../../../../src/common/编排/handback.ts";
-import type { RuntimeLiveReportViewV1, RuntimeReportSnapshotV1, DispatchReceipt, DispatchTaskPayload } from "../../../../src/model/runtime.ts";
+import type { RuntimeLiveReportViewV1, RuntimeReportSnapshotV1, DispatchReceipt, DispatchTaskPayload, RuntimeTurnOutcome } from "../../../../src/model/runtime.ts";
+import type { RoleSessionAbortResult } from "../../../../src/pipeline/orchestration/run-role.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
-import type { ActualDispatchSource, LiveSession } from "./session-types.ts";
+import type { ActualDispatchSource, ControllerDisposalLease, InternalSessionOpenRequest, LiveSession, OpenResult, SessionTarget } from "./session-types.ts";
 
 /** dispatch → fixed-workflow 的固定路径派发端口（门面注入；参数逐位原样转发）。 */
 export interface FixedDispatchPort {
@@ -32,4 +33,39 @@ export interface FixedDispatchPort {
 export interface HandbackSink {
   handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: "memory-only" | "unknown-live", flowId?: string): Promise<boolean>;
   handbackFlowId(entry: LiveSession, hb: TaskHandback | undefined): string | undefined;
+}
+
+// ——————————————— B7（2026-11-13，session.ts 重构；方案 §3.3/§5 B7）———————————————
+// 方案 §3.3 的 lifecycle 端端口：`SessionDirectory`（只读会话目录）与 `SessionControl`（会话控制）。
+// 两者由 `session/lifecycle/index.ts` 的 `Lifecycle` 实现（门面构造注入/暴露）；形状取自现行方法
+// （`sessionKey`/`hasBusyRuntime`/`liveSessionViews`/`openInternal`/`ensureFreshRoleSession`/
+// `disposeEntry`/`abort`），不新造业务语义。`DeliverySink` 已在 `session/delivery/queue.ts` 定义
+// （B4），本文件不重复第二份形状。
+
+/** 会话目录视图行（原 `liveSessionViews` 的元素形状）。 */
+export interface SessionDirectoryView {
+  projectRoot: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  profileRevision: number;
+}
+
+/** 只读会话目录（lifecycle 实现；跨模块只读视图）。 */
+export interface SessionDirectory {
+  key(projectRoot: string, roleId: string, runtime: RuntimeKind): string;
+  find(projectRoot: string, roleId: string, runtime: RuntimeKind): LiveSession | undefined;
+  activeRoleId(): string | null;
+  governanceOwner(projectRoot: string): string | null;
+  governanceRuntime(projectRoot: string): RuntimeKind | undefined;
+  isBusy(runtime: RuntimeKind): boolean;
+  views(): SessionDirectoryView[];
+  lastTurn(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined;
+}
+
+/** 会话控制（lifecycle 实现；delivery/tasks/run-change 经门面薄委托使用，参数逐位转发）。 */
+export interface SessionControl {
+  openInternal(req: InternalSessionOpenRequest, userInitiated: boolean, selectionVersion?: number): Promise<OpenResult>;
+  ensureFresh(projectRoot: string, roleId: string, runtime: RuntimeKind): Promise<{ ok: boolean; rebuilt: boolean; error?: string }>;
+  disposeEntry(roleId: string, entry: LiveSession, heldLease?: ControllerDisposalLease): Promise<string | null>;
+  abortTurn(target: string | SessionTarget): Promise<RoleSessionAbortResult>;
 }

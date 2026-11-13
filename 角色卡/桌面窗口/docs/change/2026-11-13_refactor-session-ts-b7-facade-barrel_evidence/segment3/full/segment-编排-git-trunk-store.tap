@@ -1,0 +1,28 @@
+execution-bases:first-document-source-captured
+execution-bases:delivered-code-newer-document-selected
+execution-bases:old-source-and-stale-cas-verified
+execution-bases:actual-ancestry-selected-ambiguous-heads-denied
+✔ Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time (26965.4609ms)
+✔ Git delivery bytes: real sha1 raw commits and null/existing ref CAS preserve the code basis (2694.0663ms)
+✔ Git delivery bytes: real sha256 raw commits and null/existing ref CAS preserve the code basis (2658.2599ms)
+{"format":"sha1","first":{"objectFormat":"sha1","hex":"2c3e0f8c68f37810579cd89a1a7fb0c3baae3bb6"},"next":{"objectFormat":"sha1","hex":"5ca0e2745f1c96c334c9ae7b329cbec3283e59dd"},"tree":{"objectFormat":"sha1","hex":"fc47c6d69618bdded84c851c9ff2584bebdd6f15"},"parents":[{"objectFormat":"sha1","hex":"2c3e0f8c68f37810579cd89a1a7fb0c3baae3bb6"}]}
+✔ Git candidates: real sha1 complete trees preserve unchanged arbitrary bytes and isolate the user index (964.5843ms)
+{"format":"sha256","first":{"objectFormat":"sha256","hex":"ae6b40404962a5ac99d83fd566f2e00a4df448d2c9942b48befc806b7df44e5f"},"next":{"objectFormat":"sha256","hex":"ca6b6295ffdaf5a910476c07ae230e1514425d647f5a94547c5415ba9b099c85"},"tree":{"objectFormat":"sha256","hex":"01c1d13911908cf1c77a5fd880e9f4fa4bdf6bbbb1f5f6a1caffb4793ceedc25"},"parents":[{"objectFormat":"sha256","hex":"ae6b40404962a5ac99d83fd566f2e00a4df448d2c9942b48befc806b7df44e5f"}]}
+✔ Git candidates: real sha256 complete trees preserve unchanged arbitrary bytes and isolate the user index (987.7471ms)
+✔ Git revert Provider: real sha1 inverse applies to current code and preserves unrelated later files (6461.7986ms)
+✔ Git revert Provider: real sha256 inverse applies to current code and preserves unrelated later files (6572.5808ms)
+{"old":null,"published":{"objectFormat":"sha1","hex":"0459c6628ed45b1eb3ddf6b9be8af57a5317f406"},"results":[{"status":"published","journalId":".ans/trunk/operations/7aebf56e035aecd38ee2c6264322d3356c90a40b5a93b1eefc2a5cdf15110ef7/git.json"},{"status":"conflict","journalId":".ans/trunk/operations/e6537ffc30aa789aaa2ff3671b9eb2bea7604e0bc8df187e10973d5a36efac4f/git.json"}]}
+✔ Git ref CAS: real independent Node processes have one winner; recovery uses actual ref and immutable commit (1160.8867ms)
+✔ Git query: output and real process time are bounded; forced cancellation never claims whole-tree termination (299.0938ms)
+✔ Git operation media: restart enumeration discovers both formats and refuses same-id rebinding (488.3901ms)
+✔ Git mutation process fence: an unresolved prior instance survives restart and never expires from clock or missing pid (112.8186ms)
+✔ Git TrunkStore: full five-argument CAS, same-version workflow fence, media-bound business recovery and read-only production selection (5400.8021ms)
+✔ Git migration: actual legacy committed and pending operations keep their original media proof (2194.4845ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 57182.1915

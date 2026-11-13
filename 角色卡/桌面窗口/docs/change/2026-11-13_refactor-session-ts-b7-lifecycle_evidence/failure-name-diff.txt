@@ -1,0 +1,25 @@
+# B7 首线验证 — 失败名机械对照（vs 干净 e37da80 基线工作树 `.tmp-b7/baseline-wt`）
+
+口径：`node --test <files>` 默认 spec reporter；失败名取行首 `✖ `（去时间戳、去重排序）。
+baseline 日志在 `…_evidence/baseline/`，本批日志在 `…_evidence/final/`。
+
+| 套件 | 本批（B7 lifecycle） | 干净 e37da80 基线 | 结论 |
+| --- | --- | --- | --- |
+| `session-structure.test.ts` | 8/8（另 session-source 5/5） | 8/8 | **NO_DIFF（全绿）** |
+| `boundary-refresh.test.ts` | 14/14 | 14/14 | NO_DIFF（全绿） |
+| `message-queue.test.ts` | 20/20（`entry.busy = true;` 先于 `await this.sendDelivery(...)`，读取 `lifecycle/send.ts`） | 20/20 | NO_DIFF（全绿） |
+| `run-change-entry.test.ts` | 5/5 | 5/5 | NO_DIFF（全绿） |
+| `download-decision + acceptance-evidence` | 11/11 | — | 全绿 |
+| `fixed-path-full-chain + queue-recovery-e2e + network-state-e2e` | 3+2+6 = 11/11 | — | 全绿 |
+| `handback-delivery.test.ts` | 16/18 | 16/18 | **NO_DIFF**；既有失败：<br>✖ 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发<br>✖ B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported |
+| `operator-channel.test.ts` | 58/59 | 58/59 | **NO_DIFF**；既有失败：<br>✖ I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）<br>（source 钉「arm 决策」曾因代码迁出失败——见记录 §偏差 D2，已以 session.ts 只读迁移指针补齐，现全绿） |
+| `turn-watch-verify`（a/b/c） | 12/13 | 12/13 | **NO_DIFF**；既有失败：<br>✖ B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案明确「最后兜底」 |
+| `directive-input.test.ts` | 14/19 | 14/19 | **NO_DIFF**（5 项既有失败，逐名一致） |
+| `h-scope-audit.test.ts` | 4/7 | 4/7 | **NO_DIFF**（3 项既有失败，逐名一致） |
+| `chief-workflow.test.ts` | 66 tests / 58 pass / 8 既有失败 | B6 记录（干净 b5901ac）66/58/8 逐名一致 | **NO_DIFF**；8 名：<br>✖ W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝<br>✖ W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind<br>✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界<br>✖ W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续<br>✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope<br>✖ selected<br>✖ commit-race<br>✖ required |
+| `session.test.ts` | 6/7 | 6/7 | **NO_DIFF**；既有失败：<br>✖ AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin） |
+| `session-rebuild-race.test.ts` | 14/17（进程超时退出=基线同款） | 14/17（同 3 失败、同超时） | **NO_DIFF**；既有失败：<br>✖ 重建 dispose 等待窗口：stop A 保持用户目标/关闭契约<br>✖ 重建 dispose 等待窗口：stop all 保持用户目标/关闭契约<br>✖ 重建 open 等待窗口：stop A 保持用户目标/关闭契约 |
+| 其余钉子/接线：`interface`、`hot-path`、`evidence-markers`、`queue-status`、`request-status`、`dispatch-fresh-enum`、`g1-copy-and-nails`、`governance-matrix`、`ans-wiring`、`directive-decision`、`b101`、`b111`、`optional-acceptance` | 53+11+6 = 全部通过 | — | 全绿（53/53 batch 包含 ans-wiring；directive-decision 8/8、b101 11/11、b111 5/5、optional-acceptance 6/6） |
+| 相邻生命周期套件：`abort-unwedge` 3/3、`turn-lease` 4/4、`watchdog-reuse` 4/4、`queue-withdraw-lru` 5/5、`queue-visibility` 2/2 | 全绿 | — | 全绿 |
+
+**结论：零新增失败。** 所有失败项均为干净 e37da80（或 B6 记录的干净 b5901ac）基线既有，逐名一致。

@@ -1,0 +1,14 @@
+# B7 第二段（barrel 切换后）定向基线：桌面全链四目标
+
+## fixed-path-full-chain + queue-recovery-e2e + network-state-e2e（第二段日志 final/targeted-run-change-directive-auth-fixed-queue-network.log，合计 30/30，其中本组 3+2+6=11）
+
+## turn-watch-verify（第二段日志 final/turn-watch-verify.log）
+ℹ tests 13
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 1
+ℹ skipped 0
+ℹ todo 0
+
+已知既有取消项（与 e37da80 基线逐名一致）：
+✖ B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案明确「最后兜底」 (10002.6116ms)

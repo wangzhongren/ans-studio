@@ -1,0 +1,17 @@
+B7 第二段 — 类体 token 等价证明（原始第一段 2,662 行门面 vs 候选 index.ts）
+
+命令：node tools/compare-tokens.mjs（脚本复制自临时构建目录；读取第一段工作树的
+app/desktop/session.ts 与候选 app/desktop/session/index.ts 候选文件）
+
+实测输出：
+orig tokens 15362 cand tokens 15362
+token diffs 0
+
+口径：token 流 = 去掉空白与注释后的代码 token；字符串/模板整体成 token（含引号与转义）。
+比较范围 = `export class SessionManager {` 与文件末尾 `}` 之间的类体（不含 import/文件头）。
+结论：候选类体与第一段门面类体**逐 token 相同**（15,362 = 15,362，0 差异）——紧凑化只改空白/换行/注释折行。
+
+注：该比较在第一段工作树的 session.ts（2,662 行）被 barrel 覆盖前执行；原始文件随后被本段最终内容替换，
+故本比较不可在原树上重跑。候选 → 最终文件的比较可重跑：
+tools/compare-candidate-final.mjs → token-compare-candidate-final.txt（15,362 vs 15,362，仅 2 处 import("…")
+路径深度适配）。

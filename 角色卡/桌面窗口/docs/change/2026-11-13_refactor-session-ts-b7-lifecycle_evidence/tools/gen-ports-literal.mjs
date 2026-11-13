@@ -1,0 +1,12 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const hostMethods = fs.readFileSync(path.join(HERE, "host-methods.txt"), "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
+const LIFECYCLE = new Set(["openObservedRoleSession","ownsControllerDisposal","disposeObservedHandle","observeWatchdog","noteWatchdogActivity","profileRevision","profileChanged","hasBusyRuntime","hasStaleProfile","liveSessionViews","listBackgroundTasks","readBackgroundTask","stopBackgroundTask","healStaleOrigin","beginDeliveryOrigin","captureDeliveryOrigin","sendDelivery","sendFacts","trimDeliveryOrigins","failDeliveryOrigin","activeEntry","disposeEntry","evictBeyondLimit","isPrimarySession","open","openBackground","sendBackground","isRoleBusy","hasLiveSession","wasLastTurnAborted","hasPendingDelivery","waitForRoleSettle","waitForRoleIdle","openInternal","openInternalUnsafe","consume","send","abort","stop","isOpen","openForRoleId","liveRoleIds","findLiveRuntime","ensureFreshRoleSession","rebuildSession","rebuildSessionUnsafe","isCustomerInitiatedTurn"]);
+const SHARED = new Set(["contextInfo","emitDeliveryNote","findListingForFeedback","now","queueKey","readTasks","isFixedTask","refreshListingNow","sessionKey"]);
+const ports = hostMethods.filter((n) => !LIFECYCLE.has(n) && !SHARED.has(n));
+const text = ports.map((n) => `        ${n}: (...args: Parameters<LifecyclePorts["${n}"]>) => this.${n}(...args),`).join("\n");
+fs.writeFileSync(path.join(HERE, "ports-literal.txt"), text + "\n", "utf8");
+console.log("ports:", ports.length);
+console.log(ports.join("\n"));

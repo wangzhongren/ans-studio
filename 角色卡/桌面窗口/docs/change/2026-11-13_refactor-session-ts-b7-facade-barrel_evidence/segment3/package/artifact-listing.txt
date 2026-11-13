@@ -1,0 +1,10 @@
+total 165316
+drwxr-xr-x 1 51054 197609         0 Nov 13 19:35 .
+drwxr-xr-x 1 51054 197609         0 Nov 13 19:34 ..
+drwxr-xr-x 1 51054 197609         0 Nov 13 19:34 .icon-ico
+-rw-r--r-- 1 51054 197609 169268900 Nov 13 19:35 ANS-Studio-2.0.0-win-x64.zip
+-rw-r--r-- 1 51054 197609      1181 Nov 13 19:35 builder-debug.yml
+drwxr-xr-x 1 51054 197609         0 Nov 13 19:34 win-unpacked
+# top-level file sizes (bytes) and paths
+169268900 release-output/local/ANS-Studio-2.0.0-win-x64.zip
+1181 release-output/local/builder-debug.yml

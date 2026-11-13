@@ -1,0 +1,50 @@
+# B7 第二段 — 14 钉子失败名机械对照（vs 干净 e37da80 工作树）
+
+口径：`node --test` spec reporter；失败名取行首 `✖ `，去时间戳 `(<n>ms)`、去重、排序。
+基线：临时 detached 工作树 e37da80（node_modules junction，只读对照，完成后移除）。
+当前：本工作树（barrel + session/index.ts + 模块）。日志见 baseline/ 与 final/。
+
+基线失败名（14 钉子并集）：16
+当前失败名（14 钉子并集）：16
+
+## 基线失败名
+- W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+- W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+- W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+- W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+- W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+- commit-race
+- required
+- selected
+- sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道
+- sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂
+- sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）
+- sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）
+- sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账
+- 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su
+- 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册
+- 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用
+
+## 当前失败名
+- W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+- W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+- W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+- W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+- W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+- commit-race
+- required
+- selected
+- sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道
+- sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂
+- sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）
+- sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）
+- sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账
+- 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su
+- 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册
+- 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用
+
+## 差异
+- 当前缺失（基线有、当前无）：无
+- 当前新增（当前有、基线无）：无（NO_DIFF）
+
+结论：14 钉子失败名**逐名一致、零新增**。

@@ -1,0 +1,65 @@
+B7 第二段：barrel 51 导出核对（app/desktop/session.ts）
+
+== 运行时（6，dynamic import 实测键集合，排序） ==
+CAPABILITY_INSTALL_SYSTEM_PREFIX
+MAX_LIVE_SESSIONS
+SessionManager
+desktopProjectExecutionInventory
+shouldSuppressStarTaskReport
+subscribeDesktopExecutionInventory
+
+实测：Object.keys(await import("app/desktop/session.ts")).sort() 恰为上列 6 项；MAX_LIVE_SESSIONS === 3。
+（结构测试“导出面·运行时层”同时断言类型名不得出现在运行时键集合。）
+
+== 类型（45，编译期 import type 元组钉住） ==
+1  RuntimeKind                        <- ../../src/common/shared/runtime-shared.ts
+2  RunChangeMode                      <- ../../src/common/编排/run-manifest.ts
+--- ./session/contracts/session-types.ts（22）
+3  DesktopOrchestrationEvent
+4  SessionEventEnvelope
+5  GovernanceClientProjectionV1
+6  SessionOpenRequest
+7  ActiveRunView
+8  EffectiveConfigInfo
+9  SessionMessageMetadata
+10 SessionTarget
+11 OpenResult
+12 SendResult
+13 DeliveryQueuePersistenceOutcome
+14 DeliveryQueuePersistenceFacts
+15 StopResult
+16 WithdrawResult
+17 RebuildSessionResult
+18 RedeliverResult
+19 PersistedDeliveryItemV1
+20 DeliveryQueueRestoreReport
+21 InstallationCapabilityTool
+22 InstallationEffectRefusalObservation
+23 DesktopSessionInventoryFact
+24 DesktopProjectExecutionInventory
+--- ./session/contracts/persistence.ts（5）
+25 PersistenceScope
+26 PersistenceReply
+27 PersistenceCapabilities
+28 PersistenceValues
+29 PersistenceUpdated
+--- ./session/contracts/tasks.ts（15）
+30 BackgroundTaskView
+31 BackgroundTasksListReply
+32 BackgroundTaskReadInput
+33 BackgroundTaskReadReply
+34 BackgroundTaskStopInput
+35 BackgroundTaskStopReply
+36 TaskListView
+37 TaskRestoreReport
+38 TerminateRoleRunInput
+39 TerminateRoleRunResult
+40 RedispatchTaskInput
+41 RedispatchTaskResult
+42 CloseTaskInput
+43 CloseTaskResult
+44 NativeProjectRegistration
+--- ./session/contracts/deps.ts（1）
+45 SessionManagerDeps
+
+合计 6 + 45 = 51。既有导入路径（从 app/desktop/session.ts 导入这些名字）逐字不变。

@@ -1,0 +1,2738 @@
+{
+  "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\refactor-session-ts-b7\\app\\desktop\\session.ts",
+  "totalLines": 4630,
+  "classStartLine": 464,
+  "classEndLine": 4629,
+  "methodCount": 277,
+  "fieldCount": 26,
+  "totalMethodLines": 3353,
+  "members": [
+    {
+      "name": "runStopGeneration",
+      "kind": "get",
+      "startLine": 470,
+      "endLine": 470,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "runStopGeneration",
+      "kind": "set",
+      "startLine": 471,
+      "endLine": 471,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "fencedRunTasks",
+      "kind": "get",
+      "startLine": 472,
+      "endLine": 472,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "fencedRuns",
+      "kind": "get",
+      "startLine": 473,
+      "endLine": 473,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "runStopFacts",
+      "kind": "get",
+      "startLine": 474,
+      "endLine": 474,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "controllerStopFacts",
+      "kind": "get",
+      "startLine": 475,
+      "endLine": 475,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "controllerDisposalOwners",
+      "kind": "get",
+      "startLine": 476,
+      "endLine": 476,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deferredRunChanges",
+      "kind": "get",
+      "startLine": 477,
+      "endLine": 477,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "runChangeOperations",
+      "kind": "get",
+      "startLine": 478,
+      "endLine": 478,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "inventoryPublicationErrors",
+      "kind": "get",
+      "startLine": 481,
+      "endLine": 481,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "observedInventoryRoots",
+      "kind": "get",
+      "startLine": 482,
+      "endLine": 482,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "installationRefusals",
+      "kind": "private",
+      "startLine": 483,
+      "endLine": 483,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "installationEffectObservations",
+      "kind": "public",
+      "startLine": 485,
+      "endLine": 487,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "refuseUnprovenInstallation",
+      "kind": "private",
+      "startLine": 489,
+      "endLine": 492,
+      "bodyLines": 4,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "runTaskIsFenced",
+      "kind": "private",
+      "startLine": 495,
+      "endLine": 497,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "selectRunChangeForHandle",
+      "kind": "private",
+      "startLine": 500,
+      "endLine": 503,
+      "bodyLines": 4,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "completeTeamPlanForHandle",
+      "kind": "private",
+      "startLine": 506,
+      "endLine": 510,
+      "bodyLines": 5,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "ownedRunStopMembers",
+      "kind": "private",
+      "startLine": 513,
+      "endLine": 515,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "executeOwnedRunStop",
+      "kind": "private",
+      "startLine": 518,
+      "endLine": 520,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "resumeDeferredRunChanges",
+      "kind": "private",
+      "startLine": 523,
+      "endLine": 525,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "inventoryChanged",
+      "kind": "private",
+      "startLine": 528,
+      "endLine": 530,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "publishDeliveryInventory",
+      "kind": "private",
+      "startLine": 531,
+      "endLine": 533,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "inventoryState",
+      "kind": "get",
+      "startLine": 535,
+      "endLine": 537,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "executionInventoryFacts",
+      "kind": "public",
+      "startLine": 539,
+      "endLine": 541,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "openObservedRoleSession",
+      "kind": "private",
+      "startLine": 542,
+      "endLine": 573,
+      "bodyLines": 32,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "ownsControllerDisposal",
+      "kind": "private",
+      "startLine": 574,
+      "endLine": 578,
+      "bodyLines": 5,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "disposeObservedHandle",
+      "kind": "private",
+      "startLine": 579,
+      "endLine": 595,
+      "bodyLines": 17,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "deps",
+      "kind": "private",
+      "startLine": 597,
+      "endLine": 597,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "loadEffectiveConfig",
+      "kind": "private",
+      "startLine": 598,
+      "endLine": 598,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "activeRoleId",
+      "kind": "private",
+      "startLine": 606,
+      "endLine": 606,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "selectionTargetRoleId",
+      "kind": "private",
+      "startLine": 609,
+      "endLine": 609,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "deliveryQueues",
+      "kind": "get",
+      "startLine": 617,
+      "endLine": 617,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "drainChains",
+      "kind": "get",
+      "startLine": 618,
+      "endLine": 618,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "drainClaimRecords",
+      "kind": "get",
+      "startLine": 619,
+      "endLine": 619,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryStopVersion",
+      "kind": "get",
+      "startLine": 620,
+      "endLine": 620,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryStopVersion",
+      "kind": "set",
+      "startLine": 621,
+      "endLine": 621,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryStoppedAll",
+      "kind": "get",
+      "startLine": 622,
+      "endLine": 622,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryStoppedAll",
+      "kind": "set",
+      "startLine": 623,
+      "endLine": 623,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "stoppedDeliveryKeys",
+      "kind": "get",
+      "startLine": 624,
+      "endLine": 624,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "resumedDeliveryKeys",
+      "kind": "get",
+      "startLine": 625,
+      "endLine": 625,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryKeyStopVersions",
+      "kind": "get",
+      "startLine": 626,
+      "endLine": 626,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryIsStopped",
+      "kind": "private",
+      "startLine": 628,
+      "endLine": 630,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "deliveryLifecycle",
+      "kind": "private",
+      "startLine": 632,
+      "endLine": 634,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "resumeDelivery",
+      "kind": "private",
+      "startLine": 636,
+      "endLine": 638,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "activeDeliveries",
+      "kind": "get",
+      "startLine": 655,
+      "endLine": 655,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "planEscalations",
+      "kind": "get",
+      "startLine": 666,
+      "endLine": 666,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "planEscalationPrompted",
+      "kind": "get",
+      "startLine": 669,
+      "endLine": 669,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "requestNotifiedKeys",
+      "kind": "get",
+      "startLine": 671,
+      "endLine": 671,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "versionDecisionPending",
+      "kind": "get",
+      "startLine": 674,
+      "endLine": 674,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "versionDecisionChains",
+      "kind": "get",
+      "startLine": 676,
+      "endLine": 676,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "requestPresentedKeys",
+      "kind": "get",
+      "startLine": 678,
+      "endLine": 678,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "evidence",
+      "kind": "private",
+      "startLine": 687,
+      "endLine": 687,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "persistence",
+      "kind": "private",
+      "startLine": 690,
+      "endLine": 690,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "tasks",
+      "kind": "private",
+      "startLine": 694,
+      "endLine": 694,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "diagnostics",
+      "kind": "private",
+      "startLine": 698,
+      "endLine": 698,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "sessionEnv",
+      "kind": "private",
+      "startLine": 702,
+      "endLine": 702,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "delivery",
+      "kind": "private",
+      "startLine": 705,
+      "endLine": 705,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "runChange",
+      "kind": "private",
+      "startLine": 708,
+      "endLine": 708,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "cards",
+      "kind": "private",
+      "startLine": 711,
+      "endLine": 711,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "versionDecisions",
+      "kind": "private",
+      "startLine": 713,
+      "endLine": 713,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "acceptanceFacts",
+      "kind": "private",
+      "startLine": 715,
+      "endLine": 715,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "cardGateway",
+      "kind": "private",
+      "startLine": 717,
+      "endLine": 717,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "controllerStopPort",
+      "kind": "private",
+      "startLine": 719,
+      "endLine": 719,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "handback",
+      "kind": "private",
+      "startLine": 721,
+      "endLine": 721,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "dispatch",
+      "kind": "private",
+      "startLine": 723,
+      "endLine": 723,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "fixedWorkflowRoute",
+      "kind": "private",
+      "startLine": 725,
+      "endLine": 725,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "fixedWorkflowCards",
+      "kind": "private",
+      "startLine": 727,
+      "endLine": 727,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "fixedWorkflowRelease",
+      "kind": "private",
+      "startLine": 729,
+      "endLine": 729,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "fixedWorkflowPanel",
+      "kind": "private",
+      "startLine": 731,
+      "endLine": 731,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "fixedDispatchPort",
+      "kind": "private",
+      "startLine": 733,
+      "endLine": 733,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "handbackSink",
+      "kind": "private",
+      "startLine": 735,
+      "endLine": 735,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "enqueuedHandbackKeys",
+      "kind": "get",
+      "startLine": 739,
+      "endLine": 739,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "pendingHandbackKeys",
+      "kind": "get",
+      "startLine": 740,
+      "endLine": 740,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "taskHandbackCommits",
+      "kind": "get",
+      "startLine": 742,
+      "endLine": 742,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "taskDeliveryCommits",
+      "kind": "get",
+      "startLine": 744,
+      "endLine": 744,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "runChangeAutoPrompted",
+      "kind": "get",
+      "startLine": 754,
+      "endLine": 754,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "suDeliveryBlockedNoted",
+      "kind": "get",
+      "startLine": 756,
+      "endLine": 756,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryQueueStorePath",
+      "kind": "get",
+      "startLine": 796,
+      "endLine": 796,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryPersistOutcome",
+      "kind": "get",
+      "startLine": 797,
+      "endLine": 797,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryPersistChain",
+      "kind": "get",
+      "startLine": 798,
+      "endLine": 798,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryPersistSeq",
+      "kind": "get",
+      "startLine": 799,
+      "endLine": 799,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveredDeliveryKeys",
+      "kind": "get",
+      "startLine": 800,
+      "endLine": 800,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveredAppTaskIds",
+      "kind": "get",
+      "startLine": 801,
+      "endLine": 801,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryStoreArmed",
+      "kind": "get",
+      "startLine": 802,
+      "endLine": 802,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "deliveryStoreArmed",
+      "kind": "set",
+      "startLine": 803,
+      "endLine": 803,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "networkState",
+      "kind": "private",
+      "startLine": 808,
+      "endLine": 808,
+      "bodyLines": 1,
+      "isField": true,
+      "isOneLiner": false
+    },
+    {
+      "name": "constructor",
+      "kind": "ctor",
+      "startLine": 810,
+      "endLine": 1086,
+      "bodyLines": 277,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "now",
+      "kind": "private",
+      "startLine": 1091,
+      "endLine": 1093,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "observeWatchdog",
+      "kind": "private",
+      "startLine": 1096,
+      "endLine": 1102,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "noteWatchdogActivity",
+      "kind": "private",
+      "startLine": 1105,
+      "endLine": 1108,
+      "bodyLines": 4,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "sessionKey",
+      "kind": "private",
+      "startLine": 1111,
+      "endLine": 1113,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "targetKey",
+      "kind": "private",
+      "startLine": 1115,
+      "endLine": 1123,
+      "bodyLines": 9,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "profileRevision",
+      "kind": "public",
+      "startLine": 1124,
+      "endLine": 1124,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "profileChanged",
+      "kind": "public",
+      "startLine": 1125,
+      "endLine": 1129,
+      "bodyLines": 5,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "hasBusyRuntime",
+      "kind": "public",
+      "startLine": 1130,
+      "endLine": 1130,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "hasStaleProfile",
+      "kind": "public",
+      "startLine": 1131,
+      "endLine": 1131,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "liveSessionViews",
+      "kind": "public",
+      "startLine": 1132,
+      "endLine": 1134,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "listBackgroundTasks",
+      "kind": "public",
+      "startLine": 1141,
+      "endLine": 1164,
+      "bodyLines": 24,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "readBackgroundTask",
+      "kind": "public",
+      "startLine": 1170,
+      "endLine": 1200,
+      "bodyLines": 31,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "stopBackgroundTask",
+      "kind": "public",
+      "startLine": 1207,
+      "endLine": 1227,
+      "bodyLines": 21,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "contextInfo",
+      "kind": "private",
+      "startLine": 1229,
+      "endLine": 1231,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "healStaleOrigin",
+      "kind": "private",
+      "startLine": 1238,
+      "endLine": 1253,
+      "bodyLines": 16,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "beginDeliveryOrigin",
+      "kind": "private",
+      "startLine": 1260,
+      "endLine": 1266,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "captureDeliveryOrigin",
+      "kind": "private",
+      "startLine": 1268,
+      "endLine": 1274,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "sendDelivery",
+      "kind": "private",
+      "startLine": 1276,
+      "endLine": 1386,
+      "bodyLines": 111,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "sendFacts",
+      "kind": "private",
+      "startLine": 1388,
+      "endLine": 1396,
+      "bodyLines": 9,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "trimDeliveryOrigins",
+      "kind": "private",
+      "startLine": 1398,
+      "endLine": 1405,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "failDeliveryOrigin",
+      "kind": "private",
+      "startLine": 1407,
+      "endLine": 1412,
+      "bodyLines": 6,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "activeEntry",
+      "kind": "private",
+      "startLine": 1415,
+      "endLine": 1417,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "disposeEntry",
+      "kind": "private",
+      "startLine": 1424,
+      "endLine": 1489,
+      "bodyLines": 66,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "evictBeyondLimit",
+      "kind": "private",
+      "startLine": 1502,
+      "endLine": 1520,
+      "bodyLines": 19,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "isPrimarySession",
+      "kind": "private",
+      "startLine": 1528,
+      "endLine": 1531,
+      "bodyLines": 4,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "boundaryDiff",
+      "kind": "private",
+      "startLine": 1539,
+      "endLine": 1541,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "currentSkillPaths",
+      "kind": "private",
+      "startLine": 1544,
+      "endLine": 1546,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "rebuildIfBoundaryStale",
+      "kind": "private",
+      "startLine": 1549,
+      "endLine": 1558,
+      "bodyLines": 10,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "rebuildIfBoundaryStaleUnsafe",
+      "kind": "private",
+      "startLine": 1561,
+      "endLine": 1568,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "queueRebuildWritePermitsNotice",
+      "kind": "private",
+      "startLine": 1571,
+      "endLine": 1573,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "refreshStaleBoundaries",
+      "kind": "public",
+      "startLine": 1576,
+      "endLine": 1578,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "open",
+      "kind": "public",
+      "startLine": 1583,
+      "endLine": 1595,
+      "bodyLines": 13,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "interpretDirective",
+      "kind": "public",
+      "startLine": 1598,
+      "endLine": 1600,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "openBackground",
+      "kind": "public",
+      "startLine": 1607,
+      "endLine": 1620,
+      "bodyLines": 14,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "sendBackground",
+      "kind": "public",
+      "startLine": 1637,
+      "endLine": 1651,
+      "bodyLines": 15,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "queueDirectNotification",
+      "kind": "public",
+      "startLine": 1654,
+      "endLine": 1657,
+      "bodyLines": 4,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "isRoleBusy",
+      "kind": "public",
+      "startLine": 1660,
+      "endLine": 1662,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "hasLiveSession",
+      "kind": "public",
+      "startLine": 1665,
+      "endLine": 1667,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "wasLastTurnAborted",
+      "kind": "public",
+      "startLine": 1670,
+      "endLine": 1672,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "hasPendingDelivery",
+      "kind": "public",
+      "startLine": 1675,
+      "endLine": 1679,
+      "bodyLines": 5,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "requestRequirementChangeDecision",
+      "kind": "public",
+      "startLine": 1682,
+      "endLine": 1694,
+      "bodyLines": 13,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "requestRunChangeDecision",
+      "kind": "public",
+      "startLine": 1697,
+      "endLine": 1709,
+      "bodyLines": 13,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "pickGovernedCardEntry",
+      "kind": "private",
+      "startLine": 1718,
+      "endLine": 1720,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "presentAppCard",
+      "kind": "private",
+      "startLine": 1723,
+      "endLine": 1731,
+      "bodyLines": 9,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "presentVersionChangeCard",
+      "kind": "public",
+      "startLine": 1735,
+      "endLine": 1741,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "presentAmendmentItemCard",
+      "kind": "public",
+      "startLine": 1745,
+      "endLine": 1749,
+      "bodyLines": 5,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "presentStableWriteCard",
+      "kind": "public",
+      "startLine": 1753,
+      "endLine": 1760,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "noteVersionChange",
+      "kind": "public",
+      "startLine": 1764,
+      "endLine": 1766,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "noteVersionChangeInitiator",
+      "kind": "public",
+      "startLine": 1770,
+      "endLine": 1772,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "reportPlanEscalation",
+      "kind": "public",
+      "startLine": 1777,
+      "endLine": 1779,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "afterPlanEscalation",
+      "kind": "private",
+      "startLine": 1783,
+      "endLine": 1789,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "afterStableWrite",
+      "kind": "private",
+      "startLine": 1792,
+      "endLine": 1800,
+      "bodyLines": 9,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "enrichAppointmentWriteBoundaryCard",
+      "kind": "private",
+      "startLine": 1803,
+      "endLine": 1809,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "afterAppointmentWriteApproved",
+      "kind": "private",
+      "startLine": 1812,
+      "endLine": 1821,
+      "bodyLines": 10,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "activeRunViews",
+      "kind": "public",
+      "startLine": 1824,
+      "endLine": 1826,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "proposalCardFrozenRejection",
+      "kind": "private",
+      "startLine": 1829,
+      "endLine": 1836,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "pendingVersionChangesFor",
+      "kind": "private",
+      "startLine": 1839,
+      "endLine": 1843,
+      "bodyLines": 5,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "offerRunChangeOnFrozenContract",
+      "kind": "private",
+      "startLine": 1846,
+      "endLine": 1859,
+      "bodyLines": 14,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "governanceOwnerRoleId",
+      "kind": "public",
+      "startLine": 1862,
+      "endLine": 1864,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "governanceRuntimeFor",
+      "kind": "public",
+      "startLine": 1867,
+      "endLine": 1869,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "activeRuntimeFor",
+      "kind": "public",
+      "startLine": 1872,
+      "endLine": 1874,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "refreshListingNow",
+      "kind": "public",
+      "startLine": 1880,
+      "endLine": 1882,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "waitForRoleSettle",
+      "kind": "public",
+      "startLine": 1891,
+      "endLine": 1912,
+      "bodyLines": 22,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "waitForRoleIdle",
+      "kind": "public",
+      "startLine": 1926,
+      "endLine": 1960,
+      "bodyLines": 35,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "openInternal",
+      "kind": "private",
+      "startLine": 1962,
+      "endLine": 1980,
+      "bodyLines": 19,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "openInternalUnsafe",
+      "kind": "private",
+      "startLine": 1987,
+      "endLine": 3067,
+      "bodyLines": 1081,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "consume",
+      "kind": "private",
+      "startLine": 3073,
+      "endLine": 3305,
+      "bodyLines": 233,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "send",
+      "kind": "public",
+      "startLine": 3313,
+      "endLine": 3437,
+      "bodyLines": 125,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "abort",
+      "kind": "public",
+      "startLine": 3448,
+      "endLine": 3475,
+      "bodyLines": 28,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "forceResetDeliveryState",
+      "kind": "private",
+      "startLine": 3478,
+      "endLine": 3480,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "stop",
+      "kind": "public",
+      "startLine": 3486,
+      "endLine": 3538,
+      "bodyLines": 53,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "isOpen",
+      "kind": "public",
+      "startLine": 3541,
+      "endLine": 3543,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "openForRoleId",
+      "kind": "public",
+      "startLine": 3546,
+      "endLine": 3548,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "liveRoleIds",
+      "kind": "public",
+      "startLine": 3551,
+      "endLine": 3553,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "handbackOwnerRoleId",
+      "kind": "private",
+      "startLine": 3564,
+      "endLine": 3566,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "rememberTaskCreator",
+      "kind": "private",
+      "startLine": 3570,
+      "endLine": 3572,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "chiefTaskRoleIdOf",
+      "kind": "private",
+      "startLine": 3574,
+      "endLine": 3576,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "readTasks",
+      "kind": "private",
+      "startLine": 3579,
+      "endLine": 3581,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "isFixedTask",
+      "kind": "private",
+      "startLine": 3584,
+      "endLine": 3586,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "inspectFixedHandbackChild",
+      "kind": "private",
+      "startLine": 3589,
+      "endLine": 3596,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "appendTaskStateResult",
+      "kind": "private",
+      "startLine": 3599,
+      "endLine": 3601,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "appendTaskState",
+      "kind": "private",
+      "startLine": 3602,
+      "endLine": 3604,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "recordTaskFailure",
+      "kind": "private",
+      "startLine": 3606,
+      "endLine": 3608,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "appendRoleActivity",
+      "kind": "private",
+      "startLine": 3611,
+      "endLine": 3617,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "observeRoleEvent",
+      "kind": "private",
+      "startLine": 3620,
+      "endLine": 3622,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "roleActivityLogText",
+      "kind": "private",
+      "startLine": 3625,
+      "endLine": 3627,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "requestIdFor",
+      "kind": "private",
+      "startLine": 3633,
+      "endLine": 3635,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "notifyRequest",
+      "kind": "private",
+      "startLine": 3639,
+      "endLine": 3649,
+      "bodyLines": 11,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "recordRequestPresented",
+      "kind": "private",
+      "startLine": 3652,
+      "endLine": 3654,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "appointmentWriteApplicationRejection",
+      "kind": "private",
+      "startLine": 3657,
+      "endLine": 3663,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "enrichAcceptanceJudgeContext",
+      "kind": "private",
+      "startLine": 3666,
+      "endLine": 3673,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "withRequestLifecycle",
+      "kind": "private",
+      "startLine": 3676,
+      "endLine": 3694,
+      "bodyLines": 19,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "readRoleActivityLog",
+      "kind": "public",
+      "startLine": 3697,
+      "endLine": 3699,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "listTasks",
+      "kind": "public",
+      "startLine": 3702,
+      "endLine": 3704,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "projectStateView",
+      "kind": "public",
+      "startLine": 3709,
+      "endLine": 3711,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "projectStateTool",
+      "kind": "private",
+      "startLine": 3714,
+      "endLine": 3716,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "projectNote",
+      "kind": "public",
+      "startLine": 3719,
+      "endLine": 3721,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "versionDecisionSubjectKey",
+      "kind": "private",
+      "startLine": 3724,
+      "endLine": 3726,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "isVersionDecisionRequestIdForSubject",
+      "kind": "private",
+      "startLine": 3730,
+      "endLine": 3732,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "findPendingVersionDecision",
+      "kind": "private",
+      "startLine": 3735,
+      "endLine": 3737,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "pendingRequestIdsForFlow",
+      "kind": "private",
+      "startLine": 3740,
+      "endLine": 3742,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "countAcceptanceRejections",
+      "kind": "private",
+      "startLine": 3745,
+      "endLine": 3747,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "countPriorVersionDecisions",
+      "kind": "private",
+      "startLine": 3750,
+      "endLine": 3752,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "buildVersionDecisionFacts",
+      "kind": "private",
+      "startLine": 3755,
+      "endLine": 3757,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "versionDecisionCardLabels",
+      "kind": "private",
+      "startLine": 3760,
+      "endLine": 3762,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "decidedByText",
+      "kind": "private",
+      "startLine": 3765,
+      "endLine": 3767,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "formatTargetVersions",
+      "kind": "private",
+      "startLine": 3770,
+      "endLine": 3772,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "stripVersionDecisionPrefix",
+      "kind": "private",
+      "startLine": 3775,
+      "endLine": 3777,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "nextVersionFlowId",
+      "kind": "private",
+      "startLine": 3780,
+      "endLine": 3782,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "mapVersionDecisionRawOutcome",
+      "kind": "private",
+      "startLine": 3785,
+      "endLine": 3787,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "appendVersionDecisionAudit",
+      "kind": "private",
+      "startLine": 3790,
+      "endLine": 3792,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "emitVersionDecisionResolved",
+      "kind": "private",
+      "startLine": 3795,
+      "endLine": 3797,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "requestVersionDecision",
+      "kind": "public",
+      "startLine": 3800,
+      "endLine": 3808,
+      "bodyLines": 9,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "restoreVersionDecisions",
+      "kind": "private",
+      "startLine": 3811,
+      "endLine": 3813,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "restoreRequestState",
+      "kind": "private",
+      "startLine": 3817,
+      "endLine": 3822,
+      "bodyLines": 6,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "restoreTasks",
+      "kind": "public",
+      "startLine": 3825,
+      "endLine": 3827,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "findLiveRuntime",
+      "kind": "private",
+      "startLine": 3829,
+      "endLine": 3834,
+      "bodyLines": 6,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "partialArtifactsFor",
+      "kind": "private",
+      "startLine": 3837,
+      "endLine": 3839,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "roleTempDir",
+      "kind": "private",
+      "startLine": 3842,
+      "endLine": 3844,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "isolatePartialArtifacts",
+      "kind": "private",
+      "startLine": 3847,
+      "endLine": 3854,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "ensureFreshRoleSession",
+      "kind": "private",
+      "startLine": 3857,
+      "endLine": 3867,
+      "bodyLines": 11,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "chooseRedispatchTarget",
+      "kind": "private",
+      "startLine": 3870,
+      "endLine": 3872,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "controllerProducerFacts",
+      "kind": "private",
+      "startLine": 3875,
+      "endLine": 3877,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "stopExactController",
+      "kind": "private",
+      "startLine": 3880,
+      "endLine": 3882,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "terminateRoleRun",
+      "kind": "public",
+      "startLine": 3885,
+      "endLine": 3887,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "taskChainRootOf",
+      "kind": "private",
+      "startLine": 3890,
+      "endLine": 3892,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "redispatchTask",
+      "kind": "public",
+      "startLine": 3895,
+      "endLine": 3897,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "closeTask",
+      "kind": "public",
+      "startLine": 3900,
+      "endLine": 3902,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "escalateStuckTask",
+      "kind": "private",
+      "startLine": 3905,
+      "endLine": 3915,
+      "bodyLines": 11,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "dispatcherRoleIdOf",
+      "kind": "private",
+      "startLine": 3921,
+      "endLine": 3923,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "emitDeliveryNote",
+      "kind": "private",
+      "startLine": 3926,
+      "endLine": 3928,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "governanceProjectionKey",
+      "kind": "private",
+      "startLine": 3931,
+      "endLine": 3933,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "governanceProjectionFingerprint",
+      "kind": "private",
+      "startLine": 3936,
+      "endLine": 3945,
+      "bodyLines": 10,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "registerGovernanceClientProjection",
+      "kind": "private",
+      "startLine": 3948,
+      "endLine": 3956,
+      "bodyLines": 9,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "lookupGovernanceClientProjection",
+      "kind": "private",
+      "startLine": 3959,
+      "endLine": 3966,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "mirrorGovernanceFeedback",
+      "kind": "private",
+      "startLine": 3969,
+      "endLine": 3976,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "resolveProofFlowIds",
+      "kind": "private",
+      "startLine": 3982,
+      "endLine": 3984,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "findListingForFeedback",
+      "kind": "private",
+      "startLine": 3987,
+      "endLine": 3989,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "roleDisplayName",
+      "kind": "private",
+      "startLine": 3992,
+      "endLine": 3994,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "queueKey",
+      "kind": "private",
+      "startLine": 3997,
+      "endLine": 3999,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "appTaskClientMessageId",
+      "kind": "private",
+      "startLine": 4002,
+      "endLine": 4004,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "appTaskClientMessageIdFromSeed",
+      "kind": "private",
+      "startLine": 4007,
+      "endLine": 4009,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "appDispatchClientMessageId",
+      "kind": "private",
+      "startLine": 4012,
+      "endLine": 4014,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "rememberAppTaskDelivered",
+      "kind": "private",
+      "startLine": 4017,
+      "endLine": 4019,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "pendingAppTaskDelivery",
+      "kind": "private",
+      "startLine": 4022,
+      "endLine": 4029,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "enqueueDelivery",
+      "kind": "private",
+      "startLine": 4032,
+      "endLine": 4034,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "persistableDeliveryItem",
+      "kind": "private",
+      "startLine": 4039,
+      "endLine": 4041,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "deliveryStoreItems",
+      "kind": "private",
+      "startLine": 4044,
+      "endLine": 4046,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "deliveryQueuePersistenceFacts",
+      "kind": "private",
+      "startLine": 4049,
+      "endLine": 4051,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "finishStopPersistence",
+      "kind": "private",
+      "startLine": 4054,
+      "endLine": 4056,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "persistDeliveryQueues",
+      "kind": "private",
+      "startLine": 4059,
+      "endLine": 4061,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "parsePersistedDeliveryItem",
+      "kind": "private",
+      "startLine": 4064,
+      "endLine": 4066,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "restorePersistedDeliveries",
+      "kind": "public",
+      "startLine": 4069,
+      "endLine": 4071,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "withdraw",
+      "kind": "public",
+      "startLine": 4074,
+      "endLine": 4076,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "notifyRoleState",
+      "kind": "private",
+      "startLine": 4079,
+      "endLine": 4081,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "broadcastRoleStates",
+      "kind": "public",
+      "startLine": 4084,
+      "endLine": 4086,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "isNetworkOffline",
+      "kind": "private",
+      "startLine": 4091,
+      "endLine": 4093,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "applyNetworkState",
+      "kind": "public",
+      "startLine": 4096,
+      "endLine": 4098,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "persistenceScope",
+      "kind": "private",
+      "startLine": 4101,
+      "endLine": 4101,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "persistenceKey",
+      "kind": "private",
+      "startLine": 4103,
+      "endLine": 4103,
+      "bodyLines": 1,
+      "isField": false,
+      "isOneLiner": true
+    },
+    {
+      "name": "displayHandback",
+      "kind": "private",
+      "startLine": 4105,
+      "endLine": 4107,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "mergeReportState",
+      "kind": "private",
+      "startLine": 4109,
+      "endLine": 4111,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "rememberReceipt",
+      "kind": "private",
+      "startLine": 4113,
+      "endLine": 4115,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "registerPersistenceHistory",
+      "kind": "public",
+      "startLine": 4117,
+      "endLine": 4119,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "persistenceOperation",
+      "kind": "public",
+      "startLine": 4121,
+      "endLine": 4123,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "handbackFlowId",
+      "kind": "private",
+      "startLine": 4130,
+      "endLine": 4132,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "handleHandback",
+      "kind": "private",
+      "startLine": 4136,
+      "endLine": 4138,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "commitHandback",
+      "kind": "private",
+      "startLine": 4141,
+      "endLine": 4143,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "routeDispatch",
+      "kind": "private",
+      "startLine": 4146,
+      "endLine": 4148,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "chainDispatchFacts",
+      "kind": "private",
+      "startLine": 4151,
+      "endLine": 4164,
+      "bodyLines": 14,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "captureChiefDispatchSource",
+      "kind": "private",
+      "startLine": 4167,
+      "endLine": 4169,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "resumeChiefController",
+      "kind": "private",
+      "startLine": 4172,
+      "endLine": 4174,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "routeStarDispatch",
+      "kind": "private",
+      "startLine": 4177,
+      "endLine": 4187,
+      "bodyLines": 11,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "routeFixedPathDispatch",
+      "kind": "private",
+      "startLine": 4190,
+      "endLine": 4201,
+      "bodyLines": 12,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "completeTeamPlanFixedForHandle",
+      "kind": "private",
+      "startLine": 4211,
+      "endLine": 4219,
+      "bodyLines": 9,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "closeCreatedTaskFixedForSession",
+      "kind": "private",
+      "startLine": 4222,
+      "endLine": 4229,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "verifyFixedReviewCloseBasis",
+      "kind": "private",
+      "startLine": 4232,
+      "endLine": 4237,
+      "bodyLines": 6,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "findFixedReviewArtifact",
+      "kind": "private",
+      "startLine": 4240,
+      "endLine": 4246,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "buildFixedCloseEvidence",
+      "kind": "private",
+      "startLine": 4249,
+      "endLine": 4254,
+      "bodyLines": 6,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "collectFixedProposalDocumentRefs",
+      "kind": "private",
+      "startLine": 4261,
+      "endLine": 4266,
+      "bodyLines": 6,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "prepareFixedAppointmentCardRequest",
+      "kind": "private",
+      "startLine": 4269,
+      "endLine": 4274,
+      "bodyLines": 6,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "recordFixedCardWorkflowResolution",
+      "kind": "private",
+      "startLine": 4281,
+      "endLine": 4293,
+      "bodyLines": 13,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "ensurePathBStartForDispatch",
+      "kind": "private",
+      "startLine": 4297,
+      "endLine": 4303,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "checkPathBWriteSetForDispatch",
+      "kind": "private",
+      "startLine": 4306,
+      "endLine": 4314,
+      "bodyLines": 9,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "presentMergeMainCard",
+      "kind": "private",
+      "startLine": 4318,
+      "endLine": 4324,
+      "bodyLines": 7,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "runFixedReleaseMerge",
+      "kind": "public",
+      "startLine": 4327,
+      "endLine": 4343,
+      "bodyLines": 17,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "settleMergeMainCard",
+      "kind": "private",
+      "startLine": 4346,
+      "endLine": 4361,
+      "bodyLines": 16,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "autoPresentFixedReleaseMerge",
+      "kind": "private",
+      "startLine": 4364,
+      "endLine": 4377,
+      "bodyLines": 14,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "fixedReleaseAutoEvidence",
+      "kind": "private",
+      "startLine": 4380,
+      "endLine": 4387,
+      "bodyLines": 8,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "noteFixedReleaseAutoTrigger",
+      "kind": "private",
+      "startLine": 4391,
+      "endLine": 4393,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "fixedPanelState",
+      "kind": "public",
+      "startLine": 4396,
+      "endLine": 4415,
+      "bodyLines": 20,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "dispatchAdvisorySummary",
+      "kind": "private",
+      "startLine": 4419,
+      "endLine": 4421,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "watchdogSnapshot",
+      "kind": "public",
+      "startLine": 4431,
+      "endLine": 4433,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "projectRootsWithActivity",
+      "kind": "public",
+      "startLine": 4436,
+      "endLine": 4438,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "lastTurnOf",
+      "kind": "public",
+      "startLine": 4441,
+      "endLine": 4443,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "watchdogDeliver",
+      "kind": "public",
+      "startLine": 4446,
+      "endLine": 4448,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "rebuildSession",
+      "kind": "public",
+      "startLine": 4455,
+      "endLine": 4466,
+      "bodyLines": 12,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "rebuildSessionUnsafe",
+      "kind": "private",
+      "startLine": 4469,
+      "endLine": 4497,
+      "bodyLines": 29,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "redeliverNudge",
+      "kind": "public",
+      "startLine": 4500,
+      "endLine": 4502,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "isCustomerInitiatedTurn",
+      "kind": "private",
+      "startLine": 4518,
+      "endLine": 4523,
+      "bodyLines": 6,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "activateRoleRefresh",
+      "kind": "private",
+      "startLine": 4526,
+      "endLine": 4528,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "applySkillChange",
+      "kind": "private",
+      "startLine": 4531,
+      "endLine": 4540,
+      "bodyLines": 10,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "applyMcpChange",
+      "kind": "private",
+      "startLine": 4552,
+      "endLine": 4561,
+      "bodyLines": 10,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "evidenceCheckText",
+      "kind": "private",
+      "startLine": 4566,
+      "endLine": 4568,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "evidenceScopeRoots",
+      "kind": "private",
+      "startLine": 4571,
+      "endLine": 4573,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "contractCheckText",
+      "kind": "private",
+      "startLine": 4576,
+      "endLine": 4578,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "contractCheckTextFixed",
+      "kind": "private",
+      "startLine": 4581,
+      "endLine": 4583,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "docFormatText",
+      "kind": "private",
+      "startLine": 4586,
+      "endLine": 4588,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "roleStatusText",
+      "kind": "private",
+      "startLine": 4591,
+      "endLine": 4593,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "diagnosticsTailText",
+      "kind": "private",
+      "startLine": 4596,
+      "endLine": 4598,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "sessionTailText",
+      "kind": "private",
+      "startLine": 4601,
+      "endLine": 4603,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "drainAllQueuesFor",
+      "kind": "private",
+      "startLine": 4606,
+      "endLine": 4608,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "drainPiQueuesAcrossProjects",
+      "kind": "private",
+      "startLine": 4611,
+      "endLine": 4613,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "waitForRunStopDeliveryClaims",
+      "kind": "public",
+      "startLine": 4616,
+      "endLine": 4618,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "drainQueue",
+      "kind": "private",
+      "startLine": 4621,
+      "endLine": 4623,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    },
+    {
+      "name": "drainQueueUnsafe",
+      "kind": "private",
+      "startLine": 4626,
+      "endLine": 4628,
+      "bodyLines": 3,
+      "isField": false,
+      "isOneLiner": false
+    }
+  ]
+}
