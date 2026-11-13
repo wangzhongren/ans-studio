@@ -1,0 +1,13 @@
+✔ listProject 附带 activeRuns（pinned/draft 摘要；draft 不算可发起） (19.0429ms)
+✔ requestRunChange：无 pinned run / 多 pinned run / 无可呈现会话 ⇒ 如实失败（不伪造成功） (13.7432ms)
+✔ requestRunChange（真实链路）：convener 会话呈现 run-change 卡，客户答 continue-frozen 后落账 (64.3484ms)
+✔ 跨层源码钉：main handler / preload 桥 / platform 类型 / U1 旧按钮已移除（低层 API 保留）/ 触发点接线 (7.8742ms)
+✔ requestRunChange（真实客户卡通道 + 替我决策开启）：三模式卡呈现客户、不代选；客户作答后按 customer 落账 (141.1895ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 681.1048

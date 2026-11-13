@@ -20,6 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { SessionManager, shouldSuppressStarTaskReport } from "../../app/desktop/session.ts";
+import { readSessionModule, readSessionSource } from "./session-source.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { renderHandbackPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
@@ -51,7 +52,9 @@ const PRELOAD = fs.readFileSync(path.join(APP_DIR, "preload.cjs"), "utf8");
 const NEW_RENDERER_IPC = fs.readFileSync(path.join(APP_DIR, "renderer", "src", "chat", "ipc.ts"), "utf8");
 const MAIN = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
 const IFACE = fs.readFileSync(path.join(APP_DIR, "desktop", "interface.ts"), "utf8");
-const SESSION = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
+const SESSION = readSessionSource();
+// L-1 顺序钉按目标架构的 lifecycle/send 模块读取（B0 无该模块时回退到单文件全量源码）。
+const SESSION_SEND = readSessionModule("lifecycle/send");
 
 const tick = (ms = 80) => new Promise((r) => setTimeout(r, ms));
 
@@ -429,8 +432,8 @@ test("接线钉子：role-state 通道两端齐备；忙态判据只在主进程
   // L-1 顺序修正（防竞态）：直接 send **先置忙再 await**——快适配器（如 demo）的 settled 可能在 await
   // 返回前就被消费；若此刻才置忙，settled 的复位会被反向覆盖，忙态永不复位（队列永不放行）。
   assert.ok(
-    SESSION.indexOf("entry.busy = true;") >= 0 &&
-      SESSION.indexOf("entry.busy = true;") < SESSION.indexOf("await this.sendDelivery(entry, origin, text, opts);"),
+    SESSION_SEND.indexOf("entry.busy = true;") >= 0 &&
+      SESSION_SEND.indexOf("entry.busy = true;") < SESSION_SEND.indexOf("await this.sendDelivery(entry, origin, text, opts);"),
     "直接 send 应先置忙再 await（与投递机同款）"
   );
   // 新渲染器（5B）：经 preload 白名单订阅真实快照并落入投影；队列行/单计数由 main.mjs 与

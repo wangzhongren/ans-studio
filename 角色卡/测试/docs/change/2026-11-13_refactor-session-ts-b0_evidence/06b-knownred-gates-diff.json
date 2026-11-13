@@ -1,0 +1,9 @@
+{
+  "suite": "gates",
+  "tap": "14-segment-门禁引擎.tap",
+  "canonicalCount": 5,
+  "actualCount": 5,
+  "missingInActual": [],
+  "extraVsCanonical": [],
+  "sameSet": true
+}

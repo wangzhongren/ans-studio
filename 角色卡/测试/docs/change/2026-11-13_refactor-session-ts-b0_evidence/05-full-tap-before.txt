@@ -1,0 +1,369 @@
+✔ application surface: default report equals the actually constructed ANS/foreign/WebSearch face (9.2037ms)
+✔ application surface: ANS_CLAUDE_WEB_SEARCH=1/on counts WebSearch as a native builtin, exactly as constructed (4.1205ms)
+✔ application surface: judge sessions force WebSearch off and keep the reported builtin face empty (1.5271ms)
+✔ application surface: sessions bind to their own native instance; empty foreign config reports empty (2.5568ms)
+✔ application surface: the frozen wrapper verifies the exact report only (WebSearch/drift fail closed) (2.4871ms)
+✔ application surface: a tool registration failure never becomes an observed report (1.2734ms)
+✔ T-1 contextSections absent/empty/all-empty keeps the byte-identical baseline prompt (8.5299ms)
+✔ T-2 non-empty sections splice after the boundary JSON in order; mixed empty strings are skipped (1.7864ms)
+✔ T-3 context stays before tool promptGuidelines and the tool surface is unchanged (6.2831ms)
+✔ T-4 context stays before the installed-skills section, which remains last (14.5379ms)
+✔ T-5 judge sessions never render contextSections even when misprovided (1.8814ms)
+✔ T-6 already-rendered section text passes through verbatim without a second cap or sanitization (0.6538ms)
+✔ env scrub: only base locators + declared passthrough names reach the real command (68.2615ms)
+✔ malformed passthrough lists widen nothing beyond the base set (60.881ms)
+✔ exit codes propagate and a spawn failure exits 127 with a bounded stderr note (91.4313ms)
+✔ 首字节前流失败（replaySafe）⇒ 自动重试至成功：attempts=2、恰一条 settled(completed)、不重复文本 (63.7106ms)
+✔ 重试耗尽：3 attempts 后退避 10/20ms ⇒ failed + MODEL_REQUEST_RETRY_EXHAUSTED、恰一条 settled、无额外 attempt (66.8551ms)
+✔ 重试预算耗尽（非 attempts）⇒ 不重试、failed + MODEL_REQUEST_RETRY_EXHAUSTED、attempts=1 (66.6562ms)
+✔ 已输出文本后失败 ⇒ 不重试：failed、attempts=1、replaySafe=false、无 request.retry (70.0748ms)
+✔ 已调用工具后失败 ⇒ 不重试：工具副作用零复放、attempts=1、replaySafe=false (22.8251ms)
+✔ 客户交互已出现后失败 ⇒ 不重试（运行时状态门槛，非模型自报） (2.278ms)
+✔ 退避期间取消/abort ⇒ 立即终止、不再发起 attempt、终态 aborted (125.4995ms)
+✔ 离线期间失败 ⇒ 不发起重试（走 P2 路径）、replaySafe 可见、无 request.retry (18.7002ms)
+✔ SDK api_retry 期间 ANS 不并发重试；SDK 最终失败后才 replay-safe 重开 (58.4444ms)
+✔ 结果帧状态分类：408/425/429/5xx/无状态文本/空文本均可重试（重开后成功） (249.2643ms)
+✔ 结果帧确定性 4xx（400/401/403/422）不重试：queries=1、MODEL_REQUEST_FAILED、replaySafe=true (63.0628ms)
+✔ thinking / redacted_thinking 后失败 ⇒ 不重试（replaySafe=false、无 request.retry） (27.7203ms)
+✔ 原生 WebSearch 工具使用后失败 ⇒ 不重试（tool_use 即 replayUnsafe） (21.5354ms)
+✔ PreToolUse 放行（外来 MCP）后失败 ⇒ 不重试（放行即 replayUnsafe） (13.1767ms)
+✔ 预算边界（F1）：剩余预算 < 退避 delay ⇒ 不发起第二次 attempt（queries=1、如实耗尽） (13.8076ms)
+✔ 1h 护栏边界：剩余 1h 不足以覆盖退避 delay ⇒ 不发起 attempt、如实耗尽 (14.2836ms)
+✔ 退避期间转离线 ⇒ 退避后不启动 attempt、不写 request.retry/角色日志 (522.7405ms)
+✔ 首字节永不来：注入 40ms ⇒ prompt 拒绝 request-timeout-first-byte；恰一条 settled(failed)；诊断齐全 (85.648ms)
+✔ 流中途静默：首条消息后 40ms 无活动 ⇒ request-timeout-idle；诊断含 mode=idle (59.0256ms)
+✔ 持续活动（长回合）：每 15ms 一条消息、idle 40ms ⇒ 不误杀，正常 completed (118.5729ms)
+✔ 交互等待期间计时停走：gate.begin 期间跨过 40ms 不超时；gate.end 后按剩余时间继续 (180.4463ms)
+✔ 工具执行期间计时停走：handler 睡 120ms、idle 40ms ⇒ 不超时，回合正常完成 (133.3391ms)
+✔ abort 取消：停止后不再触发请求超时；终态 aborted，且无 request.timeout 诊断 (44.0723ms)
+✔ SDK api_retry：诊断 attempt/max/delay/status/no_response + 角色日志一行；期间 ANS 不发第二次请求 (46.6426ms)
+✔ 直接 if/then/else：命中执行 then，未命中执行 else，两侧反例都拒绝 (4.8826ms)
+✔ if 无 else：未命中保持原行为；then 仅追加约束 (0.689ms)
+✔ not 反向语义：单条 required 与 anyOf 组合都强制执行（含嵌套路径） (0.7823ms)
+✔ 条件约束覆盖嵌套 properties、数组 items 与 additionalProperties (2.2391ms)
+✔ 真实 git_query/git_candidate/git_publish：oid 按 objectFormat 强制 sha1 40 位 / sha256 64 位 (9.0255ms)
+✔ 真实 dispatch_task：reviewOid 与 resumeController 条件均被强制执行 (2.7215ms)
+✔ 真实 decide_pending_request：disposition 条件（select⇒selected；reject/revise⇒无 selected） (0.8628ms)
+✔ 真实 submit_version_change：if 内 contains 与 then 全体目标 expectedFromSha256 条件 (2.2113ms)
+✔ 未知关键字与非法条件片段仍被拒绝（不静默丢弃约束） (0.639ms)
+✔ 无条件的旧 schema 行为与 z.fromJSONSchema 完全一致 (2.5353ms)
+✔ native lifecycle: real owned child close ends visible pump but cannot prove SDK process/tree coverage (81.4734ms)
+✔ native lifecycle: never-closing query stays running after dispose early return and repeated abort (42.2719ms)
+✔ native lifecycle: native result settles prompt without closing live message transport (44.3347ms)
+✔ native lifecycle: last-resort timeout rejects local turn without inventing native settlement (43.8228ms)
+✔ native lifecycle: actual handler remains active after local reject until its Promise finishes (54.8724ms)
+✔ native lifecycle: old core turn and another bind cannot stop the current turn; cancelled stop makes no request (2.5294ms)
+✔ SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials (8.6851ms)
+✔ schema preserves required/optional/union/nested object and rejects unsupported keywords (1.0947ms)
+✔ host-only schema lowering preserves all 23 write/edit rejections on actual MCP and leaves read/schema unchanged (10.4502ms)
+✔ general not is enforced semantically, malformed not is still rejected, and a forbidden nonce cannot be overwritten (10.9387ms)
+✔ dispatch conditional schema preserves GitOid formats and complete resume constraints on real MCP (17.2764ms)
+✔ dispatch conditional schema converts unknown if branches and enforces them instead of dropping conditions (13.5634ms)
+✔ actual MCP exposes union and nested required schema without losing optional/extra parameters (3.1306ms)
+✔ late old MCP callback after next prompt, replay/missing/unknown nonce all fail before effects (16.0212ms)
+✔ reserved context supports additionalProperties false, never reaches core, and schema collision rejects (2.9993ms)
+✔ same text twice has unique wire identity; old/unknown/missing/duplicate UserPromptSubmit cannot borrow next turn (1.9252ms)
+✔ auth/endpoint/model and redaction share construction-time env snapshot (1.6865ms)
+✔ private wire marker echoed by tool/error never leaks into public events or messages (2.9673ms)
+✔ missing dependency/API key and URL userinfo fail before query, explicit settings map to actual SDK options (2.7185ms)
+✔ actual shell tool deny prevents marker and allow returns actual command output (49.8003ms)
+✔ real MCP rejects missing write arguments, gate denial and gate throw produce zero effects (4.967ms)
+✔ actual write/edit MCP handlers execute in call order even concurrent transport calls (16.3946ms)
+✔ multiple input turns retain the same query and map images; exactly one settled has each turnId (1.9086ms)
+✔ SDK/result errors and handler exceptions redact secrets and fail honestly (2.2204ms)
+✔ InteractionGate pauses the last-resort deadline; answer returns and sequential write waits behind confirmation (11.2434ms)
+✔ inspect deadline never aborts; only the last resort ends the turn at 50ms outside customer waiting (2.1573ms)
+✔ inspect deadline alone never aborts a progressing turn (62.7325ms)
+✔ stop pending confirmation cancels queued write and late answer cannot report/effect in a new turn (41.97ms)
+✔ abort treats an already-closed query interrupt rejection as stopped, closes the engine and settles the turn (1.9148ms)
+✔ abort still surfaces an interrupt rejection that is not the closed-query signal (1.7556ms)
+✔ abort still surfaces a closeEngine teardown failure even when the query was already closed (3.4607ms)
+✔ abort keeps normal interrupt behavior: interrupt runs once and the turn settles aborted (2.1346ms)
+✔ last-resort deadline emits timed_out once and disposal closes event stream (20.3921ms)
+✔ actual native resume succeeds only after matching successful SDK result; failed resume clears ID and next explicit input rebuilds (19.7451ms)
+✔ native symlink and storage runtime mismatch fail before SDK query (8.825ms)
+✔ core Service receives real Claude MCP reports/dispatch receipts and saves replay with actual metadata (44.1462ms)
+✔ required-v1 rejects each missing display capability before SDK load; profile registers bind snapshot only (0.9627ms)
+✔ real Core projector receives actual args/rule/result execution while SDK content and opaque identities stay unchanged (9.4838ms)
+✔ actual handler thrown Error projects protected message, unknown throw stays opaque, model retains original generic failure (8.755ms)
+✔ unknown and old PreToolUse never borrow active turn; real original hook denial alone is blocked (1.8774ms)
+✔ projector failure yields only bounded diagnostic without changing tool result or successful turn (2.1578ms)
+✔ Core strips C metadata before Claude and preserves exact SDK prompt/images while publishing safe display copy (46.0354ms)
+✔ thin projected outlet never redacts supplied opaque identities or restores suppressed oversized identity (2.5028ms)
+✔ required production path displays real read ENOENT and Node shell output without parsing result messages (50.9511ms)
+✔ web search capability bit off (default/explicit): tools/allowedTools keep the pre-existing surface, WebSearch stays hook-denied and frames stay unconsumed (4.7683ms)
+✔ web search capability bit on: builtin declared and auto-allowed only for the live bound turn, input never rewritten (2.0378ms)
+✔ web search on: native frames project one paired start/result per call; failure, unsupported content and budget text stay truthful and never fail the turn (6.109ms)
+✔ installed-skills section: non-empty splices the orchestration render verbatim; zero/broken stays the byte-identical old prompt and never fails the turn (17.6605ms)
+✔ installed MCP declarations assemble only when injected: launcher-wrapped command, env:NAME resolved, server-level allowedTools (3.4852ms)
+✔ installed MCP allow branch: name+dynamic source+live turn only, args pass unchanged, adversarials stay denied (2.0011ms)
+✔ installed MCP frames pair start/result like WebSearch; unregistered late results stay unconsumed (2.0621ms)
+✔ installed MCP status pass: failed/needs-auth report one honest category line per engine; connected silent; status errors never fail the turn (3.119ms)
+✔ reasoning effort wiring: unset keeps zero parameters; off maps to ThinkingDisabled; four levels map to EffortLevel (6.6609ms)
+✔ thinking frames produce raw reasoning facts (complete/omitted), never adapter-redacted, duration never guessed (1.5915ms)
+✔ reasoning compatibility completes the task, uses child-only env, and is confirmed only after success (9.4821ms)
+✔ only explicit parameter rejections enable reasoning compatibility (26.5906ms)
+✔ failed or cancelled compatibility does not change the next turn's original request (92.0355ms)
+✔ normal output and tool start forbid whole-turn reasoning replay (7.7146ms)
+✔ judge mode registers exactly the three injected read-only tools, force-disables WebSearch/installed MCP, and denies every other call (15.6331ms)
+✔ governance judge mode registers exactly the three governance tools, force-disables WebSearch/installed MCP, and denies non-allowlisted calls (11.8357ms)
+✔ judge mode accepts either frozen triple but rejects mixed, partial, or extended judge tool sets (0.6581ms)
+✔ judge mode rejects non-judge tool sets before SDK load and re-checks at bind (0.8667ms)
+✔ judge mode abort settles the turn through the unchanged lifecycle path (1.998ms)
+✔ normal role sessions keep the pre-judge surface: no disallowedTools and the web search bit still honored (1.6996ms)
+✔ tool-result images ride the real MCP transport; failures and invalid payloads never attach images (3.769ms)
+✔ real git_candidate oneOf: host call context passes commit/integrate/revert/init on real MCP; invalid inputs stay rejected (7.5499ms)
+✔ composite git_candidate: forged context is overwritten by the host token, stripped before the handler, and never enters events (3.8497ms)
+✔ flat git_query/git_publish: only the top-level optional field is added; valid calls pass and invalid calls stay rejected (6.6973ms)
+✔ claudeToolInputWithCallContext: deep copy, strict-branch propagation, reserved-name collision, flat/nested shapes (0.4781ms)
+✔ unknown keywords inside oneOf branches and conditional constraints are not hidden by call-context propagation (3.8985ms)
+✔ Pi/Codex adapter sources never reference the Claude request-context field (101.6967ms)
+✔ MIME 白名单与 Claude 用户图片一致：png/jpeg/gif/webp (0.8761ms)
+✔ ok + 图片：逐张映射为 MCP image 内容块，data 原引用不重编码 (0.2212ms)
+✔ 无图/空图：不附图且不算非法 (0.0938ms)
+✔ ok:false 绝不附图，即使 images 意外非空 (0.0722ms)
+✔ 非法载荷整批不交付：非数组 / 条目非对象 / type 非 image (0.1187ms)
+✔ 非法载荷整批不交付：data 缺失/空/非字符串/非标准 base64 (0.1067ms)
+✔ 非法载荷整批不交付：MIME 非白名单 (0.5603ms)
+✔ 混合批次：一条合法一条非法 ⇒ 整批零交付（不做部分交付） (0.0939ms)
+✔ application surface equals the actual Chat function registry including controlled shell tools (14.8304ms)
+✔ application surface fails closed without bound native facts and stays out of the strict native path (0.4763ms)
+✔ configured foreign MCP is rejected before any Chat session can report a surface (0.3973ms)
+✔ real Chat application fact satisfies the frozen composition only with bound native facts (0.4311ms)
+✔ bounded Chief default Core and Codex reach only the real decision handler through local HTTP (44.0769ms)
+✔ bounded Chief rejects wrong roles extra tools and missing host context before native construction (1.3366ms)
+✔ native factory preparation has no effects and binds the same real Chat plan over local HTTP (6.9368ms)
+✔ native factory preparation rejects role config registry and environment drift before creation (1.7041ms)
+✔ native factory preparation leaves unsupported branches unconstructed and follows actual judge overrides (1.2961ms)
+✔ native tool surface observes the default production Chat registry and rejects unregistered native commands over real HTTP (4.4521ms)
+✔ native tool surface reports unknown for changed registry or a mismatched native instance (0.3559ms)
+✔ chat native lifecycle observes a real HTTP body and retains the captured Core turn (3.3105ms)
+✔ chat native lifecycle keeps an abort-ignoring response body unknown until its actual return (29.0829ms)
+✔ chat native lifecycle does not hide a tool that ignores abort (35.8604ms)
+✔ plain text multi-turn HTTP history preserves each assistant once including reasoning without tool_calls (7.9347ms)
+✔ plain text multi-turn HTTP history rolls back failed turn and retains earlier assistant (4.5771ms)
+✔ plain text multi-turn HTTP history rolls back timed_out turn and retains earlier assistant (113.0709ms)
+✔ chat transport completes a plain text turn with system/user messages and exposed ans_ tools (2.8029ms)
+✔ chat transport executes tool calls, preserves reasoning_content and returns tool text (3.2276ms)
+✔ chat transport maps same-turn tool result images to tool-message image_url data URLs (2.8028ms)
+✔ chat transport never attaches images for failed or invalid tool results (5.1809ms)
+✔ chat transport sends user prompt images as user content image_url parts (1.9135ms)
+✔ chat transport abort settles the turn and rolls back partial history (2.9051ms)
+✔ chat transport redacts tool text but never image bytes (2.6481ms)
+✔ chat mode fails closed for installed MCP servers and server-side web search (0.27ms)
+✔ chat mode requires explicit Codex/OpenAI config and never auto-reads Pi env (0.1892ms)
+✔ Node default JS entry keeps isolated environment (6.8661ms)
+✔ Electron default JS entry starts its child in Node mode (2.2382ms)
+✔ Electron explicit native CLI keeps argv and environment (1.7793ms)
+✔ matrix section is spliced after boundary JSON and before tool guidelines and installed skills (8.9761ms)
+✔ multiple sections keep their order and the prompt grows by exactly their length plus separators (0.379ms)
+✔ absent, empty array and empty string sections leave the system prompt byte-identical (0.325ms)
+✔ judge sessions ignore an accidentally passed matrix section (1.3784ms)
+✔ rendered data text passes through verbatim; the adapter adds no wrapper, cleaning or truncation (0.2447ms)
+✔ thread/start developerInstructions carries the spliced prompt on the app-server path (108.04ms)
+✔ judge allowlist accepts the governance trio and rejects non-allowlist/mixed sets before any effect (2.0133ms)
+✔ governance judge session registers exactly the three governance tools; no write/shell/interaction/handback/dispatch surface (122.469ms)
+✔ report_governance_judgement hands the model's raw arguments back unchanged (14.0599ms)
+✔ governance judge forces web search off, assembles no installed MCP, and quarantines native leaks (26.4563ms)
+✔ shell judge mode still registers exactly the three shell tools after the union allowlist change (3.0863ms)
+✔ without judgeMode the adapter keeps its existing tool/prompt behavior (26.6451ms)
+✔ judge mode accepts exactly the three read-only tools and refuses any write/shell tool before any effect (2.0046ms)
+✔ judge session registers only the three judge tools; write/shell/interaction/dispatch calls do not exist (129.7855ms)
+✔ report_shell_judgement hands the model's raw arguments back unchanged (14.0224ms)
+✔ judge mode forces web search off and assembles no installed/foreign MCP even when requested (2.5468ms)
+✔ judge mode ignores injected storage: no session reads/writes and the native thread is ephemeral (2.0052ms)
+✔ judge mode quarantines native MCP/web-search leaks; the normal path still maps them (64.1363ms)
+✔ without judgeMode the adapter keeps its existing tool/web-search behavior (13.3641ms)
+✔ mcpServersOverride encodes one combined root map; JSON.stringify escaping survives byte-for-byte (0.7118ms)
+✔ whitelist-only role assembles definitions in a single -c map and stays single-process (107.8396ms)
+✔ foreign native MCP is confined as one disabled entry inside the same combined map (2.3551ms)
+✔ process-level exact-set validation rejects foreign residue and missing whitelist entries (2.4716ms)
+✔ catalog name-set equality: failed whitelist entry passes, foreign/missing entries and cursors refuse (9.4678ms)
+✔ failed whitelist server degrades to one honest row (no turn id) and the session keeps working (16.9016ms)
+✔ late startupStatus failures degrade once, ignore foreign names, and never double-report (49.2785ms)
+✔ catalog sweep and startupStatus notification dedupe to a single row per server (23.6659ms)
+✔ mcpToolCall projects to native-result facts (probe field set) and never quarantines (25.4773ms)
+✔ legacy path (no projector): mcpToolCall rows keep three-state honesty and bounded summary (56.2749ms)
+✔ declaration validation: collisions/reserved/bad shapes throw before any effect; env refs expand from the bind snapshot (1.3577ms)
+✔ zero-install posture is byte-identical: no first-connect map, exact legacy disable map, all-false thread config (3.6201ms)
+✔ installed fixed-version metadata selects exact current model and changes only four approved fields (2.6555ms)
+✔ unknown version, ambiguous model, malformed record and oversized/truncated embedded format are refused (1.7571ms)
+✔ embedded catalog marker search accepts exactly the LF and CRLF formats, including across chunk splits (0.2377ms)
+✔ temporary catalog is private, exact, and unknown model creates no files (377.1928ms)
+✔ normal engine has no catalog overlay; confirmed E1 overlay is cleaned on dispose (317.3955ms)
+✔ failed or cancelled E1 overlay is removed before next original-policy engine request (429.7124ms)
+✔ default value also rejected uses E1 in the same second no-effort candidate (221.529ms)
+✔ four efforts retain process and turn settings; off/unset stay absent and all configuration messages belong to active prompts (381.3298ms)
+✔ invalid reasoning effort is rejected before any effect (0.9102ms)
+✔ reasoning item projects facts: content preferred, summary-only fallback, omitted when empty; durationMs only from real signals (59.3234ms)
+✔ reasoning delta frames are consumed without rows and never mis-mapped (21.547ms)
+✔ only precise effort rejections qualify; status/type/model and whole reasoning negatives win (1.9922ms)
+✔ value rejection uses exact catalog default in same thread, commits only completed, and subsequent turns retain it (47.0941ms)
+✔ field rejection rebuilds safe first turn, starts new thread, exposes new ID and sends no effort (48.0114ms)
+✔ at most two distinct compatibility candidates: catalog default then absent effort, never a third (269.3634ms)
+✔ failed, cancelled and timed-out default attempts do not stick to subsequent native requests (224.7401ms)
+✔ ordinary failures, whole-object rejection and nonpersistent later turns never rebuild (123.1754ms)
+✔ native tool starts and normal output forbid whole-turn replay (153.3409ms)
+✔ SDK retry notification does not trigger ANS compatibility (26.0812ms)
+✔ failed compatibility reconstruction reports its real error and quarantines the unconfirmed engine (21.3101ms)
+✔ loading/factory is lazy; model/key required, optional official URL, userinfo rejected (107.5567ms)
+✔ G-4 installed-skills section splices verbatim as the last segment or renders nothing (22.9505ms)
+✔ optional API address blank values use official default; explicit nonblank wins environment and invalid values stay redacted (10.5757ms)
+✔ bound model/address/key and error redaction keep the same captured environment after async transport starts (19.9793ms)
+✔ config enumeration/verification occurs before thread, no unsafe config/catalog fallback (6.889ms)
+✔ real MCP callbacks use injected schemas and gates: deny/throw have zero writes, allow writes (80.4086ms)
+✔ shell deny/unknown native tool never executes and optional capabilities only come from injection (9.9073ms)
+✔ sequential MCP calls keep original turn signal, queued writes and late old-turn requests cannot cross abort (57.4097ms)
+✔ customer wait pauses deadline; abort and late confirmed do not authorize, next turn can continue (193.845ms)
+✔ upstream tool-request cancellation invalidates original signal; timeout/failed turn settle exactly once (90.4631ms)
+✔ inspect timeout never aborts the turn; only the injected last resort aborts, with distinguishing text (319.8404ms)
+✔ stop is idempotent and bounded; hanging interrupt quarantines rather than claiming continued session (770.8328ms)
+✔ exact role/runtime native store checks, confirmed resume vs recovered; later model failure retains resumed (75.2735ms)
+✔ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (26.693ms)
+ℹ native directory alias=junction; actual outside canary read succeeded before product validation
+✔ all injected ANS capability callbacks keep receipts/turn metadata; denied customer and failed report stay failed (27.6464ms)
+✔ call IDs differ across restarts; all shared credential values are scrubbed from model/tool outputs (34.1897ms)
+✔ actual native process JSON-RPC parser routes callbacks and serverRequest/resolved cancellation (166.565ms)
+✔ native lifecycle observes owned process exit/stdio and does not settle a live handler (124.865ms)
+✔ native lifecycle cannot promote injected close completion without process coverage (4.0042ms)
+✔ native lifecycle bounds a close that has not returned and refuses to invent coverage after late close (16.3106ms)
+﹣ owned native process group cleanup kills a wrapper and child that ignore SIGTERM (0.1054ms) # SKIP
+✔ required display capabilities reject at factory before any native, MCP or storage effects (0.2202ms)
+✔ profile registers selected credential and named extras from the same immutable bind snapshot before effects (1.9053ms)
+✔ injected display receives real handler facts, rules, error and execution; opaque identities bypass legacy scrub (11.7579ms)
+✔ projector failure emits bounded diagnostic without raw fallback or changing model receipt and settled outcome (13.7455ms)
+✔ provider prompt keeps exact model text and image bytes while ignoring Core-only delivery metadata (20.6237ms)
+✔ projection never attributes unknown, repeated, queued stopped or late callbacks to a new turn (45.3829ms)
+✔ successful tool results map text and images to inputText/inputImage data URLs (128.7292ms)
+✔ MIME whitelist maps png/jpeg/gif/webp and rejects nothing else (73.2193ms)
+✔ text passes through redact while image bytes and data URLs never do (5.8097ms)
+✔ failed results never attach images even when images are present (26.5201ms)
+✔ no images or empty images keep the exact text-only shape (39.3001ms)
+✔ invalid image payloads fail closed without any image content item (144.4317ms)
+✔ image bytes and data URLs never enter session events or display projection facts (14.6157ms)
+✔ web search capability: default off, env whitelist, explicit option wins, invalid values rejected (1.0506ms)
+✔ default-off posture is byte-identical; capability on moves all three pins together (no tools key) (0.7381ms)
+✔ adapter moves process overrides, thread config and readback expectation with the capability; readback mismatch fails closed (115.6029ms)
+✔ webSearch item becomes one message row (real 0.162.1 payload shape) and settled carries searchCalls (28.893ms)
+✔ webSearch tolerance: missing or malformed fields keep the fallback row, never throw, never quarantine, results capped (33.6391ms)
+✔ item/started webSearch is not mapped; settled without searches has no searchCalls key (18.2235ms)
+✔ search text and result URLs stay redacted and conservatively stripped in rows and details (31.8347ms)
+✔ config.redact shares the tool-display A-base URL boundary: full-width punctuation is no longer swallowed; redaction itself unchanged (0.4748ms)
+✔ actual native process fixture accepts the web search on-posture and completes a governed turn (121.4696ms)
+✔ API 冻结：唯一 public entry 只导出契约符号（类型 + 唯一函数），不导出内部 helper (2.8848ms)
+✔ API 冻结：reason 结构由类型层断言（18 项闭集）+ 运行期无闭集外取值 (0.6672ms)
+✔ API 冻结：模块是纯判定（无 I/O/时钟/随机数/环境读取），不 import 角色/引擎/私有 common (0.6282ms)
+differential(gates vs frozen golden): scenarios=134 comparisons=268 differences=0
+✔ 金样差分：gates 模块与冻结金样逐字段/逐 reason/顺序一致（差异 = 0） (2.3197ms)
+✔ 金样：来源元数据自洽，且测试/金样不再 import P1 内联 oracle（E2 可删内联实现） (2.3208ms)
+✔ P3/P4/P6/P7 判定层：demo/Codex 严格路径保持现状；Claude/Pi/Codex 受限应用中介路径通过 (1.2519ms)
+✔ P6/N16：活跃 dispatch 工具名在该运行时的 applicationMediation.appTools 中（含 ans_dispatch_task 同权） (0.1783ms)
+✔ P6/N16：受控 shell（run_shell/start_background_task）在 appTools 时受限路径可通过；严格路径本身仍 unknown (0.2127ms)
+✔ P7/N26：Claude/Pi 已配置外来 MCP 精确枚举且一致时通过 (0.1029ms)
+✔ P5/hub：creatorReports 只在 hub=true 时校验；合法 provenance 通过 (0.2687ms)
+✔ N18/P：parent.kind 缺省或 message 通过；提供 creatorReports 时跳过 kind 检查（旧分支顺序） (0.1397ms)
+✔ P3/N1–N9：严格路径原条件逐条保留（disposed/非默认核/非 chief/wrong runtime/unknown surface/session/factory/turn/stop/no dispatch/input/settled） (0.1714ms)
+✔ N13：新应用中介路径拒绝 demo；demo 严格路径现状不变 (0.0706ms)
+✔ N20/F15：applicationMediation 与 observed 同时出现 ⇒ 双路径歧义拒绝 (0.1247ms)
+✔ N1/N9：其它 runtime 一律拒绝；core 缺失时拒绝 (0.1293ms)
+✔ N10/N21/N22/N23/N25/N27/N28：受限路径逐条负例 (0.2291ms)
+✔ N14/N27：Codex 应用中介路径必须有 native 事实且按字面谓词绑定 (0.1796ms)
+✔ N28/F19：Codex 配置外来 MCP ⇒ fail-closed (0.0598ms)
+✔ P6/N16：Codex 先走严格路径；严格不成立时才走受限路径；双路径歧义单独拒绝 (0.0902ms)
+✔ N19：creatorReports 数量/重复/角色/turn/reportId/origin/status 任一不匹配 ⇒ 拒绝 (0.2061ms)
+✔ N18：parent.kind 非 message（且无 creatorReports）⇒ 拒绝 (0.062ms)
+✔ N17：TOCTOU 两次复检——证据在两次判定之间变化时第二次拒绝 (0.0889ms)
+✔ reason 闭集：18 项全部可达，且判定不产生闭集之外的 reason (0.6546ms)
+✔ R5/D5：gates 模块只判定、不采集证据；import 面只有 Model public entry (4.0595ms)
+module-graph: {
+  "scannedFiles": 340,
+  "layerCounts": {
+    "engine": 278,
+    "gates": 1,
+    "role:chief": 10,
+    "role:convener": 1,
+    "role:nominator": 1,
+    "role:product": 7,
+    "role:rapporteur": 7,
+    "role:verifier": 1,
+    "shared": 19,
+    "other": 3,
+    "model": 12
+  },
+  "edges": 1849,
+  "violations": [],
+  "valueCycles": [],
+  "typeOnlyCycles": [
+    [
+      "src/model/runtime.ts",
+      "src/model/role.ts",
+      "src/model/runtime.ts"
+    ]
+  ],
+  "modelToSharedTypeOnly": [
+    "src/model/download.ts -> src/common/shared/runtime-shared.ts",
+    "src/model/runtime.ts -> src/common/shared/diagnostics.ts",
+    "src/model/runtime.ts -> src/common/shared/runtime-shared.ts"
+  ],
+  "modelInternalTypeOnly": [
+    "src/model/decision.ts -> src/model/boundary.ts",
+    "src/model/directive.ts -> src/model/directive-marker.ts",
+    "src/model/directive.ts -> src/model/runtime.ts",
+    "src/model/role.ts -> src/model/boundary.ts",
+    "src/model/role.ts -> src/model/runtime.ts",
+    "src/model/role.ts -> src/model/trunk.ts",
+    "src/model/runtime.ts -> src/model/boundary.ts",
+    "src/model/runtime.ts -> src/model/decision.ts",
+    "src/model/runtime.ts -> src/model/download.ts",
+    "src/model/runtime.ts -> src/model/governance-matrix.ts",
+    "src/model/runtime.ts -> src/model/project-state.ts",
+    "src/model/runtime.ts -> src/model/role.ts",
+    "src/model/runtime.ts -> src/model/trunk.ts",
+    "src/model/runtime.ts -> src/model/version-change.ts",
+    "src/model/version-change.ts -> src/model/trunk.ts"
+  ],
+  "gatesRootFiles": [
+    "index.ts"
+  ],
+  "roleModules": [
+    "chief",
+    "convener",
+    "nominator",
+    "product",
+    "rapporteur",
+    "verifier"
+  ],
+  "rolesPresent": true
+}
+✔ E1.4：唯一 public entry——gates 与每个角色模块根只允许 index.ts (529.3352ms)
+✔ E1.5：依赖方向零违例（角色零互引/角色不 import 引擎·门控；门控不 import 角色；共享不 import 门·角色；Model 不反向） (0.1003ms)
+✔ E1.5/E3.5：无环——模块层 value import 无环；type-only 环仅限 Model 内部（D9 口径） (0.132ms)
+✔ D9：Model→shared 仅允许既有 type-only 共享原语单列；禁止 value import 反向；Model 内 type-only 豁免单列 (0.0734ms)
+✔ E1.4：引擎只经 index.ts 消费角色/门控（无私有文件直引）；扫描输出可复算 (0.0793ms)
+✔ 契约形状钉：abort 可选——无 abort 的会话对象（含假适配器替身）仍满足 RoleSession（既有实现不破坏） (1.9796ms)
+✔ 契约形状钉：abort 返回型允许「同步 void」与「Promise<void>」两态（P0-2 冻结形状） (0.1707ms)
+✔ makeRoleSession（桩件）：abort() 透传底层 session.abort()；反复调用不抛错 (0.5351ms)
+✔ makeRoleSession（桩件）：dispose 顺序与提取前逐字一致（退订 → SDK dispose → queue.close）；events 流不变 (0.5071ms)
+✔ P0-2 主用例（faux 离线）：确认卡挂起中 abort → settled 恰 1 收尾 + 等待中的交互 fail-closed 返回 + prompt promise 正常返回 + 会话可继续 (577.2289ms)
+✔ P0-2：无进行中轮次 abort = no-op 不抛错（prompt 前 / 两轮之间），会话随后照常工作（faux 离线） (10.2808ms)
+✔ Pi native: stable bind identity, retained Core turn, mismatch is side-effect free and empty process list is unknown (11.1994ms)
+✔ Pi native: SDK settled, abort success, and dispose early return do not settle a pending raw prompt or active tool (28.7389ms)
+✔ Pi native: cancelled observation and invalid timeout do not request abort (0.3056ms)
+✔ Pi native: outer prompt timeout cannot settle raw SDK work; unobserved activity and non-started transport cannot prove idle/exit (49.2454ms)
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] session.bindExtensions…
+[pi] bindRole 完成
+[pi] prompt 发出
+✔ Pi native MCP: actual owned Node close, delayed close, and close promise early return retain honest tree unknown (403.3376ms)
+[pi] prompt 返回
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] prompt 发出
+[pi] prompt 返回
+✔ Pi public bind returns real hook: production SDK raw turn and MCP close, legacy wrapper preserves hook (278.2002ms)

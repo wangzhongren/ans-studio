@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { SessionManager } from "../../app/desktop/session.ts";
+import { readSessionSource } from "./session-source.ts";
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
@@ -229,7 +230,7 @@ test("首轮寻址②（Interface 集成）：真实接线——导入时空项�
   // 接线钉：Interface 把 refreshListing 注到共享缓存（同一 listProjectFn —— 单一来源）。
   const IFACE = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
   assert.ok(IFACE.includes("refreshListing: async (root: string)") && IFACE.includes("listingCache.set(fresh.projectRoot, fresh);"), "Interface 给出 refreshListing（刷同一份缓存）");
-  const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
+  const SESS = readSessionSource();
   assert.ok(SESS.includes("await this.deps.refreshListing(projectRoot);"), "routeDispatch 在 miss 时调用一次重枚举");
   assert.ok(SESS.includes("首轮寻址修复"), "机制写明（bootstrap J-1 首轮）");
   await desktop.stopSession({ roleId: null });

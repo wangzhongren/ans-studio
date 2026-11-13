@@ -29,6 +29,7 @@ import { inspectRuntimeCoreRegistry } from "../../src/service/runtime/session.ts
 import { createRuntimeAdapterFactory, openRoleSession, prepareChiefDecisionEvidence, readRoleCapabilityProtectionScope } from "../../src/pipeline/orchestration/run-role.ts";
 import { readTaskState } from "../../src/common/编排/task-state.ts";
 import type { RuntimeInputProvenanceV1, CustomerInputRequest, ChiefPendingDecisionRequest, RuntimeProviderOptions, ToolResult, RuntimeNativeToolSurfaceFacts, RuntimeNativeLifecycleFacts, RuntimeSessionLifecycleFacts } from "../../src/model/runtime.ts";
+import { readSessionModule } from "./session-source.ts";
 // W4（P1.4 §3.2 C8/§3.7）：桌面 run-stop 终止判定与运行时中立 drain 谓词（只读消费运行时核心单一来源）。
 import { isRuntimeSessionDrained } from "../../src/model/runtime.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
@@ -2511,7 +2512,7 @@ test("W4 桌面run-stop：Claude/Pi drain 可推进；native absent 允许、pre
       assert.equal(receipt.errorCode, "run-stop-lifecycle-unproven", "drain 不成立 ⇒ 拒绝、不提交");
     }
     // 6) 契约守卫：旧 quiescent/processCoverage/native 必填前提不再存在；身份/队列持久化/宿主 fence 检查保留。
-    const source = await fs.readFile(new URL("../../app/desktop/session.ts", import.meta.url), "utf8");
+    const source = readSessionModule("run-change");
     const slice = (from: string, to: string): string => {
       const start = source.indexOf(from), end = source.indexOf(to, start);
       assert.ok(start > 0 && end > start, `源码段可定位：${from} → ${to}`);

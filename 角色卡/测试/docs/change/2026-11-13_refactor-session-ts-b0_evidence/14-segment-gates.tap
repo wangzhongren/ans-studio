@@ -1,0 +1,98 @@
+✔ API 冻结：唯一 public entry 只导出契约符号（类型 + 唯一函数），不导出内部 helper (2.8204ms)
+✔ API 冻结：reason 结构由类型层断言（18 项闭集）+ 运行期无闭集外取值 (0.6599ms)
+✔ API 冻结：模块是纯判定（无 I/O/时钟/随机数/环境读取），不 import 角色/引擎/私有 common (0.6367ms)
+differential(gates vs frozen golden): scenarios=134 comparisons=268 differences=0
+✔ 金样差分：gates 模块与冻结金样逐字段/逐 reason/顺序一致（差异 = 0） (2.392ms)
+✔ 金样：来源元数据自洽，且测试/金样不再 import P1 内联 oracle（E2 可删内联实现） (2.3344ms)
+✔ P3/P4/P6/P7 判定层：demo/Codex 严格路径保持现状；Claude/Pi/Codex 受限应用中介路径通过 (1.3339ms)
+✔ P6/N16：活跃 dispatch 工具名在该运行时的 applicationMediation.appTools 中（含 ans_dispatch_task 同权） (0.1784ms)
+✔ P6/N16：受控 shell（run_shell/start_background_task）在 appTools 时受限路径可通过；严格路径本身仍 unknown (0.1591ms)
+✔ P7/N26：Claude/Pi 已配置外来 MCP 精确枚举且一致时通过 (0.1609ms)
+✔ P5/hub：creatorReports 只在 hub=true 时校验；合法 provenance 通过 (0.197ms)
+✔ N18/P：parent.kind 缺省或 message 通过；提供 creatorReports 时跳过 kind 检查（旧分支顺序） (0.1912ms)
+✔ P3/N1–N9：严格路径原条件逐条保留（disposed/非默认核/非 chief/wrong runtime/unknown surface/session/factory/turn/stop/no dispatch/input/settled） (0.1718ms)
+✔ N13：新应用中介路径拒绝 demo；demo 严格路径现状不变 (0.074ms)
+✔ N20/F15：applicationMediation 与 observed 同时出现 ⇒ 双路径歧义拒绝 (0.1342ms)
+✔ N1/N9：其它 runtime 一律拒绝；core 缺失时拒绝 (0.1416ms)
+✔ N10/N21/N22/N23/N25/N27/N28：受限路径逐条负例 (0.2153ms)
+✔ N14/N27：Codex 应用中介路径必须有 native 事实且按字面谓词绑定 (0.1638ms)
+✔ N28/F19：Codex 配置外来 MCP ⇒ fail-closed (0.0539ms)
+✔ P6/N16：Codex 先走严格路径；严格不成立时才走受限路径；双路径歧义单独拒绝 (0.0739ms)
+✔ N19：creatorReports 数量/重复/角色/turn/reportId/origin/status 任一不匹配 ⇒ 拒绝 (0.1857ms)
+✔ N18：parent.kind 非 message（且无 creatorReports）⇒ 拒绝 (0.2021ms)
+✔ N17：TOCTOU 两次复检——证据在两次判定之间变化时第二次拒绝 (0.1233ms)
+✔ reason 闭集：18 项全部可达，且判定不产生闭集之外的 reason (0.6482ms)
+✔ R5/D5：gates 模块只判定、不采集证据；import 面只有 Model public entry (4.0889ms)
+module-graph: {
+  "scannedFiles": 340,
+  "layerCounts": {
+    "engine": 278,
+    "gates": 1,
+    "role:chief": 10,
+    "role:convener": 1,
+    "role:nominator": 1,
+    "role:product": 7,
+    "role:rapporteur": 7,
+    "role:verifier": 1,
+    "shared": 19,
+    "other": 3,
+    "model": 12
+  },
+  "edges": 1849,
+  "violations": [],
+  "valueCycles": [],
+  "typeOnlyCycles": [
+    [
+      "src/model/runtime.ts",
+      "src/model/role.ts",
+      "src/model/runtime.ts"
+    ]
+  ],
+  "modelToSharedTypeOnly": [
+    "src/model/download.ts -> src/common/shared/runtime-shared.ts",
+    "src/model/runtime.ts -> src/common/shared/diagnostics.ts",
+    "src/model/runtime.ts -> src/common/shared/runtime-shared.ts"
+  ],
+  "modelInternalTypeOnly": [
+    "src/model/decision.ts -> src/model/boundary.ts",
+    "src/model/directive.ts -> src/model/directive-marker.ts",
+    "src/model/directive.ts -> src/model/runtime.ts",
+    "src/model/role.ts -> src/model/boundary.ts",
+    "src/model/role.ts -> src/model/runtime.ts",
+    "src/model/role.ts -> src/model/trunk.ts",
+    "src/model/runtime.ts -> src/model/boundary.ts",
+    "src/model/runtime.ts -> src/model/decision.ts",
+    "src/model/runtime.ts -> src/model/download.ts",
+    "src/model/runtime.ts -> src/model/governance-matrix.ts",
+    "src/model/runtime.ts -> src/model/project-state.ts",
+    "src/model/runtime.ts -> src/model/role.ts",
+    "src/model/runtime.ts -> src/model/trunk.ts",
+    "src/model/runtime.ts -> src/model/version-change.ts",
+    "src/model/version-change.ts -> src/model/trunk.ts"
+  ],
+  "gatesRootFiles": [
+    "index.ts"
+  ],
+  "roleModules": [
+    "chief",
+    "convener",
+    "nominator",
+    "product",
+    "rapporteur",
+    "verifier"
+  ],
+  "rolesPresent": true
+}
+✔ E1.4：唯一 public entry——gates 与每个角色模块根只允许 index.ts (538.6964ms)
+✔ E1.5：依赖方向零违例（角色零互引/角色不 import 引擎·门控；门控不 import 角色；共享不 import 门·角色；Model 不反向） (0.1413ms)
+✔ E1.5/E3.5：无环——模块层 value import 无环；type-only 环仅限 Model 内部（D9 口径） (0.1894ms)
+✔ D9：Model→shared 仅允许既有 type-only 共享原语单列；禁止 value import 反向；Model 内 type-only 豁免单列 (0.0888ms)
+✔ E1.4：引擎只经 index.ts 消费角色/门控（无私有文件直引）；扫描输出可复算 (0.0844ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1575.3294

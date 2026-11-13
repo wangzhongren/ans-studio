@@ -1,0 +1,309 @@
+diff --git a/test/桌面UI/evidence-markers.test.ts b/test/桌面UI/evidence-markers.test.ts
+index c749197..4ae7043 100644
+--- a/test/桌面UI/evidence-markers.test.ts
++++ b/test/桌面UI/evidence-markers.test.ts
+@@ -4,7 +4,9 @@ import test from "node:test";
+ import assert from "node:assert/strict";
+ import fs from "node:fs";
+ 
+-const SESSION = fs.readFileSync(new URL("../../app/desktop/session.ts", import.meta.url), "utf8");
++import { readSessionSource } from "../桌面应用/session-source.ts";
++
++const SESSION = readSessionSource();
+ const EVIDENCE = fs.readFileSync(new URL("../../src/common/编排/evidence-check.ts", import.meta.url), "utf8");
+ 
+ test("验收 facts 暴露 unverified/legacy/evidenceMismatch；P0 不伪造通过", () => {
+diff --git a/test/桌面UI/queue-status.test.ts b/test/桌面UI/queue-status.test.ts
+index 90b79db..8a40f8c 100644
+--- a/test/桌面UI/queue-status.test.ts
++++ b/test/桌面UI/queue-status.test.ts
+@@ -17,10 +17,11 @@ import {
+   queueKindLabel,
+ } from "../../app/renderer/src/chat/work-view.ts";
+ import { queueItemViews } from "../../app/renderer/src/chat/confirm-logic.ts";
++import { readSessionSource } from "../桌面应用/session-source.ts";
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+ const APP = path.resolve(HERE, "..", "..", "app");
+-const SESSION = fs.readFileSync(path.join(APP, "desktop", "session.ts"), "utf8");
++const SESSION = readSessionSource();
+ const MAIN = fs.readFileSync(path.join(APP, "main.ts"), "utf8");
+ const STORE = fs.readFileSync(path.join(APP, "renderer", "src", "chat", "chat-store.ts"), "utf8");
+ const PANEL = fs.readFileSync(path.join(APP, "renderer", "src", "shell", "QueuePanel.tsx"), "utf8");
+diff --git a/test/桌面UI/request-status.test.ts b/test/桌面UI/request-status.test.ts
+index 844895a..d8e19bb 100644
+--- a/test/桌面UI/request-status.test.ts
++++ b/test/桌面UI/request-status.test.ts
+@@ -17,10 +17,11 @@ import { describeEvent } from "../../app/renderer/src/chat/events.ts";
+ import { translate } from "../../src/common/shared/i18n/index.ts";
+ import { zhCN } from "../../src/common/shared/i18n/messages/zh-CN.ts";
+ import { enUS } from "../../src/common/shared/i18n/messages/en-US.ts";
++import { readSessionSource } from "../桌面应用/session-source.ts";
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+ const ROOT = path.resolve(HERE, "..", "..");
+-const SESSION = fs.readFileSync(path.join(ROOT, "app", "desktop", "session.ts"), "utf8");
++const SESSION = readSessionSource();
+ const SERVICE = fs.readFileSync(path.join(ROOT, "src", "service", "runtime", "session.ts"), "utf8");
+ const EVENTS = fs.readFileSync(path.join(ROOT, "app", "renderer", "src", "chat", "events.ts"), "utf8");
+ 
+diff --git a/test/桌面应用/boundary-refresh.test.ts b/test/桌面应用/boundary-refresh.test.ts
+index 29ca60e..8d1dcfe 100644
+--- a/test/桌面应用/boundary-refresh.test.ts
++++ b/test/桌面应用/boundary-refresh.test.ts
+@@ -22,9 +22,10 @@ import { REBUILT_SESSION_WRITE_PERMITS_NOTICE } from "../../src/pipeline/orchest
+ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+ import type { DispatchTaskFn } from "../../src/provider/pi/session.ts";
+ import type { DesktopCustomerInputFn } from "../../app/desktop/customer-input.ts";
++import { readSessionSource } from "./session-source.ts";
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+-const SESSION_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
++const SESSION_SRC = readSessionSource();
+ const IFACE_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
+ 
+ const tick = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+diff --git a/test/桌面应用/chief-workflow.test.ts b/test/桌面应用/chief-workflow.test.ts
+index e63fd69..ce84b2e 100644
+--- a/test/桌面应用/chief-workflow.test.ts
++++ b/test/桌面应用/chief-workflow.test.ts
+@@ -29,6 +29,7 @@ import { inspectRuntimeCoreRegistry } from "../../src/service/runtime/session.ts
+ import { createRuntimeAdapterFactory, openRoleSession, prepareChiefDecisionEvidence, readRoleCapabilityProtectionScope } from "../../src/pipeline/orchestration/run-role.ts";
+ import { readTaskState } from "../../src/common/编排/task-state.ts";
+ import type { RuntimeInputProvenanceV1, CustomerInputRequest, ChiefPendingDecisionRequest, RuntimeProviderOptions, ToolResult, RuntimeNativeToolSurfaceFacts, RuntimeNativeLifecycleFacts, RuntimeSessionLifecycleFacts } from "../../src/model/runtime.ts";
++import { readSessionModule } from "./session-source.ts";
+ // W4（P1.4 §3.2 C8/§3.7）：桌面 run-stop 终止判定与运行时中立 drain 谓词（只读消费运行时核心单一来源）。
+ import { isRuntimeSessionDrained } from "../../src/model/runtime.ts";
+ import { buildGovernedTools, createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
+@@ -2511,7 +2512,7 @@ test("W4 桌面run-stop：Claude/Pi drain 可推进；native absent 允许、pre
+       assert.equal(receipt.errorCode, "run-stop-lifecycle-unproven", "drain 不成立 ⇒ 拒绝、不提交");
+     }
+     // 6) 契约守卫：旧 quiescent/processCoverage/native 必填前提不再存在；身份/队列持久化/宿主 fence 检查保留。
+-    const source = await fs.readFile(new URL("../../app/desktop/session.ts", import.meta.url), "utf8");
++    const source = readSessionModule("run-change");
+     const slice = (from: string, to: string): string => {
+       const start = source.indexOf(from), end = source.indexOf(to, start);
+       assert.ok(start > 0 && end > start, `源码段可定位：${from} → ${to}`);
+diff --git a/test/桌面应用/directive-input.test.ts b/test/桌面应用/directive-input.test.ts
+index 4670951..966c3b3 100644
+--- a/test/桌面应用/directive-input.test.ts
++++ b/test/桌面应用/directive-input.test.ts
+@@ -29,6 +29,7 @@ import type { CreateDirectiveInterpreterOptions } from "../../src/pipeline/orche
+ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+ import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
++import { readSessionSource } from "./session-source.ts";
+ 
+ const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
+@@ -926,7 +927,7 @@ test("冻结形状：五个 IPC/preload 名、directivesEnabled 握手、应用
+ 
+   const interfaceSource = read("app/desktop/interface.ts");
+   assert.ok(interfaceSource.includes("directiveIdFromOperatorId"), "interface.ts Q9 旧读者使用三值归属");
+-  const sessionSource = read("app/desktop/session.ts");
++  const sessionSource = readSessionSource();
+   assert.equal((sessionSource.match(/directiveIdFromOperatorId/g) ?? []).length >= 3, true, "session.ts Q9 多处使用同一解析");
+ 
+   // 面板共存（P1-CAP-08/C1 侧）：独立 pending，不占 shell 卡槽/客户卡队列。
+diff --git a/test/桌面应用/dispatch-fresh-enum.test.ts b/test/桌面应用/dispatch-fresh-enum.test.ts
+index 7266608..70aaca8 100644
+--- a/test/桌面应用/dispatch-fresh-enum.test.ts
++++ b/test/桌面应用/dispatch-fresh-enum.test.ts
+@@ -19,6 +19,7 @@ import path from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { SessionManager } from "../../app/desktop/session.ts";
++import { readSessionSource } from "./session-source.ts";
+ import { createDesktopInterface } from "../../app/desktop/interface.ts";
+ import { buildProjectConfig } from "../../app/desktop/project.ts";
+ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+@@ -229,7 +230,7 @@ test("首轮寻址②（Interface 集成）：真实接线——导入时空项
+   // 接线钉：Interface 把 refreshListing 注到共享缓存（同一 listProjectFn —— 单一来源）。
+   const IFACE = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
+   assert.ok(IFACE.includes("refreshListing: async (root: string)") && IFACE.includes("listingCache.set(fresh.projectRoot, fresh);"), "Interface 给出 refreshListing（刷同一份缓存）");
+-  const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
++  const SESS = readSessionSource();
+   assert.ok(SESS.includes("await this.deps.refreshListing(projectRoot);"), "routeDispatch 在 miss 时调用一次重枚举");
+   assert.ok(SESS.includes("首轮寻址修复"), "机制写明（bootstrap J-1 首轮）");
+   await desktop.stopSession({ roleId: null });
+diff --git a/test/桌面应用/hot-path.test.ts b/test/桌面应用/hot-path.test.ts
+index 5f09f20..bff96e9 100644
+--- a/test/桌面应用/hot-path.test.ts
++++ b/test/桌面应用/hot-path.test.ts
+@@ -23,9 +23,10 @@ import { buildProjectConfig } from "../../app/desktop/project.ts";
+ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+ import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
++import { readSessionSource } from "./session-source.ts";
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+-const SESSION_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
++const SESSION_SRC = readSessionSource();
+ const MAIN_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "main.ts"), "utf8");
+ const PRELOAD = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "preload.cjs"), "utf8");
+ 
+diff --git a/test/桌面应用/interface.test.ts b/test/桌面应用/interface.test.ts
+index 3fa2938..f28b4fa 100644
+--- a/test/桌面应用/interface.test.ts
++++ b/test/桌面应用/interface.test.ts
+@@ -33,6 +33,7 @@ import { inspectRoleSessionOpenFailure, recheckRoleSessionOpenFailure } from "..
+ import { beginGitHostAction, endGitHostAction, inspectGitHostCoordinator } from "../../src/pipeline/orchestration/trunk-runtime.ts";
+ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
++import { readSessionSource } from "./session-source.ts";
+ 
+ const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
+@@ -338,7 +339,7 @@ test("接线源码钉：session:role-states handler / preload 桥 / 渲染侧主
+   assert.ok(rendererIpc.includes("void bridge.requestRoleStates?.()"), "界面加载后主动拉一次快照重放");
+   const platform = read("app/renderer/src/lib/platform.ts");
+   assert.ok(platform.includes("requestRoleStates?: () => Promise<{ ok: boolean }>"), "platform 桥类型声明");
+-  const iface = read("app/desktop/session.ts");
++  const iface = readSessionSource();
+   assert.ok(iface.includes("broadcastRoleStates(): void"), "SessionManager 提供快照重放");
+ });
+ 
+diff --git a/test/桌面应用/message-queue.test.ts b/test/桌面应用/message-queue.test.ts
+index fc9daa5..a416bbe 100644
+--- a/test/桌面应用/message-queue.test.ts
++++ b/test/桌面应用/message-queue.test.ts
+@@ -20,6 +20,7 @@ import path from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { SessionManager, shouldSuppressStarTaskReport } from "../../app/desktop/session.ts";
++import { readSessionModule, readSessionSource } from "./session-source.ts";
+ import { buildProjectConfig } from "../../app/desktop/project.ts";
+ import { renderHandbackPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
+ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+@@ -51,7 +52,9 @@ const PRELOAD = fs.readFileSync(path.join(APP_DIR, "preload.cjs"), "utf8");
+ const NEW_RENDERER_IPC = fs.readFileSync(path.join(APP_DIR, "renderer", "src", "chat", "ipc.ts"), "utf8");
+ const MAIN = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
+ const IFACE = fs.readFileSync(path.join(APP_DIR, "desktop", "interface.ts"), "utf8");
+-const SESSION = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
++const SESSION = readSessionSource();
++// L-1 顺序钉按目标架构的 lifecycle/send 模块读取（B0 无该模块时回退到单文件全量源码）。
++const SESSION_SEND = readSessionModule("lifecycle/send");
+ 
+ const tick = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+ 
+@@ -429,8 +432,8 @@ test("接线钉子：role-state 通道两端齐备；忙态判据只在主进程
+   // L-1 顺序修正（防竞态）：直接 send **先置忙再 await**——快适配器（如 demo）的 settled 可能在 await
+   // 返回前就被消费；若此刻才置忙，settled 的复位会被反向覆盖，忙态永不复位（队列永不放行）。
+   assert.ok(
+-    SESSION.indexOf("entry.busy = true;") >= 0 &&
+-      SESSION.indexOf("entry.busy = true;") < SESSION.indexOf("await this.sendDelivery(entry, origin, text, opts);"),
++    SESSION_SEND.indexOf("entry.busy = true;") >= 0 &&
++      SESSION_SEND.indexOf("entry.busy = true;") < SESSION_SEND.indexOf("await this.sendDelivery(entry, origin, text, opts);"),
+     "直接 send 应先置忙再 await（与投递机同款）"
+   );
+   // 新渲染器（5B）：经 preload 白名单订阅真实快照并落入投影；队列行/单计数由 main.mjs 与
+diff --git a/test/桌面应用/run-change-entry.test.ts b/test/桌面应用/run-change-entry.test.ts
+index 61d7d6c..eb04058 100644
+--- a/test/桌面应用/run-change-entry.test.ts
++++ b/test/桌面应用/run-change-entry.test.ts
+@@ -19,6 +19,7 @@ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+ import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+ import type { CustomerInputFn, CustomerInputRequest } from "../../src/model/runtime.ts";
++import { readSessionSource } from "./session-source.ts";
+ 
+ const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
+@@ -212,7 +213,7 @@ test("跨层源码钉：main handler / preload 桥 / platform 类型 / U1 旧按
+   assert.ok(iface.includes("requestRunChange(input: unknown): Promise<RunChangeRequestReply>"), "Interface 暴露 requestRunChange");
+   assert.ok(iface.includes("manager.requestRunChangeDecision("), "Interface 调 SessionManager.requestRunChangeDecision");
+   assert.ok(iface.includes("activeRunViews("), "listProject 使用 active run 摘要");
+-  const session = read("app/desktop/session.ts");
++  const session = readSessionSource();
+   assert.ok(session.includes("this.requestRunChangeDecision({"), "SessionManager 内部有真实调用方（显式入口）");
+   assert.doesNotMatch(session, /\brunChangeRejectionForDispatch\s*\(/, "派发不再自动触发 run-change（源码无调用）");
+   assert.ok(session.includes("proposalCardFrozenRejection"), "提案卡冻结冲突先尝试 run-change 卡");
+diff --git a/test/测试/g1-verify/g1-copy-and-nails.test.ts b/test/测试/g1-verify/g1-copy-and-nails.test.ts
+index 80d1742..ae7c7d0 100644
+--- a/test/测试/g1-verify/g1-copy-and-nails.test.ts
++++ b/test/测试/g1-verify/g1-copy-and-nails.test.ts
+@@ -9,13 +9,14 @@ import fs from "node:fs/promises";
+ import { BUILT_IN_ROLE_CARD_TEXT } from "../../../src/common/门禁引擎/boundary-core.ts";
+ import { describeTool } from "../../../src/provider/runtime/schema.ts";
+ import { renderDispatchPrompt } from "../../../src/common/编排/handback.ts";
++import { readSessionSource } from "../../桌面应用/session-source.ts";
+ 
+ const read = (rel: string) => fs.readFile(new URL(rel, import.meta.url), "utf8");
+ const T = BUILT_IN_ROLE_CARD_TEXT;
+ const splitClauses = (text: string) => text.split(/[。；\n]/);
+ 
+ test("代码级钉子（独立）：session.ts 无本地副本实现/调用、无内嵌派发模板；接线走编排三件套", async () => {
+-  const sess = await read("../../../app/desktop/session.ts");
++  const sess = readSessionSource();
+   assert.equal(/renderDispatchPromptLocal\s*\(/.test(sess), false, "session.ts 不得残留本地副本的**实现/调用**（ASCII 左括号判据；注释性指称合法）");
+   assert.equal(sess.includes("[派发] 来自"), false, "session.ts 不得内嵌派发文案模板（渲染单一来源 = 编排）");
+   assert.ok(sess.includes("extractDispatchReadPaths("), "接线须调用提取（单一来源）");
+diff --git a/test/测试/g4-skill-verify/h-scope-audit.test.ts b/test/测试/g4-skill-verify/h-scope-audit.test.ts
+index ff61dfc..dc935ff 100644
+--- a/test/测试/g4-skill-verify/h-scope-audit.test.ts
++++ b/test/测试/g4-skill-verify/h-scope-audit.test.ts
+@@ -18,6 +18,7 @@ import { buildGovernedTools } from "../../../src/provider/runtime/tools.ts";
+ import { describeTool } from "../../../src/provider/runtime/schema.ts";
+ import type { ToolDefinition, ToolResult } from "../../../src/model/runtime.ts";
+ import { makeTempProject } from "./fixture.ts";
++import { readSessionSource } from "../../桌面应用/session-source.ts";
+ 
+ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+ const read = (rel: string): string => fs.readFileSync(path.join(REPO, rel), "utf8");
+@@ -64,7 +65,7 @@ test("范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工
+   const src = read("src/pipeline/orchestration/run-role.ts");
+   assert.ok(/const installMcp = cap\?\.installMcp === true \? input\.installMcp : undefined;/.test(src), "installMcp 透传判据＝能力矩阵（唯一）");
+   assert.ok(/const uninstallMcp = cap\?\.installMcp === true \? input\.uninstallMcp : undefined;/.test(src), "uninstallMcp 同判据");
+-  const sess = read("app/desktop/session.ts");
++  const sess = readSessionSource();
+   assert.ok(/const canNominate = governanceFunction === "nomination" \|\| legacyBuiltIn;/.test(sess), "canNominate 判据");
+   for (const [fn, ty] of [["installMcp", "InstallMcpFn"], ["uninstallMcp", "UninstallMcpFn"]] as const) {
+     assert.ok(
+@@ -77,7 +78,7 @@ test("范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工
+ // —————————————————————— ③ 安装链零 request_confirmation ——————————————————————
+ 
+ test("范围③（源码切片）：applySkillChange 与 makeSkillReceiptTool 全切片零 request_confirmation/零客户通道调用", () => {
+-  const sess = read("app/desktop/session.ts");
++  const sess = readSessionSource();
+   const start = sess.indexOf("private async applySkillChange");
+   const end = sess.indexOf("private async roleStatusText");
+   assert.ok(start >= 0 && end > start, "须能定位 applySkillChange 切片");
+@@ -174,7 +175,7 @@ test("范围③补＋⑤：编排判据——installSkill 由能力矩阵透传
+     /const uninstallSkill = cap\?\.installSkill === true \? input\.uninstallSkill : undefined;/.test(src),
+     "uninstallSkill 同判据",
+   );
+-  const sess = read("app/desktop/session.ts");
++  const sess = readSessionSource();
+   const inject = sess.match(/const installSkill: InstallSkillFn \| undefined =\s*\n?\s*canNominate/);
+   assert.ok(inject, "桌面注入判据＝canNominate（single=su / trio=Nominator）");
+ });
+@@ -189,7 +190,7 @@ test("范围④：工具面无删除原语；卸载链源码不含 unlink/rm/删
+   }).map((t) => t.name);
+   assert.deepEqual(names.sort(), ["edit_file", "install_skill", "list_dir", "read_file", "request_choice", "request_confirmation", "uninstall_skill", "write_file"].sort(), "工具面集合固定（运行核新增只读 list_dir；无删除/无导出第三套）");
+   assert.equal(names.some((n) => /delete|remove|unlink|rm_/.test(n)), false, "不得注册任何删除类工具");
+-  const sess = read("app/desktop/session.ts");
++  const sess = readSessionSource();
+   const start = sess.indexOf("private async applySkillChange");
+   const end = sess.indexOf("private async roleStatusText");
+   const slice = sess.slice(start, end);
+diff --git a/test/测试/governance-matrix-integration.test.ts b/test/测试/governance-matrix-integration.test.ts
+index 527e908..2e38082 100644
+--- a/test/测试/governance-matrix-integration.test.ts
++++ b/test/测试/governance-matrix-integration.test.ts
+@@ -29,6 +29,7 @@ import os from "node:os";
+ import path from "node:path";
+ 
+ import { buildProjectConfig, DESKTOP_RUNTIME_CONSENT } from "../../app/desktop/project.ts";
++import { readSessionSource } from "../桌面应用/session-source.ts";
+ import {
+   listProject,
+   resolveRole,
+@@ -1383,7 +1384,7 @@ test("T1-27 桌面端到端：真实 openRoleSession + 只读导入 buildProject
+       await worker.handle.dispose();
+     }
+     // 桌面代码零改动（本特性无新增 IPC）：desktop 生产文件不得引用 governance-matrix 能力。
+-    const desktopSession = fs.readFileSync(path.join(process.cwd(), "app", "desktop", "session.ts"), "utf8");
++    const desktopSession = readSessionSource();
+     assert.equal(desktopSession.includes("governanceMatrix"), false, "桌面 session 不应引用矩阵能力");
+     assert.equal(desktopSession.includes("contextSections"), false, "桌面 session 不应引用提示段通道");
+   } finally {

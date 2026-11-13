@@ -1,0 +1,8 @@
+✖ W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+✖ W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+✖ W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+✖ commit-race
+✖ required
+✖ selected

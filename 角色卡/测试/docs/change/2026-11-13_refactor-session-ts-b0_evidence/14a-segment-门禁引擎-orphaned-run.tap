@@ -1,0 +1,484 @@
+✔ 解析：archived: true 为合法顶层键；条目照常解析、标记经 loadBoundaryFile 回传 (7.6862ms)
+✔ 解析：archived 仅接受布尔；false / 缺省不产生归档标记 (1.2473ms)
+✔ listProject：archived: true 的目录静默跳过——不枚举、不产生任何警告（与活角色共存） (10.0078ms)
+✔ listProject：目录全部为归档 → 与「无有效角色」同等静默（无逐条警告、无汇总提示） (1.9255ms)
+✔ listProject：归档目录缺 role-card.md 也静默（归档探测先于缺卡检查） (1.7784ms)
+✔ listProject：不带 archived 键的目录行为不变——缺 boundary 仍逐条告警（归档不吞旁告警） (2.1071ms)
+✔ resolveRole：归档角色 fail-closed 拒绝开启（「角色 X 已归档，不可开启」）；活角色照常解析 (13.1253ms)
+✔ 防御深度：绕过开启入口按 id 解析归档角色的边界 → 未接受 + parseError；resolveWrite 拒绝一切写入 (4.5049ms)
+✔ A：散文 boundary.md（存在、被读到、解析 0 条）→ parseError，文案含原因与出路（改写为 boundary.yaml） (5.4926ms)
+✔ A：listProject 对散文边界角色记 warning（既有通道）并跳过；一切被列角色都无「0 条且无 parseError」 (3.2189ms)
+✔ A：闸链贯通——resolveBoundarySection(角色) 得 parseError；resolveWrite 拒绝理由与 format-denial 渲染均呈现原因 (1.5904ms)
+✔ A 反向：代码合成边界（内置 / 治理种子 / 未知角色回退）一律无 parseError——修复只针对文件解析 (0.4498ms)
+✔ A 反向：YAML 显式 entries: []（作者按声明格式明确表达空集）→ 无 parseError，角色仍可枚举（O1 角落语义） (9.9092ms)
+✔ A 兼容：.md 带合法 legacy 表格仍解析出条目；散文写成 boundary.yaml 走严格 YAML 报错（既响亮路径） (6.9083ms)
+✔ C：su 内置卡文本写死「角色边界必须是 boundary.yaml（YAML）」+ 最小可抄示例 + 散文不会被解析 (0.1568ms)
+✔ C：治理种子（governanceBoundaryEntries）的角色卡条目 purpose 明示 boundary.yaml（YAML：role+entries） (0.0797ms)
+✔ 合法最小模板：ok=true；path 规范化、root 缺省 project (3.9847ms)
+✔ 非法顶层键 version/roleId/root：ok=false，且提示正确顶层键 (0.9173ms)
+✔ 合法 role/entries + archived:true；archived 非布尔被拒 (0.8455ms)
+✔ Nominator 卡文本：逐字最小模板 + 禁止 version/roleId/root 顶层键与条目 root: (0.177ms)
+✔ YAML 合法：解析出三条，root 缺省 project，condition 保留 (5.0308ms)
+✔ YAML：root 可显式指定 skill (0.3348ms)
+✔ YAML 非法：语法错误 → 抛错 (1.0538ms)
+✔ YAML 非法：未知顶层键 → 抛错 (0.2342ms)
+✔ YAML 非法：未知 kind → 抛错 (0.2746ms)
+✔ YAML 非法：缺 path → 抛错 (0.2279ms)
+✔ YAML 非法：缺 purpose → 抛错 (0.2021ms)
+✔ YAML 非法：conditional-directory 缺 condition → 抛错 (0.2441ms)
+✔ YAML 非法：condition slug 非法 → 抛错 (0.3185ms)
+✔ YAML 非法：条目含未知键 → 抛错 (0.324ms)
+✔ resolveBoundary：非法 YAML → 未接受且带 parseError；resolveWrite 理由含边界解析失败 (8.8329ms)
+✔ resolveBoundary+resolveWrite：合法 YAML 三条路径判定正确 (6.913ms)
+✔ Markdown 回退：.md 走 legacy 表格解析 (4.0625ms)
+✔ builtInRoles：声明 su 不改变 resolveRole 的解析结果（仍下沉为内置治理角色且不抛错） (0.6473ms)
+✔ builtInRoles：未设置时行为不变——未登记角色照样下沉为内置治理角色 (0.1061ms)
+✔ 等价性：builtInBoundarySection() 与内置分支的金标准字面量逐字段一致（含无 parseError） (0.8464ms)
+✔ 等价性：resolveBoundarySection 分支 3 与 builtInBoundarySection() 返回内容完全一致（su 与任意未知角色皆然） (0.2485ms)
+✔ 等价性：accepted 恒为 false 且 source 为空串（fail-closed 的证据来源恒定） (0.0913ms)
+✔ 等价性：每次调用返回全新数组，互不共享可变状态（与改动前内联构造一致） (0.0973ms)
+✔ fail-closed 未被破坏：对内置角色 su 的边界，resolveWrite 拒绝一切写入（F6） (0.4872ms)
+✔ B7.1 A1：首个 stage-request JSON 示例含全部精确字段（roleId=convener/taskKind/workflowAction/workflowPath=A/stage=A1/flowId/sideEffect=read-only） (5.2775ms)
+✔ B7.1 A1：路径 B 首请求同形（workflowPath=B/stage=B1）且缺字段 fail-closed 非 legacy 回退 (0.34ms)
+✔ B7.1 A1：禁止直派生产线角色与 legacy run/trunk 概念 (0.2658ms)
+✔ B7.1 各阶段：A2/A4/A7/A8/A10/A11/A12a/A12b 的 fixed 任务字段与卡节奏齐备 (0.3577ms)
+✔ B7.1 卡呈交：A6/A10/A13 卡由幕僚呈交；merge-main 客户本人且 judge 不可代批 (0.3264ms)
+✔ B7.1 contract_check：fixed 会话应显示 fixed 口径；legacy 文本不作为 fixed 依据 (0.239ms)
+✔ B7.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变 (3.7732ms)
+✔ B7.1 版本与规模：v2 版本行恰一处、字节 ≤256 KiB、无 BOM/NUL (0.6723ms)
+✔ B31 A12b 阶段清单：blocked 报告到达后必须当回合三选一并留痕、禁止空转（三选一 = 轻量验收/有限返工/停止上报） (0.9463ms)
+✔ B31 轻量验收通过：close_created_task outcome="accepted" + note 标记；应用归档记为 staffDecision；A13 披露「运行期未验证」 (0.2908ms)
+✔ B31 受支持动作边界：A12b blocked accepted 必须同时有 acceptanceArchive 与非空 note；其余阶段/缺归档/缺 note 仍 fail-closed (0.2447ms)
+✔ B31 返工/补证：有限、可执行、静态证据/具体文件与字段；不得要求 shell 自测；outcome:"rework" 回 A11 (0.5235ms)
+✔ B31 停止并如实上报客户：说明阻塞事实与所需客户决策；按停止流程 stage-request stop；不伪造通过、不静默归档 (0.3332ms)
+✔ B31 既有安全语义不放宽 + legacy 不改：hash/shell/写区/卡预算口径保留；v1 版本与模块 pin 不变；v2 版本行/规模/编码有界 (1.2754ms)
+✔ B32.1 A11 段：实现任务文本写死提交命令形态（引号/单 argv 参数） (0.8107ms)
+✔ B32.1 「A10 与 A11 的顺序」段：A11 stage-request 文本与返工均写死提交语法 (0.338ms)
+✔ B32.1 Git 普通用法段：实现角色提交命令带引号且既有拒绝面不变 (0.2425ms)
+✔ B32.1/B32.2 既有安全语义不放宽：hash/shell/卡预算口径保留，legacy 字节与模块 pin 不变 (0.7877ms)
+✔ B32.1 资源事实：版本行恰一处 chief-workflow/v2、规模有界、无 BOM/NUL (1.0273ms)
+✔ B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算 (0.8913ms)
+✔ B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash (0.286ms)
+✔ B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因） (0.2886ms)
+✔ B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算） (0.4651ms)
+✔ B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值） (0.4896ms)
+✔ B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷 (0.49ms)
+✔ B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash） (1.0632ms)
+✔ B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变 (0.4322ms)
+✔ B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留 (0.4183ms)
+✔ B27 A11 实现 worker 不执行 shell/自测：报告静态自检结论，旧「变更与测试结论」措辞移除 (0.3306ms)
+✔ B34 路径 B 概要：B1 completed 后直接发 B3 advance stage-request；应用在受理 B3 时记录 change.scope-decided，B2 由该记录完成（不发 B2） (0.8268ms)
+✔ B34 首个动作与阶段段：重申路径 B 不发 B2 stage-request（B1 完成后直接 B3 advance） (0.4267ms)
+✔ B34 路径 B 要点 B2：稳定码 b2-stage-request-forbidden + 应用文案；B1 completed 后 B3 advance 由应用记录 scope、派生写集 (0.4734ms)
+✔ B34 旧「B2 发范围决定」错误引导移除：不得再出现「B2：你发范围决定」旧措辞 (0.2892ms)
+✔ B34 B2 卡住处置：按真实拒绝码如实上报/停止；不得反复重发 B2、不得伪造范围决定 (0.2637ms)
+✔ B34 禁止用 shell 探测或读取应用源码：findstr/grep/Get-Content/PowerShell；应用源码不是项目证据；不得产生额外卡 (0.3572ms)
+✔ B34 既有安全语义不放宽 + legacy 不改：hash/卡预算/写区/fail-closed 口径保留；v1 字节与模块 pin 不变；v2 版本行/规模/编码有界 (1.5583ms)
+✔ chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B (1.474ms)
+✔ legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1 (0.2925ms)
+✔ chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同） (0.5845ms)
+✔ B9.2 A1/A2 分离：A1 产品受理任务写死 stage:"A1" 且完成于任务创建；A2 意图任务 stage:"A2" 在 A1 收口后另派、完成于收口 + 文档 hash (1.0535ms)
+✔ B9.2 A1 精确 JSON：stage 仍为 A1；任务文本明确 A1 只受理/准备、A2 另派（B9.1 hash 口径保留） (0.4088ms)
+✔ B9.2 A4/A5 分离：A4 受理任务 stage:"A4" 完成于创建；A5 方案任务 stage:"A5" 在 A4 收口后另派、完成于收口 + 文档证据 (0.3008ms)
+✔ B9.2 A7/A8 分离：A7 受理任务 stage:"A7" 完成于创建；A8 激活任务 stage:"A8" 在 A7 收口后另派、完成于 role.activated (0.299ms)
+✔ B9.2 stage.dispatched 记录集合：恰 A1/A4/A7/A8/A12a/A12b；A2/A5 不得误记；与桌面常量一致 (0.8444ms)
+✔ B9.2 无合并回归：旧「A1/A4/A7 受理与 A2/A5/A8 产物同一任务」写法不得出现 (0.3003ms)
+✔ B9.2 冻结与资源事实：legacy 字节/模块 pin 不变；v2 版本行恰一处、≤256 KiB、无 BOM/NUL；B9.1 哈希口径保留 (0.6872ms)
+✔ B28 A12a/A12b 项目验收角色必须绑定 roster 模块；review 任务禁止 shell/mkdir，write_file 自动建目录 (0.2652ms)
+✔ v5 版本：SHELL_RULES_VERSION='5'、ans-default-v5；v4/v3 规则集整条拒绝（fail-closed） (0.7614ms)
+✔ v4 只读白名单保留：精确只读形态 allow；写形态/未列形态仍硬拒 (1.1243ms)
+✔ matchTaskGit 允许：add 单文件/多文件/目录、commit -m；摘要确定性且不依赖时钟/随机 (1.014ms)
+✔ matchTaskGit 拒绝：add flag/-A/--all/./glob/pathspec magic/绝对/..）/.git/路径外/治理写区 (0.5511ms)
+✔ matchTaskGit 拒绝：commit 仅 -m 单形态（-F/amend/no-verify/-a/--author/空 message/多参） (0.53ms)
+✔ taskGitScopeError：无 scope/坏 taskId/坏 workflowId/非任务分支/空写集/治理写集/重复项均拒 (0.1718ms)
+✔ 分类器：无 taskGitScope 时 add/commit 一律拒（旧 2 参调用逐字保持硬拒） (0.2637ms)
+✔ 分类器：合法 scope 的 add/commit allow，规则 id 与审计描述稳定 (0.2471ms)
+✔ 普通 Git 拒绝面：push/fetch/pull/remote/tag/merge/rebase/reset/clean/checkout/switch/stash/worktree/submodule/config/update-ref 等硬拒 (1.1653ms)
+✔ 绕过面：sh -c / bash -c / cmd /c / node -e / awk 等仍硬拒（不经任务级白名单） (0.8887ms)
+✔ 写守卫 v5：任务级 add/commit 前台 pass（形状级）；无 scope/后台/路径外/普通 Git 硬拒 (1.4977ms)
+✔ 审计：ShellGate 对 task-git add/commit allow 与普通 Git deny 各写一行（既有字段不变） (2.5662ms)
+✔ v4 旧规则回归：四档/硬拒/risky/例行白名单/元字符耦合不变 (0.3181ms)
+✔ D3：显式程序路径和脚本后缀只将原只读 allow 降为 review (1.6618ms)
+✔ D3：保留裸读取命令、exe、既有窄re-shell及原deny/risky (0.9595ms)
+✔ D3：rg显式预处理选项在位置参数前后均为review (0.2285ms)
+✔ D3：rg模式、选项值及--后的文件名不是预处理选项 (0.3186ms)
+✔ 四档：allow / deny / risky / review 各有一条可达用例 (0.1368ms)
+✔ 白名单：只读命令 → allow (0.239ms)
+✔ 执行模型（argv-noshell）：`>` 是普通参数，白名单程序照常放行（不再误判为重定向） (0.1343ms)
+✔ 执行模型（argv-noshell）：`|`/`;`/`$()`/反引号 是普通参数，不再过头拦截 (0.2636ms)
+✔ 执行模型（argv-noshell）：换行只是普通字节，多行参数不被拒 (0.2913ms)
+✔ 执行模型（shell-string）：元字符规则恢复拦截（`>`/`|`/`$()`/换行） (0.218ms)
+✔ 执行模型（缺省）：省略 executionModel ⇒ 保守假定 shell 解释，元字符仍生效（fail-closed 缺省） (0.0967ms)
+✔ 执行模型（shell-string）：硬拒记号先于白名单（echo 在白名单但含 `>` → deny） (0.0639ms)
+✔ fail-closed：executionModel 未知 → deny (0.0427ms)
+✔ 硬拒：外壳 sh -c / bash -c / cmd /c / pwsh（argv 藏命令）→ deny (0.0811ms)
+✔ 只读 re-shell：cmd [/d] /c dir|where 与 powershell Test-Path '<路径>' → allow（ruleId 钉死） (0.1533ms)
+✔ 只读 re-shell 仍守住：del/Get-Process/元字符/变量/绝对路径/pwsh → deny (0.218ms)
+✔ 反向守卫：sh -c 仍硬拒——**不是** risky、**不是** allow（防止后人顺手放宽，§14.4） (0.119ms)
+✔ 硬拒：eval / exec / source / command（求值内建）→ deny；同样不得是 risky/allow (0.1089ms)
+✔ 解释器内联：短内联（bounds 内）→ script 审查（review）；长内联/超界 → deny；deno eval 仍 deny (0.2533ms)
+✔ 反向守卫：长内联仍 deny；短内联落 review——不是 risky、不是 allow (0.0919ms)
+✔ 硬拒：awk/gawk（可 system()/重定向）→ deny；不得是 risky/allow (0.0732ms)
+✔ 硬拒：提权 sudo/doas/su/pkexec → deny (0.0894ms)
+✔ 硬拒：系统级破坏/控制 mkfs/diskpart/wipefs/fdisk/shutdown/reboot/halt → deny (0.1282ms)
+✔ 硬拒：Windows 脚本宿主/LOLBin mshta/wscript/cscript/rundll32/certutil/bitsadmin → deny (0.0863ms)
+✔ risky：删除/截断 rm/rmdir/del/shred/truncate/dd → risky（删临时文件等正当） (0.0894ms)
+✔ risky：原地改写 sed -i / perl -i；普通 sed → review（只读式） (0.0723ms)
+✔ risky：编辑器 vi/vim/nano/notepad → risky (0.0623ms)
+✔ risky：进程/服务 kill/systemctl/reg/schtasks → risky (0.1227ms)
+✔ risky：网络抓取/远程 curl/wget/ssh/scp → risky (0.0751ms)
+✔ risky：间接执行器 xargs/env/nohup/timeout → risky（程序名在 argv 里可见，区别于 A-1 藏进 string） (0.0829ms)
+✔ risky：构建/任务运行器 make/gradle/cargo/dotnet → risky (0.0871ms)
+✔ risky：包管理 npm run / npm install / npx → risky；npm ls（只读）→ allow (0.3857ms)
+✔ 例行白名单（§5.4）：npm test / npm ci → allow；npm install / npm run build 仍 risky (0.1409ms)
+✔ risky：文件写入/创建/权限 cp/mv/mkdir/touch/chmod/tee → risky（正当写盘，程序名可见） (0.1081ms)
+✔ Git P2（W3-G 收窄）：只读精确形态 allow；写子命令/写盘 flag/未列形态仍硬拒（不走普通 shell 审批） (0.3711ms)
+✔ risky：程序名大小写与 .exe 归一（Windows），路径前缀剥除 (0.1065ms)
+✔ 常规未命中命令 → review (0.1128ms)
+✔ fail-closed：规则集缺失 → deny（不是 allow） (0.0339ms)
+✔ fail-closed：规则集非对象 / 版本未知 / 形状非法 → deny (0.0832ms)
+✔ fail-closed：riskyPrograms 缺失（v3 必需）→ deny（不静默降级为 review） (0.0395ms)
+✔ fail-closed：id 若存在但非法（空串/非字符串）→ deny (0.0438ms)
+✔ fail-closed：即使规则集有效，空白名单也不放行任何命令 (0.0717ms)
+✔ fail-closed：argv 非法（空/非数组/非字符串元素）→ deny (0.0548ms)
+✔ argv[0] 含空白（整条命令串塞进一个元素）→ deny (0.0684ms)
+✔ 规则集是数据：自定义 denyToken / 白名单被实际消费 (0.0619ms)
+✔ 规则集是数据：自定义 risky 程序被实际消费（→ risky） (0.0454ms)
+✔ 规则集是数据：argv-noshell 下自定义 denyToken 也不生效（记号是参数字符） (0.0361ms)
+✔ 默认规则集每次返回全新对象（无共享可变状态）；带 id、执行模型与三段规则 (0.0986ms)
+✔ 已知缺口：任意解释器运行『脚本文件』→ review（不是 deny） (0.089ms)
+✔ 已知缺口：JVM/其它运行器与项目内脚本 → review (0.0745ms)
+✔ 已知缺口：间接执行类整体不可穷尽（命名模式已覆盖，其余如实列缺） (0.101ms)
+✔ classifyShellDetailed 给出原因与命中规则 id（审计可用） (0.2182ms)
+✔ bash/sh <script> 不再是硬拒（进入脚本审查）；-c/eval/exec/source/awk/find -exec 仍 deny (0.1421ms)
+✔ T31：空项目 + 操作者 bootstrap → su 的边界为项目根治理种子（普通目录，accepted，source=操作者指令） (0.9571ms)
+✔ T15：创世只作用于**内置治理角色**；项目角色不受益（仍回退内置未接受） (0.1282ms)
+✔ T15：genesisBootstrap.source 为空 → 边界 accepted 但 F6 仍拒一切写（fail-closed） (0.365ms)
+✔ T31 要害：genesisBootstrap 设、scope:undefined → su 对 角色卡/<任意新角色>/…、docs/…、.ans/project.json 判 allowed (2.0706ms)
+✔ T31 负面：scope:undefined → src/**、项目根外、README.md/package.json 一律拒 (2.877ms)
+✔ T31 回归：不设 genesisBootstrap → su 仍回退内置未接受边界（skill 根），拒一切写 (0.2476ms)
+✔ T31 自终止：项目治理边界写出并 pin 后，genesisBootstrap 残留也不再生效（项目覆盖接管） (10.1482ms)
+✔ T31 自终止（对照）：同项目**不设** genesisBootstrap 时结果一致——证明创世非放行因素 (1.5098ms)
+✔ T31 留痕：acceptance.source 携操作者指令，且 scope:undefined 下 docs/bootstrap-manifest.md 可写 (0.5928ms)
+✔ 注册表：convener Section 1 含 docs/workflow.md 精确文件条目，且列入 preauthorizedDirs (0.5209ms)
+✔ 注册表：其他角色写集不被放宽——chief/product/verifier 仍禁写，rapporteur/nominator 不含该条目 (0.1241ms)
+✖ 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者 (0.5618ms)
+✔ 注册表完整性：仍恰为六角色，convener 能力位不变（写权恢复不扩张能力） (0.4291ms)
+✔ 非 decision 卡 ⇒ applicable:false（调用方按原卡种处理） (0.8746ms)
+✔ 角色发行上限：仅 trio 的 convener/rapporteur；其余角色/single 拒绝 (0.2378ms)
+✔ 应用自有 decision 卡：application:true 不借用角色槽位，任意来源角色可发 (0.1216ms)
+✔ 结构负例 fail-closed：非 choice/缺 flowId/选项不足/重复/非法 id/推荐项非恰一 (0.146ms)
+✔ G15 pure lexical/canonical/final stages authorize only the same accepted frozen scope (1.784ms)
+✔ G15 managed read stages reject absent role/scope, secrets, traversal and malformed host bindings (0.7316ms)
+✔ G15 canonical/currentFile unknown, root escape, protected aliases and final hash absence fail closed (0.5451ms)
+✔ G15 pure read/final predicates never call fs or the legacy live-boundary diagnostics (0.6657ms)
+✔ G5 Git-selected missing effective ref never falls back to valid FS projection/live role (161.2915ms)
+✔ G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed (5859.3226ms)
+✔ G2 pure activation check binds complete bytes and rejects half-set/mismatch/widened/shared ownership (2.7523ms)
+✔ G2 real Provider-backed new old-run session re-resolves frozen bytes after live change and deletion (28.9859ms)
+✔ G2 run requires matching full evidence; corrupt or missing snapshot cannot fall back to live (20.9738ms)
+✔ G3 no-run uses independent active pointer after doc-only update; old-run pin remains unchanged (98.2446ms)
+✔ G3 awaited Service refresh installs real Provider confirmation freeze and fails closed on damaged evidence (22.8989ms)
+✔ G3 judge-delegated intent freeze is accepted by the gate's own versions.jsonl consumer (single Model validator) (19.2555ms)
+✔ G2 freeze source validates real direct/delegated kinds and rejects fabricated customer approvals (0.3649ms)
+✔ 六角色明确未注入能力不得虚构或恢复取消卡 (0.1632ms)
+✔ 产品/策划整单直接提交，来源和旧run冻结约束可见 (0.1464ms)
+✔ 策划独占三模式，旧pin与停稳失败不能绕过 (0.0665ms)
+✔ 人事保留真实D3，三文档整体激活，不再逐次写卡审批 (0.0964ms)
+✔ 运营直接完成计划与主动环境卡，真实恢复条件先行 (0.0848ms)
+✔ chief/convener收口必须为原创建者，报告不等于关闭 (0.097ms)
+✔ 真实chief委托能选非推荐项/拒绝/退修，且受revision单次结算约束 (0.101ms)
+✔ 提示变化不扩充工具布尔位、写区或派发权 (0.1007ms)
+✔ Chief枢纽在六卡区分普通准备和动作授权，历史创建者保持真实 (0.2004ms)
+✔ Chief资源正文独立且卡只声明真实注入来源，两套workflow分开 (0.091ms)
+✔ J-1：落盘之后「立刻派发」——用 dispatch_task，task 自足，不等客户手动转达 (0.5389ms)
+✔ J-1：派发 ≠ 授权——写权来源措辞与 H-1 逐字一致；不得在任务文本里代授权限 (0.084ms)
+✔ J-1：失败语义——派发被拒/失败如实告知、不得假设已开工；无可派发角色停在「待客户指示」 (0.0719ms)
+✔ J-1 反向断言：任何涉及「授权/获准/放行」的小句必须是禁止式/否定义，不得出现「已获授权」式表述 (0.1932ms)
+✔ B0：类型层——旧调用不传新字段，fixed 调用方显式传值（纯数据形状） (0.4447ms)
+✔ B0：dispatch 缺省 matrix/purpose ≡ 显式 legacy-v1/production（六模块逐例） (1.1883ms)
+✔ B0：context 缺省 matrix ≡ 显式 legacy-v1（六模块 × 两治理模型；现有返回值不变） (0.1453ms)
+✔ B0：ProjectConfig.workflowSchema 是纯配置数据——两值可构造、缺省不声明、不改其它字段 (0.1074ms)
+✔ 规范锚点：A17/A18/A19/A21 的 validator 指向真实实现文件与导出符号 (1.6019ms)
+✔ A17：ROLE_CARD_REQUIRED_SECTIONS 冻结 10 章节，与任务/B1 口径逐项相等 (0.4961ms)
+✔ A17：spec 章节字段逐项/按序包含 10 章节，并披露 #{1,6} 空白匹配口径 (0.1998ms)
+✔ A17：三文件规范路径与 boundary-core 校验一致（正例 + role-document-path-mismatch 负例） (6.6685ms)
+✔ A17：10 章节逐章节缺失 ⇒ role-card-section-missing:<label>；完整模板正例 ok (1.7978ms)
+✔ A18/A19：boundary-yaml 私有常量 KINDS/ROOTS/TOP_KEYS/ENTRY_KEYS 源码字面量冻结 (0.3692ms)
+✔ A18/A19：spec 字段逐项包含 kind/root/entry 键/顶层键与条件目录 slug 口径 (0.2516ms)
+✔ A19：validateBoundaryYamlText 正例（spec example 与归档布尔），及条件目录 slug 正例 (0.9518ms)
+✔ A19：严格 YAML 负例 —— 未知顶层键/entry 键/kind/root/condition/archived 非布尔 (2.3865ms)
+✔ A19：条件目录 slug 走 model CONDITION_SLUG_PATTERN（正例/负例一致） (0.1669ms)
+✔ A17/A18/A19：spec 三文件样例经 parseSnapshotRoleDocuments/validateRoleDocumentsSnapshot 为 ok (0.8158ms)
+✔ A17/A18/A19：boundary.md↔yaml 不一致 ⇒ boundary-md-yaml-mismatch（条目多/少/重复/空集） (1.1854ms)
+✔ A17/A18/A19：archived:true ⇒ frozen-role-archived；role 标签不一致 ⇒ boundary-role-mismatch (0.6097ms)
+✔ A17/A18/A19：项目角色范围负例 ⇒ invalid-role-boundary-scope（条件目录/路径逃逸） (0.9251ms)
+✔ A21：七键与源码解析键集逐项相等；NAME_PATTERN/RESERVED_NAMES/ENV_NAME_PATTERN 源码字面量冻结 (0.4224ms)
+✔ A21：spec 文本包含名字符集/保留名/env 形态，pathPattern 与状态口径冻结 (0.4739ms)
+✔ A21：spec example 经真实 readMcpDeclaration/listInstalledMcpServers 为 ok（七键视图/env 原文） (5.4266ms)
+✔ A21：负例 —— name-invalid/reserved-name/env 名非法/! 前缀/状态未知/必填缺失（readMcpDeclaration 不抛错） (10.3345ms)
+✔ 既有片段：角色卡/编排/boundary.md、角色卡/产品/boundary.yaml 与本角色边界经真实 parser 为 ok (13.6168ms)
+✔ 文档面清单逐项在卡文本中（五文件 + 四目录 + 测试目录 + temp；kind 按项标注） (0.4914ms)
+✔ 交付纪律：每次交付同步文档、代码与文档同批交回、不得靠「下次补」 (0.0879ms)
+✔ 反向断言：不得暗示文档路径可选/可后补；不得出现「未列即默认可写」式表述 (0.2054ms)
+✔ F4：仍拒绝（fail-closed）；原头逐字保留；追加可操作指引（request_confirmation/preview/confirmed:true） (2.8305ms)
+✔ F4 分支 allowedByRoot：writeSet 空 ⇒ 两根皆空（如实呈现此刻什么也写不了） (0.7802ms)
+✔ F4 分支 allowedByRoot：恰列出经边界+条件过滤后的 writeSet 项（project）；边界目录本身不再出现 (0.4158ms)
+✔ F4 分支 allowedByRoot：条件未激活的 writeSet 项不计入（与判定同源过滤） (0.6377ms)
+✔ 非 F4 分支语义回归：F5 缺条件分支与未匹配分支的列表仍为边界覆盖（用例期望不改） (0.7793ms)
+✔ 渲染链：F4 决策渲染后项目行＝当前已发行可写集；指引与 reason 同现 (0.3811ms)
+✔ F6（accepted:false）：仍拒绝一切写入；首句逐字开头；其后为完整恢复指引 (0.8724ms)
+✔ F6（accepted:true 但 source 为空）：同样仍拒绝、同样带指引 (0.1597ms)
+✔ 渲染链：两份 format-denial 的输出都包含完整指引（renders reason 自动带出） (0.2185ms)
+✔ 已接受边界：覆盖路径照常放行（不出现指引） (0.7071ms)
+✔ 已接受边界的非 F6 拒绝（未匹配）：不出现 F6 指引 (0.5564ms)
+✔ MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻结、同引用、缺省 matrix＝legacy） (0.8881ms)
+✔ MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`） (0.2245ms)
+✔ MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变 (0.098ms)
+✔ MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed） (0.0964ms)
+✔ fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独立非空、缺失/未知 fail-closed (0.2564ms)
+✔ G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项 (2.9967ms)
+✔ MF-IR-4：fixed 视图读取不改写注册表/模块（纯策略只读；no I/O） (0.2897ms)
+✔ W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13） (60.4883ms)
+✔ W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13） (50.1051ms)
+✔ W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19） (46.1404ms)
+✔ W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17） (58.8925ms)
+✔ W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2） (47.2912ms)
+✔ W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18） (40.4331ms)
+✔ W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变） (38.5634ms)
+✔ G18 actual sha1 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence (3218.4807ms)
+✔ G18 actual sha256 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence (3235.8278ms)
+✔ G17 actual sha1 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL (3645.5181ms)
+✔ G17 actual sha256 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL (3561.8702ms)
+✔ G17 ref-only denies wrong actor/ref/CAS/source/parents/commit bytes/tree/grants and extra commands (3281.0819ms)
+✔ G17 recomputed real candidate plans still cannot alter inherited metadata/other owners/modes (7982.1393ms)
+✔ G16 actual sha1 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands (2047.9197ms)
+✔ G16 actual sha256 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands (2014.5753ms)
+✔ G16 integrate refuses wrong actor/run/grants/parents/ref/commands and cannot pretend to be commit (1574.9407ms)
+✔ G16 complete Provider replans cannot integrate metadata, controller-owned paths, ungranted deletes or mode changes (2193.4748ms)
+✔ G23 shared raw observations retain special modes and R/C without enabling unsupported revert (1514.5887ms)
+✔ revert actual sha1 inverse preserves unrelated current entries and rejects false observations (4057.0602ms)
+✔ revert actual sha256 inverse preserves unrelated current entries and rejects false observations (3989.8421ms)
+✔ G11 actual sha1 approved-source/written-consumed initial workflow preserves active and document authority (2959.6161ms)
+✔ G11 actual sha256 approved-source/written-consumed initial workflow preserves active and document authority (3058.6464ms)
+✔ G11 full replans reject false source, unconsumed permission, changed mainline/active/history/workflow and transport (7904.3817ms)
+✔ G10 actual sha1 independent eight-ref activation preserves document mainline and accepts historical D3 source (1681.5224ms)
+✔ G10 actual sha256 independent eight-ref activation preserves document mainline and accepts historical D3 source (1769.3746ms)
+✔ G10 actual sha1 judge-delegated D3 accepts honest judge audit with the real application decisionId (1602.399ms)
+✔ G10 actual sha256 judge-delegated D3 accepts honest judge audit with the real application decisionId (1606.3763ms)
+✔ G10 judge-delegated D3 variants reject malformed audit, mismatched operatorId/decisionId and mixed sources (3132.1476ms)
+✔ G10 complete replans reject activation changes to authority, document bytes, role evidence, history and transport (2932.4611ms)
+✔ G9 actual sha1 existing-base team-plan completion preserves other authority and supports exact no-op (1359.2268ms)
+✔ G9 actual sha256 existing-base team-plan completion preserves other authority and supports exact no-op (1419.2757ms)
+✔ G9 fully re-planned team-plan tampering cannot change refs, authorization, marker, versions or unrelated bytes (2416.752ms)
+✔ G8 actual Provider sha1 full first-document tree/no-index plan and exact publication CAS (41.0759ms)
+✔ G8 actual Provider sha256 full first-document tree/no-index plan and exact publication CAS (39.7505ms)
+✔ G8 recomputed malicious metadata/content/modes remain rejected beyond object-hash binding (49.9487ms)
+✔ G6 actual Provider sha1 first-init/empty-candidate plans have honest no-repo/no-index policy (1.8547ms)
+✔ G6 actual Provider sha256 first-init/empty-candidate plans have honest no-repo/no-index policy (1.3532ms)
+✔ G6 narrow first-init facts cannot exempt an existing repo, actor, worksite, nonempty diff, root or command (2.496ms)
+✔ pure ACL all six roles/worker may use an exactly planned readable query; digest binds every field (0.4691ms)
+✔ query refuses malicious config/argv, hidden paths, ungranted history, pathspec and stale revision (0.261ms)
+✔ candidate ACL gives each role a valid own-path case and rejects other-role content (1.1594ms)
+✔ complete base→candidate diff checks deletion/rename both sides, mixed staged data, modes and revocation (0.3905ms)
+✔ publish roles and convener integration use full owner-bound diffs without granting chief decisions Git power (0.2772ms)
+✔ raw Git：只读精确形态 allow/pass（固定传输）；别名/写形态/全局选项仍硬拒 (1.4334ms)
+✔ actual write_file/edit_file handlers protect .git, canonical host roots and directory-link aliases (13.4076ms)
+✔ real core handle inventory in an isolated unprotected fixture is per-session, never whole-team proof (6.7494ms)
+✖ test\门禁引擎\governance-matrix-fixed-view.test.ts (7.3506ms)
+✖ test\门禁引擎\governance-matrix-service.test.ts (7.5046ms)
+✖ test\门禁引擎\governance-matrix.test.ts (6.4043ms)
+✖ test\门禁引擎\governance-seed-public-entry.test.ts (6.5487ms)
+✖ test\门禁引擎\list-project.test.ts (6.2458ms)
+✖ test\门禁引擎\model-and-service.test.ts (6.4308ms)
+✖ test\门禁引擎\pin-acceptance.test.ts (6.1384ms)
+✖ test\门禁引擎\pin-evidence.test.ts (6.2763ms)
+✖ test\门禁引擎\readonly-git-matcher.test.ts (6.9964ms)
+✖ test\门禁引擎\resolve-write.test.ts (6.1583ms)
+✖ test\门禁引擎\role-card-sections.test.ts (6.1939ms)
+✖ test\门禁引擎\role-group-metadata.test.ts (6.1169ms)
+✖ test\门禁引擎\role-module-contract.test.ts (6.1985ms)
+✖ test\门禁引擎\shell-approval.test.ts (6.1221ms)
+✖ test\门禁引擎\shell-routine.test.ts (6.0067ms)
+✖ test\门禁引擎\shell-rules-b4-reexport.test.ts (6.0716ms)
+✖ test\门禁引擎\shell-rules-public-reexport.test.ts (6.0152ms)
+✖ test\门禁引擎\shell-write-guard-task-git-shape.test.ts (6.1456ms)
+✖ test\门禁引擎\shell-write-guard.test.ts (5.9678ms)
+✖ test\门禁引擎\stable-write-guard.test.ts (6.0663ms)
+✖ test\门禁引擎\stale-snapshot-hint.test.ts (6.1348ms)
+✖ test\门禁引擎\su-doc-surface-convention.test.ts (6.1914ms)
+✖ test\门禁引擎\su-shell-approval-convention.test.ts (6.1557ms)
+✖ test\门禁引擎\su-turn-watch-convention.test.ts (5.9749ms)
+✖ test\门禁引擎\task-git-critical-section.test.ts (6.0886ms)
+✖ test\门禁引擎\temp-staging-convention.test.ts (6.2205ms)
+✖ test\门禁引擎\versioned-doc-guard-assets.test.ts (6.0431ms)
+✖ test\门禁引擎\versioned-doc-guard.test.ts (6.0173ms)
+✖ test\门禁引擎\view-image-cards.test.ts (5.9732ms)
+ℹ tests 316
+ℹ suites 0
+ℹ pass 286
+ℹ fail 30
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 85247.5734
+
+✖ failing tests:
+
+test at test\门禁引擎\convener-workflow-write.test.ts:42:1
+✖ 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者 (0.5618ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\/workflow\.md` 由运营落盘维护/. Input:
+  
+  '# 角色：幕僚（内置角色）\n' +
+    '\n' +
+    '职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。\n' +
+    '- 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。\n' +
+    '- 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。\n' +
+    '- 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。\n' +
+    '- 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。\n' +
+    '- Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。\n' +
+    '意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。\n' +
+    '命名与来源：入口文件为 `docs/intents/<intentId>.md`；intentId 必须是 ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$ 的小写 slug；不得用 flowId 代替。 intentId 先写入产品意图文档 frontmatter，再由提案 frontmatter 原样复制；两处与意图入口文件名必须一致。\n' +
+    '模板：\n' +
+    '---\n' +
+    'intentId: <小写 slug；全文唯一；不得用 flowId 代替>\n' +
+    'flowId: <flowId>\n' +
+    'goal: <目标；单行 key: value，长文本可用 | block scalar>\n' +
+    'scope: <范围>\n' +
+    'acceptance: <验收标准>\n' +
+    'nonGoals: <非目标（可选）>\n' +
+    'constraints: <约束（可选）>\n' +
+    '---\n' +
+    '可写：`docs/intents/`（Section 1，预授权直接写）。\n' +
+    '禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/b0-baseline-c234e79/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/convener-workflow-write.test.ts:47:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '# 角色：幕僚（内置角色）\n\n职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。\n- 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。\n- 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。\n- 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。\n- 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。\n- Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。\n意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。\n命名与来源：入口文件为 `docs/intents/<intentId>.md`；intentId 必须是 ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$ 的小写 slug；不得用 flowId 代替。 intentId 先写入产品意图文档 frontmatter，再由提案 frontmatter 原样复制；两处与意图入口文件名必须一致。\n模板：\n---\nintentId: <小写 slug；全文唯一；不得用 flowId 代替>\nflowId: <flowId>\ngoal: <目标；单行 key: value，长文本可用 | block scalar>\nscope: <范围>\nacceptance: <验收标准>\nnonGoals: <非目标（可选）>\nconstraints: <约束（可选）>\n---\n可写：`docs/intents/`（Section 1，预授权直接写）。\n禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。',
+    expected: /项目工作流文件 `docs\/workflow\.md` 由运营落盘维护/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\门禁引擎\governance-matrix-fixed-view.test.ts:1:1
+✖ test\门禁引擎\governance-matrix-fixed-view.test.ts (7.3506ms)
+  'test failed'
+
+test at test\门禁引擎\governance-matrix-service.test.ts:1:1
+✖ test\门禁引擎\governance-matrix-service.test.ts (7.5046ms)
+  'test failed'
+
+test at test\门禁引擎\governance-matrix.test.ts:1:1
+✖ test\门禁引擎\governance-matrix.test.ts (6.4043ms)
+  'test failed'
+
+test at test\门禁引擎\governance-seed-public-entry.test.ts:1:1
+✖ test\门禁引擎\governance-seed-public-entry.test.ts (6.5487ms)
+  'test failed'
+
+test at test\门禁引擎\list-project.test.ts:1:1
+✖ test\门禁引擎\list-project.test.ts (6.2458ms)
+  'test failed'
+
+test at test\门禁引擎\model-and-service.test.ts:1:1
+✖ test\门禁引擎\model-and-service.test.ts (6.4308ms)
+  'test failed'
+
+test at test\门禁引擎\pin-acceptance.test.ts:1:1
+✖ test\门禁引擎\pin-acceptance.test.ts (6.1384ms)
+  'test failed'
+
+test at test\门禁引擎\pin-evidence.test.ts:1:1
+✖ test\门禁引擎\pin-evidence.test.ts (6.2763ms)
+  'test failed'
+
+test at test\门禁引擎\readonly-git-matcher.test.ts:1:1
+✖ test\门禁引擎\readonly-git-matcher.test.ts (6.9964ms)
+  'test failed'
+
+test at test\门禁引擎\resolve-write.test.ts:1:1
+✖ test\门禁引擎\resolve-write.test.ts (6.1583ms)
+  'test failed'
+
+test at test\门禁引擎\role-card-sections.test.ts:1:1
+✖ test\门禁引擎\role-card-sections.test.ts (6.1939ms)
+  'test failed'
+
+test at test\门禁引擎\role-group-metadata.test.ts:1:1
+✖ test\门禁引擎\role-group-metadata.test.ts (6.1169ms)
+  'test failed'
+
+test at test\门禁引擎\role-module-contract.test.ts:1:1
+✖ test\门禁引擎\role-module-contract.test.ts (6.1985ms)
+  'test failed'
+
+test at test\门禁引擎\shell-approval.test.ts:1:1
+✖ test\门禁引擎\shell-approval.test.ts (6.1221ms)
+  'test failed'
+
+test at test\门禁引擎\shell-routine.test.ts:1:1
+✖ test\门禁引擎\shell-routine.test.ts (6.0067ms)
+  'test failed'
+
+test at test\门禁引擎\shell-rules-b4-reexport.test.ts:1:1
+✖ test\门禁引擎\shell-rules-b4-reexport.test.ts (6.0716ms)
+  'test failed'
+
+test at test\门禁引擎\shell-rules-public-reexport.test.ts:1:1
+✖ test\门禁引擎\shell-rules-public-reexport.test.ts (6.0152ms)
+  'test failed'
+
+test at test\门禁引擎\shell-write-guard-task-git-shape.test.ts:1:1
+✖ test\门禁引擎\shell-write-guard-task-git-shape.test.ts (6.1456ms)
+  'test failed'
+
+test at test\门禁引擎\shell-write-guard.test.ts:1:1
+✖ test\门禁引擎\shell-write-guard.test.ts (5.9678ms)
+  'test failed'
+
+test at test\门禁引擎\stable-write-guard.test.ts:1:1
+✖ test\门禁引擎\stable-write-guard.test.ts (6.0663ms)
+  'test failed'
+
+test at test\门禁引擎\stale-snapshot-hint.test.ts:1:1
+✖ test\门禁引擎\stale-snapshot-hint.test.ts (6.1348ms)
+  'test failed'
+
+test at test\门禁引擎\su-doc-surface-convention.test.ts:1:1
+✖ test\门禁引擎\su-doc-surface-convention.test.ts (6.1914ms)
+  'test failed'
+
+test at test\门禁引擎\su-shell-approval-convention.test.ts:1:1
+✖ test\门禁引擎\su-shell-approval-convention.test.ts (6.1557ms)
+  'test failed'
+
+test at test\门禁引擎\su-turn-watch-convention.test.ts:1:1
+✖ test\门禁引擎\su-turn-watch-convention.test.ts (5.9749ms)
+  'test failed'
+
+test at test\门禁引擎\task-git-critical-section.test.ts:1:1
+✖ test\门禁引擎\task-git-critical-section.test.ts (6.0886ms)
+  'test failed'
+
+test at test\门禁引擎\temp-staging-convention.test.ts:1:1
+✖ test\门禁引擎\temp-staging-convention.test.ts (6.2205ms)
+  'test failed'
+
+test at test\门禁引擎\versioned-doc-guard-assets.test.ts:1:1
+✖ test\门禁引擎\versioned-doc-guard-assets.test.ts (6.0431ms)
+  'test failed'
+
+test at test\门禁引擎\versioned-doc-guard.test.ts:1:1
+✖ test\门禁引擎\versioned-doc-guard.test.ts (6.0173ms)
+  'test failed'
+
+test at test\门禁引擎\view-image-cards.test.ts:1:1
+✖ test\门禁引擎\view-image-cards.test.ts (5.9732ms)
+  'test failed'

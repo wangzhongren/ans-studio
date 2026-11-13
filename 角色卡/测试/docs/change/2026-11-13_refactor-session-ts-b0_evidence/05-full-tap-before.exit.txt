@@ -1,0 +1,5 @@
+started: 2026-11-13 11:41:03 +0800 (approx)
+last output: 2026-11-13 11:41:24 (+0800), 369 lines, 34,433 bytes
+status: 手动终止任务（约 11:46），但 runner 进程泄漏未退出（PID 1744 + 子进程 PID 17028，2026-11-13 11:55 清理时仍存活）
+挂起点: 子进程命令行 = node --test-isolation=process ... test\pi-adapter\abort.test.ts；自 11:41:22 起 >14 分钟无结束（已超过 --test-timeout=120000 多轮，属 runner/进程级挂起，非单测断言失败）
+处理: 清理泄漏进程树后，改用按 test/ 一级目录分段（14-segments-summary.txt），见记录 §5

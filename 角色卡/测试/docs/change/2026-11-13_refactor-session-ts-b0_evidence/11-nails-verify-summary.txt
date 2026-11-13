@@ -1,0 +1,15 @@
+0 0 test/桌面UI/evidence-markers.test.ts
+0 0 test/桌面UI/queue-status.test.ts
+0 0 test/桌面UI/request-status.test.ts
+0 1 test/桌面应用/hot-path.test.ts
+0 1 test/桌面应用/interface.test.ts
+1 9 test/桌面应用/directive-input.test.ts
+0 1 test/桌面应用/dispatch-fresh-enum.test.ts
+0 1 test/桌面应用/run-change-entry.test.ts
+0 0 test/测试/g1-verify/g1-copy-and-nails.test.ts
+1 1 test/测试/g4-skill-verify/h-scope-audit.test.ts
+0 1 test/测试/governance-matrix-integration.test.ts
+0 4 test/桌面应用/boundary-refresh.test.ts
+1 71 test/桌面应用/chief-workflow.test.ts
+0 5 test/桌面应用/message-queue.test.ts
+ALLDONE
