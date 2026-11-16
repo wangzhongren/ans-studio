@@ -1,0 +1,470 @@
+diff --git a/test/桌面应用/chief-workflow.test.ts b/test/桌面应用/chief-workflow.test.ts
+index ce84b2e..41ad2d8 100644
+--- a/test/桌面应用/chief-workflow.test.ts
++++ b/test/桌面应用/chief-workflow.test.ts
+@@ -1,13 +1,13 @@
+ // test/桌面应用/chief-workflow.test.ts
+ // B 批（2026-10-28）：chief 目标能力（dispatch_task/role_status/session_tail/role_activity_log）在运行时注入端生效；
+ // convener 旧能力保留、但不获得 role_activity_log；项目角色零注入（结构性 fail-closed）。
+-import test from "node:test";
++import test, { after } from "node:test";
+ import assert from "node:assert/strict";
+ import fs from "node:fs/promises";
+ import os from "node:os";
+ import path from "node:path";
+ import { createHash, randomUUID } from "node:crypto";
+-import { createServer } from "node:http";
++import { createServer as rawCreateServer, type Server } from "node:http";
+ import { acquireVersionLock } from "../../src/provider/version-change/public/version-change-store.ts";
+ import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../../src/common/shared/diagnostics.ts";
+ 
+@@ -51,6 +51,59 @@ async function rmrf(target: string): Promise<void> {
+   await fs.rm(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+ }
+ 
++// —————— B1b（2026-11-16）：夹具句柄释放兜底 ——————
++// Windows CI run 43793243595 在本文件末用例通过后静默 112 分钟（6,727,417ms，直到 job 120 分钟上限）：
++// 本文件的 HTTP 夹具 server 在每个用例 finally 的**顺序清理链**末尾才关闭；前面任一步抛错
++// （如 desktop.disposeProjectDocuments() 在 Git host coordinator 正被在途 dispatch 占用时同步抛
++// 「项目正在处理派发或权限变更…」，或某次 stop/dispose 抛出）就会跳过 server.close，监听中的
++// server 让 node --test 的文件子进程永不退出。修复口径（同 B1）：清理步骤互相隔离、server 必关、
++// 每个清理 await 有界；文件级 after() 再兜底关闭任何遗漏的夹具 server。清理失败不改变用例断言
++// 结果（只输出诊断），确保失败名与基线逐名一致；断言文本/语义未放宽。
++const fixtureServers = new Set<Server>();
++function trackedServer(server: Server): Server { fixtureServers.add(server); return server; }
++// 本文件所有夹具 server 统一经此工厂创建（调用点不变），保证文件级 after() 能兜底关闭。
++const createServer = ((handler: Parameters<typeof rawCreateServer>[0]) => trackedServer(rawCreateServer(handler))) as typeof rawCreateServer;
++async function closeServer(server: Server): Promise<void> {
++  try { server.closeAllConnections(); } catch { /* 未监听/已关闭 */ }
++  if (!server.listening) return;
++  await new Promise<void>(resolve => { try { server.close(() => resolve()); } catch { resolve(); } });
++}
++type CleanupStep = readonly [label: string, run: () => unknown];
++async function releaseAll(context: string, steps: readonly CleanupStep[]): Promise<void> {
++  const failures: string[] = [];
++  for (const [label, run] of steps) {
++    try { await run(); } catch (error) { failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`); }
++  }
++  if (failures.length > 0) console.error(`B1b cleanup retained for ${context}: ${failures.join(" | ")}`);
++}
++async function settleBounded(context: string, work: Promise<unknown>, timeoutMs: number): Promise<void> {
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  const deadline = new Promise<void>(resolve => { timer = setTimeout(() => { console.error(`B1b ${context} exceeded ${timeoutMs}ms`); resolve(); }, timeoutMs); });
++  try { await Promise.race([work, deadline]); } finally { if (timer !== undefined) clearTimeout(timer); }
++}
++async function stopManagerBounded(manager: { stop(target: null): Promise<unknown> } | undefined, context: string, timeoutMs = 15_000): Promise<void> {
++  if (!manager) return;
++  await settleBounded(`${context} manager.stop`, manager.stop(null), timeoutMs);
++}
++async function disposeDocumentsBounded(desktop: { disposeProjectDocuments(): void } | undefined, context: string): Promise<void> {
++  if (!desktop) return;
++  // 在途 dispatch 可能暂占 Git host coordinator；有界重试让清理自身完成，而不是无限持有夹具 server。
++  let lastError: unknown;
++  for (const wait of [0, 50, 200, 800]) {
++    if (wait > 0) await tick(wait);
++    try { desktop.disposeProjectDocuments(); return; } catch (error) { lastError = error; }
++  }
++  console.error(`B1b disposeProjectDocuments retained for ${context}: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
++}
++after(async () => {
++  // 兜底：任何用例 finally 未触及的夹具 server 都必须在这里关闭，否则文件子进程无法自然退出。
++  for (const server of [...fixtureServers]) await releaseAll("file-level server backstop", [["close-server", () => closeServer(server)]]);
++  fixtureServers.clear();
++  try { await disposeDiagnostics(); } catch (error) { console.error("B1b file-level disposeDiagnostics retained: " + String(error)); }
++  const remaining = process.getActiveResourcesInfo().filter(resource => ["TCPServerWrap", "TCPSocketWrap", "Timeout", "Immediate", "MessagePort"].includes(resource));
++  if (!process.env.ANS_W52_UNKNOWN_CHILD && remaining.length > 0) console.error("B1b post-suite active resources pid=" + process.pid + ": " + JSON.stringify(remaining));
++});
++
+ // Only fixtures mapped to actual unproven custom Core adapters use this process boundary.
+ // It never edits production registry facts, and a file-only exit 0 is insufficient proof.
+ async function isolateUnknownCoreCase(name: string, completedMarker: string): Promise<boolean> {
+@@ -174,8 +227,7 @@ test("能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 disp
+     assert.equal(caps.worker.terminateRoleRun, undefined);
+     assert.equal(caps.worker.redispatchTask, undefined);
+   } finally {
+-    await mgr.stop(null);
+-    await rmrf(root);
++    await releaseAll("manager fixture", [["manager.stop", () => stopManagerBounded(mgr, "manager fixture")], ["rmrf", () => rmrf(root)]]);
+   }
+ });
+ 
+@@ -215,8 +267,7 @@ test("role_activity_log 数据面：只读、脱敏、字段/坏行如实；role
+     const invalid = (await caps.chief.roleActivityLog!({ roleId: "" }))!;
+     assert.equal(invalid.ok, false);
+   } finally {
+-    await mgr.stop(null);
+-    await rmrf(root);
++    await releaseAll("manager fixture", [["manager.stop", () => stopManagerBounded(mgr, "manager fixture")], ["rmrf", () => rmrf(root)]]);
+   }
+ });
+ 
+@@ -423,13 +474,15 @@ async function realWaitingChiefLoop(dispositions: readonly ("select" | "reject"
+     return { workerResults, chiefResults, writeResults, results, actualRequests, audit, presetCalls, shown,
+       independentCalls, disposedIndependent, materialErrors, enabled: delegation.get().enabled };
+   } finally {
+-    if (timer !== undefined) clearTimeout(timer);
+-    channel.rejectAllPending("test cleanup"); directiveController.cancelAll("test cleanup"); releaseMain();
+-    await Promise.allSettled(launched);
+-    await manager.stop(null);
+-    console.log("W52 legacy custom case actual Core binding", JSON.stringify({ dispositions, missingEvidence, originRoleId, entries: inspectRuntimeCoreRegistry().entries.filter(entry => entry.projectRoot === path.resolve(root)).map(entry => ({ sessionId: entry.sessionId, roleId: entry.roleId, state: entry.state, lifecycleStatus: entry.lifecycle?.status, providerFinished: entry.lifecycle?.providerFinished, processCoverage: entry.lifecycle?.processCoverage })) }));
+-    versionStack.dispose();
+-    await rmrf(root);
++    await releaseAll("W1b shared loop", [
++      ["clear-timer", () => { if (timer !== undefined) clearTimeout(timer); }],
++      ["channel-close", () => { channel.rejectAllPending("test cleanup"); directiveController.cancelAll("test cleanup"); releaseMain(); }],
++      ["launched-settle", () => Promise.allSettled(launched)],
++      ["manager.stop", () => stopManagerBounded(manager, "W1b shared loop")],
++      ["binding-log", () => { console.log("W52 legacy custom case actual Core binding", JSON.stringify({ dispositions, missingEvidence, originRoleId, entries: inspectRuntimeCoreRegistry().entries.filter(entry => entry.projectRoot === path.resolve(root)).map(entry => ({ sessionId: entry.sessionId, roleId: entry.roleId, state: entry.state, lifecycleStatus: entry.lifecycle?.status, providerFinished: entry.lifecycle?.providerFinished, processCoverage: entry.lifecycle?.processCoverage })) })); }],
++      ["version-stack", () => versionStack.dispose()],
++      ["rmrf", () => rmrf(root)],
++    ]);
+   }
+ }
+ 
+@@ -570,8 +623,7 @@ test("B1 materials失败fail-closed：不呈现卡、declined+notPresented+真
+     assert.equal(failure.phase, "materials");
+     assert.match(String(failure.errorMessage ?? ""), /Draft request target is not bound to that run/);
+   } finally {
+-    await disposeDiagnostics();
+-    await rmrf(diagDir);
++    await releaseAll("B1 diagnostics fixture", [["disposeDiagnostics", () => disposeDiagnostics()], ["rmrf", () => rmrf(diagDir)]]);
+   }
+ });
+ 
+@@ -723,11 +775,15 @@ test("W3 默认Core→默认CodexChat本地HTTP：真实git_query与同实例sur
+       gitMetadataBefore: before, gitMetadataAfter: await metadataHashes(), live: current, disposed,
+       requestCount: bodies.length, registeredTools: bodies[0]!.tools?.map(tool => tool.function?.name), toolResponses: responses }, null, 2));
+   } finally {
+-    await desktop?.stopSession(); server.closeAllConnections();
+-    if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
+-    if (priorWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = priorWire;
+-    if (priorKey === undefined) delete process.env.ANS_W3_LOCAL_HTTP_KEY; else process.env.ANS_W3_LOCAL_HTTP_KEY = priorKey;
+-    await rmrf(root);
++    await releaseAll("W3 local HTTP", [
++      ["stopSession", () => settleBounded("W3 desktop.stopSession", desktop?.stopSession() ?? Promise.resolve(), 15_000)],
++      ["close-server", () => closeServer(server)],
++      ["restore-env", () => {
++        if (priorWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = priorWire;
++        if (priorKey === undefined) delete process.env.ANS_W3_LOCAL_HTTP_KEY; else process.env.ANS_W3_LOCAL_HTTP_KEY = priorKey;
++      }],
++      ["rmrf", () => rmrf(root)],
++    ]);
+   }
+ });
+ 
+@@ -787,7 +843,7 @@ test("W3 创建中普通库存与实际revision可见；custom工厂伪CodexChat
+     console.log("W52_W3_ACTUAL_UNKNOWN_ASSERTIONS_COMPLETED", JSON.stringify({ coreSessionId: live.coreSessionId, phase: disposed.phase, coverage: after.coverage, factoryProvenance: live.toolSurface?.factoryProvenance, nativeToolRegistry: live.toolSurface?.nativeToolRegistry }));
+     assert.equal(after.sessions.filter(session => session.phase === "open-failed").length, 1, "A rejected creation is not erased to pretend complete inventory");
+     if (process.env.ANS_W3_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W3_EVIDENCE_DIR, "custom-source-proof.json"), JSON.stringify({ creating, live, after, revisions }, null, 2));
+-  } finally { release(); unsubscribe(); await manager.stop(null); await rmrf(root); }
++  } finally { await releaseAll("W3 inventory", [["release", () => release()], ["unsubscribe", () => unsubscribe()], ["manager.stop", () => stopManagerBounded(manager, "W3 inventory")], ["rmrf", () => rmrf(root)]]); }
+ });
+ 
+ 
+@@ -1215,14 +1271,22 @@ test(target === "worker" ? "W14 convener按本次真实任务冻结；缺完整
+     if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, target === "worker" ? "w15-worker-freeze-proof.json" : target === "review" ? "w22-explicit-review-negative-proof.json" : "w23-default-review-negative-proof.json"),
+       JSON.stringify({ root, creating, trace, workerRequests, tasks: [...tasks.records.values()], inventory: desktopProjectExecutionInventory(root) }, null, 2));
+   } catch (error) { console.error("W52 original worker/review primary failure", error); throw error; } finally {
+-    unsubscribe();
+-    if (desktop) for (const session of desktopProjectExecutionInventory(root).sessions.filter(session => session.phase === "live"))
+-      await desktop.stopSession({ projectRoot: root, roleId: session.roleId, runtime: session.runtime });
+-    await desktop?.stopSession(); desktop?.disposeProjectDocuments(); server.closeAllConnections();
+-    if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
+-    if (priorWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = priorWire;
+-    if (priorKey === undefined) delete process.env.ANS_W14_LOCAL_HTTP_KEY; else process.env.ANS_W14_LOCAL_HTTP_KEY = priorKey;
+-    if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root);
++    await releaseAll(`W14/${target}`, [
++      ["unsubscribe", () => unsubscribe()],
++      ["live-sessions", async () => {
++        if (!desktop) return;
++        for (const session of desktopProjectExecutionInventory(root).sessions.filter(session => session.phase === "live"))
++          await settleBounded("W14 live session stop", desktop.stopSession({ projectRoot: root, roleId: session.roleId, runtime: session.runtime }), 15_000);
++      }],
++      ["stopSession", () => settleBounded("W14 desktop.stopSession", desktop?.stopSession() ?? Promise.resolve(), 15_000)],
++      ["disposeDocuments", () => disposeDocumentsBounded(desktop, `W14/${target}`)],
++      ["close-server", () => closeServer(server)],
++      ["restore-env", () => {
++        if (priorWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = priorWire;
++        if (priorKey === undefined) delete process.env.ANS_W14_LOCAL_HTTP_KEY; else process.env.ANS_W14_LOCAL_HTTP_KEY = priorKey;
++      }],
++      ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }],
++    ]);
+   }
+ });
+ }
+@@ -1270,7 +1334,7 @@ test("W16 打开拒绝保队列不自旋；stop后的晚到通知不重开，显
+     assert.equal(attempts, 4); assert.deepEqual(sent, ["保留first", "保留late"]);
+     if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, "w16-delivery-layer-proof.json"),
+       JSON.stringify({ root, attempts, sent, notes, inventory: manager.executionInventoryFacts(root), scope: "Actual SessionManager layer; openRoleSession failure injection is not a Git/Core admission proof; CPU attribution remains unknown" }, null, 2));
+-  } finally { await manager.stop(null); if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }
++  } finally { await releaseAll("W16 delivery layer", [["manager.stop", () => stopManagerBounded(manager, "W16 delivery layer")], ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }]]); }
+ });
+ 
+ 
+@@ -1298,7 +1362,7 @@ test("W16 在途open跨stop不安装晚到handle，真实dispose后保队列等
+     const inventory = manager.executionInventoryFacts(root);
+     assert.equal(inventory.sessions.length, 1); assert.equal(inventory.sessions[0]!.phase, "disposed");
+     assert.equal(inventory.pendingOpens.length, 0);
+-  } finally { release(); await manager.stop(null); await rmrf(root); }
++  } finally { await releaseAll("W16 in-flight open", [["release", () => release()], ["manager.stop", () => stopManagerBounded(manager, "W16 in-flight open")], ["rmrf", () => rmrf(root)]]); }
+ });
+ 
+ 
+@@ -1340,7 +1404,7 @@ test("W17 写后fallback经公开Pipeline登记实际字节；既有hook false
+         await fs.writeFile(abs, Buffer.from("changed after baseline", "utf8"));
+         assert.equal(await hook(abs), false, "Versioned body without its required version record retains registration failure semantics");
+       }
+-    } finally { await manager.stop(null); if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }
++    } finally { await releaseAll("W17 afterwrite", [["manager.stop", () => stopManagerBounded(manager, "W17 afterwrite")], ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }]]); }
+   }
+ });
+ 
+@@ -1503,11 +1567,16 @@ test("W19 实际Core回报与Git回调同assignment；报告续父/通知/新cha
+     if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w33-manual"}-w19-assignment-layer-proof.json`),
+       JSON.stringify({ root, scope: "Real Core/tools, actual draft task ledger/parent CAS/resolver; inference-only demo SDK override. Planning data fixture is not production route/worker/pin proof.", optionsByTurn, captures, state: await readTaskState(root), inventory: manager.executionInventoryFacts(root) }, null, 2));
+   } finally {
+-    continueClose(); await manager.stop(null);
+-    console.log("W52 W19 actual custom Core binding", JSON.stringify(inspectRuntimeCoreRegistry().entries.filter(entry => entry.projectRoot === path.resolve(root)).map(entry => ({ sessionId: entry.sessionId, roleId: entry.roleId, state: entry.state, lifecycleStatus: entry.lifecycle?.status, processCoverage: entry.lifecycle?.processCoverage }))));
+-    if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w33-manual"}-w19-last-layer-trace.json`),
+-      JSON.stringify({ root, restored, optionsByTurn, captures, events, state: await readTaskState(root), inventory: manager.executionInventoryFacts(root) }, null, 2));
+-    else await rmrf(root);
++    await releaseAll("W19 assignment layer", [
++      ["continue-close", () => continueClose()],
++      ["manager.stop", () => stopManagerBounded(manager, "W19 assignment layer")],
++      ["binding-log", () => { console.log("W52 W19 actual custom Core binding", JSON.stringify(inspectRuntimeCoreRegistry().entries.filter(entry => entry.projectRoot === path.resolve(root)).map(entry => ({ sessionId: entry.sessionId, roleId: entry.roleId, state: entry.state, lifecycleStatus: entry.lifecycle?.status, processCoverage: entry.lifecycle?.processCoverage })))); }],
++      ["evidence-or-rmrf", async () => {
++        if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w33-manual"}-w19-last-layer-trace.json`),
++          JSON.stringify({ root, restored, optionsByTurn, captures, events, state: await readTaskState(root), inventory: manager.executionInventoryFacts(root) }, null, 2));
++        else await rmrf(root);
++      }],
++    ]);
+   }
+ });
+ 
+@@ -1572,11 +1641,18 @@ test(`W20 默认Core/Chat产品真实报告落账并到chief ${contended ? "真
+     assert.ok(product.reports.some(report => report.summary === "W20真实产品稿已写并报告"), JSON.stringify(events.filter(event => event.event.summary.includes("登记失败"))));
+     assert.ok(trace.some(row => row.role === "chief" && row.user.startsWith("[工作结果]") && row.user.includes("W20真实产品稿已写并报告")), JSON.stringify(trace));
+   } finally {
+-    finishFinal(); await desktop?.stopSession(); desktop?.disposeProjectDocuments(); server.closeAllConnections(); if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
+-    if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
+-    if (oldKey === undefined) delete process.env.ANS_W20_LOCAL_KEY; else process.env.ANS_W20_LOCAL_KEY = oldKey;
+-    await disposeDiagnostics();
+-    if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root);
++    await releaseAll(`W20/${contended ? "contended" : "normal"}`, [
++      ["finish-gate", () => finishFinal()],
++      ["stopSession", () => settleBounded("W20 desktop.stopSession", desktop?.stopSession() ?? Promise.resolve(), 15_000)],
++      ["disposeDocuments", () => disposeDocumentsBounded(desktop, `W20/${contended ? "contended" : "normal"}`)],
++      ["close-server", () => closeServer(server)],
++      ["restore-env", () => {
++        if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
++        if (oldKey === undefined) delete process.env.ANS_W20_LOCAL_KEY; else process.env.ANS_W20_LOCAL_KEY = oldKey;
++      }],
++      ["disposeDiagnostics", () => disposeDiagnostics()],
++      ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }],
++    ]);
+   }
+ });
+ }
+@@ -1912,16 +1988,27 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3
+         JSON.stringify({ root, scenario, scope: "Real default Core/Chat current-customer document planning after an actually applied document baseline; no immutable execution pin was seeded or claimed", trace, cards, events, created, tasks: [...changed.records.values()], inventory: desktopProjectExecutionInventory(root) }, null, 2));
+     }
+   } catch (error) { console.error("W52 fixture primary failure before teardown", error); throw error; } finally {
+-    if (teamPlanning && process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w34-manual"}-before-cleanup.json`), JSON.stringify({ stage: "before fixture abort/stop", root, trace, inventory: desktopProjectExecutionInventory(root), coordinator: inspectGitHostCoordinator({ projectRoot: root }), tasks: [...(await readTaskState(root)).records.values()] }, null, 2));
+-    unsubscribeNotice();
+-    channel.rejectAllPending("W21 owned fixture cleanup");
+-    if (desktop) for (const session of desktopProjectExecutionInventory(root).sessions.filter(session => session.phase === "live"))
+-      await desktop.stopSession({ projectRoot: root, roleId: session.roleId, runtime: session.runtime });
+-    await desktop?.stopSession(); desktop?.disposeProjectDocuments(); server.closeAllConnections(); if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
+-    if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
+-    if (oldKey === undefined) delete process.env.ANS_W21_LOCAL_KEY; else process.env.ANS_W21_LOCAL_KEY = oldKey;
+-    if (intentConfirmV2 && process.env.ANS_W14_EVIDENCE_DIR) await disposeDiagnostics();
+-    if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root);
++    await releaseAll(`W21 variant ${String(scenario)}`, [
++      ["pre-cleanup-evidence", async () => {
++        if (teamPlanning && process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w34-manual"}-before-cleanup.json`), JSON.stringify({ stage: "before fixture abort/stop", root, trace, inventory: desktopProjectExecutionInventory(root), coordinator: inspectGitHostCoordinator({ projectRoot: root }), tasks: [...(await readTaskState(root)).records.values()] }, null, 2));
++      }],
++      ["unsubscribe", () => unsubscribeNotice()],
++      ["channel-close", () => channel.rejectAllPending("W21 owned fixture cleanup")],
++      ["live-sessions", async () => {
++        if (!desktop) return;
++        for (const session of desktopProjectExecutionInventory(root).sessions.filter(session => session.phase === "live"))
++          await settleBounded("W21 live session stop", desktop.stopSession({ projectRoot: root, roleId: session.roleId, runtime: session.runtime }), 15_000);
++      }],
++      ["stopSession", () => settleBounded("W21 desktop.stopSession", desktop?.stopSession() ?? Promise.resolve(), 15_000)],
++      ["disposeDocuments", () => disposeDocumentsBounded(desktop, `W21 variant ${String(scenario)}`)],
++      ["close-server", () => closeServer(server)],
++      ["restore-env", () => {
++        if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
++        if (oldKey === undefined) delete process.env.ANS_W21_LOCAL_KEY; else process.env.ANS_W21_LOCAL_KEY = oldKey;
++      }],
++      ["disposeDiagnostics", async () => { if (intentConfirmV2 && process.env.ANS_W14_EVIDENCE_DIR) await disposeDiagnostics(); }],
++      ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }],
++    ]);
+   }
+ });
+ 
+@@ -1987,8 +2074,10 @@ test(`W27 stop等待真实队列写有限barrier ${obstructed ? "实际IO失败
+       JSON.stringify({ root, storePath, before, stopped, directed, facts, file: JSON.parse(await fs.readFile(storePath, "utf8")), opens, disposed,
+         scope: "Real queue IO cutoff; known counts do not prove every old constructor/external producer stopped; no CPU attribution" }, null, 2));
+   } finally {
+-    await manager.stop(null);
+-    if (!process.env.ANS_W14_EVIDENCE_DIR) { assert.equal(path.dirname(root), path.resolve(os.tmpdir())); assert.ok(path.basename(root).startsWith("ans-w27-persist-")); await rmrf(root); }
++    await releaseAll("W27 persistence barrier", [
++      ["manager.stop", () => stopManagerBounded(manager, "W27 persistence barrier")],
++      ["verify-and-rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) { assert.equal(path.dirname(root), path.resolve(os.tmpdir())); assert.ok(path.basename(root).startsWith("ans-w27-persist-")); await rmrf(root); } }],
++    ]);
+   }
+ });
+ }
+@@ -2055,10 +2144,17 @@ test("W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+     assert.ok(events.some(row => row.roleId === "nominator" && row.event.kind === "denied" && (row.event.detail as { toolName?: string } | undefined)?.toolName === "write_file"), "The actual write action must remain denied; dispatch did not grant write authority");
+     if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w36-manual"}-hub-proof.json`), JSON.stringify({ root, trace, events, tasks: [...(await readTaskState(root)).records.values()], inventory: desktopProjectExecutionInventory(root), cards }, null, 2));
+   } finally {
+-    channel.rejectAllPending("W36 owned fixture cleanup"); await desktop?.stopSession(); desktop?.disposeProjectDocuments(); server.closeAllConnections(); if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
+-    if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
+-    if (oldKey === undefined) delete process.env.ANS_W36_LOCAL_KEY; else process.env.ANS_W36_LOCAL_KEY = oldKey;
+-    if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root);
++    await releaseAll("W36 builtin preparation", [
++      ["channel-close", () => channel.rejectAllPending("W36 owned fixture cleanup")],
++      ["stopSession", () => settleBounded("W36 desktop.stopSession", desktop?.stopSession() ?? Promise.resolve(), 15_000)],
++      ["disposeDocuments", () => disposeDocumentsBounded(desktop, "W36 builtin preparation")],
++      ["close-server", () => closeServer(server)],
++      ["restore-env", () => {
++        if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
++        if (oldKey === undefined) delete process.env.ANS_W36_LOCAL_KEY; else process.env.ANS_W36_LOCAL_KEY = oldKey;
++      }],
++      ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }],
++    ]);
+   }
+ });
+ 
+@@ -2095,7 +2191,7 @@ test("W38 恢复的未受理resume回执出队前拒绝；缺metadata不降普
+       const stored = JSON.parse(await fs.readFile(storePath, "utf8"));
+       if (!missingMetadata) assert.equal(stored.items.length, 0);
+       if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w38-manual"}-${missingMetadata ? "missing" : "unaccepted"}-receipt.json`), JSON.stringify({ root, restored, events, stopped, stored, opens }, null, 2));
+-    } finally { await manager.stop(null); if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }
++    } finally { await releaseAll("W38 restored receipt", [["manager.stop", () => stopManagerBounded(manager, "W38 restored receipt")], ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }]]); }
+   }
+ });
+ 
+@@ -2125,8 +2221,11 @@ test("W42 同步入队发布完整persistence事实后释放自己的dispatch le
+     const admission = beginGitHostAction({ projectRoot: root, kind: "session-open" }); assert.ok(admission.ok, "The released dispatch must not block the next real admission lease");
+     assert.ok(endGitHostAction({ projectRoot: root, leaseId: admission.leaseId, inventory: desktopProjectExecutionInventory(root) }).ok);
+   } finally {
+-    if (leaseId) endGitHostAction({ projectRoot: root, leaseId });
+-    await manager.stop(null); if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root);
++    await releaseAll("W42 enqueue lease", [
++      ["end-lease", () => { if (leaseId) endGitHostAction({ projectRoot: root, leaseId }); }],
++      ["manager.stop", () => stopManagerBounded(manager, "W42 enqueue lease")],
++      ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }],
++    ]);
+   }
+ });
+ 
+@@ -2167,7 +2266,12 @@ for (const mode of ["affected", "same-root-other", "unknown", "cancel"] as const
+       if (mode === "cancel") assert.equal(actual.status === "blocked" ? actual.code : undefined, "run-stop-claim-wait-cancelled");
+       await tick(0); assert.equal(sends, 0); assert.equal(disposed, 1);
+       if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w45-manual"}-${mode}-proof.json`), JSON.stringify({ root, transportTaskId, result: actual, sends, disposed, inventory: desktopProjectExecutionInventory(root) }, null, 2));
+-    } finally { const stopped = manager.stop(null); release(); await stopped; if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }
++    } finally {
++      await releaseAll(`W45 claim barrier ${mode}`, [
++        ["manager.stop", async () => { const stopped = manager.stop(null); release(); await settleBounded("W45 manager.stop", stopped, 15_000); }],
++        ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }],
++      ]);
++    }
+   });
+ }
+ 
+@@ -2251,11 +2355,18 @@ for (const disposition of ["select", "revise"] as const) {
+       assert.equal(resolved[0]!.choice, disposition === "select" ? "alternate" : "declined");
+       if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w47-manual"}-${disposition}-proof.json`), JSON.stringify({ root, trace, contexts, inventories, audit, workerResult, serverErrors }, null, 2));
+     } finally {
+-      channel.rejectAllPending("W47 owned cleanup"); release(); await Promise.allSettled(launched); await manager?.stop(null); stack?.dispose();
+-      server.closeAllConnections(); if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
+-      if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
+-      if (oldKey === undefined) delete process.env.ANS_W47_LOCAL_KEY; else process.env.ANS_W47_LOCAL_KEY = oldKey;
+-      if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root);
++      await releaseAll(`W47 ${disposition}`, [
++        ["channel-close", () => { channel.rejectAllPending("W47 owned cleanup"); release(); }],
++        ["launched-settle", () => Promise.allSettled(launched)],
++        ["manager.stop", () => stopManagerBounded(manager, `W47 ${disposition}`)],
++        ["stack-dispose", () => stack?.dispose()],
++        ["close-server", () => closeServer(server)],
++        ["restore-env", () => {
++          if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
++          if (oldKey === undefined) delete process.env.ANS_W47_LOCAL_KEY; else process.env.ANS_W47_LOCAL_KEY = oldKey;
++        }],
++        ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }],
++      ]);
+     }
+   });
+ }
+@@ -2374,13 +2485,22 @@ test(`W48 默认Core精确controller停止：缺/错task零停止，当前任务
+     }
+     assert.equal(errors.length, 0, errors.join("\n"));
+   } finally {
+-    unsubscribe?.(); await injected;
+-    if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w48-manual"}-${stopMode}-finally-proof.json`), JSON.stringify({ root, stopMode, taskIds, trace, errors, injectionFacts, inventory: desktopProjectExecutionInventory(root), after: await readTaskState(root) }, null, 2));
+-    if (foreignLeaseId) assert.ok(endGitHostAction({ projectRoot: root, leaseId: foreignLeaseId }).ok);
+-    await desktop?.stopSession(); desktop?.disposeProjectDocuments(); server.closeAllConnections(); if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
+-    if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
+-    if (oldKey === undefined) delete process.env.ANS_W48_LOCAL_KEY; else process.env.ANS_W48_LOCAL_KEY = oldKey;
+-    if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root);
++    await releaseAll(`W48 ${stopMode}`, [
++      ["unsubscribe", () => unsubscribe?.()],
++      ["injected-settle", () => injected],
++      ["finally-evidence", async () => {
++        if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w48-manual"}-${stopMode}-finally-proof.json`), JSON.stringify({ root, stopMode, taskIds, trace, errors, injectionFacts, inventory: desktopProjectExecutionInventory(root), after: await readTaskState(root) }, null, 2));
++      }],
++      ["end-foreign-lease", () => { if (foreignLeaseId) assert.ok(endGitHostAction({ projectRoot: root, leaseId: foreignLeaseId }).ok); }],
++      ["stopSession", () => settleBounded("W48 desktop.stopSession", desktop?.stopSession() ?? Promise.resolve(), 15_000)],
++      ["disposeDocuments", () => disposeDocumentsBounded(desktop, `W48 ${stopMode}`)],
++      ["close-server", () => closeServer(server)],
++      ["restore-env", () => {
++        if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
++        if (oldKey === undefined) delete process.env.ANS_W48_LOCAL_KEY; else process.env.ANS_W48_LOCAL_KEY = oldKey;
++      }],
++      ["rmrf", async () => { if (!process.env.ANS_W14_EVIDENCE_DIR) await rmrf(root); }],
++    ]);
+   }
+ });
+ }
+@@ -2532,8 +2652,7 @@ test("W4 桌面run-stop：Claude/Pi drain 可推进；native absent 允许、pre
+     assert.ok(owned.includes("!manager.deliveryStoreArmed || manager.openChains.size"), "队列持久化/宿主就绪检查保留");
+     assert.ok(execute.includes("run-stop-host-fence-unproven") && execute.includes("run-stop-persistence-unproven"), "宿主 fence/持久化检查保留");
+   } finally {
+-    await manager.stop(null);
+-    await rmrf(root);
++    await releaseAll("W4 run-stop boundary", [["manager.stop", () => stopManagerBounded(manager, "W4 run-stop boundary")], ["rmrf", () => rmrf(root)]]);
+   }
+ });
+ 
+@@ -2612,8 +2731,7 @@ test("W6/T5 团队计划宿主绑定：省略 runId 注入受派任务 run；自
+     assert.equal(asserted.ok, true, JSON.stringify(asserted)); assert.equal(asserted.status, "no-op");
+     assert.ok(asserted.source?.kind === "role-direct"); assert.equal(asserted.source.runId, f.runId);
+   } finally {
+-    await manager.stop(null);
+-    await rmrf(f.root);
++    await releaseAll("W6/T5 team plan host", [["manager.stop", () => stopManagerBounded(manager, "W6/T5 team plan host")], ["rmrf", () => rmrf(f.root)]]);
+   }
+ });
+ 
+@@ -2651,8 +2769,7 @@ test("W6/T5 团队计划宿主绑定拒绝分层：plan-task-unavailable/plan-ta
+     assert.equal(invalid.ok, false); assert.equal(invalid.status, "blocked");
+     if (invalid.ok === false) assert.equal(invalid.errorCode, "trunk-item-invalid");
+   } finally {
+-    await manager.stop(null);
+-    await rmrf(f.root);
++    await releaseAll("W6/T5 team plan host", [["manager.stop", () => stopManagerBounded(manager, "W6/T5 team plan host")], ["rmrf", () => rmrf(f.root)]]);
+   }
+ });
+ 
+@@ -2675,7 +2792,6 @@ test("W6/T5 团队计划宿主绑定：普通消息回合无受派任务 ⇒ hos
+     assert.equal(receipt.ok, false); assert.equal(receipt.status, "blocked");
+     if (receipt.ok === false) assert.equal(receipt.errorCode, "plan-task-unavailable");
+   } finally {
+-    await manager.stop(null);
+-    await rmrf(root);
++    await releaseAll("W6/T5 ordinary message", [["manager.stop", () => stopManagerBounded(manager, "W6/T5 ordinary message")], ["rmrf", () => rmrf(root)]]);
+   }
+ });
