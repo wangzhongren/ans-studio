@@ -1,0 +1,96 @@
+diff --git a/test/runtime-core/file-write-safety.test.ts b/test/runtime-core/file-write-safety.test.ts
+index 0aed068..b857058 100644
+--- a/test/runtime-core/file-write-safety.test.ts
++++ b/test/runtime-core/file-write-safety.test.ts
+@@ -122,7 +122,9 @@ test("D3 lstat ENOTDIR is a status error, never a new-file fallback", async () =
+       // 若 Node/Windows 以后改报 ENOTDIR，则回到守卫拒绝的同一文案，故两个形态都接受。
+       assert.match(result.message, /无法读取目标状态.*ENOTDIR|写入失败（建目录）：file\.txt\/child\.txt.*EEXIST.*file\.txt/);
+     } else {
+-      assert.match(result.message, /无法读取目标状态.*ENOTDIR/);
++      // B6a（2026-11-16）：现行守卫在 canonical-distinct 预检（finalFileProtection）即拒绝，
++      // 早于 fs-write 的「无法读取目标状态」层；ENOTDIR 仍是状态错误、绝不回退为新建文件。
++      assert.match(result.message, /canonical identity unavailable; no write \(ENOTDIR/);
+     }
+     assert.deepEqual(await readdir(root), ["file.txt"]);
+     assert.equal(await readFile(path.join(root, "file.txt"), "utf8"), "original");
+diff --git a/test/编排/git-command.test.ts b/test/编排/git-command.test.ts
+index 3561ef7..104a651 100644
+--- a/test/编排/git-command.test.ts
++++ b/test/编排/git-command.test.ts
+@@ -38,7 +38,9 @@ test("Git protection freshness: only the issued observation survives unchanged c
+   assert.equal(checkGitProtectionFactsCurrent(unknown), false);
+ });
+ const raw = promisify(execFile);
+-async function fixture() { const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-git-command-")); await initializeGitRepository(root); return root; }
++// B6a（2026-11-16）：产品按**真实根**返回保护事实/执行固定传输；CI 的 os.tmpdir() 可能是非规范拼写
++//（macOS `/var` → `/private/var`、Windows 8.3 短名 `RUNNER~1`）。夹具统一持有规范根，断言与产品同口径。
++async function fixture() { const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "ans-git-command-"))); await initializeGitRepository(root); return root; }
+ 
+ test("Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry", async () => {
+   const root = await fixture(), objects = createGitCandidateStore(root), dir = path.join(root, ".git/ans/processes"); await fs.mkdir(dir, { recursive: true });
+@@ -78,7 +80,7 @@ test("Git final spawn fence: real pending-record interruption records no launch
+ });
+ test("Git init Provider: final real root/file hashes fence initialization and persist original operation process identity", async () => {
+   const base = process.platform === "win32" && process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Temp") : "/tmp";
+-  const root = await fs.mkdtemp(path.join(base, "ans-init-fence-")); await fs.mkdir(path.join(root, ".ans"));
++  const root = await fs.realpath(await fs.mkdtemp(path.join(base, "ans-init-fence-"))); await fs.mkdir(path.join(root, ".ans"));
+   const relative = ".ans/actual-source.json", bytes = "actual binding bytes", sha256 = createHash("sha256").update(bytes).digest("hex");
+   await fs.writeFile(path.join(root, relative), bytes);
+   const initial = await readGitInitializationFacts(root), fence = { operationId: "actual-fenced-init", qualificationDigest: initial.qualificationDigest, expectedFiles: [{ path: relative, sha256 }] };
+@@ -93,7 +95,7 @@ test("Git init Provider: final real root/file hashes fence initialization and pe
+   assert.equal(observedProcess.operationId, fence.operationId); assert.equal(observedProcess.termination, "exited"); assert.equal(observedProcess.exitCode, 0);
+ });
+ test("Git init journal: restart discovery binds the original operation and excludes FS/ref media", async () => {
+-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-init-journal-")); await fs.mkdir(path.join(root, ".ans"));
++  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "ans-init-journal-"))); await fs.mkdir(path.join(root, ".ans"));
+   const record = { media: "git-initialization/v1" as const, operationId: "unique-init-op", requestDigest: "a".repeat(64), projectRoot: root,
+     taskId: "actual-task", runId: "actual-run", flowId: "demo", sourceId: "init-source-" + "b".repeat(64), sourceSha256: "c".repeat(64),
+     qualificationDigest: "d".repeat(64), expectedFiles: [], stage: "prepared" as const };
+diff --git a/test/编排/git-operation-sidecar-tolerance.test.ts b/test/编排/git-operation-sidecar-tolerance.test.ts
+index c5c3484..939b31d 100644
+--- a/test/编排/git-operation-sidecar-tolerance.test.ts
++++ b/test/编排/git-operation-sidecar-tolerance.test.ts
+@@ -27,7 +27,11 @@ const sidecarPath = (root: string, operationId: string) => path.join(operationsD
+ 
+ /** 真实 Git-backed trunk（无会话）：bootstrap manifest v1 + 迁移记录（唯一既有 journal）。 */
+ async function gitTrunkRoot() {
+-  const project = await createTrunkProject({ withRun: false }), root = project.root, documents = project.snapshot().documents;
++  const project = await createTrunkProject({ withRun: false });
++  // B6a（2026-11-16）：journal/sidecar 扫描要求操作目录满足 `realpath(dir) === dir`
++  //（git-command.ts listGitOperationJournals），而 CI 的 os.tmpdir() 可能是非规范拼写
++  //（macOS `/var` → `/private/var` 符号链接、Windows 8.3 短名）。夹具持有规范根，测试真实临时根与产品口径一致。
++  const root = await fs.realpath(project.root), documents = project.snapshot().documents;
+   const fsStore = createFsTrunkStore(root);
+   const snapshot = await fsStore.captureSnapshot!({ snapshotId: "tol-basis", createdAt: at, files: Object.values(documents) });
+   if (!snapshot.ok) throw new Error(`fixture snapshot: ${snapshot.reason}`);
+diff --git a/test/编排/git-trunk-store.test.ts b/test/编排/git-trunk-store.test.ts
+index 7972196..730ba14 100644
+--- a/test/编排/git-trunk-store.test.ts
++++ b/test/编排/git-trunk-store.test.ts
+@@ -14,7 +14,9 @@ import { completeSnapshotDigest } from "../../src/provider/version-change/public
+ import { TRUNK_APPLY_JOURNAL_SCHEMA, TRUNK_MANIFEST_SCHEMA, type TrunkApplyJournal, type TrunkManifest, type CompleteSnapshot } from "../../src/model/trunk.ts";
+ const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+ const b64 = (value: string | Buffer) => Buffer.from(value).toString("base64");
+-async function fixture(format: "sha1" | "sha256" = "sha1") { const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-git-store-")); const identity = await initializeGitRepository(root, format); return { root, identity, candidates: createGitCandidateStore(root), refs: createGitRefStore(root) }; }
++// B6a（2026-11-16）：操作媒体枚举/迁移拒绝非规范根（`realpath(dir) === dir`）；CI 的 os.tmpdir()
++// 可能是 macOS `/var` 符号链接或 Windows 8.3 短名（`RUNNER~1`），夹具统一持有规范根。
++async function fixture(format: "sha1" | "sha256" = "sha1") { const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "ans-git-store-"))); const identity = await initializeGitRepository(root, format); return { root, identity, candidates: createGitCandidateStore(root), refs: createGitRefStore(root) }; }
+ 
+ test("Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time", async () => {
+   // Ordinary stored source DTOs exercise storage identity/ancestry only. No accepted task or business pin is fabricated here.
+diff --git a/test/编排/run-role-submit-capabilities.test.ts b/test/编排/run-role-submit-capabilities.test.ts
+index 42a0974..f7a4db9 100644
+--- a/test/编排/run-role-submit-capabilities.test.ts
++++ b/test/编排/run-role-submit-capabilities.test.ts
+@@ -438,7 +438,10 @@ test("Pipeline handback turn intent: real task identity survives optional info r
+ 
+ 
+ test("Pipeline initial workflow source: actual approved Core request binds task before the real guarded write", async () => {
+-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-o10-workflow-source-")), at = new Date().toISOString(), storage = createFsTrunkStore(root), flowId = "workflow-source-fixture";
++  // B6a（2026-11-16）：产品按真实根安装/读取 initial workflow source（git-trunk-store.ts 的
++  // `realpath(dir) === dir` 与读路径 realpath）；CI 的 os.tmpdir() 可能是 macOS `/var` 符号链接或
++  // Windows 8.3 短名。夹具持有规范根，稳定源写入与读取落在同一真实根。
++  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ans-o10-workflow-source-"))), at = new Date().toISOString(), storage = createFsTrunkStore(root), flowId = "workflow-source-fixture";
+   writeFile(root, "docs/actual.txt", "Actual allocated planning fixture");
+   const sha = (text: string) => createHash("sha256").update(text).digest("hex"), snap = await storage.captureSnapshot!({ snapshotId: "o10-source-basis", createdAt: at, files: [{ path: "docs/actual.txt", sha256: sha("Actual allocated planning fixture") }] });
+   assert.ok(snap.ok); if (!snap.ok) return;

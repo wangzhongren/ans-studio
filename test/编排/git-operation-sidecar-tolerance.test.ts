@@ -27,7 +27,11 @@ const sidecarPath = (root: string, operationId: string) => path.join(operationsD
 
 /** 真实 Git-backed trunk（无会话）：bootstrap manifest v1 + 迁移记录（唯一既有 journal）。 */
 async function gitTrunkRoot() {
-  const project = await createTrunkProject({ withRun: false }), root = project.root, documents = project.snapshot().documents;
+  const project = await createTrunkProject({ withRun: false });
+  // B6a（2026-11-16）：journal/sidecar 扫描要求操作目录满足 `realpath(dir) === dir`
+  //（git-command.ts listGitOperationJournals），而 CI 的 os.tmpdir() 可能是非规范拼写
+  //（macOS `/var` → `/private/var` 符号链接、Windows 8.3 短名）。夹具持有规范根，测试真实临时根与产品口径一致。
+  const root = await fs.realpath(project.root), documents = project.snapshot().documents;
   const fsStore = createFsTrunkStore(root);
   const snapshot = await fsStore.captureSnapshot!({ snapshotId: "tol-basis", createdAt: at, files: Object.values(documents) });
   if (!snapshot.ok) throw new Error(`fixture snapshot: ${snapshot.reason}`);
