@@ -17,6 +17,8 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
 import { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
+import { createFsTrunkStore } from "../../src/provider/trunk/public/trunk-store.ts";
+import { prepareParentTaskRef } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -99,8 +101,8 @@ function listingWithSuAndA(): ProjectListing {
   };
 }
 
-/** 2026-10-24 治理协调：trio 内置五角色 + 项目角色 A（主入口=幕僚/chief）。 */
-function trioHandbackListing(): ProjectListing {
+/** 2026-10-24 治理协调：trio 内置五角色 + 项目角色 A（主入口=幕僚/chief）。root 可注入（三源门夹具用独立根）。 */
+function trioHandbackListing(root: string = PROJECT_ROOT): ProjectListing {
   const builtIn = (roleId: string, governanceFunction: NonNullable<ProjectListing["roles"][number]["governanceFunction"]>): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: "",
@@ -111,7 +113,7 @@ function trioHandbackListing(): ProjectListing {
     governanceFunction,
   });
   return {
-    projectRoot: PROJECT_ROOT,
+    projectRoot: root,
     roles: [
       builtIn("chief", "chief"),
       builtIn("rapporteur", "proposal"),
@@ -657,14 +659,39 @@ test("F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产�
 });
 
 test("2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发", async () => {
-  const h = makeHarness({ customListing: trioHandbackListing() });
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-handback-trio-"));
+  const h = makeHarness({ customListing: trioHandbackListing(root) });
   try {
-    await h.openOk({ projectRoot: PROJECT_ROOT, roleId: "chief", runtime: "demo" });
+    await h.openOk({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
-    await h.openOk({ projectRoot: PROJECT_ROOT, roleId: "convener", runtime: "demo" });
+    await h.openOk({ projectRoot: root, roleId: "convener", runtime: "demo" });
     await tick(30);
-    await h.openOk({ projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
+    await h.openOk({ projectRoot: root, roleId: "A", runtime: "demo" });
     await tick(30);
+
+    // 2026-11-16（B4，e71501c 起当前语义）：trio 项目回交投递 Steward 前有**任务来源门**
+    // （delivery `resolveDeliveryAssignment` child-report：task.created + parentTaskRef + 报告 + 同 run）。
+    // 裸回交（无账本任务）会如实 blocked 保留、不投递。按当前语义补真实 legacy 子任务装配；
+    // 「项目 worker→Steward、内置来源→Lead、同轮 settle 不双发」断言保持不放宽。
+    const flowId = "trio-handback-flow", runId = "run-trio-handback";
+    const runStore = createFsTrunkStore(root);
+    assert.ok((await runStore.compareAndSwapRunRecord!(runId, null, {
+      schema: "ans-run/v1", runId, flowId, state: "draft", documents: {},
+      execution: { teamPlan: null, flow: null }, createdAt: new Date().toISOString(),
+    })).ok);
+    await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "T-parent", from: "chief", to: "convener", flowId, runId, runState: "draft",
+      text: "trio 回交父任务", sideEffect: "read-only", idempotencyKey: "trio-parent",
+    }));
+    const parent = await prepareParentTaskRef({ projectRoot: root, actorRoleId: "convener", taskId: "T-parent", flowId, runId });
+    assert.ok(parent.ok, JSON.stringify(parent));
+    await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "T1", from: "convener", to: "A", flowId, runId, runState: "draft",
+      text: "trio 回交子任务", sideEffect: "code", idempotencyKey: "trio-child", parentTaskRef: parent.parentTaskRef,
+    }));
+    await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "T1", from: "A", status: "done", summary: HANDBACK_A1.summary, evidence: HANDBACK_A1.evidence,
+    }));
 
     // ① 项目 worker 回交 → Steward（Convener）；Lead 不接收项目回交。
     h.streams.A.push({ kind: "handback", summary: "A 完成", handback: HANDBACK_A1 } as OrchestrationEvent);
@@ -693,6 +720,7 @@ test("2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来�
     assert.ok(!h.sent.chief.some((text) => text.startsWith("[系统·治理反馈] 来自 convener")), "不重复投递内置反馈");
   } finally {
     await h.close();
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -735,13 +763,17 @@ test("B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结�
       turnId: "turn-star",
     };
     h.streams.A.push({ kind: "handback", summary: "星形回交", handback } as OrchestrationEvent);
-    await waitUntil(() => h.sent.chief.includes(renderWorkReportPrompt(handback)));
+    // 2026-11-16（B4，e71501c 起当前语义）：星形工作结果投给幕僚时会在固定字段后追加应用绑定的
+    // [收口依据] 后缀（basis 可用 ⇒ 应用绑定的原创建者收口依据；不可用 ⇒ 收口依据尚不可用）。
+    // `renderWorkReportPrompt` 仍是固定字段的唯一来源，按前缀+后缀单独断言（不弱化字段检查）。
+    await waitUntil(() => h.sent.chief.some((entry) => entry.startsWith(renderWorkReportPrompt(handback))));
     assert.equal(h.sent.convener.some((text) => text.includes("实现完成")), false, "旧 Steward 不再接收星形工作结果");
-    const text = h.sent.chief.find((entry) => entry.includes("实现完成"))!;
+    const text = h.sent.chief.find((entry) => entry.startsWith(renderWorkReportPrompt(handback)))!;
     assert.match(text, /^\[工作结果\]/);
     assert.match(text, /任务：#t-star/);
     assert.match(text, /状态：done/);
     assert.match(text, /证据：/);
+    assert.match(text, /\n\n\[(?:应用绑定的原创建者收口依据|收口依据尚不可用)\]/, "固定字段后缀：应用绑定收口依据或如实不可用");
     const state = await readTaskState(root);
     assert.equal(state.records.get("t-star")?.reports[0]?.status, "done");
     assert.equal(state.records.get("t-star")?.reports[0]?.turnId, "turn-star");

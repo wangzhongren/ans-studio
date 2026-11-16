@@ -1,0 +1,18 @@
+✔ 星形派发（2026-10-29 v4.1，M8）：chief → 项目 worker 被拒，拒绝发生在 task.created 之前（不写任务行） (59.3994ms)
+✔ 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝 (49.8117ms)
+✔ convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务 (44.3171ms)
+✔ BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递） (54.4558ms)
+✔ BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队 (40.7005ms)
+✔ BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断） (255.1481ms)
+✔ BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递） (319.6033ms)
+✔ R1/P1-R-05：convener→chief 归矩阵；convener→不存在 worker 硬拒；硬拒无任务/会话/run (54.1573ms)
+✔ AC-1.2：wrong-source 桌面证据——非 chief/convener 直接调用 routeDispatch 被拒 (1.9974ms)
+✔ AC-4.3：洁净派发无 advisory、无诊断噪声 (51.8951ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2794.8013

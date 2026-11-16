@@ -1,0 +1,24 @@
+✔ safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递 (291.5522ms)
+✔ unsafe：external 副作用 0 次自动重派；原任务保持未收口并如实给原因 (146.5252ms)
+✔ needs-review：部分写入 ⇒ 不自动重派；终止未确认 ⇒ unsafe (71.4621ms)
+✔ 重派上限：同链已 2 次仍卡死 ⇒ 第 3 次不自动重派（升级） (22.5179ms)
+✔ B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务 (261.2411ms)
+✔ B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐） (106.5537ms)
+✔ C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，客户选 continue ⇒ 任务保持未收口并留人工处置 (133.2107ms)
+✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (10019.2513ms)
+✔ C-04 升级卡 redispatch/replace：不自动执行危险动作，写人工处置系统行且任务保持未收口 (188.269ms)
+✔ B-08 终止证据：role.terminated 记录 exit/signal；temp/<role>/ 部分产物物理隔离到 staging (53.1517ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 9
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16731.3416
+
+✖ failing tests:
+
+test at test\桌面应用\stuck-redispatch.test.ts:371:1
+✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (10019.2513ms)
+  [Error: ENOTEMPTY: directory not empty, rmdir 'C:\Users\51054\AppData\Local\Temp\ans-escalation-switch-on-mlUtWy\.ans\state'] { errno: -4051, code: 'ENOTEMPTY', syscall: 'rmdir', path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-escalation-switch-on-mlUtWy\\.ans\\state' }

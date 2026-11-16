@@ -858,6 +858,11 @@ test("W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦
       const root = await fs.mkdtemp(path.join(os.tmpdir(), `ans-w4-${mode}-`));
       let primaryFailure: unknown;
       assert.deepEqual(await fs.readdir(root), [], "Actual empty start; no fixture init/docs/approval/pin");
+      // 2026-11-16（B4，e71501c 起当前语义）：空 trio 项目聊天自 B6.1 起默认为 fixed，而本用例验证的是
+      // legacy 仓库初始化/来源链（git_candidate init + 星形派发）。按 B7.1 既有模式显式写明「旧项目」
+      // （只写工作流模式标记，不预置文档/审批/pin——上方空目录断言先执行、继续有效）。
+      await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+      await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
       const trace: Array<{ role: string; step: number; tools: string[]; toolResponses: string[] }> = [];
       const counts = new Map<string, number>(); let picks = 0;
       const positive = mode === "selected" || mode === "commit-race";
@@ -1052,6 +1057,11 @@ test("W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私�
     const address = server.address(); assert.ok(address && typeof address !== "string");
     if (mode === "required") {
       assert.deepEqual(await fs.readdir(root), [], "Real managed work-source begins from an actual empty fixture root");
+      // 2026-11-16（B4，e71501c 起当前语义）：本分段验证的是 legacy 初始化来源链（workSourceRef）；
+      // 空 trio 聊天自 B6.1 起默认 fixed ⇒ 按 B7.1 既有模式显式写明「旧项目」（只写模式标记，
+      // 不预置文档/审批/pin——空目录断言先执行、继续有效）。
+      await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+      await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
       preparationDesktop = createDesktopInterface({ pickDirectory: async () => root, emitEvent() {},
         runtimeOptions: { baseUrl: `http://127.0.0.1:${address.port}/v1`, apiKeyEnvVar: "ANS_W9_LOCAL_HTTP_KEY", modelId: "w10-source-local",
           requestAttemptMax: 1, requestFirstByteTimeoutMs: 2000, turnLastResortMs: 5000 }, envFilePath: path.join(root, ".env"), piConfigEnv: {} });
@@ -1869,11 +1879,14 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3�
       await waitFor(() => trace.some(row => row.role === "convener" && row.user.includes("W34 actual formal team planning")), "Actual published material creator handback must route a genuine team planning task");
       const state = await readTaskState(root), plan = [...state.records.values()].find(row => row.created?.idempotencyKey === "w34-team-planning"), publication = [...state.records.values()].find(row => row.created?.idempotencyKey === "w21-publish");
       assert.ok(plan?.created && publication?.closed); assert.equal(publication.closed.outcome, "accepted");
-      assert.equal(plan.created.flowId, "w21-flow"); assert.equal(plan.created.runState, "draft"); assert.match(plan.created.runId ?? "", /^run-plan-/);
+      assert.equal(plan.created.flowId, "w21-flow"); assert.equal(plan.created.runState, "draft"); assert.match(plan.created.runId ?? "", /^run-hub-/);
       assert.notEqual(plan.created.runId, publication.created?.runId); assert.equal(plan.created.workSourceRef?.kind, "chief-creator-report");
       assert.equal(plan.created.moduleId, undefined); assert.equal(plan.created.reviewBasisRef, undefined); assert.ok(plan.created.workSourceRef);
       const source = JSON.parse(await fs.readFile(path.join(root, plan.created.workSourceRef.path), "utf8"));
-      assert.equal(source.purpose, "team-planning"); assert.equal(source.parent.kind, "handback"); assert.equal(source.creatorReports[0]?.taskId, publication.taskId);
+      // e71501c 起 chief→convener 团队规划走 hub 准备来源（run-hub / purpose=builtin-preparation），
+      // 不再是 legacy team-planning/run-plan 命名；独立 scope（不同 run、creator 报告绑定）断言保持。
+      assert.equal(source.purpose, "builtin-preparation"); assert.equal(source.hubRouting, "chief-hub-v1");
+      assert.equal(source.parent.kind, "handback"); assert.equal(source.creatorReports[0]?.taskId, publication.taskId);
       assert.equal(cards.length, 1, "Future D3 has not been fabricated to prepare a team plan");
       if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w34-manual"}-team-planning.json`), JSON.stringify({ root, plan, publication, source, trace, events, cards }, null, 2));
       return;

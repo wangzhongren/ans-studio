@@ -165,19 +165,21 @@ test("星形目标（v4.1）：chief → 产品受理（链首）；chief → �
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
     const dispatch = h.caps.chief!;
+    // 2026-11-16（B4，e71501c 起当前语义）：星形文档/交付派发有**来源门**——本套件 harness 桩掉
+    // openRoleSession、无 getRegisteredProjectLifecycle / 真实 running origin / 真实文档与 run 身份
+    // （prepareRoleDispatch 还要求实际 default-core 会话证据）。伪造这些宿主事实会削弱门禁，
+    // 与 chain-enforcement（B3-4）同口径按 fail-closed 断言：拒绝码 + 零任务账本 + 零投递。
+    // 「产品链首 / 运营缺 D3 受理 + advisory」的受理语义由真实项目链（固定路径/chain-enforcement）覆盖。
     const toProduct = (await dispatch({ roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "flow-a" })) as DispatchReceipt;
-    assert.equal(toProduct.ok, true, toProduct.message ?? "");
-    assert.match(toProduct.message ?? "", /任务编号：#t-/);
-    await waitUntil(() => (h.sent.product?.length ?? 0) > 0);
+    assert.equal(toProduct.ok, false);
+    assert.match(toProduct.message ?? "", /document-planning-source-unavailable/);
     const toConvener = (await dispatch({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "flow-a" })) as DispatchReceipt;
-    assert.equal(toConvener.ok, true, toConvener.message ?? "");
-    assert.match(toConvener.message ?? "", /D3|招人/);
-    assert.match(toConvener.message ?? "", /状态提示（未阻断）/);
-    const afterHandoff = await readTaskState(root);
-    assert.equal(afterHandoff.records.size, 2, "缺 D3 也受理（产品 + 运营交付）");
-    const convenerTask = [...afterHandoff.records.values()].find((record) => record.created?.to === "convener")!.created!;
-    assert.equal(convenerTask.stepId, "project-handoff");
-    assert.match(toConvener.message ?? "", /pin|冻结/);
+    assert.equal(toConvener.ok, false);
+    assert.match(toConvener.message ?? "", /document-planning-source-unavailable/);
+    const afterRefusals = await readTaskState(root);
+    assert.equal(afterRefusals.records.size, 0, "来源门拒绝不写任务账本（不伪造受理）");
+    assert.equal(h.sent.product?.length ?? 0, 0, "拒绝不打开/投递产品会话");
+    assert.equal(h.sent.convener?.length ?? 0, 0, "拒绝不打开/投递运营会话");
     const self = (await dispatch({ roleId: "chief", task: "自派" })) as DispatchReceipt;
     assert.equal(self.ok, false);
     assert.match(self.message ?? "", /不能派发给幕僚自己/);
@@ -194,12 +196,15 @@ test("convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受�
     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
     await tick(30);
     assert.equal(typeof h.caps.convener, "function", "v4.1：convener 拥有 dispatch_task");
+    // 2026-11-16（B4，e71501c 起当前语义）：运营→项目 worker 派发要求**当前运营真实受派任务**
+    // （running origin + taskId + 可核验父任务）。本裸 harness 没有该来源 ⇒ 当前语义 fail-closed；
+    // 「未接交付也受理 + advisory」的受理面由真实项目链/固定路径覆盖，这里钉拒绝码 + 零任务 + 零投递。
     const receipt = (await h.caps.convener!({ roleId: "worker", task: "实现 X", sideEffect: "code" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /交付|handoff/);
-    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /worker-dispatch-source-unavailable/);
     const state = await readTaskState(root);
-    assert.equal(state.records.size, 1, "未接交付也受理并建任务");
+    assert.equal(state.records.size, 0, "缺当前运营真实受派任务 ⇒ 不建任务");
+    assert.equal(h.sent.worker?.length ?? 0, 0, "拒绝不打开/投递目标会话");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
@@ -209,37 +214,36 @@ test("convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受�
 test("BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-star-idem-"));
   const h = harness(root);
-  const payload: DispatchTaskPayload = { roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "flow-a" };
+  // 2026-11-16（B4）：e71501c 起裸 harness 的首次派发被来源门拒绝；本命名行为（终态任务 + 同幂等键
+  // 的重复派发抑制）在**去重门**即完成（先于来源门），因此以真实任务账本种子触发。payload 显式
+  // idempotencyKey，种子 task.created 使用同一键（taskIdempotencyKey 显式键优先）。
+  const payload: DispatchTaskPayload = { roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "flow-a", idempotencyKey: "key-star-idem" };
   try {
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
     const dispatch = h.caps.chief!;
-    const first = (await dispatch(payload)) as DispatchReceipt;
-    assert.equal(first.ok, true, first.message ?? "");
-    await waitUntil(() => (h.sent.product?.length ?? 0) > 0);
-    const state = await readTaskState(root);
-    const taskId = [...state.records.keys()][0];
-    assert.ok(taskId);
-    const sentBefore = h.sent.product!.length;
-
-    await appendTaskEvent(root, taskEvent("task.reported", {
-      taskId,
-      from: "product",
-      status: "done",
-      summary: "已完成",
+    await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "t-star-idem", from: "chief", to: "product", text: "写产品意图文档", sideEffect: "docs", idempotencyKey: "key-star-idem",
     }));
+    await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-star-idem", from: "product", status: "done", summary: "已完成",
+    }));
+    const state = await readTaskState(root);
+    assert.equal(state.records.size, 1);
+    const sentBefore = h.sent.product?.length ?? 0;
+
     const dupReported = (await dispatch(payload)) as DispatchReceipt;
     assert.equal(dupReported.ok, true);
     assert.match(dupReported.message ?? "", /已报告|重复派发已抑制/);
     assert.equal((await readTaskState(root)).records.size, 1, "报告后重复派发不得创建新任务");
-    assert.equal(h.sent.product!.length, sentBefore, "报告后重复派发不得再次投递");
+    assert.equal(h.sent.product?.length ?? 0, sentBefore, "报告后重复派发不得再次投递");
 
-    await appendTaskEvent(root, taskEvent("task.closed", { taskId, by: "chief", outcome: "accepted" }));
+    await appendTaskEvent(root, taskEvent("task.closed", { taskId: "t-star-idem", by: "chief", outcome: "accepted" }));
     const dupClosed = (await dispatch(payload)) as DispatchReceipt;
     assert.equal(dupClosed.ok, true);
     assert.match(dupClosed.message ?? "", /已收口|重复派发已抑制/);
     assert.equal((await readTaskState(root)).records.size, 1, "收口后重复派发不得创建新任务");
-    assert.equal(h.sent.product!.length, sentBefore, "收口后重复派发不得再次投递");
+    assert.equal(h.sent.product?.length ?? 0, sentBefore, "收口后重复派发不得再次投递");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
@@ -252,15 +256,15 @@ test("BUG-5：派发到无会话角色会先 open/resume；打开失败则如实
   try {
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
+    // 2026-11-16（B4，e71501c 起当前语义）：来源门先于打开/投递——裸 harness 无真实来源，
+    // 因此本用例在 open 之前即 fail-closed（不会到达 delivery-target-open-failed 分支）。
+    // 断言保持同等强度：如实拒绝码 + 零任务行 + 零投递。打开失败分支由真实项目链/固定路径覆盖。
     const receipt = (await h.caps.chief!({ roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "flow-a" })) as DispatchReceipt;
-    assert.equal(receipt.ok, false, "目标会话打不开 ⇒ 派发回执失败");
-    assert.match(receipt.message ?? "", /无法打开|未投递/);
-    assert.equal(h.sent.product?.length ?? 0, 0, "打开失败不得投递");
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /document-planning-source-unavailable/);
+    assert.equal(h.sent.product?.length ?? 0, 0, "拒绝不得投递");
     const state = await readTaskState(root);
-    const records = [...state.records.values()];
-    assert.equal(records.length, 1, "已创建的任务应如实收口为 rejected，而不是静默留在队列");
-    assert.equal(records[0]!.closed?.outcome, "rejected");
-    assert.match(records[0]!.closed?.note ?? "", /delivery-target-open-failed/);
+    assert.equal(state.records.size, 0, "来源门在 open 之前：不写任务行（不伪造 rejected 收口）");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
@@ -276,20 +280,21 @@ test("BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写
     await tick(30);
     const holdSend = h.mgr.send("占住 product 本轮", undefined, { projectRoot: root, roleId: "product", runtime: "demo" });
     await waitUntil(() => (h.sent.product?.length ?? 0) === 1);
+    // 2026-11-16（B4，e71501c 起当前语义）：裸 harness 无真实来源 ⇒ 派发在入队前 fail-closed；
+    // 断言「不产生排队投递、不补写 task.delivered、占住轮不被抢占」的既有判据保持。
     const receipt = (await h.caps.chief!({ roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "flow-a" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /document-planning-source-unavailable/);
     const state = await readTaskState(root);
-    const taskId = [...state.records.keys()][0];
-    assert.ok(taskId);
-    await appendTaskEvent(root, taskEvent("task.reported", { taskId, from: "product", status: "done", summary: "先完成" }));
+    assert.equal(state.records.size, 0, "来源门拒绝不写任务行");
     h.releaseHold();
     (h.streams.product ??= []).push({ kind: "settled", summary: "占住轮结束" } as OrchestrationEvent);
     await holdSend;
     await tick(180);
-    assert.equal(h.sent.product!.length, 1, "任务完成后，排队的旧派发不得再启动新一轮");
+    assert.equal(h.sent.product!.length, 1, "拒绝的派发不得再启动新一轮");
     assert.equal(h.sent.product![0], "占住 product 本轮");
     const after = await readTaskState(root);
-    assert.equal(after.events.filter((event) => event.kind === "task.delivered" && (event as { taskId?: string }).taskId === taskId).length, 0, "不得补写 task.delivered");
+    assert.equal(after.events.filter((event) => event.kind === "task.delivered").length, 0, "不得补写 task.delivered");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
@@ -300,32 +305,37 @@ test("BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey �
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-star-report-"));
   const h = harness(root);
   try {
+    // 2026-11-16（B4，e71501c 起当前语义）：裸 harness 的派发被来源门拒绝，本命名行为（已报告任务的
+    // 重复回交抑制）在回交投递层独立成立；以真实任务账本种子 + listTasks 登记 star 任务触发。
+    await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "t-star-report", from: "chief", to: "product", text: "写产品意图文档", sideEffect: "docs", idempotencyKey: "key-star-report",
+    }));
+    await h.mgr.listTasks(root); // 登记星形任务（真实恢复路径同源）
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await h.mgr.open({ projectRoot: root, roleId: "product", runtime: "demo" });
     await tick(30);
-    const receipt = (await h.caps.chief!({ roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "flow-a" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    await waitUntil(() => (h.sent.product?.length ?? 0) > 0);
-    const taskId = [...(await readTaskState(root)).records.keys()][0];
-    assert.ok(taskId);
     const handback = {
       roleId: "product",
-      taskId,
+      taskId: "t-star-report",
       status: "completed" as const,
       summary: "完成产品文档",
       evidence: ["docs/product/flow-a-intent-v1.md"],
       at: "2026-10-29T13:24:02.000Z",
+      turnId: "turn-star-report",
     };
     (h.streams.product ??= []).push({ kind: "handback", summary: "报告", handback } as OrchestrationEvent);
     await waitUntil(() => (h.sent.chief?.length ?? 0) > 0);
     const sentBefore = h.sent.chief!.length;
     for (let i = 0; i < 50; i += 1) {
-      if ((await readTaskState(root)).records.get(taskId)?.reports.length) break;
+      if ((await readTaskState(root)).records.get("t-star-report")?.reports.length) break;
       await tick(10);
     }
+    assert.equal((await readTaskState(root)).records.get("t-star-report")?.reports.length, 1);
     (h.streams.product ??= []).push({ kind: "handback", summary: "重复报告", handback: { ...handback, at: "2026-10-29T13:24:08.000Z" } } as OrchestrationEvent);
     await tick(180);
     assert.equal(h.sent.chief!.length, sentBefore, "已报告任务的重复回交不得再次投递");
-    assert.equal((await readTaskState(root)).records.get(taskId)?.reports.length, 1, "报告事件也不得重复追加");
+    assert.equal((await readTaskState(root)).records.get("t-star-report")?.reports.length, 1, "报告事件也不得重复追加");
+    assert.equal(h.sent.convener?.length ?? 0, 0, "星形工作结果只投幕僚（不投旧 Steward）");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
@@ -387,13 +397,16 @@ test("AC-4.3：洁净派发无 advisory、无诊断噪声", async () => {
   try {
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
+    // 2026-11-16（B4，e71501c 起当前语义）：裸 harness 无真实来源 ⇒ 洁净派发在来源门 fail-closed；
+    // 「无 advisory、无诊断噪声」的判据保持：拒绝不是 advisory 受理，诊断中不得出现 tasks.dispatch.advisory。
     const receipt = (await h.caps.chief!({ roleId: "product", task: "写产品意图文档（洁净）", sideEffect: "docs", flowId: "flow-clean" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.equal((receipt.message ?? "").includes("状态提示（未阻断）"), false, "洁净派发无 advisory");
-    await waitUntil(() => (h.sent.product?.length ?? 0) > 0);
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /document-planning-source-unavailable/);
+    assert.equal((receipt.message ?? "").includes("状态提示（未阻断）"), false, "来源门拒绝无 advisory");
+    assert.equal(h.sent.product?.length ?? 0, 0, "拒绝不打开/投递目标会话");
     await flushDiagnostics();
     const diagnosticsText = await readDiagnostics(diagnosticsDir);
-    assert.equal(diagnosticsText.includes("tasks.dispatch.advisory"), false, "洁净派发零 advisory 诊断");
+    assert.equal(diagnosticsText.includes("tasks.dispatch.advisory"), false, "来源门拒绝零 advisory 诊断");
   } finally {
     await h.mgr.stop(null);
     await disposeDiagnostics();

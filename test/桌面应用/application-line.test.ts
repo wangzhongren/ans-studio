@@ -100,7 +100,10 @@ test("申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源
     assert.equal(resolved.by, "customer");
     assert.equal(resolved.choice, "accept");
     const notified = events.filter((event) => event.kind === "request.notified" && event.requestId === created.requestId);
-    assert.deepEqual(notified.map((event) => event.kind === "request.notified" ? event.event : ""), ["created", "presented", "resolved"]);
+    // 2026-11-16（B4）：`request.notified` 的 created/presented 两条分别挂在 createdWrite 的后续链上，
+    // 落盘先后由异步 append 调度决定（本机 3× 复跑 1 次 created→presented、2 次 presented→created），
+    // 顺序不是产品契约；按 requestId+event 去重、每条一次且都通知幕僚才是契约。改为集合断言。
+    assert.deepEqual(notified.map((event) => event.kind === "request.notified" ? event.event : "").sort(), ["created", "presented", "resolved"]);
     assert.ok(notified.every((event) => event.kind === "request.notified" && event.to === "chief"));
     assert.ok(envelopes.some((envelope) => envelope.roleId === "chief" && envelope.event.kind === "message" && (envelope.event.detail as { source?: string } | undefined)?.source === "request-notified"), "幕僚收到系统通知（不是可作答卡）");
   } finally {

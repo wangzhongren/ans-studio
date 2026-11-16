@@ -1,0 +1,26 @@
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (209.2606ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (194.7176ms)
+✔ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (509.6144ms)
+✔ P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投 (452.6626ms)
+✔ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (79.0677ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (124.3405ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (4.4142ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (361.9885ms)
+✔ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (298.7312ms)
+✔ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (360.6906ms)
+✔ C Window merges source saved-before-business and retry Promise/change orders into one enqueue (70.228ms)
+✔ C frozen batch retries keep members and delivery ID while later reports stay separate (149.4152ms)
+✔ C possible provider start and unknown failure do not automatically prompt again (208.0732ms)
+✔ C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire (36.3947ms)
+✔ C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs (72.7523ms)
+✔ F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次 (438.9157ms)
+✔ 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发 (793.5145ms)
+✔ B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported (96.0071ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4909.1256

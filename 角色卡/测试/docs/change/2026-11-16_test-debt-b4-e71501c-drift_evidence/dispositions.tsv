@@ -1,0 +1,34 @@
+family	file	name	disposition	basis
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝	fixture-updated (green)	e71501c/B6.1：空 trio 聊天默认 fixed，本链是 legacy 仓库初始化（git_candidate init）；按 B7.1 既有模式在空目录断言后显式写 legacy/v1 标记；断言不变
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind	fixture-updated (green)	required 来源阶段同 W5：legacy 初始化 workSourceRef 链需要显式 legacy/v1（B6.1 默认 fixed）；断言不变
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界	PRODUCT-CANDIDATE (red, unchanged)	closeCreatedTask 不调用 notifyDirect（trunk-runtime.ts:831-836）；消费侧 classifyClosedTaskNotice 已支持 close 通知；见 w19-w33-close-notify-investigation.txt
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin	no-change (green local 3/3)	本机 Windows x64 3/3 绿（verify-chief-workflow-run1..3）；R3 CI macOS 红不可复现 ⇒ 平台/环境候选
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin	no-change (green local 3/3)	同上
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin	no-change (green local 3/3)	同上
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin	no-change (green local 3/3; R3 out-of-family variant)	任务指定先 3× 定性；本机 3× 定向复跑全绿；R3 仅 Windows inline（无错误体）不可复现 ⇒ 平台/环境候选（w36-w29-missing-3x.txt）。R3 归因把它落在未归类而非本族 32 名内，故本 TSV 多出此一行。
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后	no-change (green local 3/3)	本机 3/3 绿；R3 macOS 红不可复现 ⇒ 平台/环境候选
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后	no-change (green local 3/3)	同上
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续	PRODUCT-CANDIDATE (red, unchanged)	与 W19 同根因（close 通知生产侧缺失）；另含 run-docs→run-hub 命名漂移，待 close 修复后一并更新（不改）
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W34 真实首文档发布与原创建者关闭后派团队规划保独立scope	expectation-updated (green)	当前 hub 准备分支：run-hub-<hash>（apply-journal.ts:3841）、purpose=builtin-preparation、hubRouting=chief-hub-v1；独立 run/creatorReports 断言保持
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝	no-change (green local 3/3)	本机 3/3 绿；R3 macOS 红不可复现 ⇒ 平台/环境候选
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒	no-change (green local 3/3)	本机 3× 定向复跑全绿；R3 仅 macOS x64 红 ⇒ 平台/环境候选（w36-w29-missing-3x.txt）
+e71501c-drift	test/桌面应用/chief-workflow.test.ts	commit-race	expectation-updated via W5 fixture (green)	W5 子测试；fixed 默认导致 stage-request-required，legacy/v1 夹具后按原断言通过
+e71501c-drift	test/桌面应用/star-routing.test.ts	星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝	source-gate-updated (green)	裸 harness 无真实注册/客户轮次/default-core 证据，伪造会削弱门禁；按 chain-enforcement B3-4 同口径钉 document-planning-source-unavailable + 零任务 + 零投递；self 拒绝保留
+e71501c-drift	test/桌面应用/star-routing.test.ts	convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务	source-gate-updated (green)	当前语义要求当前运营真实受派任务；裸 harness ⇒ worker-dispatch-source-unavailable + 零任务 + 零投递；能力在场断言保留
+e71501c-drift	test/桌面应用/star-routing.test.ts	BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）	behavior-preserved via ledger seed (green)	去重门先于来源门；以真实任务账本种子（显式 idempotencyKey + reported/closed）触发原命名行为
+e71501c-drift	test/桌面应用/star-routing.test.ts	BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队	source-gate-updated (green)	当前语义来源门先于 open；拒绝码 document-planning-source-unavailable + 零任务 + 零投递（不伪造 rejected 收口）
+e71501c-drift	test/桌面应用/star-routing.test.ts	BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）	source-gate-updated (green)	派发在入队前 fail-closed；保留「不产生排队投递、不补写 task.delivered、占住轮不被抢占」判据
+e71501c-drift	test/桌面应用/star-routing.test.ts	BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）	behavior-preserved via ledger seed (green)	以真实 task.created + listTasks 登记触发回交层去重；只投幕僚、报告恰一次断言保留
+e71501c-drift	test/桌面应用/star-routing.test.ts	AC-4.3：洁净派发无 advisory、无诊断噪声	source-gate-updated (green)	拒绝不是 advisory 受理；断言无「状态提示（未阻断）」、无 tasks.dispatch.advisory、零投递
+e71501c-drift	test/桌面应用/directive-input.test.ts	sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道	fixture-updated (green)	e71501c 起 Interface.sendSession 客户入口仅接受 chief（customerEntryChiefOnly）；目标/句柄改 chief，未开会话用 chief/claude 目标；指令行为断言不变
+e71501c-drift	test/桌面应用/directive-input.test.ts	sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）	fixture-updated (green)	同上：target chief；图片拒绝与普通聊天断言不变
+e71501c-drift	test/桌面应用/directive-input.test.ts	sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）	fixture-updated (green)	同上：target chief；能力不可用 + 零 send 断言不变
+e71501c-drift	test/桌面应用/directive-input.test.ts	sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账	fixture-updated (green)	同上：target chief/claude；解释器构造/落账断言不变
+e71501c-drift	test/桌面应用/directive-input.test.ts	sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂	fixture-updated (green)	同上：target chief/demo；确认禁用/解释器零构造断言不变
+e71501c-drift	test/桌面应用/stuck-redispatch.test.ts	safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递	expectation-updated (green)	当前 recordTaskFailure 写 task.reported(failed, stuck-terminated:redispatch)，不写 task.closed/rework；新任务账本断言保留；裸 legacy 无 pinned run ⇒ 投递来源门 fail-closed（断言不伪造送达）
+e71501c-drift	test/桌面应用/stuck-redispatch.test.ts	B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务	expectation-updated (green)	替代角色选择/任务缩窄断言保留；当前无 pinned run ⇒ 交付来源门 fail-closed（不投递、不自动打开）
+e71501c-drift	test/桌面应用/stuck-redispatch.test.ts	B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）	expectation-updated (green)	terminate 处置 = recordTaskFailure(stuck-escalation:terminate)（failed 报告），不再 task.closed/rejected；发卡/推荐/去重断言保留
+e71501c-drift	test/桌面应用/handback-delivery.test.ts	2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发	fixture-updated (green)	e71501c 起 trio 回交投递 Steward 前有来源门（resolveDeliveryAssignment child-report）；补真实 legacy 父/子任务 + draft run + 子报告；路由/去重断言不变
+e71501c-drift	test/桌面应用/handback-delivery.test.ts	B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported	expectation-updated (green)	星形回交正文追加应用绑定 [收口依据] 后缀（或如实不可用）；renderWorkReportPrompt 仍是固定字段唯一来源，wait 改为前缀 + 后缀断言；日志/报告断言保留
+e71501c-drift	test/桌面应用/application-line.test.ts	申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl	flake-hardened (green)	request.notified created/presented 落盘顺序依赖异步 append（3×：1 次 old order、2 次 presented-first）；改为按 requestId+event 的去重集合断言（每条一次 + 都通知 chief）
+e71501c-drift	test/桌面应用/decision-service.test.ts	业务卡的旧@决策预设不能形成第三个自动执行者	expectation-updated (green)	B3-1 起 @决策 消费者先于幕僚分支，业务 decision 卡（非客户主权排除集）会先尝试指令；无匹配时回落原卡。断言改为「指令被尝试但不结算、客户本人裁决、无 judge」

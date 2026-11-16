@@ -277,12 +277,21 @@ test("业务卡的旧@决策预设不能形成第三个自动执行者", async (
   const pushed: OperatorRequestPayload[] = [];
   const mode = createDecisionDelegationSwitch(false);
   const channel = createCustomerInputChannel({ operatorId: "customer", presenter: payload => pushed.push(payload), delegation: mode,
-    directive: { decisionFacts: () => { directiveCalls++; throw new Error("must not enter"); },
+    directive: { decisionFacts: () => { directiveCalls++; throw new Error("no decision facts"); },
       applyDecisionDirective: async () => { directiveCalls++; return undefined; }, emitResult() {}, emitNotice() {} } });
   const pending = channel.customerInput(appDecisionRequest(), ctx);
-  assert.equal(directiveCalls, 0); assert.equal(pushed.length, 1);
+  // 2026-11-16（B4，e71501c 起当前语义；2026-11-12 B3-1 顺序修复后 @决策消费者先于幕僚分支）：
+  // 业务 decision 卡不在客户主权排除集（run-change/版本/VCA/升级/修正案）内 ⇒ 指令消费者会先被尝试；
+  // 无匹配指令时回落原卡呈现。判据是「不形成第三个自动执行者」：指令未结算、judge 未介入、卡仍由客户裁决。
+  for (let i = 0; i < 100 && pushed.length === 0; i += 1) await tick();
+  assert.ok(directiveCalls >= 1, "当前语义会先尝试 @决策 消费者（不再要求应用业务卡零调用）");
+  assert.equal(pushed.length, 1, "无匹配指令 ⇒ 仍呈现原卡，不产生指令代选");
+  assert.equal(channel.pendingCount(), 1);
   channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["replace"] } });
-  assert.equal((await pending)?.outcome, "answered");
+  const out = await pending;
+  assert.equal(out?.outcome, "answered");
+  assert.equal(out?.outcome === "answered" ? out.operatorId : "", "customer", "客户本人裁决（不是 directive/judge 第三个执行者）");
+  assert.equal(out?.outcome === "answered" ? out.judge : undefined, undefined);
 });
 
 // ———————————————— 2026-11-04 客户直修：应用自有 decision 卡不被「替我决策」代选 ————————————————

@@ -1,0 +1,27 @@
+✔ 指令提交：确认面板字段（原文/动作/范围/期限/confirmable/开关快照）；确认后 durable 落账 + 回执 + 双视图 (42.466ms)
+✔ 指令取消：不落账、无回执、directiveCancelled；未知 id 为 expired；关窗 cancelAll (46.5827ms)
+✔ 输入式撤销：@审批 撤销 #id 经确认后调 runtime.revoke；同 target/active；回执与列表刷新；跨 target/终态直接回错 (116.2139ms)
+✔ 高危复核：approval 宽命令/forever 未勾选拒绝且面板保持；勾选后落账 (37.2727ms)
+✔ AC-13 2×2：decision 项目级 select-recommended 仅在「开关关闭」时高危；flow 范围无该高危 (127.4779ms)
+✔ 幂等与重推：同 clientMessageId 同文只开一张面板、返回同一 id；replayPending 复用同一 requestId (35.3445ms)
+✔ 项目切换：未决面板取消、不销毁旧运行时；切回后同一运行内 session 指令仍 active (56.9753ms)
+✔ sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道 (73.9126ms)
+✔ sendSession target fail-closed：缺失/非法/跨项目/角色不在清单/无效引擎均不落账、不投递、不回退 (5.4051ms)
+✔ sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变） (8.1593ms)
+✔ sendSession：未命中标记时普通消息行为逐字不变（含图片校验路径仍在） (4.5509ms)
+✔ sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席） (4.8671ms)
+✔ 控制器：自然语言解释成功 ⇒ 面板预填 AI 解释；解释器收到 target/正文/原文/项目/角色/引擎；确认后落账 (20.1143ms)
+✔ 控制器：解释失败 ⇒ 回退现有面板（confirmable=false、未识别片段）；伪造确认也不落账 (14.6605ms)
+✔ 控制器：撤销快路径不调用解释器；确认后 durable revoked (23.9527ms)
+✔ sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账 (33.5863ms)
+✔ sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂 (27.9129ms)
+✔ preload：directive:state 注册即同步回放缓存；订阅后续推送；取消订阅保留顶层缓存监听 (1.3072ms)
+✔ 冻结形状：五个 IPC/preload 名、directivesEnabled 握手、应用运行级 sessionId、Q9 旧读者三值 (5.3073ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1132.1288

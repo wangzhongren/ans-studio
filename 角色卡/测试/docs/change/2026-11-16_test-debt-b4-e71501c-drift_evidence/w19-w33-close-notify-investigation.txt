@@ -1,0 +1,72 @@
+# W19/W33 close 通知语义调查（B4，产品候选——未改产品、未改断言）
+
+## 结论（一句话）
+`closeCreatedTask`（legacy 直能力）**从不调用** `notifyDirect`；`notifyDirect` 生产者只挂在
+`activateRoleDocuments` / `completeTeamPlan` / `selectRunChange` 上。消费侧（队列 + trunk 分类）
+完整实现了 close 通知的 information-only 退化，但**生产侧缺失**。W19/W33 因此 3/3 稳定红。
+→ 判定为**产品缺口/回归候选**（不是测试期望过时）。按协调者裁定：停手、不改产品、
+不改 W19 相关断言，先报告。
+
+## 证据 1：当前产品代码（e71501c 起）
+文件：src/pipeline/orchestration/trunk-runtime.ts（createDirectRoleRuntime，:783-876）
+- :783  `createDirectRoleRuntime(input: { …, notifyDirect?: DirectNotificationSink })`
+- :785-804 `notify(receipt)`：对 `role-direct` 成功回执，向 chief/convener/actor 逐收件人
+  幂等投递（`directDeliveryRecorded` → `notifyDirect` → `recordDirectDelivery`）。
+- :805-830 `activateRoleDocuments` → 末尾 `const pending = await notify(receipt); …`
+- :837-857 `completeTeamPlan` → 末尾同样 `notify(receipt)`
+- :858-876 `selectRunChange` → 末尾同样 `notify(receipt)`
+- :831-836 `closeCreatedTask`：
+  ```
+  }, closeCreatedTask: async (request, signal) => {
+    if (signal?.aborted) return { ok:false, ... };
+    // A task lifecycle receipt belongs to its actual creator/caller and persisted UI task state.
+    // It is not a document/permission effect and must not start unrelated model turns.
+    return service.closeCreatedTask(request, input.actorRoleId);
+  },
+  ```
+  **无 notify 调用**（`git log -S "must not start unrelated model turns"` 唯一命中 e71501c）。
+
+## 证据 2：close 回执本身具备 notify 所需字段
+src/service/trunk/impl/apply-journal.ts closeCreatedTask（~:3182-3250）成功回执含
+`status`, `operationId`, `applicationId`, `journalId`, `targetDigest`, `source:{kind:"role-direct",
+action:"close-created-task", …}`——与 notify() 的守卫/键构造完全匹配。
+
+## 证据 3：消费侧（队列/账本）已为 close 通知实现 information-only 退役
+- app/desktop/session/delivery/queue.ts:742-745：system 条目带 notificationSource 时调用
+  `classifyClosedTaskNotice({boundTaskId, operationId, source})`。
+- src/service/trunk/impl/apply-journal.ts:2304-2359：`classifyClosedTaskNotice` 明确支持
+  `source.action === "close-created-task"`，校验关闭操作与收件人旧任务后返回
+  `{kind:"information-only", …}`（不重开、不伪造完成、不产生模型轮次）。
+- test/编排/direct-role-capabilities.test.ts:1480-1542 已用真实 close 回执 source 验证该分类。
+
+## 证据 4：测试期望与历史
+- test/桌面应用/chief-workflow.test.ts:1495-1502（W19）：以真实 `createDirectRoleRuntime(...,
+  notifyDirect)` 关闭父任务，期望 `actualCloseNotice` 由 close 回执填充，再入队并断言
+  旧控制器 notice 被退役、不产生模型提示。
+- 同文件 :1830-1844（W33）：期望真实 `ans_close_created_task` 的 close 通知出现在 convener
+  队列（operationId `w33-close-product-draft`）并以 information-only 退役旧 InitRun 绑定。
+- `git log --oneline -S "The actual creator receipt must supply notification source"` 唯一命中
+  e71501c（W19 断言与产品同批引入）；e71501c^ 树中 `git grep closeCreatedTask/notifyDirect`
+  **均无**（两者都是该 checkpoint 新引入）。即：测试与产品同批提交，但生产侧漏接了 close 通知。
+- 本地 3/3：W19 失败于 :1502「The actual creator receipt must supply notification source」；
+  W33 失败于 :1832「The exact cross-run host close notice must retire rather than block the queue」。
+
+## 最小恢复建议（供协调者/owner 裁决，未实施）
+在 `createDirectRoleRuntime.closeCreatedTask` 成功返回后复用同一 `notify(receipt)`：
+```ts
+}, closeCreatedTask: async (request, signal) => {
+  if (signal?.aborted) return { … };
+  const receipt = await service.closeCreatedTask(request, input.actorRoleId);
+  const pending = await notify(receipt);
+  return pending ? { ...receipt, ...pending } : receipt;
+},
+```
+- notify() 已含幂等键（operationId+targetDigest+action+recipient）与 pending-recovery 语义；
+- 队列的 `classifyClosedTaskNotice` 会把精确 close 事实退化为 information-only，不启动模型轮次
+  （与注释「must not start unrelated model turns」不冲突；W19 :1505/:1533 即断言无新模型提示）；
+- 需同批复跑 W19 + W33；W33 另有 /^run-docs-/ → /^run-hub-/ 的命名漂移（当前产品 hub 分支
+  在 src/service/trunk/impl/apply-journal.ts:3841 生成 `run-hub-<hash>`），待 close 通知修复后
+  可一并更新。
+
+## 边界
+本调查**未修改产品代码**、**未修改 W19/W33 断言**；仅记录证据与最小恢复建议。

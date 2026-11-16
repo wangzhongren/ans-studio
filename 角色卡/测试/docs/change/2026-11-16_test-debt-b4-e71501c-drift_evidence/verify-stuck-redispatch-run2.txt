@@ -1,0 +1,27 @@
+✔ safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递 (253.1488ms)
+✔ unsafe：external 副作用 0 次自动重派；原任务保持未收口并如实给原因 (137.3571ms)
+✔ needs-review：部分写入 ⇒ 不自动重派；终止未确认 ⇒ unsafe (72.7625ms)
+✔ 重派上限：同链已 2 次仍卡死 ⇒ 第 3 次不自动重派（升级） (19.6815ms)
+✔ B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务 (243.6799ms)
+✔ B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐） (111.1469ms)
+✔ C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，客户选 continue ⇒ 任务保持未收口并留人工处置 (135.3886ms)
+✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (10014.6024ms)
+✔ C-04 升级卡 redispatch/replace：不自动执行危险动作，写人工处置系统行且任务保持未收口 (131.2271ms)
+✔ B-08 终止证据：role.terminated 记录 exit/signal；temp/<role>/ 部分产物物理隔离到 staging (47.4434ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 9
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16596.3783
+
+✖ failing tests:
+
+test at test\桌面应用\stuck-redispatch.test.ts:371:1
+✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (10014.6024ms)
+  Error: C-04 decision 开关开启：judge 代选未在有界窗口内结算（无客户裁决事件）：10000ms 内未结算 {"pushed":1,"rows":0}
+      at Timeout.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b4/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:38:39)
+      at listOnTimeout (node:internal/timers:685:17)
+      at process.processTimers (node:internal/timers:618:7)
