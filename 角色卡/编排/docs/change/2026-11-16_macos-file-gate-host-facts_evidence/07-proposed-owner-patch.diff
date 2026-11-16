@@ -1,0 +1,26 @@
+# 07 — 建议的最小产品补丁（未应用；属主 = 运行时核心）
+#
+# 文件：src/provider/trunk/impl/git-command.ts
+# 位置：protectionTopology() 内的 describe()（当前 :598-603）
+# 方案：目录 nlink 不进入 protection topology digest；普通文件 nlink 原样保留。
+# 原因：POSIX 目录 nlink = 2 + 直接子目录数，普通 mkdir 就会改变；它不是保护身份事实。
+#       .git/config 的 nlink===1 安全校验（:605）与 host-facts 目标文件 nlink 防护均不变。
+#
+# 建议同批新增回归钉（runtime-core 测试；随修复一起提交，不要在修复前单独提交为红）：
+#   有 .git 的根：readGitProtectionFacts（coverage complete）→ 在根下 mkdir 一级目录
+#   → checkGitProtectionFactsCurrent 必须仍为 true（Windows 恒真；macOS/POSIX 修复前为 false）。
+#   无 .git 的根：同一动作必须仍为 true（absentProtectionTopology 本就不含 nlink）。
+#
+--- a/src/provider/trunk/impl/git-command.ts
++++ b/src/provider/trunk/impl/git-command.ts
+@@ -598,7 +598,10 @@ function protectionTopology(root: string): string {
+   const describe = (file: string) => {
+     try {
+       const info = lstatSync(file);
+-      return [realpathSync.native(file), info.dev, info.ino, info.birthtimeMs, info.isDirectory(), info.isSymbolicLink(), info.nlink];
++      // POSIX directory nlink = 2 + direct subdirectory count: ordinary mkdir under the root changes it.
++      // Directory identity is dev/ino/birthtime + realpath; keep nlink only for regular files
++      // (.git/config hardlink guard at :605 is separate and unchanged).
++      return [realpathSync.native(file), info.dev, info.ino, info.birthtimeMs, info.isDirectory(), info.isSymbolicLink(), info.isDirectory() ? 0 : info.nlink];
+     } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+   };

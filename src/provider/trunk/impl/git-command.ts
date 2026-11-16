@@ -598,7 +598,11 @@ function protectionTopology(root: string): string {
   const describe = (file: string) => {
     try {
       const info = lstatSync(file);
-      return [realpathSync.native(file), info.dev, info.ino, info.birthtimeMs, info.isDirectory(), info.isSymbolicLink(), info.nlink];
+      // 2026-11-16（macOS file-gate W29/W30）：POSIX 目录 nlink = 2 + 直接子目录数，普通 mkdir
+      // （如首个 docs/）就会改变它，但目录 nlink 不是保护身份事实（目录不可硬链接；链接替换由
+      // isSymbolicLink/realpath 覆盖）。仅普通文件保留 nlink；`.git/config` 的 nlink===1 校验
+      // （下方）与 host-facts 目标文件 nlink 防护均不变。
+      return [realpathSync.native(file), info.dev, info.ino, info.birthtimeMs, info.isDirectory(), info.isSymbolicLink(), info.isDirectory() ? 0 : info.nlink];
     } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
   };
   const gitDir = path.join(root, ".git"), config = path.join(gitDir, "config"), info = lstatSync(config);

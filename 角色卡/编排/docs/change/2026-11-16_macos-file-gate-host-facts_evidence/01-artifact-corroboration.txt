@@ -1,0 +1,123 @@
+# 01 — CI 工件佐证（macOS file-gate host-facts）
+# 工件（原始只读，不入库）：
+#  - R6 run 43848313583: /tmp/r9-art/test-logs-mac-x64/test-ci-output.log（本轮无 arm64）
+#  - R5 run 43829367008: /tmp/r8-art/test-logs-mac-arm64|mac-x64|win-x64/test-ci-output.log
+
+## A. 错误码出现形态与阶段分布（精确串计数）
+R9 mac-x64: {"fileGate":55,"postMkdirRecheck":55,"otherGateStage":0}
+R8 mac-arm64: {"fileGate":55,"postMkdirRecheck":55,"otherGateStage":0}
+R8 mac-x64: {"fileGate":55,"postMkdirRecheck":55,"otherGateStage":0}
+R8 win-x64: {"fileGate":0,"postMkdirRecheck":0,"otherGateStage":0}
+
+结论：macOS 两个 run、两个架构共 4 份平台日志中 file-gate-host-facts-unproven 全部 55 次均为
+      「写入前复核未通过」包裹（writeGuarded 的 mkdir 后 final-write 复判分支）；无一次发生在
+      lexical-read/canonical-read 或 recheckFileInvocation 的其他文案。Windows R8 为 0 次。
+
+## B. 同轮 macOS 用例结果矩阵（R9 mac-x64，日志行号）
+2426:✔ W20 默认Core/Chat产品真实报告落账并到chief 普通 (945.373034ms)
+2427:✔ W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争 (931.67883ms)
+2428:✔ W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告 (3516.575916ms)
+2429:✔ W21 默认Core/Chat应用生效通知 显式blocked保真任务 (3334.851679ms)
+2445:✖ W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin (10094.48406ms)
+2459:✖ W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin (10322.364803ms)
+2473:✖ W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin (9854.689607ms)
+2478:✔ W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin (7101.4571ms)
+2492:✖ W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后 (9910.592221ms)
+2506:✖ W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后 (9496.838198ms)
+2510:✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope (542.366551ms)
+2512:✖ W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝 (526.81686ms)
+7436:✖ W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin (10094.48406ms)
+7451:✖ W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin (10322.364803ms)
+
+要点：W20×2、W21×2（首次 product 写入时项目尚无 .git ⇒ 走 absentProtectionTopology，拓扑不含 nlink）全绿；
+      W29×3/W30×2（先经 git_candidate init 建 .git ⇒ present-repo protectionTopology，describe 含 nlink）全红；
+      W29 document-change-missing-confirmation 绿（该场景不断言意图卡出现，写入失败不影响其断言）。
+
+## C. W29 失败 trace 行摘录（R9 mac-x64 L7437；完整 JSON 为 AssertionError 内嵌 trace）
+row 11 role=product lastRole=user tool=- user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i8g8-593232e7
+W21 draft actual intent
+完成后请交回报告（改了什么/结论/证据）。
+row 12 role=product lastRole=tool tool=w21-write user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i8g8-593232e7
+W21 draft actual intent
+完成后请交回报告（改了什么/结论/证据）。
+row 13 role=product lastRole=tool tool=w21-13 user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i8g8-593232e7
+W21 draft actual intent
+完成后请交回报告（改了什么/结论/证据）。
+row 18 role=rapporteur lastRole=user tool=- user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i93z-610d627b
+W21 author actual proposal
+完成后请交回报告（改了什么/结论/证据）。
+row 19 role=rapporteur lastRole=tool tool=w21-proposal-write user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i93z-610d627b
+W21 author actual proposal
+完成后请交回报告（改了什么/结论/证据）。
+row 20 role=rapporteur lastRole=tool tool=w21-20 user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i93z-610d627b
+W21 author actual proposal
+完成后请交回报告（改了什么/结论/证据）。
+row 24 role=product lastRole=user tool=- user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i9x1-8dc6ee30
+W21 publish actual material then report
+完成后请交回报告（改了什么/结论/证据）。
+row 25 role=product lastRole=tool tool=w21-publish user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i9x1-8dc6ee30
+W21 publish actual material then report
+完成后请交回报告（改了什么/结论/证据）。
+row 26 role=product lastRole=tool tool=w21-26 user=[派发] 来自 幕僚 的任务
+任务编号：#t-mwj4i9x1-8dc6ee30
+W21 publish actual material then report
+完成后请交回报告（改了什么/结论/证据）。
+
+row12/13 工具回执原文（节选）：
+write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+
+要点：product 的 write_file（row12/13）被拒；rapporteur 的 write_file（row19）在同一轮成功——
+      product 先写入时 mkdir 创建了顶层 docs/（root nlink+1），rapporteur 写入时 docs/ 已存在（nlink 稳定）。
+
+## D. Q2 P2 同码失败（R9 mac-x64 L3626-3665，git-role-workflows-e2e.test.ts:2023）
+
+AggregateError: Actual NEW failure and cleanup/evidence errors; no failure suppressed
+    at runFirstNewBusinessCase (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:2299:77)
+    at async file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:3425:9 {
+  [errors]: [
+    Error: AssertionError [ERR_ASSERTION]: The input did not match the regular expression /已获准并落盘/. Input:
+    
+    'write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required\n' +
+      '允许写入的路径（按根分组）：\n' +
+      '  skill: （无）\n' +
+      '  project: （无）（未写入目标文件；可能已创建父目录）'
+    
+        at file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:2023:41
+        at async Object.bounded (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-driver.ts:739:18)
+        at async runFirstNewBusinessCase (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:2021:5)
+        at async file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:3425:9,
+    AssertionError [ERR_ASSERTION]: Complete NEW must not ignore late fixture or transport callback errors
+    + actual - expected
+    
+    + [
+    +   'AssertionError [ERR_ASSERTION]: The input did not match the regular expression /已获准并落盘/. Input:\n' +
+    +     '\n' +
+    +     "'write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required\\n' +\n" +
+    +     "  '允许写入的路径（按根分组）：\\n' +\n" +
+    +     "  '  skill: （无）\\n' +\n" +
+    +     "  '  project: （无）（未写入目标文件；可能已创建父目录）'\n"
+    + ]
+    - []
+    
+        at runFirstNewBusinessCase (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:2291:12)
+        at async file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:3425:9 {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: [
+        'AssertionError [ERR_ASSERTION]: The input did not match the regular expression /已获准并落盘/. Input:\n' +
+          '\n' +
+          "'write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required\\n' +\n" +
+          "  '允许写入的路径（按根分组）：\\n' +\n" +
+          "  '  skill: （无）\\n' +\n" +
+          "  '  project: （无）（未写入目标文件；可能已创建父目录）'\n"

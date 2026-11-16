@@ -1,0 +1,39 @@
+--- run 1 ---
+✔ macOS file-gate：present-repo 根下创建一级目录后 protection facts 仍 current (46.883ms)
+✔ macOS file-gate：目录 nlink +1（POSIX mkdir 效果模拟）不进入 topology digest (39.7203ms)
+✔ macOS file-gate：普通文件 nlink 变化仍 fail-closed（.git/config 硬链接被拒绝） (38.3113ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 308.0084
+RUN1 EXIT=0
+--- run 2 ---
+✔ macOS file-gate：present-repo 根下创建一级目录后 protection facts 仍 current (51.0724ms)
+✔ macOS file-gate：目录 nlink +1（POSIX mkdir 效果模拟）不进入 topology digest (41.4208ms)
+✔ macOS file-gate：普通文件 nlink 变化仍 fail-closed（.git/config 硬链接被拒绝） (39.7076ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 317.6076
+RUN2 EXIT=0
+--- run 3 ---
+✔ macOS file-gate：present-repo 根下创建一级目录后 protection facts 仍 current (51.7486ms)
+✔ macOS file-gate：目录 nlink +1（POSIX mkdir 效果模拟）不进入 topology digest (46.2893ms)
+✔ macOS file-gate：普通文件 nlink 变化仍 fail-closed（.git/config 硬链接被拒绝） (38.961ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 325.8851
+RUN3 EXIT=0
