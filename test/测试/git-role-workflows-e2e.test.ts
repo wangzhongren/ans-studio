@@ -2232,13 +2232,46 @@ export async function runFirstNewBusinessCase() {
       assert.equal(createHash("sha256").update(Buffer.from(frozenFile.bytesBase64, "base64")).digest("hex"), frozenRef.sha256);
     }
     await driver.save(path.join(evidence, `${caseTag}-first-pin-child-verified-proof.json`), { parent, child: actualChild, runRead, snapshot: runBytes.value, frozenRole: frozen });
-    await driver.bounded("actual worker required surface / scoped write", async signal => {
+    // R9 批次 E2（2026-11-17）：本 tail stage 受既有 case deadline 约束 + 子阶段标记，不新增预算。
+    // 第九轮 x64 诊断（run 43911103883 / job 133452915507）：单段 bounded 在 240.005s 触顶（driver elapsed 469.4s），
+    // 但 case 仍剩 69.3s（child 540s 上限）；roleProgress 已推进到 chief-visible-controller-review-target，
+    // lastHttp=verifier roleStep 0（age 24.5s，已发 ans_git_query q25-verifier-criterion），inventory=verifier live +
+    // activeDelivery 在途，errors/waits 空——链路正常推进，非回合停滞。该阶段天然横跨 worker→集成→verifier→delivery
+    //（controller-bounded-stop 只在 delivery 发布回执处产生），故按子阶段拆段：每段退出 = 原终态
+    //（controller-bounded-stop 或 worker-candidate-source-gap）或该段推进标记；原失败检查逐段保留，总等待语义不变。
+    // 裁决（协调者已批准方案 (i)）：不新增预算，各段以 { remainingCase: true } 受既有 case deadline（child 540s/父 600s）约束；
+    // 若收官轮仍撞 Q_CASE_ABSOLUTE_BUDGET，按既定规则拆 Q2 P2 测试/转产品候选，不再抬预算。
+    await driver.bounded("actual worker surface / scoped write", async signal => {
+      while (!roleProgress.some(item => item.stage === "controller-bounded-stop" || item.stage === "worker-candidate-source-gap")
+        && !roleProgress.some(item => item.stage === "worker-candidate-result")) {
+        const failed = driver.inspectInventory().sessions.find(session => session.roleId === "impl" && ["open-failed", "dispose-failed"].includes(session.phase));
+        if (failed) throw new Error(`Q15_WORKER_OPEN_BLOCK ${JSON.stringify({ phase: failed.phase, errors: failed.errors, coreSessionId: failed.coreSessionId })}`);
+        if (driver.errors.length) throw new Error(driver.errors.join("\n")); signal.throwIfAborted(); await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }, { remainingCase: true });
+    await driver.bounded("actual controller integration", async signal => {
+      while (!roleProgress.some(item => item.stage === "controller-bounded-stop" || item.stage === "worker-candidate-source-gap")
+        && !roleProgress.some(item => item.stage === "controller-integration-result")) {
+        const failed = driver.inspectInventory().sessions.find(session => session.roleId === "impl" && ["open-failed", "dispose-failed"].includes(session.phase));
+        if (failed) throw new Error(`Q15_WORKER_OPEN_BLOCK ${JSON.stringify({ phase: failed.phase, errors: failed.errors, coreSessionId: failed.coreSessionId })}`);
+        if (driver.errors.length) throw new Error(driver.errors.join("\n")); signal.throwIfAborted(); await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }, { remainingCase: true });
+    await driver.bounded("actual verifier review", async signal => {
+      while (!roleProgress.some(item => item.stage === "controller-bounded-stop" || item.stage === "worker-candidate-source-gap")
+        && !roleProgress.some(item => item.stage === "chief-visible-controller-review-target")) {
+        const failed = driver.inspectInventory().sessions.find(session => session.roleId === "impl" && ["open-failed", "dispose-failed"].includes(session.phase));
+        if (failed) throw new Error(`Q15_WORKER_OPEN_BLOCK ${JSON.stringify({ phase: failed.phase, errors: failed.errors, coreSessionId: failed.coreSessionId })}`);
+        if (driver.errors.length) throw new Error(driver.errors.join("\n")); signal.throwIfAborted(); await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }, { remainingCase: true });
+    await driver.bounded("actual controller bounded stop / delivery", async signal => {
       while (!roleProgress.some(item => item.stage === "controller-bounded-stop" || item.stage === "worker-candidate-source-gap")) {
         const failed = driver.inspectInventory().sessions.find(session => session.roleId === "impl" && ["open-failed", "dispose-failed"].includes(session.phase));
         if (failed) throw new Error(`Q15_WORKER_OPEN_BLOCK ${JSON.stringify({ phase: failed.phase, errors: failed.errors, coreSessionId: failed.coreSessionId })}`);
         if (driver.errors.length) throw new Error(driver.errors.join("\n")); signal.throwIfAborted(); await new Promise(resolve => setTimeout(resolve, 10));
       }
-    });
+    }, { remainingCase: true });
     // W5（P1.4 §4.5）：worker 不再据 native/strict surface 阻塞；真实工具面证据单独断言——
     // 结构化写路径不得向 worker 暴露原始 shell 工具（N7：裸 Git 写仍硬拒；声明为事实观察，不是动作门）。
     const workerSurfaceEvidence = roleProgress.find(item => item.stage === "worker-surface-evidence"); assert.ok(workerSurfaceEvidence, "Q14_WORKER_SURFACE_EVIDENCE_MISSING");
