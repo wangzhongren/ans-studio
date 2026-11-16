@@ -113,11 +113,15 @@ test("withHandback：透传 SessionEvent；在 settled **之前**发 handback �
 
 // —— 端到端：普通角色 settle → handback；治理角色不自我回交 ——
 
+// 2026-11-16（KR-29 #22）：现行 fail-closed——有构造 taskId 的会话写入必须在真实任务的
+// assignedTaskWritePaths 交集内；合成 taskId 不在账本 ⇒ 空集 ⇒ 写入被拒、handback 变 blocked。
+// 本用例只验证普通角色 settle 的 handback 形状：会话按无 taskId 的聊天形态开（写入可放行），
+// 经 send 的显式 handback intent 绑定回交任务身份（api-spec:1458 的宿主核验 taskId 语义）。
 test("openRoleSession：普通角色 settle → 发出 handback（形状正确）", async () => {
   const project = makeTempProject();
   try {
     const handle = await openRoleSession(
-      { roleId: "X", project, taskId: "T-1" },
+      { roleId: "X", project },
       {
         createAdapter: (gate) =>
           createFakeRuntimeAdapter({
@@ -126,7 +130,7 @@ test("openRoleSession：普通角色 settle → 发出 handback（形状正确�
           }),
       },
     );
-    await handle.send("做点事");
+    await handle.send("做点事", { handback: { required: true, taskId: "T-1" } });
     const events: OrchestrationEvent[] = [];
     for await (const ev of handle.events()) events.push(ev);
 

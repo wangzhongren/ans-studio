@@ -1,0 +1,16 @@
+git-capabilities.test.ts:515 冻结名测试阶段耗时（临时插桩一次，插桩已移除；本机 Windows）
+命令：node --test --test-timeout=300000 --test-name-pattern "Git team plan publication" test/编排/git-capabilities.test.ts
+阶段（累计毫秒）：
+  start                +0ms
+  migration            +1184ms
+  dispatch-task        +1247ms      （新增 Service.prepareRoleDispatch 真实源，约 0.06s）
+  team-plan-commit     +5664ms      （4.42s）
+  activation-commit    +23902ms     （18.24s）
+  workflow-commit      +64479ms     （40.58s）
+  freeze-execution     +89780ms     （25.30s）
+  worker-candidate     +104250ms    （14.47s）
+  integration          +116791ms    （12.54s）
+合计约 116.8s。该测试在分类基线因 #16 早失败（约 1s）未执行后半段真实 Git 链路；转绿后完整链路超过 CLI 默认 120s：
+- run 1（--test-timeout=120000）：1375 / 1372 pass / 0 fail / 1 cancelled / 2 skip，EXIT=1（该名被取消，120000.19ms）。
+适配：该测试声明 { timeout: 180000 }（Node per-test 超时覆盖 CLI 默认；断言/判定不变），run 2/3 通过。
+本插桩仅用于定位；最终文件中无 __mark/__t0/o7-time（grep 无命中）。

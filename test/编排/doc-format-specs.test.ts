@@ -1307,6 +1307,15 @@ const SCHEMA_WHITELIST: ReadonlyArray<{ literal: string; reason: string }> = [
   { literal: "chief-hub-resume/v1", reason: "apply-journal.ts 的 directHash 哈希域分隔标签；非 schema" },
   { literal: "doc-format-specs/v1", reason: "规范模块契约版本（doc-format-specs.ts DOC_FORMAT_SPEC_VERSION）；非文档格式" },
   { literal: "project-roster/v4", reason: "T3 名单 v4 字面量（G-9/MF-IR-7）：与 project-roster/v3 同一条 doc-format 条目双字面量兼容；不新增格式 id" },
+  // KR-29 #19（2026-11-16）：e71501c/B16/B26 批次新增的内部账本/矩阵/资源枚举字面量。
+  // 全部为应用内部状态或装配标识，不是目标项目文档格式；扫描覆盖面不变，只登记并写明理由。
+  { literal: "ans-basis/v1", reason: "fixed 路径账本 schema（model/runtime.ts；common/编排/workflow-service.ts 写入）；应用内部状态，非项目文档格式" },
+  { literal: "ans-release/v1", reason: "fixed 路径账本 schema（model/runtime.ts；common/编排/workflow-service.ts 写入）；应用内部状态，非项目文档格式" },
+  { literal: "ans-workflow/v1", reason: "fixed 路径账本 schema（model/runtime.ts；common/编排/workflow-service.ts 写入）；应用内部状态，非项目文档格式" },
+  { literal: "ans-task-git-shell/v1", reason: "任务级 Git shell 分类器 kind（pipeline/orchestration/run-role.ts）；运行期匹配标识，非文档格式" },
+  { literal: "chief-workflow/v2", reason: "应用内置 Chief workflow 资源版本（run-role.ts fixed 资源校验）；资源元数据，非项目文档格式" },
+  { literal: "legacy/v1", reason: "派发/工作流矩阵 schema 枚举（model/role.ts 与角色模块 context）；运行期矩阵标识，非项目文档格式" },
+  { literal: "two-fixed-paths/v1", reason: "fixed 两路径派发/工作流矩阵枚举（model/role.ts、run-role.ts、角色模块 context）；运行期矩阵标识，非文档格式" },
 ];
 
 test("TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）", async () => {

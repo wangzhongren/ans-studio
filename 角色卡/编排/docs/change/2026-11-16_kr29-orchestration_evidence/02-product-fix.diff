@@ -1,0 +1,70 @@
+diff --git a/src/pipeline/orchestration/run-role.ts b/src/pipeline/orchestration/run-role.ts
+index 087a764..1a3b70e 100644
+--- a/src/pipeline/orchestration/run-role.ts
++++ b/src/pipeline/orchestration/run-role.ts
+@@ -508,6 +508,24 @@ export interface RunRoleResult {
+   transcript: SessionEvent[];
+ }
+ 
++// —————————————————————— 空 projectRoot（旧支持形态）——————————————————————
++// `sessionDirFor` 一直显式支持空 projectRoot（不传 sessionDir/不预建 .ans，见 4466-4469）。
++// e71501c 引入 Git 保护面后，`readGitProtectionFacts("")` 会对空串 realpath('') 抛 ENOENT，
++// 把旧支持的形态变成会话构造前失败（KR-29 #14 产品回归，CI 两平台同错）。
++// 最小修复：仅当根为空（trim 后）时短路——不做主机探测，按 unmanaged/无保护根返回；
++// 非空根仍走真实探测与 fail-closed 判定，语义逐字不变。
++function isBlankProjectRoot(projectRoot: string): boolean {
++  return typeof projectRoot !== "string" || projectRoot.trim() === "";
++}
++/** 空根的 Git 保护事实：不 realpath、无保护根；与无 `.git` 根同形的安全空集（非探测结果，故 coverage=unknown）。 */
++function blankRootGitProtectionFacts(): GitProtectionFacts {
++  return { projectRoot: "", protectedGitRoots: [], coverage: "unknown", basisDigest: "blank-project-root-unmanaged", reasons: ["blank-project-root-unmanaged"] };
++}
++/** 空根的主机保护要求：与无 `.git`/无 trunk 状态的根同形（unmanaged）。 */
++const BLANK_ROOT_HOST_PROTECTION = { state: "unmanaged", revision: 0, reasons: [] } as const satisfies {
++  state: "required" | "unmanaged" | "unknown"; revision: number; reasons: readonly string[];
++};
++
+ export async function runRole(
+   input: RunRoleInput,
+   deps: RoleSessionDeps = {}
+@@ -532,8 +550,9 @@ export async function runRole(
+   const role = setup.role;
+ 
+   // gate：照抄契约 §5 的构造，绑定 resolveWrite；scope 可能为 undefined（无任务收窄）。
+-  const protectedGit = await readGitProtectionFacts(input.project.projectRoot);
+-  const fileProtectionScope = await readGitHostProtectionRequirement({ projectRoot: input.project.projectRoot });
++  const blankRoot = isBlankProjectRoot(input.project.projectRoot);
++  const protectedGit = blankRoot ? blankRootGitProtectionFacts() : await readGitProtectionFacts(input.project.projectRoot);
++  const fileProtectionScope = blankRoot ? BLANK_ROOT_HOST_PROTECTION : await readGitHostProtectionRequirement({ projectRoot: input.project.projectRoot });
+   const legacyGate = buildGate(role, input.project, input.scope, protectedGit.protectedGitRoots);
+   const managedBoundary = structuredClone(role.boundary), managedScope = input.scope && structuredClone(input.scope);
+   const gate: WriteGate = fileProtectionScope.state === "unmanaged" ? legacyGate : (p, context) => {
+@@ -804,7 +823,7 @@ export function inspectManagedRoleSessionInventory() {
+ async function bindPreparedRuntimeRole(adapter: RuntimeAdapter, role: ResolvedRole, projectRoot: string): Promise<RoleSession> {
+   if (adapter.prepareRole && adapter.bindPreparedRole) {
+     const prepared = await adapter.prepareRole(role);
+-    const requirement = await readGitHostProtectionRequirement({ projectRoot });
++    const requirement = isBlankProjectRoot(projectRoot) ? BLANK_ROOT_HOST_PROTECTION : await readGitHostProtectionRequirement({ projectRoot });
+     // 2026-11-08（设计 P1.3 §2.2.4；退役旧门 `runtime-protected-scope-unmediated-app-execution-planned`）：
+     // 受保护范围下「注册了 shell 工具」不再于创建期拒绝，改为要求审批链证据——防御性断言：
+     // plan 声称注册了 shell 但未携带 `approvalChain`（理论上不可达：prepareRole 已按新算法拒绝）⇒
+@@ -821,7 +840,7 @@ async function bindPreparedRuntimeRole(adapter: RuntimeAdapter, role: ResolvedRo
+       const error = new Error(`runtime-creation-admission-unproven:${prepared.plan.reasons.join(",")}`); discardRuntimeRolePreparation(prepared, error); throw error;
+     }
+   } else {
+-    const requirement = await readGitHostProtectionRequirement({ projectRoot });
++    const requirement = isBlankProjectRoot(projectRoot) ? BLANK_ROOT_HOST_PROTECTION : await readGitHostProtectionRequirement({ projectRoot });
+     if (requirement.state !== "unmanaged") throw new Error("runtime-creation-prepared-api-unavailable");
+   }
+   // Preserve genuinely unmanaged legacy behavior; it stays unverified in the real Core registry and cannot grant Git mutation.
+@@ -1540,8 +1559,8 @@ export async function openRoleSession(
+     input.customerInput !== undefined && (cap === undefined || cap.customerInput);
+   const issued = new Set<string>();
+   const conditions = conditionSlugsOf(setup.role.boundary);
+-  const gitProtection = await readGitProtectionFacts(input.project.projectRoot);
+-  const roleCapabilityProtection = await readGitHostProtectionRequirement({ projectRoot: input.project.projectRoot });
++  const gitProtection = isBlankProjectRoot(input.project.projectRoot) ? blankRootGitProtectionFacts() : await readGitProtectionFacts(input.project.projectRoot);
++  const roleCapabilityProtection = isBlankProjectRoot(input.project.projectRoot) ? BLANK_ROOT_HOST_PROTECTION : await readGitHostProtectionRequirement({ projectRoot: input.project.projectRoot });
+   const managedFileProtocol = roleCapabilityProtection.state !== "unmanaged";
+   const managedBoundary = structuredClone(setup.role.boundary);
+   const gateCtx = { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot, protectedGitRoots: gitProtection.protectedGitRoots };

@@ -581,7 +581,9 @@ test("applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/�
     newSha: sha256("x"),
     at: AT2,
   });
-  assert.deepEqual(pending, { applied: false, pendingReattach: true });
+  // 无 manifest ⇒ 只记待续接，不虚构快照；pending 结果保留真实诊断字段
+  // （api-spec:1714：stable-manifest-unavailable/missing；不改变「不升版本/不虚构快照」断言）。
+  assert.deepEqual(pending, { applied: false, pendingReattach: true, errorCode: "stable-manifest-unavailable", message: "missing" });
 });
 
 const AMENDMENT_TEXT = (items: string, baseTrunk = 'baseTrunk:\n  trunkVersion: 1\n  runId: run-20261104-demo-a1b2c3d4\n  digest: DIGEST') =>

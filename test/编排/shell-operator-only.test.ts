@@ -558,14 +558,23 @@ test("P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不�
     const result = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `outside-${index}` });
     assert.equal(result.allow, false, `${argv.join(" ")} 静态可证明越界 ⇒ deny`);
   }
-  assert.equal(prompts.length, 0, "静态越界不弹卡、不进判断");
+  // W3-G（2026-11-08，KR-29 #17）：裸 Git 写（只读精确白名单与任务级 add/commit 之外）一律硬拒，
+  // 审批通过也不能覆盖；原先列在「opaque ⇒ 审批放行」的 git clean / checkout 归入此类。
+  const bareGit: string[][] = [
+    ["git", "clean", "-fdx"],
+    ["git", "checkout", "--", "."],
+  ];
+  for (const [index, argv] of bareGit.entries()) {
+    const result = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `bare-git-${index}` });
+    assert.equal(result.allow, false, `${argv.join(" ")}：裸 Git 写硬拒（审批不可覆盖）`);
+    assert.match(result.allow === false ? result.reason : "", /裸 Git 硬拒/);
+  }
+  assert.equal(prompts.length, 0, "静态越界与裸 Git 写不弹卡、不进判断");
 
   // 2) 无法静态解析 ⇒ 进入审批（开关开启时由 judge），上下文含脚本内容。
   const opaque: string[][] = [
     ["find", "src", "-delete"],
     ["xargs", "rm", "-rf"],
-    ["git", "clean", "-fdx"],
-    ["git", "checkout", "--", "."],
     ["rsync", "-a", "src/a", "src/"],
     ["tar", "-xf", "x.tar", "-C", "src/"],
     // 复验 F6：短内联 ⇒ script（代码内容随 approvalContext）。
