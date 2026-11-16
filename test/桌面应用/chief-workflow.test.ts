@@ -1700,7 +1700,24 @@ const roleMissingPlan = scenario === "role-preparation-missing-plan";
 const teamPlanning = scenario === "team-planning";
 const crossDocumentNotice = scenario === "cross-document-close-notice";
 const documentChange = roleMissingPlan || teamPlanning || crossDocumentNotice || intentConfirmV2 || typeof scenario === "string" && scenario.startsWith("document-change");
-test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝" : teamPlanning ? "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope" : crossDocumentNotice ? "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续" : intentConfirmV2 ? `W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 ${intentConfirmRestart ? "真实重启迁移后" : "连续写入后"}` : documentChange ? `W29 默认Core/Chat真实既有文档基线后续 ${scenario} 保专业规划scope不授旧执行pin` : requestedRunMode ? `W28 默认Core/Chat真实受派策划缺不可变pin ${requestedRunMode} 拒绝且零停止` : `W21 默认Core/Chat应用生效通知 ${explicitNoticeReport ? "显式blocked保真任务" : "纯确认不覆盖真实完成报告"}`, { timeout: teamPlanning ? 18000 : documentChange ? 30000 : 12000 }, async () => {
+// —————— R9 批 B（2026-11-16）：发布回合预算（W 家族 7 名同根残差）——————
+// 证据：R9 三平台 CI run 43887939365（见 角色卡/测试/docs/change/2026-11-16_remediation-plan-r9-update.md §3.3）。
+// x64/Windows 慢 runner 上真实发布回合（version-upgrade Git 应用 + 通知入队 + 完成回交）超过夹具
+// turnLastResortMs=4500，被中止为 timed_out（handback.ts:543「本轮执行超时」），closeBasis 永不产生
+// → :1945「Actual publication/notice turns must settle and creator basis arrive」失败
+// （W29×3、W30×2、W34；W35 x64 为 W34 超时后的级联）。arm64 同名用例 7.2–9.2s 全绿 ⇒ 产品行为正确，纯夹具预算。
+// 仅真实发布变体（documentChange，含 teamPlanning/W34：代码上走同一 product 发布回合 :1782-:1793
+// 与同一 runtimeOptions）放宽回合兜底；W21/W28 按 R9 口径保留 4.5s（R9 三平台该类全绿，未观测到 4.5s 中止）。
+const W21_TURN_LAST_RESORT_MS = documentChange ? 30_000 : 4_500;
+// 用例预算：旧 teamPlanning 18_000 < 通知等待 20_000（:1934，自相矛盾）；旧 documentChange 30_000
+// 不足以覆盖放宽后的慢发布回合 + 收口/改写最坏链。R9 建议 documentChange ≥45_000、teamPlanning 45–60_000，
+// 统一取 60_000（仅上限，不影响通过路径耗时）。
+const W21_CASE_TIMEOUT_MS = documentChange ? 60_000 : 12_000;
+// W34 的 :1915 等待覆盖「提案回交 → 真实发布回合（放宽后兜底 30s）→ 原创建者关闭」整链；
+// 旧默认 6500ms 小于放宽后的回合兜底，慢 runner 上会在产品回合完成前先到期。只放宽有界等待窗口，
+// 谓词与失败信息不变（同 x64fu 对 :1933 通知等待 6.5→20s 的既有口径）。
+const W34_PUBLICATION_CLOSE_WAIT_MS = 20_000;
+test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝" : teamPlanning ? "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope" : crossDocumentNotice ? "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续" : intentConfirmV2 ? `W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 ${intentConfirmRestart ? "真实重启迁移后" : "连续写入后"}` : documentChange ? `W29 默认Core/Chat真实既有文档基线后续 ${scenario} 保专业规划scope不授旧执行pin` : requestedRunMode ? `W28 默认Core/Chat真实受派策划缺不可变pin ${requestedRunMode} 拒绝且零停止` : `W21 默认Core/Chat应用生效通知 ${explicitNoticeReport ? "显式blocked保真任务" : "纯确认不覆盖真实完成报告"}`, { timeout: W21_CASE_TIMEOUT_MS }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w21-notice-"));
   if (intentConfirmV2 && process.env.ANS_W14_EVIDENCE_DIR) configureDiagnostics({ directory: process.env.ANS_W14_EVIDENCE_DIR });
   // B6.1：W21/W28/W29/W30/W33/W34/W35 验证 legacy 派发/run/意图链 ⇒ 显式 legacy 项目夹具（断言不变）。
@@ -1810,7 +1827,7 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3�
     // 进入本阶段前等待真实注册表静止（有界；超时抛出带 entry 诊断的错误，不绕过产品守卫）。
     await waitForCoreRegistryQuiescent(`W21 variant ${String(scenario)} pre-open`, { throwOnTimeout: true });
     const makeDesktop = () => createDesktopInterface({ pickDirectory: async () => nativePickAllowed ? root : null, emitEvent: event => events.push(event), customerInput: channel.customerInput,
-      runtimeOptions: { baseUrl: `http://127.0.0.1:${address.port}/v1`, apiKeyEnvVar: "ANS_W21_LOCAL_KEY", modelId: "owned-local-only", requestAttemptMax: 1, requestFirstByteTimeoutMs: 1500, turnLastResortMs: 4500 },
+      runtimeOptions: { baseUrl: `http://127.0.0.1:${address.port}/v1`, apiKeyEnvVar: "ANS_W21_LOCAL_KEY", modelId: "owned-local-only", requestAttemptMax: 1, requestFirstByteTimeoutMs: 1500, turnLastResortMs: W21_TURN_LAST_RESORT_MS },
       envFilePath: path.join(root, ".env"), piConfigEnv: {}, runtimeStatePath: path.join(root, ".runtime-selection.json") });
     desktop = makeDesktop();
     assert.equal(await desktop.pickProject(), root); await desktop.listProject({ projectRoot: root }); const target = { projectRoot: root, roleId: "chief", runtime: "codex" as const };
@@ -1912,7 +1929,7 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3�
       return;
     }
     if (teamPlanning) {
-      await waitFor(() => trace.some(row => row.role === "chief" && row.lastToolId === "w34-close-publication"), "The actual first publication and creator-close must finish before measuring team dispatch");
+      await waitFor(() => trace.some(row => row.role === "chief" && row.lastToolId === "w34-close-publication"), "The actual first publication and creator-close must finish before measuring team dispatch", W34_PUBLICATION_CLOSE_WAIT_MS);
       await waitFor(() => trace.some(row => row.role === "convener" && row.user.includes("W34 actual formal team planning")), "Actual published material creator handback must route a genuine team planning task");
       const state = await readTaskState(root), plan = [...state.records.values()].find(row => row.created?.idempotencyKey === "w34-team-planning"), publication = [...state.records.values()].find(row => row.created?.idempotencyKey === "w21-publish");
       assert.ok(plan?.created && publication?.closed); assert.equal(publication.closed.outcome, "accepted");
