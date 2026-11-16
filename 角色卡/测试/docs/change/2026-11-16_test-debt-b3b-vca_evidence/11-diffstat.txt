@@ -1,0 +1,3 @@
+ test/桌面应用/version-change.test.ts         | 252 +++++---
+ test/测试/version-change-integration.test.ts | 887 ++++++++++++++++-----------
+ 2 files changed, 714 insertions(+), 425 deletions(-)

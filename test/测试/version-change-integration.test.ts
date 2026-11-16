@@ -2,18 +2,17 @@
 // T1（2026-11-05 trunk-amendment Batch 5）：跨层集成——真实 Model（C1 契约）→ 真实 Service
 // （C2c VCA/冻结/重构校验）→ 真实 Provider（S1 存储 + R9 baseline + doc-freezes 派生缓存）→
 // 真实 S2 trunk service / S3 run-manifest 冻结校验 → 真实 S4 Pipeline（version-change-runtime /
-// refactor-runtime / trunk-runtime）→ 真实桌面客户通道（createCustomerInputChannel + D1 卡组装）→
-// 真实账本（tasks.jsonl，readTaskState 逐事件校验）。
+// refactor-runtime / trunk-runtime）→ 真实账本（tasks.jsonl，readTaskState 逐事件校验）。
 //
-// 替身仅限：客户作答（模拟客户本人点选）与通知收集；不启动 Electron、不触网、不改产品代码。
-// 覆盖（V1 §4.3 / 团队计划增量 §6 / P1.6 AC-1–AC-8/10/14/18/19/25/26/28/29/31）：
-//   · version-upgrade（product）提交/批准 → 冻结目标 + R9 记录 + trunk re-pin + t+1；批准前后哈希重验；
-//   · detail-amendment（rapporteur）两阶段：提交冻结修正案 → 批准 → 逐项 apply/keep +
-//     acknowledgments 必选 → 只冻结 applied 项 + apply-journal re-pin；
-//   · 拒绝路径：不冻结目标、不 re-pin；修正案自身保持冻结（不可原地改）；
-//   · 发起角色/目标范围/base 匹配/并发/幂等矩阵（真实错误码）；
-//   · bootstrap 两条路径：首次 handoff pin 写 handoff-pin-bootstrap 冻结（pin 只 pin 冻结文档）；
-//     无 trunk VCA（baseTrunk:null + bootstrap:true）批准后建立 t1；
+// 替身仅限：direct 通知收集与通知收集；不启动 Electron、不触网、不改产品代码。
+// 当前语义（e71501c role-direct）：VCA 由 product/rapporteur 以真实会话角色 + operationId +
+// 显式 base/expectedFrom 直接提交（submitDirect）；旧客户批准卡通道（submit/present/approve/
+// reject/runAmendmentItems）已关闭、历史请求只读。覆盖：
+//   · version-upgrade 直接提交 → role-direct 冻结 + R9 记录 + trunk t+1；expectedFrom 重验；
+//   · detail-amendment 整单直接提交（逐项客户卡通道关闭、历史只读）；
+//   · 历史客户拒绝/批准入口只读 + 显式 supersede；发起角色/目标范围/base/并发/幂等矩阵；
+//   · AC-5：无效 roster / D3 越界 / 版本链不匹配 / apply 前重验 ⇒ 直接提交 fail-closed；
+//   · bootstrap：显式 baseTrunk:null + 真实 intent-confirmed 才建立 t1（缺证据 fail-closed）；
 //   · 冻结迁移：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建、
 //     以 R9 baseline 为准；migrated-draft 证据标记（不写 doc.freeze）；
 //   · 轻量重构：convener 发起、managedBy application-scheduler、机械写集、无客户决定、不产生 trunk 版本、
@@ -54,6 +53,7 @@ import type {
   VersionChangePresenter,
   VersionChangeRuntime,
 } from "../../src/pipeline/orchestration/version-change-runtime.ts";
+import { refreshAndInstallVersionedDocFreezeSnapshot } from "../../src/service/boundary/resolve-boundary.ts";
 import { createRefactorRuntime } from "../../src/pipeline/orchestration/refactor-runtime.ts";
 import type { RefactorRuntime } from "../../src/pipeline/orchestration/refactor-runtime.ts";
 import { createRunRepinPort, createTrunkRuntime } from "../../src/pipeline/orchestration/trunk-runtime.ts";
@@ -89,6 +89,7 @@ interface Rig {
   refactor: RefactorRuntime;
   events: TaskStateEvent[];
   notifications: string[];
+  directNotifications: Array<{ key: string; recipientRoleId: string; message: string }>;
   channel: ReturnType<typeof createCustomerInputChannel>;
   pushed: OperatorRequestPayload[];
   directiveCalls: { count: number };
@@ -116,6 +117,7 @@ async function setup(options: RigOptions = {}): Promise<Rig> {
   });
   const events: TaskStateEvent[] = [];
   const notifications: string[] = [];
+  const directNotifications: Array<{ key: string; recipientRoleId: string; message: string }> = [];
   const emitEvent = async (event: TaskStateEvent): Promise<void> => {
     events.push(event);
     const appended = await appendTaskEvent(project.root, event);
@@ -229,6 +231,10 @@ async function setup(options: RigOptions = {}): Promise<Rig> {
     trunkService: integration.trunk,
     trunkRuntime,
     emitEvent,
+    // direct 提交在真实提交后必须能幂等通知 chief/convener/发起角色；无 sink ⇒ committed-pending-recovery。
+    notifyDirect: async (input) => {
+      directNotifications.push({ key: input.key, recipientRoleId: input.recipientRoleId, message: input.message });
+    },
     ...(presenter !== undefined ? { presenter } : {}),
     notify: (message) => {
       notifications.push(message);
@@ -252,6 +258,7 @@ async function setup(options: RigOptions = {}): Promise<Rig> {
     refactor,
     events,
     notifications,
+    directNotifications,
     channel,
     pushed,
     directiveCalls,
@@ -279,6 +286,28 @@ async function bootstrapTrunk(rig: Rig, d3RoleIds: string[] = ["impl"]): Promise
   });
   assert.equal(boot.ok, true, boot.ok ? "" : `${boot.code}: ${boot.message ?? ""}`);
   rig.events.length = 0;
+}
+
+/** 当前 trunk 指针 → direct 提交要求的显式 base（TrunkCommitRef `{version, digest}`）。 */
+function directBaseOf(current: { trunkVersion: number; digest: string }): { version: number; digest: string } {
+  return { version: current.trunkVersion, digest: current.digest };
+}
+
+/**
+ * direct 冻结由 Provider（O 层）追加 R9 记录；G 的同步守卫快照须由调用方经 G 公共刷新安装
+ * （生产 = 桌面栈 initialize / 会话边界解析；集成测试直连 S2/S4，须显式走同一公共路径）。
+ */
+async function refreshGuardSnapshot(rig: Rig): Promise<void> {
+  await refreshAndInstallVersionedDocFreezeSnapshot(rig.project.root, {
+    migrationCompleted: true,
+    now: () => new Date(AT),
+  });
+}
+
+/** direct 提交由运行时自己的 trunk service 实例追加 R9；集成层的冻结查询缓存须按公共 Service 刷新。 */
+async function refreshFreezeRegistry(rig: Rig): Promise<void> {
+  const ready = await rig.integration.services.freeze.ensureReady();
+  assert.equal(ready.ok, true, ready.ok ? "" : `${ready.code}`);
 }
 
 async function ledgerOf(rig: Rig): Promise<TaskStateEvent[]> {
@@ -310,65 +339,80 @@ function amendmentDoc(current: { trunkVersion: number; digest: string }, runId: 
   ].join("\n");
 }
 
-// ———————————————— 1. VCA version-upgrade 全链路 ————————————————
+// ———————————————— 1. VCA version-upgrade 全链路（role-direct 直接提交） ————————————————
 
-test("VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖", async () => {
+test("VCA：product version-upgrade 经真实直接提交（role-direct）→ 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖", async () => {
   const rig = await setup();
   try {
     await bootstrapTrunk(rig);
     const v2 = "docs/proposals/demo-proposal-v2.md";
-    const v2sha = await writeProjectFile(rig.project.root, v2, "---\nschema: project-proposal/v2\n---\n# proposal v2\n");
+    const v2sha = await writeProjectFile(rig.project.root, v2, PROPOSAL_V2_TEXT);
+    const current = (await rig.integration.trunk.current())!;
 
-    const submitted = await rig.runtime.submit({
+    // 当前真实语义（e71501c role-direct）：product 以真实会话角色 + operationId + 显式 base/expectedFrom
+    // 直接提交；旧的客户批准卡通道（submit/present）已关闭，没有 submitted/approved 中间阶段。
+    const submitted = await rig.runtime.submitDirect!({
       kind: "version-upgrade",
       initiatorRoleId: "product",
       flowId: FLOW_ID,
-      baseTrunk: (await rig.integration.trunk.current())!,
-      targets: [{ kind: "contract", path: v2, action: "modify" }],
+      operationId: "op-vc-1",
+      baseTrunk: directBaseOf(current),
+      targets: [{ kind: "contract", path: v2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.proposal] }],
       summary: "补一个契约细节",
-      applicationId: "vc-1",
+    }, "product");
+    assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.errorCode}: ${submitted.message ?? ""}`);
+    assert.equal(submitted.status, "applied");
+    assert.match(submitted.applicationId ?? "", /^vc-\d+$/);
+    assert.equal(submitted.operationId, "op-vc-1");
+
+    // 关闭的旧通道：submit/present 一律 vca-channel-unavailable，不创建/不改写客户批准卡。
+    const legacySubmit = await rig.runtime.submit({
+      kind: "version-upgrade",
+      initiatorRoleId: "product",
+      flowId: FLOW_ID,
+      baseTrunk: current,
+      targets: [{ kind: "contract", path: v2, action: "modify" }],
+      summary: "legacy",
+      applicationId: "vc-2",
       at: AT,
     });
-    assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.code}: ${submitted.message ?? ""}`);
-    if (!submitted.ok) return;
-    assert.equal(submitted.value.status, "submitted");
-    const eventsAfterSubmit = await ledgerOf(rig);
-    const submitEvent = eventOf(eventsAfterSubmit, "version.change").at(-1)!;
-    assert.equal(submitEvent.status, "submitted");
-    assert.equal(submitEvent.origin, "application");
-    assert.equal(submitEvent.decidedBy, undefined);
-    assert.equal(submitEvent.initiatorRoleId, "product");
+    assert.equal(legacySubmit.ok, false);
+    if (!legacySubmit.ok) assert.equal(legacySubmit.code, "vca-channel-unavailable");
+    const legacyPresent = await rig.runtime.present(submitted.applicationId!);
+    assert.equal(legacyPresent.ok, false);
+    if (!legacyPresent.ok) assert.equal(legacyPresent.code, "vca-channel-unavailable");
 
-    // 客户卡（真实通道组装）：kind/发起者/targets/path/sha256/语义说明。
-    const card = buildVersionChangeCard({ record: submitted.value });
-    assert.ok(card !== undefined);
-    const preview = (card!.request as { preview?: string }).preview ?? "";
-    assert.match(preview, /demo-proposal-v2\.md/);
-    assert.match(preview, new RegExp(v2sha));
+    const records = await rig.runtime.list({ flowId: FLOW_ID });
+    const record = records.find((candidate) => candidate.applicationId === submitted.applicationId);
+    assert.equal(record?.status, "applied");
+    assert.equal(record?.operationId, "op-vc-1");
+    assert.equal(record?.actionSource?.kind, "role-direct");
+    assert.equal(record?.actionSource?.actorRoleId, "product");
 
-    const presented = await rig.runtime.present("vc-1");
-    assert.equal(presented.ok, true, presented.ok ? "" : `${presented.code}: ${presented.message ?? ""}`);
-    if (!presented.ok) return;
-    assert.equal(presented.value.record.status, "applied");
-    assert.equal(presented.value.resultTrunkVersion, 2);
-
-    const current = await rig.integration.trunk.current();
-    assert.equal(current?.trunkVersion, 2);
+    // 运行时 direct service 已追加 R9；集成层冻结查询缓存按公共 Service 刷新后再核验。
+    await refreshFreezeRegistry(rig);
+    const currentAfter = await rig.integration.trunk.current();
+    assert.equal(currentAfter?.trunkVersion, 2);
     const status = await rig.integration.trunk.status();
     assert.equal(status.manifest?.artifacts.documents.proposal?.path, v2);
     assert.equal(status.manifest?.artifacts.documents.proposal?.sha256, v2sha);
     assert.deepEqual(await rig.integration.trunk.verify(), { ok: true, violations: [] });
 
-    // R9 权威记录 + 冻结事件归属（customer 类 reason 带 decisionId）。
+    // R9 权威记录 + 冻结归属：direct 冻结以真实 role 来源（非客户、无 decisionId/decidedBy）。
     const baseline = await fs.readFile(path.join(rig.project.root, ".ans/state/versions.jsonl"), "utf8");
-    assert.match(baseline, /"reason":"version-upgrade-approved"/);
-    assert.match(baseline, /"decidedBy":"customer"/);
+    assert.match(baseline, /"reason":"role-direct-applied"/);
+    assert.match(baseline, /"origin":"role-direct"/);
+    assert.ok(!baseline.includes('"decidedBy":"customer"'), "direct 冻结不冒充客户");
     const frozen = await rig.integration.services.freeze.entryOf(v2);
-    assert.equal(frozen?.freeze.reason, "version-upgrade-approved");
-    assert.equal(frozen?.freeze.origin, "customer");
+    assert.equal(frozen?.freeze.reason, "role-direct-applied");
+    assert.equal(frozen?.freeze.origin, "role-direct");
+    assert.equal(frozen?.freeze.decidedBy, undefined);
+    assert.equal(frozen?.freeze.decisionId, undefined);
+    assert.equal(frozen?.freeze.actorRoleId, "product");
     assert.equal(frozen?.sha256, v2sha);
 
-    // 跨层守卫：冻结后同版本覆盖被拒；新版本 v3（不存在 ⇒ draft）允许。
+    // 跨层守卫：经 G 公共刷新装入同步快照；冻结后同版本覆盖被拒；新版本 v3（不存在 ⇒ draft）允许。
+    await refreshGuardSnapshot(rig);
     assert.equal(versionedDocFreezeState(rig.project.root, v2, true), "frozen");
     const overwrite = versionedDocOverwriteDecision({ relPath: v2, exists: true, frozen: "frozen", operation: "write" });
     assert.equal(overwrite.allowed, false);
@@ -382,32 +426,38 @@ test("VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R
     assert.equal(newVersion.allowed, true);
 
     const events = await ledgerOf(rig);
-    const versionEvents = eventOf(events, "version.change").map((event) => event.status);
-    assert.deepEqual(versionEvents, ["submitted", "approved", "applied"]);
-    const approvedEvent = eventOf(events, "version.change").find((event) => event.status === "approved")!;
-    assert.equal(approvedEvent.origin, "customer");
-    assert.equal(approvedEvent.decidedBy, "customer");
-    assert.match(approvedEvent.decisionId ?? "", /^decision-/);
-    const freezeEvent = eventOf(events, "doc.freeze")[0]!;
-    assert.equal(freezeEvent.reason, "version-upgrade-approved");
-    assert.equal(freezeEvent.origin, "customer");
-    assert.equal(freezeEvent.decidedBy, "customer");
+    const versionEvents = eventOf(events, "version.change");
+    assert.equal(versionEvents.length, 1, "direct 提交只有一个 applied 事件（无 submitted/approved 阶段）");
+    assert.equal(versionEvents[0]!.status, "applied");
+    assert.equal(versionEvents[0]!.origin, "role-direct");
+    assert.equal(versionEvents[0]!.decidedBy, undefined);
+    assert.equal(versionEvents[0]!.decisionId, undefined);
+    assert.equal(versionEvents[0]!.operationId, "op-vc-1");
+    assert.equal(versionEvents[0]!.actionSource?.kind, "role-direct");
+    assert.equal(versionEvents[0]!.actionSource?.actorRoleId, "product");
+    assert.equal(versionEvents[0]!.resultTrunkVersion, 2);
+    // role-direct 提交后按固定 key 通知 chief/convener/发起角色；sink 幂等由调用方保证。
+    assert.deepEqual(
+      rig.directNotifications.map((entry) => entry.recipientRoleId).sort(),
+      ["chief", "convener", "product"],
+    );
+    assert.ok(rig.directNotifications.every((entry) => entry.key.startsWith("op-vc-1:")));
   } finally {
     await cleanup(rig);
   }
 });
 
-// ———————————————— 2. VCA detail-amendment 两阶段 ————————————————
+// ———————————————— 2. VCA detail-amendment 整单直接提交 ————————————————
 
-test("VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied", async () => {
+test("VCA：detail-amendment 整单直接提交（role-direct）→ 修正案与 applied 目标冻结 + trunk t2；逐项客户卡通道关闭", async () => {
   const rig = await setup();
   try {
     await bootstrapTrunk(rig);
     const current = (await rig.integration.trunk.current())!;
     const v2 = "docs/proposals/demo-proposal-v2.md";
-    const v2sha = await writeProjectFile(rig.project.root, v2, "version: 2\n# proposal v2\n");
+    const v2sha = await writeProjectFile(rig.project.root, v2, PROPOSAL_V2_TEXT);
     const team2 = "docs/scheduling/demo-team-v2.md";
-    const team2sha = await writeProjectFile(rig.project.root, team2, "version: 2\n# team v2\n");
+    const team2sha = await writeProjectFile(rig.project.root, team2, "---\nschema: teamPlanSchema:3\n---\n# team v2\n");
     const amendmentRel = "docs/proposals/demo-amendment-v1.md";
     await writeProjectFile(
       rig.project.root,
@@ -429,29 +479,55 @@ test("VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/k
     assert.equal(validated.ok, true);
     if (!validated.ok) return;
 
-    const submitted = await rig.runtime.submit({
+    // 当前真实语义：rapporteur 以整单方式直接提交修正案（operationId + 显式 base/expectedFrom）；
+    // 提交即应用全部 target，无需（也不存在）客户批准/逐项确认阶段。
+    const submitted = await rig.runtime.submitDirect!({
       kind: "detail-amendment",
       initiatorRoleId: "rapporteur",
       flowId: FLOW_ID,
-      baseTrunk: current,
+      operationId: "op-am-1",
+      baseTrunk: directBaseOf(current),
       targets: [
-        { kind: "contract", path: v2, action: "modify" },
-        { kind: "execution", path: team2, action: "modify" },
+        { kind: "contract", path: v2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.proposal] },
+        { kind: "execution", path: team2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.teamPlan] },
       ],
       amendmentId: "am-1",
       amendmentDocPath: amendmentRel,
-      amendmentItems: validated.value.items,
       summary: "修正案",
-      applicationId: "vc-1",
-      at: AT,
-    });
-    assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.code}: ${submitted.message ?? ""}`);
+    }, "rapporteur");
+    assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.errorCode}: ${submitted.message ?? ""}`);
+    assert.equal(submitted.status, "applied");
+    assert.match(submitted.applicationId ?? "", /^vc-\d+$/);
+    const trunkAfter = await rig.integration.trunk.current();
+    assert.equal(trunkAfter?.trunkVersion, 2);
+    const status = await rig.integration.trunk.status();
+    assert.equal(status.manifest?.artifacts.documents.proposal?.path, v2);
+    assert.equal(status.manifest?.artifacts.execution.teamPlan?.path, team2, "整单直接提交应用全部 target");
 
-    // 提交即冻结修正案（application 归属，不冒充客户）；任何编辑被拒。
+    // 修正案与 contract 目标均按 role-direct-applied 冻结（真实 role 来源，不冒充客户）；
+    // execution 仍不纳入 guard 冻结（C15 语义不变）。
+    await refreshFreezeRegistry(rig);
     const amendmentEntry = await rig.integration.services.freeze.entryOf(amendmentRel);
-    assert.equal(amendmentEntry?.freeze.reason, "amendment-submitted");
-    assert.equal(amendmentEntry?.freeze.origin, "application");
+    assert.equal(amendmentEntry?.freeze.reason, "role-direct-applied");
+    assert.equal(amendmentEntry?.freeze.origin, "role-direct");
     assert.equal(amendmentEntry?.freeze.decidedBy, undefined);
+    assert.equal(amendmentEntry?.freeze.decisionId, undefined);
+    assert.equal(amendmentEntry?.freeze.actorRoleId, "rapporteur");
+    const frozenApplied = await rig.integration.services.freeze.isFrozen(v2);
+    assert.equal(frozenApplied.state, "frozen");
+    assert.equal(await rig.integration.services.freeze.entryOf(team2), undefined, "execution 目标不纳入 guard 冻结");
+    assert.ok(team2sha.length === 64);
+
+    // 关闭的逐项客户卡通道：runAmendmentItems/present 均为 vca-channel-unavailable
+    // （历史请求只读；由原发起人显式整单重提）。
+    const items = await rig.runtime.runAmendmentItems(submitted.applicationId!);
+    assert.equal(items.ok, false);
+    if (!items.ok) assert.equal(items.code, "vca-channel-unavailable");
+    const presented = await rig.runtime.present(submitted.applicationId!);
+    assert.equal(presented.ok, false);
+    if (!presented.ok) assert.equal(presented.code, "vca-channel-unavailable");
+
+    await refreshGuardSnapshot(rig);
     assert.equal(versionedDocFreezeState(rig.project.root, amendmentRel, true), "frozen");
     const editAmendment = versionedDocOverwriteDecision({
       relPath: amendmentRel,
@@ -460,126 +536,90 @@ test("VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/k
       operation: "edit",
     });
     assert.equal(editAmendment.allowed, false);
-    // 目标仍是草稿（尚未批准/生效）。
-    assert.equal(versionedDocFreezeState(rig.project.root, v2, true), "draft");
-
-    const presented = await rig.runtime.present("vc-1");
-    assert.equal(presented.ok, true, presented.ok ? "" : `${presented.code}: ${presented.message ?? ""}`);
-    if (!presented.ok) return;
-    assert.equal(presented.value.needsItems, true);
-    assert.equal(presented.value.record.status, "approved");
-    // detail 批准不冻结目标（只冻结 applied）。
-    assert.equal(await rig.integration.services.freeze.entryOf(v2), undefined);
-
-    const items = await rig.runtime.runAmendmentItems("vc-1");
-    assert.equal(items.ok, true, items.ok ? "" : `${items.code}: ${items.message ?? ""}`);
-    if (!items.ok) return;
-    assert.equal(items.value.decisions.length, 2);
-    assert.deepEqual(items.value.decisions[0]?.acknowledgments, [
-      { id: "boundary-expansion-0", label: "边界扩大示例（测试）" },
-    ]);
-    const decisions = items.value.decisions.map((decision) =>
-      decision.itemId === "it-2" ? { ...decision, choice: "item-keep" as const } : decision,
-    );
-    const applied = await rig.runtime.applyAmendmentItems("vc-1", { decisionId: "dec-items", decisions });
-    assert.equal(applied.ok, true, applied.ok ? "" : `${applied.code}: ${applied.message ?? ""}`);
-    if (!applied.ok) return;
-    assert.equal(applied.value.resultTrunkVersion, 2);
-
-    const status = await rig.integration.trunk.status();
-    assert.equal(status.manifest?.artifacts.documents.proposal?.path, v2);
-    assert.equal(status.manifest?.artifacts.execution.teamPlan?.path, PATHS.teamPlan, "kept 项保留旧工件");
-    // 只冻结 applied 的 contract 目标；execution（C15）不纳入 guard 冻结。
-    const frozenApplied = await rig.integration.services.freeze.isFrozen(v2);
-    assert.equal(frozenApplied.state, "frozen");
-    const frozenKept = await rig.integration.services.freeze.isFrozen(PATHS.proposal);
-    assert.equal(frozenKept.state, "frozen");
-    assert.equal(await rig.integration.services.freeze.entryOf(team2), undefined);
 
     const events = await ledgerOf(rig);
-    const itemEvents = eventOf(events, "trunk.amendment").filter((event) => event.itemId !== undefined);
-    assert.ok(itemEvents.some((event) => event.itemId === "it-1" && event.itemResult === "applied"));
-    assert.ok(itemEvents.some((event) => event.itemId === "it-2" && event.itemResult === "kept"));
-    assert.ok(itemEvents.every((event) => event.decidedBy === "customer" && event.decisionId === "dec-items"));
-    const lifecycle = eventOf(events, "trunk.amendment").find((event) => event.status === "applied");
-    assert.ok(lifecycle !== undefined);
-    assert.equal(lifecycle!.origin, "application");
-    assert.equal(lifecycle!.decidedBy, undefined);
-    assert.equal(lifecycle!.journalId, "j-vc-1");
-    const freezeEvents = eventOf(events, "doc.freeze");
-    assert.ok(freezeEvents.some((event) => event.reason === "detail-item-applied" && event.sha256 === v2sha));
-    assert.ok(!freezeEvents.some((event) => event.path === team2));
-    assert.ok(team2sha.length === 64);
+    const versionEvents = eventOf(events, "version.change");
+    assert.equal(versionEvents.length, 1);
+    assert.equal(versionEvents[0]!.status, "applied");
+    assert.equal(versionEvents[0]!.origin, "role-direct");
+    assert.equal(versionEvents[0]!.operationId, "op-am-1");
+    assert.equal(versionEvents[0]!.vcKind, "detail-amendment");
+    assert.equal(versionEvents[0]!.decidedBy, undefined);
+    assert.equal(versionEvents[0]!.decisionId, undefined);
+    assert.equal(versionEvents[0]!.resultTrunkVersion, 2);
   } finally {
     await cleanup(rig);
   }
 });
 
-// ———————————————— 3. VCA 拒绝路径 ————————————————
+// ———————————————— 3. VCA 历史客户入口只读 + 显式 supersede ————————————————
 
-test("VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用）", async () => {
+test("VCA：历史客户拒绝/批准入口只读（vca-conflict）⇒ 不冻结/不 re-pin；显式 supersede 才可重提", async () => {
   const rig = await setup();
   try {
     await bootstrapTrunk(rig);
     const current = (await rig.integration.trunk.current())!;
     const v2 = "docs/proposals/demo-proposal-v2.md";
-    await writeProjectFile(rig.project.root, v2, "version: 2\n# proposal v2\n");
-    const amendmentRel = "docs/proposals/demo-amendment-v1.md";
-    await writeProjectFile(
-      rig.project.root,
-      amendmentRel,
-      amendmentDoc(current, rig.project.runId, [
-        "  - itemId: it-1",
-        "    kind: contract",
-        "    change: modify",
-        `    from: ${PATHS.proposal}`,
-        `    to: ${v2}`,
-      ]),
-    );
-    const validated = await rig.integration.trunk.validateAmendment({ amendmentDocPath: amendmentRel, flowId: FLOW_ID });
-    assert.equal(validated.ok, true);
-    if (!validated.ok) return;
-    const submitted = await rig.runtime.submit({
-      kind: "detail-amendment",
-      initiatorRoleId: "rapporteur",
+    await writeProjectFile(rig.project.root, v2, PROPOSAL_V2_TEXT);
+    // 历史 pending（客户卡时代记录）仍可读，但新的客户批准/拒绝不得结算它。
+    const created = await rig.integration.services.vca.create({
+      kind: "version-upgrade",
+      initiatorRoleId: "product",
       flowId: FLOW_ID,
       baseTrunk: current,
       targets: [{ kind: "contract", path: v2, action: "modify" }],
-      amendmentId: "am-1",
-      amendmentDocPath: amendmentRel,
-      amendmentItems: validated.value.items,
-      summary: "会被拒绝",
-      applicationId: "vc-1",
+      summary: "历史 pending",
+      applicationId: "vc-2",
       at: AT,
     });
-    assert.equal(submitted.ok, true);
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    assert.equal(created.value.status, "draft", "历史 create 只建草稿（客户卡时代 submit 才进 pending）");
+    // 真实历史 pending：经 Service 旧 submit 状态机进入 submitted（运行时客户通道已关闭，但历史记录仍可读）。
+    const legacySubmitted = await rig.integration.services.vca.submit({ applicationId: "vc-2", at: AT });
+    assert.equal(legacySubmitted.ok, true, legacySubmitted.ok ? "" : `${legacySubmitted.code}: ${legacySubmitted.message ?? ""}`);
+    const records = await rig.runtime.list({ flowId: FLOW_ID });
+    assert.equal(records.find((record) => record.applicationId === "vc-2")?.status, "submitted", "历史 pending 保持只读");
 
-    const rejected = await rig.runtime.reject("vc-1", "dec-no", "内容不够清楚");
-    assert.equal(rejected.ok, true);
-    if (!rejected.ok) return;
-    assert.equal(rejected.value.status, "rejected");
+    const rejected = await rig.runtime.reject("vc-2", "dec-no", "内容不够清楚");
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.equal(rejected.code, "vca-conflict");
+    const approved = await rig.runtime.approve("vc-2", "dec-no");
+    assert.equal(approved.ok, false);
+    if (!approved.ok) assert.equal(approved.code, "vca-conflict");
 
     const trunkAfter = await rig.integration.trunk.current();
     assert.equal(trunkAfter?.trunkVersion, 1);
-    assert.equal(await rig.integration.services.freeze.entryOf(v2), undefined, "拒绝不冻结目标");
-    // 目标仍是草稿，可原位改；修正案保持提交时冻结。
+    const recordsAfterReject = await rig.runtime.list({ flowId: FLOW_ID });
+    assert.equal(recordsAfterReject.find((record) => record.applicationId === "vc-2")?.status, "submitted", "历史记录保持只读");
+    assert.equal(await rig.integration.services.freeze.entryOf(v2), undefined, "拒绝/批准均不冻结目标");
+    await refreshGuardSnapshot(rig);
     assert.equal(versionedDocFreezeState(rig.project.root, v2, true), "draft");
     const targetEdit = versionedDocOverwriteDecision({ relPath: v2, exists: true, frozen: "draft", operation: "edit" });
     assert.equal(targetEdit.allowed, true);
-    const amendmentEdit = versionedDocOverwriteDecision({
-      relPath: amendmentRel,
-      exists: true,
-      frozen: "frozen",
-      operation: "write",
-    });
-    assert.equal(amendmentEdit.allowed, false);
 
     const events = await ledgerOf(rig);
-    const rejectedEvent = eventOf(events, "version.change").at(-1)!;
-    assert.equal(rejectedEvent.status, "rejected");
-    assert.equal(rejectedEvent.decidedBy, "customer");
-    assert.equal(rejectedEvent.decisionId, "dec-no");
+    assert.ok(!eventOf(events, "version.change").some((event) => event.status === "rejected" || event.status === "approved"));
     assert.ok(!eventOf(events, "doc.freeze").some((event) => event.path === v2));
+
+    // 当前真实语义：只有显式 supersede 的真实直接提及才推进；旧记录字节不变（视图标 superseded）。
+    const submitted = await rig.runtime.submitDirect!({
+      kind: "version-upgrade",
+      initiatorRoleId: "product",
+      flowId: FLOW_ID,
+      operationId: "op-supersede-1",
+      baseTrunk: directBaseOf(current),
+      targets: [{ kind: "contract", path: v2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.proposal] }],
+      supersedesApplicationId: "vc-2",
+      summary: "显式重提",
+    }, "product");
+    assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.errorCode}: ${submitted.message ?? ""}`);
+    assert.equal(submitted.status, "applied");
+    const recordsAfter = await rig.runtime.list({ flowId: FLOW_ID });
+    const legacyView = recordsAfter.find((record) => record.applicationId === "vc-2");
+    assert.equal(legacyView?.status, "superseded", "旧记录只读视图标 superseded");
+    assert.match(legacyView?.message ?? "", /Replaced by/);
+    assert.equal(recordsAfter.find((record) => record.applicationId === submitted.applicationId)?.status, "applied");
   } finally {
     await cleanup(rig);
   }
@@ -593,7 +633,7 @@ test("VCA：发起角色、目标范围、base 匹配、并发与幂等（真实
     await bootstrapTrunk(rig);
     const current = (await rig.integration.trunk.current())!;
     const v2 = "docs/proposals/demo-proposal-v2.md";
-    await writeProjectFile(rig.project.root, v2, "version: 2\n# proposal v2\n");
+    const v2sha = await writeProjectFile(rig.project.root, v2, PROPOSAL_V2_TEXT);
     const team2 = "docs/scheduling/demo-team-v2.md";
     await writeProjectFile(rig.project.root, team2, "version: 2\n# team v2\n");
 
@@ -707,72 +747,118 @@ test("VCA：发起角色、目标范围、base 匹配、并发与幂等（真实
     assert.equal(stale.ok, false);
     if (!stale.ok) assert.equal(stale.code, "vca-base-mismatch");
 
-    // 并发：同一 flow 同时只允许一个 submitted/approved；重复提交幂等。
-    const first = await rig.runtime.submit({
-      kind: "version-upgrade",
-      initiatorRoleId: "product",
+    // 并发/幂等（当前语义）：direct 提交按 operationId 幂等；同 flow 的历史 pending 阻断新的
+    // direct 提交，只有显式 supersedesApplicationId 才能推进（不复用/不改写旧记录）。
+    const firstInput = {
+      kind: "version-upgrade" as const,
+      initiatorRoleId: "product" as const,
       flowId: FLOW_ID,
-      baseTrunk: current,
-      targets: [{ kind: "contract", path: v2, action: "modify" }],
+      operationId: "op-matrix-1",
+      baseTrunk: directBaseOf(current),
+      targets: [{ kind: "contract" as const, path: v2, action: "modify" as const, expectedFromSha256: rig.project.hashes[PATHS.proposal] }],
       summary: "first",
-      applicationId: "vc-1",
-      at: AT,
-    });
-    assert.equal(first.ok, true);
-    const again = await rig.integration.services.vca.submit({ applicationId: "vc-1", at: AT2 });
-    assert.equal(again.ok, true, "重复提交幂等返回现有申请");
+    };
+    const first = await rig.runtime.submitDirect!(firstInput, "product");
+    assert.equal(first.ok, true, first.ok ? "" : `${first.errorCode}: ${first.message ?? ""}`);
+    assert.equal(first.status, "applied");
+    const trunkAfterFirst = (await rig.integration.trunk.current())!;
+    assert.equal(trunkAfterFirst.trunkVersion, 2);
+    const again = await rig.runtime.submitDirect!(firstInput, "product");
+    assert.equal(again.ok, true, "同 operationId/同请求幂等返回");
+    assert.equal(again.applicationId, first.applicationId);
+    assert.equal((await rig.integration.trunk.current())?.trunkVersion, 2, "幂等重放不重复推进 trunk");
+
+    // 历史 pending 阻断新的 direct（无 supersede）⇒ vca-pending。
     const v3 = "docs/proposals/demo-proposal-v3.md";
-    await writeProjectFile(rig.project.root, v3, "version: 3\n# proposal v3\n");
-    const second = await rig.integration.services.vca.create({
+    const v3sha = await writeProjectFile(rig.project.root, v3, lines("---", "schema: project-proposal/v2", `intent: ${PATHS.intent}`, "---", "# proposal v3", ""));
+    const legacy = await rig.integration.services.vca.create({
       kind: "version-upgrade",
       initiatorRoleId: "product",
       flowId: FLOW_ID,
-      baseTrunk: current,
+      baseTrunk: trunkAfterFirst,
       targets: [{ kind: "contract", path: v3, action: "add" }],
-      summary: "second",
+      summary: "legacy pending",
       applicationId: "vc-2",
-      at: AT,
+      at: AT2,
     });
-    assert.equal(second.ok, true);
-    const pending = await rig.integration.services.vca.submit({ applicationId: "vc-2", at: AT2 });
-    assert.equal(pending.ok, false);
-    if (!pending.ok) assert.equal(pending.code, "vca-pending");
+    assert.equal(legacy.ok, true);
+    // 真实历史 pending：旧 Service submit 状态机（运行时客户通道关闭，不影响历史记录只读语义）。
+    const legacySubmitted = await rig.integration.services.vca.submit({ applicationId: "vc-2", at: AT2 });
+    assert.equal(legacySubmitted.ok, true, legacySubmitted.ok ? "" : `${legacySubmitted.code}: ${legacySubmitted.message ?? ""}`);
+    const blocked = await rig.runtime.submitDirect!({
+      kind: "version-upgrade",
+      initiatorRoleId: "product",
+      flowId: FLOW_ID,
+      operationId: "op-matrix-2",
+      baseTrunk: directBaseOf(trunkAfterFirst),
+      targets: [{ kind: "contract", path: v3, action: "add", expectedFromSha256: v2sha }],
+      summary: "blocked by legacy pending",
+    }, "product");
+    assert.equal(blocked.ok, false);
+    if (!blocked.ok) assert.equal(blocked.errorCode, "vca-pending");
+    assert.equal((await rig.integration.trunk.current())?.trunkVersion, 2, "被阻断的提交不改指针");
+    const superseded = await rig.runtime.submitDirect!({
+      kind: "version-upgrade",
+      initiatorRoleId: "product",
+      flowId: FLOW_ID,
+      operationId: "op-matrix-3",
+      baseTrunk: directBaseOf(trunkAfterFirst),
+      targets: [{ kind: "contract", path: v3, action: "add", expectedFromSha256: v2sha }],
+      supersedesApplicationId: "vc-2",
+      summary: "explicit supersede",
+    }, "product");
+    assert.equal(superseded.ok, true, superseded.ok ? "" : `${superseded.errorCode}: ${superseded.message ?? ""}`);
+    assert.equal(superseded.status, "applied");
+    assert.equal((await rig.integration.trunk.current())?.trunkVersion, 3);
+    const finalRecords = await rig.runtime.list({ flowId: FLOW_ID });
+    assert.equal(finalRecords.find((record) => record.applicationId === "vc-2")?.status, "superseded");
+    assert.ok(v3sha.length === 64);
   } finally {
     await cleanup(rig);
   }
 });
 
-// ———————————————— 4b. 批准前哈希重验 ————————————————
+// ———————————————— 4b. 直接提交 expectedFrom 重验 ————————————————
 
-test("VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin）", async () => {
+test("VCA：直接提交 expectedFrom 重验（声明旧基线 hash 不符 ⇒ vca-target-invalid，不冻结/不 re-pin）", async () => {
   const rig = await setup();
   try {
     await bootstrapTrunk(rig);
+    const current = (await rig.integration.trunk.current())!;
     const v2 = "docs/proposals/demo-proposal-v2.md";
-    await writeProjectFile(rig.project.root, v2, "version: 2\n# proposal v2\n");
-    const submitted = await rig.runtime.submit({
+    await writeProjectFile(rig.project.root, v2, PROPOSAL_V2_TEXT);
+    // 提交时声明错误的旧基线 hash ⇒ PrepareDirectSubmission 在提交点前拒绝（不落记录/不冻结/不 re-pin）。
+    const drifted = await rig.runtime.submitDirect!({
       kind: "version-upgrade",
       initiatorRoleId: "product",
       flowId: FLOW_ID,
-      baseTrunk: (await rig.integration.trunk.current())!,
-      targets: [{ kind: "contract", path: v2, action: "modify" }],
+      operationId: "op-drift-1",
+      baseTrunk: directBaseOf(current),
+      targets: [{ kind: "contract", path: v2, action: "modify", expectedFromSha256: sha256("stale-baseline") }],
       summary: "drift",
-      applicationId: "vc-1",
-      at: AT,
-    });
-    assert.equal(submitted.ok, true);
-    // 提交后目标被改（漂移注入）⇒ 批准前重算不一致，拒绝批准、保持 submitted。
-    await writeProjectFile(rig.project.root, v2, "version: 2\n# proposal v2 CHANGED after submit\n");
-    const presented = await rig.runtime.present("vc-1");
-    assert.equal(presented.ok, false);
-    if (!presented.ok) assert.equal(presented.code, "vca-hash-drift");
-    const records = await rig.runtime.list({ flowId: FLOW_ID });
-    assert.equal(records.find((record) => record.applicationId === "vc-1")?.status, "submitted");
-    assert.equal(await rig.integration.services.freeze.entryOf(v2), undefined, "漂移不冻结");
+    }, "product");
+    assert.equal(drifted.ok, false);
+    if (!drifted.ok) assert.equal(drifted.errorCode, "vca-target-invalid");
     assert.equal((await rig.integration.trunk.current())?.trunkVersion, 1, "漂移不 re-pin");
+    assert.equal(await rig.integration.services.freeze.entryOf(v2), undefined, "漂移不冻结");
+    assert.equal((await rig.runtime.list({ flowId: FLOW_ID })).length, 0, "提交点前拒绝不产生 VCA 记录");
     const events = await ledgerOf(rig);
-    assert.ok(!eventOf(events, "version.change").some((event) => event.status === "approved"));
+    assert.ok(!eventOf(events, "version.change").some((event) => event.status === "applied"));
     assert.ok(!eventOf(events, "doc.freeze").some((event) => event.path === v2));
+
+    // 正确 hash ⇒ 一次提交即 applied。
+    const submitted = await rig.runtime.submitDirect!({
+      kind: "version-upgrade",
+      initiatorRoleId: "product",
+      flowId: FLOW_ID,
+      operationId: "op-drift-2",
+      baseTrunk: directBaseOf(current),
+      targets: [{ kind: "contract", path: v2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.proposal] }],
+      summary: "drift retry",
+    }, "product");
+    assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.errorCode}: ${submitted.message ?? ""}`);
+    assert.equal(submitted.status, "applied");
+    assert.equal((await rig.integration.trunk.current())?.trunkVersion, 2);
   } finally {
     await cleanup(rig);
   }
@@ -782,45 +868,90 @@ test("VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift
 
 const NL = String.fromCharCode(10);
 const lines = (...items: string[]): string => items.join(NL);
-const PROPOSAL_V2_TEXT = lines("---", "schema: project-proposal/v2", "---", "# proposal v2", "");
+const PROPOSAL_V2_TEXT = lines("---", "schema: project-proposal/v2", `intent: ${PATHS.intent}`, "---", "# proposal v2", "");
 
-const ROSTER_V2_REFERENCING_V1 = lines(
-  "---",
-  "schema: project-roster/v3",
-  `flowId: ${FLOW_ID}`,
-  "version: 2",
-  `intent: ${PATHS.intent}`,
-  `proposal: ${PATHS.proposal}`,
-  `architecture: ${PATHS.architecture}`,
-  "envBootstrap:",
-  "  omitted: true",
-  "  omissionReason: 测试夹具",
-  "roles:",
-  "  - id: impl",
-  "    displayName: 实现",
-  "    purpose: 实现",
-  "    capability: TS",
-  "    modules:",
-  "      - impl-core",
-  "modules:",
-  "  - id: impl-core",
-  "    name: 实现",
-  "    purpose: 实现模块",
-  "    path: src/",
-  "    category: core",
-  "    publicContract: src/index.ts",
-  `    architectureSource: ${PATHS.architecture}`,
-  "---",
-);
+/** 合法 roster v2（含拓扑章节）；proposal/architecture 引用可参数化以构造版本链不匹配。 */
+function rosterV2Text(input: { proposal: string; architecture: string }): string {
+  return lines(
+    "---",
+    "schema: project-roster/v3",
+    `flowId: ${FLOW_ID}`,
+    "version: 2",
+    `intent: ${PATHS.intent}`,
+    `proposal: ${input.proposal}`,
+    `architecture: ${input.architecture}`,
+    "envBootstrap:",
+    "  omitted: true",
+    "  omissionReason: 测试夹具",
+    "roles:",
+    "  - id: impl",
+    "    displayName: 实现",
+    "    purpose: 实现",
+    "    capability: TS",
+    "    modules:",
+    "      - impl-core",
+    "modules:",
+    "  - id: impl-core",
+    "    name: 实现",
+    "    purpose: 实现模块",
+    "    path: src/",
+    "    category: core",
+    "    publicContract: src/index.ts",
+    `    architectureSource: ${input.architecture}`,
+    "---",
+    "# 名单",
+    "## 人员+模块拓扑图",
+    "```topology",
+    "schema: project-topology/v2",
+    "management: [convener, impl]",
+    "modules:",
+    "  - id: impl-core",
+    "    path: src/",
+    "    roleId: impl",
+    "roles:",
+    "  - id: impl",
+    "    modules: [impl-core]",
+    "```",
+  );
+}
 
-async function assertUpgradeRejectedBeforeApproval(rig: Rig, targetPaths: string[], expectedCode: string): Promise<void> {
-  const presented = await rig.runtime.present("vc-1");
-  assert.equal(presented.ok, false);
-  if (!presented.ok) assert.equal(presented.code, expectedCode);
-  const records = await rig.runtime.list({ flowId: FLOW_ID });
-  assert.equal(records.find((record) => record.applicationId === "vc-1")?.status, "submitted", "VCA 保持 submitted");
-  for (const path of targetPaths) {
-    assert.equal(await rig.integration.services.freeze.entryOf(path), undefined, `未冻结目标：${path}`);
+function modulesV2Text(architecturePath: string): string {
+  return lines(
+    "---",
+    "schema: project-modules/v2",
+    `flowId: ${FLOW_ID}`,
+    "version: 2",
+    "modules:",
+    "  - id: impl-core",
+    "    name: 实现",
+    "    purpose: 实现模块",
+    "    path: src/",
+    "    category: core",
+    "    publicContract: src/index.ts",
+    `    architectureSource: ${architecturePath}`,
+    "---",
+    "# 模块清单 v2",
+  );
+}
+
+function architectureV2Text(referencedProposal: string): string {
+  return lines("---", "schema: project-architecture/v1", "---", "# architecture v2", "", `proposal: ${referencedProposal}`);
+}
+
+/**
+ * 当前语义（role-direct）：AC-5 类前置/链校验发生在**直接提交点**（prepareDirectSubmission +
+ * executeDirect 的 upgrade-chain 校验），失败即 fail-closed，不产生 applied/冻结/re-pin。
+ */
+async function assertDirectUpgradeRejected(
+  rig: Rig,
+  input: Parameters<NonNullable<VersionChangeRuntime["submitDirect"]>>[0],
+  expectedErrorCode: string,
+): Promise<void> {
+  const result = await rig.runtime.submitDirect!(input, "product");
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, expectedErrorCode);
+  for (const target of input.targets) {
+    assert.equal(await rig.integration.services.freeze.entryOf(target.path), undefined, `未冻结目标：${target.path}`);
   }
   assert.equal((await rig.integration.trunk.current())?.trunkVersion, 1, "trunk 指针不变");
   const run = await readRunManifest(rig.project.root, rig.project.runId);
@@ -829,11 +960,16 @@ async function assertUpgradeRejectedBeforeApproval(rig: Rig, targetPaths: string
     assert.equal(run.manifest.documents.proposal?.path, PATHS.proposal, "run manifest 未 re-pin");
     assert.equal((run.manifest as { repins?: unknown[] }).repins, undefined, "run manifest 无 repins");
   }
+  await refreshGuardSnapshot(rig);
+  for (const target of input.targets) {
+    assert.equal(versionedDocFreezeState(rig.project.root, target.path, true), "draft", `目标保持草稿：${target.path}`);
+  }
   const events = await ledgerOf(rig);
-  assert.ok(!eventOf(events, "version.change").some((event) => event.status === "approved"));
+  assert.ok(!eventOf(events, "version.change").some((event) => event.status === "applied"));
+  assert.ok(!eventOf(events, "doc.freeze").some((event) => input.targets.some((target) => target.path === event.path)));
 }
 
-test("VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变）", async () => {
+test("VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 直接提交 fail-closed（不冻结/不 re-pin/trunk 不变）", async () => {
   // 1) 无效 roster（roles 非数组）
   {
     const rig = await setup();
@@ -847,21 +983,18 @@ test("VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fa
       );
       const proposalV2 = "docs/proposals/demo-proposal-v2.md";
       await writeProjectFile(rig.project.root, proposalV2, PROPOSAL_V2_TEXT);
-      const submitted = await rig.runtime.submit({
+      await assertDirectUpgradeRejected(rig, {
         kind: "version-upgrade",
         initiatorRoleId: "product",
         flowId: FLOW_ID,
-        baseTrunk: (await rig.integration.trunk.current())!,
+        operationId: "op-ac5-invalid-roster",
+        baseTrunk: directBaseOf((await rig.integration.trunk.current())!),
         targets: [
-          { kind: "roster", path: rosterV2, action: "add" },
-          { kind: "contract", path: proposalV2, action: "modify" },
+          { kind: "roster", path: rosterV2, action: "add", expectedFromSha256: rig.project.hashes[PATHS.roster] },
+          { kind: "contract", path: proposalV2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.proposal] },
         ],
         summary: "invalid roster",
-        applicationId: "vc-1",
-        at: AT,
-      });
-      assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.code}: ${submitted.message ?? ""}`);
-      await assertUpgradeRejectedBeforeApproval(rig, [rosterV2, proposalV2], "vca-target-invalid");
+      }, "vca-apply-failed");
     } finally {
       await cleanup(rig);
     }
@@ -874,105 +1007,120 @@ test("VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fa
       await bootstrapTrunk(rig, ["impl", "ghost"]);
       const proposalV2 = "docs/proposals/demo-proposal-v2.md";
       await writeProjectFile(rig.project.root, proposalV2, PROPOSAL_V2_TEXT);
-      const submitted = await rig.runtime.submit({
+      await assertDirectUpgradeRejected(rig, {
         kind: "version-upgrade",
         initiatorRoleId: "product",
         flowId: FLOW_ID,
-        baseTrunk: (await rig.integration.trunk.current())!,
-        targets: [{ kind: "contract", path: proposalV2, action: "modify" }],
+        operationId: "op-ac5-d3",
+        baseTrunk: directBaseOf((await rig.integration.trunk.current())!),
+        targets: [{ kind: "contract", path: proposalV2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.proposal] }],
         summary: "d3 out of roster",
-        applicationId: "vc-1",
-        at: AT,
-      });
-      assert.equal(submitted.ok, true);
-      await assertUpgradeRejectedBeforeApproval(rig, [proposalV2], "vca-target-invalid");
+      }, "vca-apply-failed");
     } finally {
       await cleanup(rig);
     }
   }
 
-  // 3) 契约版本链不匹配（roster v2 引用 proposal v1，但 target 为 proposal v2）
+  // 3) 契约版本链不匹配（roster v2 引用 proposal v1，但 target 为 proposal v2；四文档齐备以命中链校验）
   {
     const rig = await setup();
     try {
       await bootstrapTrunk(rig);
-      const rosterV2 = "docs/proposals/demo-roster-v2.md";
-      await writeProjectFile(rig.project.root, rosterV2, ROSTER_V2_REFERENCING_V1);
+      const architectureV2 = "docs/contracts/demo-architecture-v2.md";
+      const modulesV2 = "docs/proposals/demo-modules-v2.md";
       const proposalV2 = "docs/proposals/demo-proposal-v2.md";
+      const rosterV2 = "docs/proposals/demo-roster-v2.md";
+      await writeProjectFile(rig.project.root, rosterV2, rosterV2Text({ proposal: PATHS.proposal, architecture: architectureV2 }));
       await writeProjectFile(rig.project.root, proposalV2, PROPOSAL_V2_TEXT);
-      const submitted = await rig.runtime.submit({
+      await writeProjectFile(rig.project.root, architectureV2, architectureV2Text(PATHS.proposal));
+      await writeProjectFile(rig.project.root, modulesV2, modulesV2Text(architectureV2));
+      await assertDirectUpgradeRejected(rig, {
         kind: "version-upgrade",
         initiatorRoleId: "product",
         flowId: FLOW_ID,
-        baseTrunk: (await rig.integration.trunk.current())!,
+        operationId: "op-ac5-chain",
+        baseTrunk: directBaseOf((await rig.integration.trunk.current())!),
         targets: [
-          { kind: "roster", path: rosterV2, action: "add" },
-          { kind: "contract", path: proposalV2, action: "modify" },
+          { kind: "roster", path: rosterV2, action: "add", expectedFromSha256: rig.project.hashes[PATHS.roster] },
+          { kind: "contract", path: proposalV2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.proposal] },
+          { kind: "contract", path: architectureV2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.architecture] },
+          { kind: "contract", path: modulesV2, action: "modify", expectedFromSha256: rig.project.hashes[PATHS.modules] },
         ],
         summary: "chain mismatch",
-        applicationId: "vc-1",
-        at: AT,
-      });
-      assert.equal(submitted.ok, true);
-      await assertUpgradeRejectedBeforeApproval(rig, [rosterV2, proposalV2], "vca-target-invalid");
+      }, "vca-apply-failed");
     } finally {
       await cleanup(rig);
     }
   }
 });
 
-test("VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试）", async () => {
+test("VCA AC-5：直接提交 apply 前重验（链损坏 ⇒ vca-apply-failed，不 re-pin；修复后新 operation 重试成功）", async () => {
   const rig = await setup();
   try {
     await bootstrapTrunk(rig);
+    const current = (await rig.integration.trunk.current())!;
+    const architectureV2 = "docs/contracts/demo-architecture-v2.md";
+    const modulesV2 = "docs/proposals/demo-modules-v2.md";
     const proposalV2 = "docs/proposals/demo-proposal-v2.md";
+    const rosterV2 = "docs/proposals/demo-roster-v2.md";
+    await writeProjectFile(rig.project.root, rosterV2, rosterV2Text({ proposal: PATHS.proposal, architecture: architectureV2 }));
     const v2sha = await writeProjectFile(rig.project.root, proposalV2, PROPOSAL_V2_TEXT);
-    const submitted = await rig.runtime.submit({
+    await writeProjectFile(rig.project.root, architectureV2, architectureV2Text(PATHS.proposal));
+    await writeProjectFile(rig.project.root, modulesV2, modulesV2Text(architectureV2));
+    const targets = [
+      { kind: "roster" as const, path: rosterV2, action: "add" as const, expectedFromSha256: rig.project.hashes[PATHS.roster] },
+      { kind: "contract" as const, path: proposalV2, action: "modify" as const, expectedFromSha256: rig.project.hashes[PATHS.proposal] },
+      { kind: "contract" as const, path: architectureV2, action: "modify" as const, expectedFromSha256: rig.project.hashes[PATHS.architecture] },
+      { kind: "contract" as const, path: modulesV2, action: "modify" as const, expectedFromSha256: rig.project.hashes[PATHS.modules] },
+    ];
+    // 链损坏（roster v2 仍引用 proposal v1）⇒ executeDirect 在提交点前拒绝，trunk/run 均不变。
+    const broken = await rig.runtime.submitDirect!({
       kind: "version-upgrade",
       initiatorRoleId: "product",
       flowId: FLOW_ID,
-      baseTrunk: (await rig.integration.trunk.current())!,
-      targets: [{ kind: "contract", path: proposalV2, action: "modify" }],
+      operationId: "op-ac5-broken",
+      baseTrunk: directBaseOf(current),
+      targets,
       summary: "apply recheck",
-      applicationId: "vc-1",
-      at: AT,
-    });
-    assert.equal(submitted.ok, true);
-    // 直接经 Service 批准（冻结目标），再以故障注入让 **apply 前重验** 失败（第一次批准前校验通过、
-    // 第二次 apply 重验失败）——覆盖 apply 路径的 fail-closed 映射（S4 在 services.vca.apply 前置检查）。
-    const approved = await rig.integration.services.vca.approve({ applicationId: "vc-1", decisionId: "dec-x", at: AT });
-    assert.equal(approved.ok, true, approved.ok ? "" : `${approved.code}: ${approved.message ?? ""}`);
-    assert.equal(await rig.integration.services.freeze.entryOf(proposalV2).then((entry) => entry?.sha256), v2sha);
-    const realValidate = rig.integration.trunk.validateUpgradeChain.bind(rig.integration.trunk);
-    let validateCalls = 0;
-    (rig.integration.trunk as { validateUpgradeChain: typeof realValidate }).validateUpgradeChain = async (input) => {
-      validateCalls += 1;
-      if (validateCalls === 2) {
-        return { ok: false, code: "trunk-item-invalid", message: "fault-injected apply recheck" };
-      }
-      return realValidate(input);
-    };
-    const failed = await rig.runtime.approve("vc-1", "dec-x");
-    assert.equal(failed.ok, false);
-    if (!failed.ok) assert.equal(failed.code, "vca-apply-failed");
-    assert.ok(validateCalls >= 2, "批准前 + apply 前各校验一次");
+    }, "product");
+    assert.equal(broken.ok, false);
+    if (!broken.ok) assert.equal(broken.errorCode, "vca-apply-failed");
     const records = await rig.runtime.list({ flowId: FLOW_ID });
-    assert.equal(records.find((record) => record.applicationId === "vc-1")?.status, "approved", "apply 失败保持 approved");
+    assert.equal(records.find((record) => record.operationId === "op-ac5-broken")?.status, "draft", "失败保持 draft（未 applied）");
     assert.equal((await rig.integration.trunk.current())?.trunkVersion, 1, "trunk 指针不变");
+    for (const target of targets) {
+      assert.equal(await rig.integration.services.freeze.entryOf(target.path), undefined, `未冻结目标：${target.path}`);
+    }
     const run = await readRunManifest(rig.project.root, rig.project.runId);
     assert.equal(run.ok, true);
     if (run.ok) {
       assert.equal(run.manifest.documents.proposal?.path, PATHS.proposal, "run manifest 未 re-pin");
       assert.equal((run.manifest as { repins?: unknown[] }).repins, undefined);
     }
-    // 恢复真实校验后重试 ⇒ applied、re-pin、trunk+1。
-    (rig.integration.trunk as { validateUpgradeChain: typeof realValidate }).validateUpgradeChain = realValidate;
-    const retry = await rig.runtime.approve("vc-1", "dec-x");
-    assert.equal(retry.ok, true, retry.ok ? "" : `${retry.code}: ${retry.message ?? ""}`);
-    if (retry.ok) assert.equal(retry.value.record.status, "applied");
+    // 修复：roster v2 / architecture v2 改为引用 proposal v2；以新的真实 operation 重提 ⇒ applied + trunk+1。
+    await writeProjectFile(rig.project.root, rosterV2, rosterV2Text({ proposal: proposalV2, architecture: architectureV2 }));
+    await writeProjectFile(rig.project.root, architectureV2, architectureV2Text(proposalV2));
+    const retry = await rig.runtime.submitDirect!({
+      kind: "version-upgrade",
+      initiatorRoleId: "product",
+      flowId: FLOW_ID,
+      operationId: "op-ac5-fixed",
+      baseTrunk: directBaseOf(current),
+      targets,
+      summary: "apply recheck retry",
+    }, "product");
+    assert.equal(retry.ok, true, retry.ok ? "" : `${retry.errorCode}: ${retry.message ?? ""}`);
+    assert.equal(retry.status, "applied");
     assert.equal((await rig.integration.trunk.current())?.trunkVersion, 2);
+    const status = await rig.integration.trunk.status();
+    assert.equal(status.manifest?.artifacts.documents.proposal?.path, proposalV2);
+    assert.equal(status.manifest?.artifacts.documents.roster?.path, rosterV2);
+    await refreshFreezeRegistry(rig);
+    assert.equal(await rig.integration.services.freeze.entryOf(proposalV2).then((entry) => entry?.sha256), v2sha);
+    // direct 语义明确不重 pin 旧 run（run 保持原 pinned 字节；trunk 已推进 t2）。
     const runAfter = await readRunManifest(rig.project.root, rig.project.runId);
-    if (runAfter.ok) assert.ok((runAfter.manifest as { repins?: unknown[] }).repins !== undefined, "重试成功后 re-pin");
+    assert.equal(runAfter.ok, true);
+    if (runAfter.ok) assert.equal((runAfter.manifest as { repins?: unknown[] }).repins, undefined, "direct 不重 pin 旧 run");
   } finally {
     await cleanup(rig);
   }
@@ -1046,44 +1194,80 @@ test("bootstrap：首次 handoff pin 写 handoff-pin-bootstrap 冻结（pin 只 
   }
 });
 
-test("bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1", async () => {
-  const rig = await setup({ migrate: true, withRun: false, freezeKeys: [] });
-  try {
-    assert.equal(await rig.integration.trunk.current(), null);
-    const v2 = "docs/proposals/demo-proposal-v2.md";
-    const v2sha = await writeProjectFile(rig.project.root, v2, PROPOSAL_V2_TEXT);
-    const submitted = await rig.runtime.submit({
-      kind: "version-upgrade",
-      initiatorRoleId: "product",
-      flowId: FLOW_ID,
-      baseTrunk: null,
-      bootstrap: true,
-      targets: [{ kind: "contract", path: v2, action: "add" }],
-      summary: "bootstrap v2",
-      applicationId: "vc-1",
-      at: AT,
-    });
-    assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.code}: ${submitted.message ?? ""}`);
-    const presented = await rig.runtime.present("vc-1");
-    assert.equal(presented.ok, true, presented.ok ? "" : `${presented.code}: ${presented.message ?? ""}`);
-    if (!presented.ok) return;
-    assert.equal(presented.value.resultTrunkVersion, 1);
-    const current = await rig.integration.trunk.current();
-    assert.equal(current?.trunkVersion, 1);
-    const status = await rig.integration.trunk.status();
-    assert.equal(status.manifest?.source, "bootstrap");
-    const frozen = await rig.integration.services.freeze.entryOf(v2);
-    assert.equal(frozen?.freeze.reason, "bootstrap-vca-approved");
-    assert.equal(frozen?.freeze.origin, "application");
-    assert.equal(frozen?.freeze.decidedBy, undefined);
-    assert.equal(frozen?.sha256, v2sha);
-    const events = await ledgerOf(rig);
-    const freezeEvent = eventOf(events, "doc.freeze")[0]!;
-    assert.equal(freezeEvent.reason, "bootstrap-vca-approved");
-    assert.equal(freezeEvent.origin, "application");
-    assert.equal(freezeEvent.decidedBy, undefined);
-  } finally {
-    await cleanup(rig);
+test("bootstrap：无 trunk ⇒ 显式 baseTrunk:null + 真实 intent-confirmed 直接建立 trunk v1；缺证据 fail-closed", async () => {
+  // 反例：无真实 intent-confirmed 证据 ⇒ 直接提交拒绝（不自报 bootstrap、不伪造基线）。
+  {
+    const rig = await setup({ migrate: true, withRun: false, freezeKeys: [] });
+    try {
+      assert.equal(await rig.integration.trunk.current(), null);
+      const v2 = "docs/proposals/demo-proposal-v2.md";
+      await writeProjectFile(rig.project.root, v2, PROPOSAL_V2_TEXT);
+      const rejected = await rig.runtime.submitDirect!({
+        kind: "version-upgrade",
+        initiatorRoleId: "product",
+        flowId: FLOW_ID,
+        operationId: "op-boot-no-intent",
+        baseTrunk: null,
+        targets: [{ kind: "contract", path: v2, action: "add", expectedFromSha256: null }],
+        summary: "bootstrap without evidence",
+      }, "product");
+      assert.equal(rejected.ok, false);
+      if (!rejected.ok) assert.equal(rejected.errorCode, "vca-target-invalid");
+      assert.equal(await rig.integration.trunk.current(), null, "缺证据不建立 trunk");
+    } finally {
+      await cleanup(rig);
+    }
+  }
+
+  // 正例：真实 intent-confirmed 冻结记录作为 bootstrap 证据。
+  {
+    const rig = await setup({ migrate: true, withRun: false, freezeKeys: [] });
+    try {
+      const intentFrozen = await rig.integration.services.freeze.freeze({
+        path: PATHS.intent,
+        version: 1,
+        sha256: rig.project.hashes[PATHS.intent]!,
+        applicationId: "intent-dec-intent",
+        reason: "intent-confirmed",
+        decisionId: "dec-intent",
+        at: AT,
+      });
+      assert.equal(intentFrozen.ok, true, intentFrozen.ok ? "" : `${intentFrozen.code}: ${intentFrozen.message ?? ""}`);
+      assert.equal(await rig.integration.trunk.current(), null);
+      const v2 = "docs/proposals/demo-proposal-v2.md";
+      const v2sha = await writeProjectFile(rig.project.root, v2, PROPOSAL_V2_TEXT);
+      const submitted = await rig.runtime.submitDirect!({
+        kind: "version-upgrade",
+        initiatorRoleId: "product",
+        flowId: FLOW_ID,
+        operationId: "op-boot-1",
+        baseTrunk: null,
+        targets: [{ kind: "contract", path: v2, action: "add", expectedFromSha256: null }],
+        summary: "bootstrap v2",
+      }, "product");
+      assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.errorCode}: ${submitted.message ?? ""}`);
+      assert.equal(submitted.status, "applied");
+      const current = await rig.integration.trunk.current();
+      assert.equal(current?.trunkVersion, 1);
+      const status = await rig.integration.trunk.status();
+      assert.equal(status.manifest?.source, "upgrade", "direct 首建按 direct commit 记录 source=upgrade");
+      assert.equal(status.manifest?.previous, null, "direct 首建 previous=null（无旧 trunk）");
+      assert.equal(status.manifest?.artifacts.documents.proposal?.path, v2);
+      await refreshFreezeRegistry(rig);
+      const frozen = await rig.integration.services.freeze.entryOf(v2);
+      assert.equal(frozen?.freeze.reason, "role-direct-applied");
+      assert.equal(frozen?.freeze.origin, "role-direct");
+      assert.equal(frozen?.freeze.decidedBy, undefined);
+      assert.equal(frozen?.sha256, v2sha);
+      const events = await ledgerOf(rig);
+      const applied = eventOf(events, "version.change").find((event) => event.status === "applied")!;
+      assert.equal(applied.origin, "role-direct");
+      assert.equal(applied.bootstrap, true);
+      assert.equal(applied.decidedBy, undefined);
+      assert.ok(!eventOf(events, "doc.freeze").length, "direct 冻结不写 doc.freeze 账本事件（R9 记录直写）");
+    } finally {
+      await cleanup(rig);
+    }
   }
 });
 
@@ -1115,6 +1299,8 @@ test("冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；
     });
     assert.equal(await reopened.services.freeze.state(), "ready");
     await reopened.services.freeze.ensureReady();
+    // 同步守卫快照归 G（C2b）公共刷新；生产由桌面栈 initialize / 会话边界解析安装。
+    await refreshAndInstallVersionedDocFreezeSnapshot(project.root, { migrationCompleted: true, now: () => new Date(AT) });
     assert.equal(versionedDocFreezeState(project.root, PATHS.proposal, true), "frozen");
 
     // 派生缓存：缺失 ⇒ 从 baseline 重建；一致 ⇒ consistent；损坏 ⇒ fail-closed（不自动重建）。
@@ -1147,6 +1333,7 @@ test("冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；
     assert.equal(marker.ok, true);
     assert.equal((await reopened.services.freeze.isFrozen(draftV2)).state, "draft");
     assert.equal((await reopened.services.freeze.migrationMarkOf(draftV2, 2)), "migrated-draft");
+    await refreshAndInstallVersionedDocFreezeSnapshot(project.root, { migrationCompleted: true, now: () => new Date(AT) });
     assert.equal(versionedDocFreezeState(project.root, draftV2, true), "draft");
     const draftEdit = versionedDocOverwriteDecision({ relPath: draftV2, exists: true, frozen: "draft", operation: "write" });
     assert.equal(draftEdit.allowed, true);
@@ -1172,6 +1359,8 @@ test("冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；
     assert.equal(migrated.ok, false);
     if (!migrated.ok) assert.equal(migrated.code, "doc-freeze-registry-corrupt");
     assert.equal(await corrupt.services.freeze.isFrozen(PATHS.proposal).then((lookup) => lookup.state), "unknown");
+    // 经 G 公共刷新后仍是 unknown（baseline corrupt ⇒ 不自动重建/不放开覆盖）。
+    await refreshAndInstallVersionedDocFreezeSnapshot(corruptRoot.root, { migrationCompleted: true, now: () => new Date(AT) });
     assert.equal(versionedDocFreezeState(corruptRoot.root, PATHS.proposal, true), "unknown");
     const denied = versionedDocOverwriteDecision({
       relPath: PATHS.proposal,
