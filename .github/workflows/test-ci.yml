@@ -15,11 +15,19 @@
 # 非目标（明确声明）：
 #   - 不改 release.yml：发布 workflow 保持原样（冻结 tag + overlay 发布门禁不动）；
 #   - 不放宽发布门禁：本 workflow 不替代、不参与发布验证。发布权威测试命令仍是
-#     release.yml 的 `node --test --test-concurrency=1 "test/**/*.test.ts"`；本文件中的
-#     --test-timeout=300000 只把挂起变成可命名的失败，不跳过、不放宽任何断言；
+#     release.yml 的 `node --test --test-concurrency=1 "test/**/*.test.ts"`（零改动，不得
+#     据此放松）；本文件中的 --test-timeout=300000 只把挂起变成可命名的失败；
+#     --test-force-exit 仅在**全部用例完成或被命名（失败）后**影响进程退出，用于防止
+#     Node/Windows 上测试后异步清理期（post-test spin 残余）进程不退出。两者都不跳过、
+#     不放宽任何断言/用例；
 #   - 不发布：无 tag、无打包、无 release-prepare/overlay、无 Release 资产、无写权限
 #     （仅 contents: read）；
 #   - 仅开发反馈：通过与否只表示该 ref 的开发期测试状态，不构成任何发布放行结论。
+#
+# --test-force-exit 批准依据：B1b（chief-workflow 退出/句柄泄漏修复）与 B3c（CI 路径规范形）
+#   记录的 post-test spin 残余——测试体全绿后偶发文件级进程不退出（无 ref'd 句柄、与修复
+#   无关的 Node 主线程自旋，--test-isolation=none 亦复现）。协调者已批准仅本开发反馈通道
+#   使用该 flag；发布门禁 command 不变。
 #
 # 触发：仅 workflow_dispatch（手动）。输入 ref 指定被测 ref（分支/tag/commit），默认 main。
 # 矩阵、Node 版本、git config、依赖安装与 typecheck 命令均与 release.yml 逐项对齐。
@@ -91,7 +99,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          node --test --test-concurrency=1 --test-timeout=300000 "test/**/*.test.ts" 2>&1 | tee test-ci-output.log
+          node --test --test-concurrency=1 --test-timeout=300000 --test-force-exit "test/**/*.test.ts" 2>&1 | tee test-ci-output.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
