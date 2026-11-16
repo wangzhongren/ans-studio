@@ -1,0 +1,169 @@
+test at test\测试\git-action-cross-runtime-audit-failure.test.ts:15:1
+✖ AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行） (93.1565ms)
+  AssertionError [ERR_ASSERTION]: {"operationId":"w5-cross-ac16","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+  + actual - expected
+  
+  + 'git-file-final-guard-unproven'
+  - 'git-action-audit-unavailable'
+         ^
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-action-cross-runtime-audit-failure.test.ts:19:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'git-file-final-guard-unproven',
+    expected: 'git-action-audit-unavailable',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------
+test at test\测试\git-action-cross-runtime-codex-init.test.ts:14:1
+✖ P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在 (103.971ms)
+  AssertionError [ERR_ASSERTION]: {"operationId":"w5-cross-codex-init","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+  + actual - expected
+  
+  + 'blocked'
+  - 'prepared'
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-action-cross-runtime-codex-init.test.ts:17:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------
+test at test\测试\git-action-cross-runtime-init.test.ts:64:1
+✖ AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录 (122.3998ms)
+  AssertionError [ERR_ASSERTION]: {"operationId":"w5-cross-claude-init","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+  + actual - expected
+  
+  + 'blocked'
+  - 'prepared'
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-action-cross-runtime-init.test.ts:67:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------
+test at test\测试\git-action-cross-runtime-pi-init.test.ts:14:1
+✖ AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确 (90.6074ms)
+  AssertionError [ERR_ASSERTION]: {"operationId":"w5-cross-pi-init","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+  + actual - expected
+  
+  + 'blocked'
+  - 'prepared'
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-action-cross-runtime-pi-init.test.ts:17:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------
+test at test\测试\run-stop-host-continuation-integration.test.ts:81:1
+✖ host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven (26.4735ms)
+  AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/run-stop-host-continuation-integration.test.ts:106:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------
+test at test\测试\session-admission-approval-q9-integration.test.ts:86:1
+✖ Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed (162.0396ms)
+  AssertionError [ERR_ASSERTION]: {"operationId":"w5-q16-pos-init","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+  + actual - expected
+  
+  + 'blocked'
+  - 'prepared'
+  
+      at file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/session-admission-approval-q9-integration.test.ts:176:16
+      at async withCodexEnv (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/session-admission-approval-q9-integration.test.ts:51:12)
+      at async TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/session-admission-approval-q9-integration.test.ts:87:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------
+test at test\编排\git-action-authorization-gate.test.ts:104:1
+✖ gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录 (26.5505ms)
+  AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-action-authorization-gate.test.ts:118:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------
+test at test\编排\git-action-authorization-gate.test.ts:175:1
+✖ gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生） (9.4323ms)
+  AssertionError [ERR_ASSERTION]: 未撤销的 prepared 条目必须拒绝（H13）
+  + actual - expected
+  
+  + 'git-file-final-guard-unproven'
+  - 'git-core-in-flight-unproven'
+         ^
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-action-authorization-gate.test.ts:195:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'git-file-final-guard-unproven',
+    expected: 'git-core-in-flight-unproven',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------
+test at test\编排\git-action-authorization-gate.test.ts:216:1
+✖ gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven (6.6537ms)
+  AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-action-authorization-gate.test.ts:235:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+--------

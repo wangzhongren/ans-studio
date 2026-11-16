@@ -56,7 +56,9 @@ function fixtureRole(id: string): ResolvedRole {
 }
 function fileGateOptions(root: string): Partial<RuntimeSessionOptions> {
   // B3c（2026-11-16）：guard 期望根为调用方根的 realpath 规范拼写（macOS `/var` 链接 / Windows 8.3 短名）。
-  const canonical = realpathSync(root);
+  // B3c-followup（2026-11-16）：用 `realpathSync.native`（与产品 `canonicalProjectRoot` 同语义）；
+  // 同步 JS `realpathSync` 不展开 Windows 8.3 短名（CI TEMP = `RUNNER~1`，junction 模拟测不出）。
+  const canonical = realpathSync.native(root);
   const protectedGitRoots = [path.join(canonical, ".git")];
   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
     fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };

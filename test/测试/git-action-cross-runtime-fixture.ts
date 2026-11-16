@@ -45,9 +45,12 @@ export function fixtureRole(id: string): ResolvedRole {
 /** 受保护项目 host 文件守卫事实（`.git` 根；与 W3b/W2 gate 夹具同口径）。
  *  B3c（2026-11-16）：guard 的期望根由调用方根经 `canonicalProjectRoot`（realpath）构造；
  *  macOS CI 的 `/var` 符号链接与 Windows CI 的 8.3 短名会让 mkdtemp 原拼写与真实根不同，
- *  因此夹具发布的 protectedGitRoots 必须是同一真实根的规范拼写（真实目录已由 mkdtemp 建立）。 */
+ *  因此夹具发布的 protectedGitRoots 必须是同一真实根的规范拼写（真实目录已由 mkdtemp 建立）。
+ *  B3c-followup（2026-11-16）：必须用 `realpathSync.native`——同步 JS `realpathSync` 在 Windows
+ *  只做 lstat/readlink 游走，不展开 8.3 短名（CI TEMP 拼写为 `RUNNER~1`，本地 junction 可解析，
+ *  故 junction 模拟测不出）；`.native` 与产品 `canonicalProjectRoot` 同一语义（展开短名/解析链接）。 */
 export function fileGateOptions(root: string): Partial<RuntimeSessionOptions> {
-  const canonical = realpathSync(root);
+  const canonical = realpathSync.native(root);
   const protectedGitRoots = [path.join(canonical, ".git")];
   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
     fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };

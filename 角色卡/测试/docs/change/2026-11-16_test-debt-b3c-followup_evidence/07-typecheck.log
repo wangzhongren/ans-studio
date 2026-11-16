@@ -1,0 +1,7 @@
+# npm run typecheck — capture 2026-11-16, worktree b3cfu, Node v24.22.1
+# shell exit status: EXIT=0
+
+
+> ans-cli@2.0.0 typecheck
+> tsc --noEmit
+

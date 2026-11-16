@@ -1,0 +1,62 @@
+# B3c-followup baseline: pre-fix (B3c code, realpathSync) under 8.3 short-name TEMP
+# TEMP=TMP=C:\Users\51054\AppData\Local\Temp\ANF967~3 (8.3 short spelling of ans-b3cfu-shortname-probe-abcdef)
+# command: node --test --test-concurrency=1 --test-timeout=120000 <file>
+
+######## git-action-cross-runtime-init
+✔ P1.2-AC-27 Codex 创建期对照：responses（native 不可用）⇒ plan 省略 native 仍发 token；chat/off（observed）⇒ 记录可选强证明 (20.8521ms)
+✖ AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录 (125.7426ms)
+ℹ pass 1
+ℹ fail 1
+✖ failing tests:
+✖ AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录 (125.7426ms)
+
+######## git-action-cross-runtime-audit-failure
+✖ AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行） (118.6908ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行） (118.6908ms)
+
+######## git-action-cross-runtime-pi-init
+✖ AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确 (110.3713ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确 (110.3713ms)
+
+######## git-action-cross-runtime-codex-init
+✖ P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在 (103.0492ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在 (103.0492ms)
+
+######## git-action-authorization-gate
+✖ gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录 (25.9129ms)
+✔ gate active-tool：expectedTool 缺失、actor Core/角色/任务不符 ⇒ git-actor-core-binding-unproven (11.8826ms)
+✖ gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生） (17.9898ms)
+✖ gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven (7.4298ms)
+✔ W2 C1–C4/Q8：run-stop/controller-stop 成员身份=Core+可选 native；finalize 终止证据用 drain；native absent 允许、present-but-changed 拒绝 (1.2261ms)
+ℹ pass 2
+ℹ fail 3
+✖ failing tests:
+✖ gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录 (25.9129ms)
+✖ gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生） (17.9898ms)
+✖ gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven (7.4298ms)
+
+######## run-stop-host-continuation-integration
+✖ host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven (22.4148ms)
+✔ B1-EV3 drain：Claude/Pi 形态（status/processCoverage unknown、native absent）⇒ drained；非 idle Pi/活动面/清理失败/未知 reason ⇒ 阻断 (0.501ms)
+✔ AC-8/AC-20 run-stop/controller-stop：成员=Core+可选 native；finalize 用 drain；present-but-changed 拒绝；host fence 保留；不写 sidecar (1.8398ms)
+ℹ pass 2
+ℹ fail 1
+✖ failing tests:
+✖ host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven (22.4148ms)
+
+######## session-admission-approval-q9-integration
+✖ Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed (190.6059ms)
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+✖ Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed (190.6059ms)
+
