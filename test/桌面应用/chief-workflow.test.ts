@@ -2107,11 +2107,21 @@ test("W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
   const events: Parameters<Parameters<typeof createDesktopInterface>[0]["emitEvent"]>[0][] = [], cards: OperatorRequestPayload[] = [];
   const channel = createCustomerInputChannel({ operatorId: "human", presenter: card => cards.push(card) });
   const trace: Array<{ role: string; text: string; tools: string[] }> = [];
+  // R6（2026-11-16，x64-only W36）：CI 曾出现 `tool.function` 缺席的 tools 元素（TypeError at :2111）。
+  // 记录异常形状样本供失败诊断，不把未知请求猜成幕僚。
+  const toolShapeAnomalies: string[] = [];
   let requestedRole = "product", desktop: ReturnType<typeof createDesktopInterface> | undefined;
   let resumeTarget: { taskId: string; flowId: string; runId: string; reviewTaskId: string; reviewCloseOperationId: string } | undefined;
   const server = createServer(async (request, response) => {
     let raw = ""; for await (const chunk of request) raw += chunk;
-    const body = JSON.parse(raw), isChief = body.tools.some((tool: { function: { name: string } }) => tool.function.name === "ans_role_activity_log");
+    const body = JSON.parse(raw);
+    // R6 夹具加固：chat-transport 是嵌套 `{type:"function", function:{name}}`，responses 原生路径是扁平
+    // `{type:"function", name}`；两种真实形状都识别。无名元素只记异常样本（不崩溃、不猜幕僚、不放宽断言）。
+    const rawTools: unknown[] = Array.isArray(body.tools) ? body.tools : [];
+    const toolNames = rawTools.map((tool) => { const value = tool as { function?: { name?: unknown }; name?: unknown } | null;
+      return typeof value?.function?.name === "string" ? value.function.name : typeof value?.name === "string" ? value.name : undefined; });
+    if (toolNames.some((name) => name === undefined)) toolShapeAnomalies.push(JSON.stringify(rawTools.map((tool) => tool !== null && typeof tool === "object" ? Object.keys(tool) : typeof tool)));
+    const isChief = toolNames.includes("ans_role_activity_log");
     const role = isChief ? "chief" : requestedRole;
     const text = [...body.messages].reverse().find((message: { role: string }) => message.role === "user")?.content ?? "";
     const last = body.messages.at(-1), tools = body.messages.filter((message: { role: string }) => message.role === "tool").map((message: { content: string }) => message.content);
@@ -2126,7 +2136,7 @@ test("W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
     const call = name ? { id, type: "function", function: { name, arguments: JSON.stringify(args) } } : undefined;
     response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ id: "w36-local", object: "chat.completion", choices: [{ index: 0, finish_reason: call ? "tool_calls" : "stop", message: { role: "assistant", content: call ? null : "已收到真实阻塞报告，由幕僚决定下一步。", ...(call ? { tool_calls: [call] } : {}) } }] }));
   });
-  const wait = async (predicate: () => Promise<boolean> | boolean, reason: string) => { const end = Date.now() + 6000; while (!await predicate() && Date.now() < end) await tick(10); assert.ok(await predicate(), reason + JSON.stringify(trace)); };
+  const wait = async (predicate: () => Promise<boolean> | boolean, reason: string) => { const end = Date.now() + 6000; while (!await predicate() && Date.now() < end) await tick(10); assert.ok(await predicate(), reason + JSON.stringify(trace) + JSON.stringify(toolShapeAnomalies)); };
   try {
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); const address = server.address(); assert.ok(address && typeof address !== "string");
     desktop = createDesktopInterface({ pickDirectory: async () => root, customerInput: channel.customerInput, emitEvent: event => events.push(event),

@@ -1,0 +1,23 @@
+✔ direct governance bridge: only the trusted trio action owner receives each capability (38.9826ms)
+✔ chief bridge: trusted bounded context forwards only decision capability and denies production writes (4.62ms)
+✔ chief bridge: wrong role, single model and unbound settlement capability fail before adapter construction (0.7545ms)
+✔ chief bridge: real runtime Service sees only decide tool, separate host context, and no session persistence (13.6254ms)
+✔ run-role 能力注入：product → 仅 submitVersionChange；rapporteur 同；convener → refactor+stable；chief 全无 (20.7406ms)
+✔ run-role 能力注入：项目角色即便调用方误给也不注入三能力（模型自报角色不可信） (14.1337ms)
+✔ run-role 能力注入：未注入 ⇒ 能力位缺席（工具不注册；无副作用） (3.8575ms)
+✔ run-role 能力注入：假实现的结构化回执形状（submitted/requested）由工具层透传（形状自检） (0.1825ms)
+✔ Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions (1466.6416ms)
+✔ Pipeline handback turn intent: real task identity survives optional info reports; work still requires a report and chat clears old task (59.0197ms)
+✔ Pipeline initial workflow source: actual approved Core request binds task before the real guarded write (1957.0459ms)
+✔ Pipeline failed open: actual Core preparation is revoked and error reference binds one host handle (14.7924ms)
+✔ Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology (766.8245ms)
+✔ Hub NoGit stage facts: actual default Chat writes a legal product draft and rejects a late Git association (89.5099ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4781.6214
+EXIT=0

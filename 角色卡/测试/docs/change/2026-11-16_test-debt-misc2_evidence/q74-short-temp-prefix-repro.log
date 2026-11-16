@@ -1,0 +1,34 @@
+✖ Q74 owned Git metadata observer atomic rename race remains bounded and strict (51.4416ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 564.8779
+
+✖ failing tests:
+
+test at test\测试\git-role-workflows-e2e.test.ts:35:63
+✖ Q74 owned Git metadata observer atomic rename race remains bounded and strict (51.4416ms)
+  AssertionError [ERR_ASSERTION]: Fixture inventory path must not traverse unknown links
+  + actual - expected
+  
+  + 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-ci-shortname-simulation-longdir\\q2-git-metadata-observer-5yVWYx\\.git\\ans'
+  - 'C:\\Users\\51054\\AppData\\Local\\Temp\\ANS-CI~1\\q2-git-metadata-observer-5yVWYx\\.git\\ans'
+  
+      at visit (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/misc2/test/%E6%B5%8B%E8%AF%95/git-role-workflows-driver.ts:355:18)
+      at async hashFixtureFiles (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/misc2/test/%E6%B5%8B%E8%AF%95/git-role-workflows-driver.ts:369:11)
+      at async race (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/misc2/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:191:14)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/misc2/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:198:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-ci-shortname-simulation-longdir\\q2-git-metadata-observer-5yVWYx\\.git\\ans',
+    expected: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ANS-CI~1\\q2-git-metadata-observer-5yVWYx\\.git\\ans',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+PREFIX_EXIT=1

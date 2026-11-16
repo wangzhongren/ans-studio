@@ -202,7 +202,10 @@ function sourceGatedHarness(root: string, options: { realRoles?: readonly string
   markLegacyProject(root);
   const realRoles = new Set<string>(options.realRoles ?? ["chief"]);
   const scripts: Record<string, ToolCall[]> = {};
-  const receipts: DispatchReceipt[] = [];
+  // R6 CI（2026-11-16）：回执按「发起角色 + 请求载荷」记录。demo 脚本数组是会话级共享引用，
+  // 回合结束后若不清空，后续无关投递（回交/通知）会重放上一回合的 dispatch_task，产生
+  // 「重复派发已抑制」的第二条 ok 回执（CI run-pin.test.ts:392 true !== false）。
+  const receipts: Array<{ receipt: DispatchReceipt; fromRoleId: string; payload: DispatchTaskPayload }> = [];
   const customerInputs: Record<string, CustomerInputFn | undefined> = {};
   const contractChecks: Record<string, ContractCheckFn | undefined> = {};
   const streams: Record<string, OrchestrationEvent[]> = {};
@@ -260,7 +263,9 @@ function sourceGatedHarness(root: string, options: { realRoles?: readonly string
       const dispatch = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
       const wrapped: DispatchTaskFn | undefined = dispatch === undefined ? undefined : async (d, metadata) => {
         const receipt = (await dispatch(d, metadata)) as DispatchReceipt | null | undefined;
-        if (receipt !== null && receipt !== undefined) receipts.push(receipt);
+        if (receipt !== null && receipt !== undefined) receipts.push({ receipt, fromRoleId: input.roleId, payload: d });
+        // 一次性脚本：本角色本回合的 dispatch 已完成，后续无关提示（回交/通知/系统行）不得重放它。
+        script.length = 0;
         return receipt;
       };
       return openRoleSession({ ...input, autoRepin: false, ...(wrapped !== undefined ? { dispatchTask: wrapped } : {}) }, { createAdapter: factory });
@@ -281,9 +286,13 @@ function sourceGatedHarness(root: string, options: { realRoles?: readonly string
       ? await mgr.sendBackground({ projectRoot: root, roleId, runtime: "demo", text, kind: "system" })
       : await mgr.send(text, undefined, { projectRoot: root, roleId, runtime: "demo" });
     assert.equal(send.ok, true, `真实 ${roleId} 回合应被受理`);
-    for (let tries = 0; tries < 500 && receipts.length === before; tries += 1) await tick(10);
-    assert.ok(receipts.length > before, `${roleId} 回合内 dispatch_task 应返回回执`);
-    return receipts[receipts.length - 1]!;
+    // 只取本回合、本载荷的回执：无关并发投递（如 chief 的重复抑制回执）不得顶替被测 dispatch 的结果。
+    const match = (): DispatchReceipt | undefined => receipts.slice(before)
+      .find((entry) => entry.fromRoleId === roleId && entry.payload.roleId === payload.roleId && entry.payload.task === payload.task)?.receipt;
+    for (let tries = 0; tries < 500 && match() === undefined; tries += 1) await tick(10);
+    const produced = match();
+    assert.ok(produced !== undefined, `${roleId} 回合内 dispatch_task 应返回回执`);
+    return produced;
   };
   return {
     mgr,

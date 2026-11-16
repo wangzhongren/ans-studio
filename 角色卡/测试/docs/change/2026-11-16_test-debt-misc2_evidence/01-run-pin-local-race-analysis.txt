@@ -1,0 +1,43 @@
+# run-pin M1/M2/M3：本地复现与机理（R6 CI x64/Windows 同错误体）
+
+## CI 错误体（/tmp/r9-art 两平台最终 section）
+AssertionError [ERR_ASSERTION]: 已受理：任务 #t-... 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。
+true !== false
+at run-pin.test.ts:392:12（worker.ok 断言：期望 false=freeze 硬拒，实际 true=重复派发抑制回执）
+
+## 本机复现（Node v24.22.1，Windows 11；改前）
+- 定向运行 11 次出现 3 次失败（首轮 10 次中 2 次 + 捕捉轮首跑 1 次），失败体与 CI 逐字同形（run-pin-local-flake-repro.log）。
+- 约 27% 的复现率说明不是环境独有，而是夹具时序竞态。
+
+## 机理解析（RUNPIN_DEBUG 仪表日志，见 run-pin-local-flake-repro-debug.log）
+关键序列（行号为调试日志行）：
+  [runpin:dispatch] chief -> convener task=把项目交付运营 ok=true   （handoff 回合，脚本=dispatch_task handoff）
+  [runpin:before-worker-dispatch] 任务表中 handoff 任务 reports=0
+  [runpin:dispatch] convener -> implementer task=实现番茄钟 ok=false msg="worker-freeze stage=prepare code=trunk-verify-failed ..."
+  [runpin:dispatch] chief -> convener task=把项目交付运营 ok=true msg="已受理：任务 #t-... 已报告，重复派发已抑制..."
+机理：demo runtime 的脚本数组是**会话级共享引用**，每个 prompt 都会重放当前脚本。handoff 回合结束后，
+convener 回合 settle 产生 handback/通知又向 chief 发了一次 prompt；此时 chief 的脚本仍留着上一回合的
+dispatch_task（handoff），于是重放产生第二条 ok=true 的“重复派发已抑制”回执。测试取
+receipts[receipts.length-1]，恰好拿到这条无关回执，392 行断言 true !== false。
+
+## 改法（仅测试夹具）
+1. wrapped dispatch 完成后清空本角色脚本（一次性脚本）——后续无关 prompt（回交/通知/系统行）不再重放。
+2. driveTurn 只取“本回合 + 本角色 + 本载荷(roleId/task)”的回执，杜绝无关并发回执顶替被测 dispatch。
+断言/用例零改动；产品“重复派发抑制”语义未触碰（BUG-5 既有用例仍覆盖）。
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"chief"}
+[runpin:before-worker-dispatch] [{"id":"t-mwj72wtx-d51123f8","to":"product","text":"写产品意图","reports":0,"delivered":"product","closed":false},{"id":"t-mwj72wzw-ec601e77","to":"rapporteur","text":"出方案与名单","reports":0,"delivered":"rapporteur","closed":false},{"id":"t-mwj72x5k-7e809919","to":"nominator","text":"按名单招人","reports":0,"delivered":"nominator","closed":false},{"id":"t-mwj72xbg-e07a3afa","to":"convener","text":"把项目交付运营","reports":0,"delivered":"convener","closed":false}]
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:dispatch] {"role":"convener","to":"implementer","task":"实现番茄钟","ok":false,"msg":"worker-freeze stage=prepare code=trunk-verify-failed parentT"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:dispatch] {"role":"chief","to":"convener","task":"把项目交付运营","ok":true,"msg":"已受理：任务 #t-mwj72xbg-e07a3afa 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}

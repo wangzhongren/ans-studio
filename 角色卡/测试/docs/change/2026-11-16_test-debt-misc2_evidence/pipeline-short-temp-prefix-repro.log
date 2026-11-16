@@ -1,0 +1,25 @@
+✖ Pipeline initial workflow source: actual approved Core request binds task before the real guarded write (1235.3566ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1591.8045
+
+✖ failing tests:
+
+test at test\编排\run-role-submit-capabilities.test.ts:440:1
+✖ Pipeline initial workflow source: actual approved Core request binds task before the real guarded write (1235.3566ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"reason":"missing","message":"Error: ENOENT: no such file or directory, realpath 'C:\\Users\\51054\\AppData\\Local\\Temp\\ANS-CI~1\\ans-o10-workflow-source-WL5JcR\\.ans\\trunk\\operations\\59ff13f4e32417eab058606e1beb81f9eb341923c52db7c50dcddf562dc30223\\stable-source.json'"}
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/misc2/test/%E7%BC%96%E6%8E%92/run-role-submit-capabilities.test.ts:504:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

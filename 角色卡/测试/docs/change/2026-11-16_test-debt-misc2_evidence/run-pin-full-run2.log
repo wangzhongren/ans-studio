@@ -1,0 +1,29 @@
+✔ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (1076.0587ms)
+✔ D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集 (417.7596ms)
+✔ run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned (229.0338ms)
+✔ run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等 (37.2612ms)
+✔ legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned (2.2163ms)
+✔ P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝 (38.5194ms)
+✔ P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写 (65.8165ms)
+✔ P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId (74.8694ms)
+✔ R2（P1.3）：legacy 任务验收 facts 标 runState=legacy (201.0825ms)
+✔ contract_check session：pinned run/角色写区/legacy 明示（只读） (61.6338ms)
+✔ contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12） (37.1724ms)
+✔ contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8） (38.6497ms)
+✔ F2：版本化文档基线违规受理 + advisory；基线/文档未被改写 (200.7276ms)
+✔ §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出 (209.8213ms)
+✔ R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable (40.6863ms)
+✔ R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable (141.2062ms)
+✔ AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点 (106.1585ms)
+✔ AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点 (102.2367ms)
+✔ AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读 (98.3001ms)
+✔ P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定 (108.0861ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3721.1953
+EXIT=0

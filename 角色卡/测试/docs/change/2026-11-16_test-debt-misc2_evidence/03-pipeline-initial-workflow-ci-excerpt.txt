@@ -1,0 +1,20 @@
+=== windows-x64 (only failing platform) ===
+✖ Pipeline initial workflow source: actual approved Core request binds task before the real guarded write (1696.6024ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"reason":"missing","message":"Error: ENOENT: no such file or directory, realpath 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-o10-workflow-source-KljWHL\\.ans\\trunk\\operations\\59ff13f4e32417eab058606e1beb81f9eb341923c52db7c50dcddf562dc30223\\stable-source.json'"}
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/run-role-submit-capabilities.test.ts:504:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\编排\section1-write-preauthorization.test.ts:248:1
+✖ 有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒 (8.305ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:
+
+=== macos-x64: passed ===
+✔ Pipeline initial workflow source: actual approved Core request binds task before the real guarded write (4231.147255ms)

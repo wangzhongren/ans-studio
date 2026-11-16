@@ -1,0 +1,28 @@
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (1020.7851ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1481.2697
+
+✖ failing tests:
+
+test at test\桌面应用\run-pin.test.ts:318:1
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (1020.7851ms)
+  AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj72dku-905ce6d3 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/misc2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:392:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

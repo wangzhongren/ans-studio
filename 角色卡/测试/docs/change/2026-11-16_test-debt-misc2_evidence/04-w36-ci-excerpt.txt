@@ -1,0 +1,11 @@
+=== macos-x64 ===
+✖ W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒 (3627.922837ms)
+  TypeError: Cannot read properties of undefined (reading 'name')
+      at file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2111:117
+      at Array.some (<anonymous>)
+      at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2111:56)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+test at test/桌面应用/run-pin.test.ts:318:1
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (3066.267347ms)
+  AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4lu36-676aba20 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。

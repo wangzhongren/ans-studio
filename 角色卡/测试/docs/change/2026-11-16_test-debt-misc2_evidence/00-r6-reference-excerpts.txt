@@ -1,0 +1,17 @@
+## 16-platform-diff.tsv 相关行（原样）
+name	platforms	x64Ms	win	r5Platforms	r5Family	r6Family	sets	notes	file
+Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry	x64	272.140674		arm64+x64	unclassified-new	unclassified-new	-	R6 macOS-x64-only; R5 平台=arm64+x64; 与 R5 平台分布不同	test/编排/git-command.test.ts
+Pipeline initial workflow source: actual approved Core request binds task before the real guarded write	win		1	arm64+x64+win	unclassified-new	unclassified-new	-	R6 Windows-only（macOS 仅有 x64 工件）; R5 平台=arm64+x64+win; 与 R5 平台分布不同	test/编排/run-role-submit-capabilities.test.ts
+Q74 owned Git metadata observer atomic rename race remains bounded and strict	x64+win	161.080087	1	arm64+x64+win	b0-existing-other	b0-existing-other	B0+B7	R5 平台=arm64+x64+win; 与 R5 平台分布不同	test/测试/git-role-workflows-e2e.test.ts
+run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned	x64+win	3066.267347	1	arm64+x64+win	source-gate	b0-existing-other	B0+B7	R5 平台=arm64+x64+win; 与 R5 平台分布不同	test/桌面应用/run-pin.test.ts
+W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒	x64	3627.922837		x64	e71501c-drift	e71501c-drift	NEW	R6 macOS-x64-only; R5 平台=x64; 与 R5 平台分布相同	test/桌面应用/chief-workflow.test.ts
+
+## 10-block-codes.json 相关条目（node 提取）
+macos_x64	W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒	[]	✖ W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒 (3627.922837ms)
+macos_x64	run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned	["ERR_ASSERTION"]	✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (3066.267347ms)
+macos_x64	Q74 owned Git metadata observer atomic rename race remains bounded and strict	["ERR_ASSERTION"]	✖ Q74 owned Git metadata observer atomic rename race remains bounded and strict (161.080087ms)
+macos_x64	Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry	["ERR_ASSERTION"]	✖ Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry (272.140674ms)
+windows_x64	run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned	["ERR_ASSERTION"]	✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (1245.4492ms)
+windows_x64	Q74 owned Git metadata observer atomic rename race remains bounded and strict	["ERR_ASSERTION"]	✖ Q74 owned Git metadata observer atomic rename race remains bounded and strict (59.8949ms)
+windows_x64	Pipeline initial workflow source: actual approved Core request binds task before the real guarded write	["ERR_ASSERTION"]	✖ Pipeline initial workflow source: actual approved Core request binds task before the real guarded write (1696.6024ms)
+arm64	{"status":"cancelled","artifact":null,"note":"run 43848313583 arm64 job cancelled at job level; no steps/artifact — block attribution unavailable for arm64"}
