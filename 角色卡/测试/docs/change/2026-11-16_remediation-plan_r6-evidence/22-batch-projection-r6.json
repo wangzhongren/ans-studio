@@ -1,0 +1,259 @@
+{
+  "generatedAt": "2026-11-16T11:32:12.414Z",
+  "basis": "R6 宇宙 63（run 43848313583，main@82dc180，含 B3a残差/B5/B6a/B6b/cife；arm64 job cancelled 无工件）",
+  "mergedBatchesAudit": {
+    "projection55": 55,
+    "stillRedInR6": 54,
+    "greenedSinceProjection": 1,
+    "greenedNames": [
+      "W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场"
+    ],
+    "outsideProjection": 9,
+    "batches": {
+      "B3a-residual": {
+        "expectedGreen": 14,
+        "greenedInR6": 13,
+        "stillRedInR6": 1,
+        "stillRedNames": [
+          "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned"
+        ]
+      },
+      "B5": {
+        "expectedGreen": 16,
+        "greenedInR6": 16,
+        "stillRedInR6": 0,
+        "stillRedNames": []
+      },
+      "B6a": {
+        "expectedGreen": 12,
+        "greenedInR6": 10,
+        "stillRedInR6": 2,
+        "stillRedNames": [
+          "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+          "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write"
+        ]
+      },
+      "B6b": {
+        "expectedGreen": 18,
+        "greenedInR6": 16,
+        "stillRedInR6": 2,
+        "stillRedNames": [
+          "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+          "Q74 owned Git metadata observer atomic rename race remains bounded and strict"
+        ]
+      }
+    }
+  },
+  "runningBatches": {
+    "W19/W33 (w19@a469a83)": {
+      "description": "close-notify 产品修复 + hub 跨 run information-only 例外 + direct-role-capabilities 三处旧语义更新（批内已解决，无 +3 风险）",
+      "targets": [
+        "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+        "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续"
+      ],
+      "presentInR6": 2
+    },
+    "B4-fu (b4fu@84c4a3c)": {
+      "description": "W1b 挂起守卫 2.5s→15s；W29/W30/W34/W35/W36 不改（产品/平台候选）",
+      "targets": [],
+      "presentInR6": 0,
+      "note": "W1b 未在 R6 宇宙（Windows 本轮已绿）；平台残差保留：8 名",
+      "platformCarry": [
+        "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+        "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+        "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+        "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+        "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+        "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+        "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+        "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒"
+      ]
+    },
+    "B3c-fu (b3cfu@99adf94)": {
+      "description": "9 名 Windows-only 残差（8.3 短名 TEMP → 夹具 realpathSync.native）",
+      "targets": [
+        "AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录",
+        "AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）",
+        "AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确",
+        "gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录",
+        "gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）",
+        "gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+        "host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+        "P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在",
+        "Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed"
+      ],
+      "presentInR6": 9,
+      "note": "恰好 9 名，与批记录逐名一致"
+    },
+    "misc (misc@2c323ff)": {
+      "description": "task-restart 按 v2.0.0 run-bound 重写；direct-role e2e 按 fixed A1→A2→A3 重写（旧名退役）",
+      "targets": [
+        "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+        "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze"
+      ],
+      "presentInR6": 2,
+      "note": "W-J5 / Q2 P2 / spawn fence 仅分类不改，保留：3 名",
+      "unchangedCandidates": [
+        "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+        "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+        "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例"
+      ]
+    }
+  },
+  "deductedTotal": 13,
+  "projectedRemaining": 50,
+  "projectedRemainingPerPlatform": {
+    "x64": 47,
+    "windows": 38
+  },
+  "remainingByFamily": {
+    "known-red-62": [
+      "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+      "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+      "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+      "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+      "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+      "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+      "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+      "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+      "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+      "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+      "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+      "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+      "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+      "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+      "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+      "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+      "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+      "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+      "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+      "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+      "D3 linked workspace root remains usable; linked target itself is not replaced",
+      "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+      "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+      "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+      "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+      "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+      "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+      "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+      "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+      "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+      "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+      "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+      "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力"
+    ],
+    "unclassified-new": [
+      "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+      "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+      "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+      "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts"
+    ],
+    "ci-path-canonical": [
+      "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+      "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards"
+    ],
+    "b0-existing-other": [
+      "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+      "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned"
+    ],
+    "hang-timeout": [
+      "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例"
+    ],
+    "e71501c-drift": [
+      "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+      "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+      "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+      "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+      "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+      "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒"
+    ]
+  },
+  "remainingByCategory": {
+    "B7 重冻结（冻结基线，不排修）": [
+      "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+      "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+      "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+      "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+      "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+      "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+      "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+      "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+      "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+      "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+      "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+      "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+      "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+      "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+      "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+      "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+      "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+      "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+      "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+      "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+      "D3 linked workspace root remains usable; linked target itself is not replaced",
+      "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+      "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+      "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+      "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+      "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+      "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+      "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+      "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+      "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+      "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+      "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+      "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力"
+    ],
+    "R6 新增（b31 fixed-release delivery 断言 undefined!==delivered；x64-only，待定性）": [
+      "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）"
+    ],
+    "R6 新增（Windows ENOTEMPTY 临时目录清理；flake 候选）": [
+      "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt"
+    ],
+    "macOS FSEvents 时序候选（B6a 归因；两路 fail-closed）": [
+      "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry"
+    ],
+    "B6a 未竟（ENOENT realpath stable-source；Windows-only）": [
+      "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write"
+    ],
+    "macOS 产品 file-gate（host facts/protection）": [
+      "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards"
+    ],
+    "B6b 未竟（/已获准并落盘/ 文案断言）；需 B6b 跟进": [
+      "Q74 owned Git metadata observer atomic rename race remains bounded and strict"
+    ],
+    "B3a-residual 未竟（重复派发抑制断言 true!==false）；需 B3a 重开或更新期望": [
+      "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned"
+    ],
+    "R6 新增（Windows 原生 libuv 断言崩溃 UV_HANDLE_CLOSING；file-level）": [
+      "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts"
+    ],
+    "x64 180s 挂起（R3/R5/R6 三度 x64-only；平台/性能候选）": [
+      "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例"
+    ],
+    "macOS 产品 file-gate（file-gate-host-facts-unproven；W29/W30，与 Q2 P2 同源）": [
+      "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+      "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+      "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后"
+    ],
+    "macOS 平台链（file-gate + W33 遗留 active 条目；B4-fu 已定性不改）": [
+      "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+      "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝"
+    ],
+    "x64 平台候选（tools 形状 TypeError；本机 4× 绿）": [
+      "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒"
+    ]
+  },
+  "risks": {
+    "w19Merge": "w19 批内已同步 direct-role-capabilities 三处旧语义更新（§8.2）；R5 记录的 +3 风险已随批次内更新消除。产品面新增 close 通知与 hub 跨 run 白名单，需在 R7 三平台复核。",
+    "b4fuW1b": "W1b 在 R6 已绿（未入宇宙）；b4fu 的 15s 守卫为回归保险。W29/W30/W34/W35/W36 不改，仍是 macOS/x64 平台候选。",
+    "b3cfu": "9 名按 8.3 短名 TEMP 本地复现并 3 口径 × 3× 绿；Windows CI 等价性依赖 runner TEMP 短名（已从工件取证 RUNNER~1）。",
+    "misc": "task-restart 45–50s/次（真实 Git 链），direct-role e2e ~0.6s；均 3× 自然退出绿。direct-role 旧名退役，R7 宇宙中应出现新名且为绿。",
+    "newNames": "b31 路径 B（x64）、multi-runtime request_choice abort ENOTEMPTY（win）、compatibility-loopback 原生崩溃（win）均无批次覆盖；若 R7 复现需排修/定性。",
+    "arm64Gap": "arm64 job 级 cancelled（无步骤/工件），macOS-only 名在 arm64 上的状态未知；R7 必须优先恢复 arm64 并以三平台复跑为准。"
+  }
+}

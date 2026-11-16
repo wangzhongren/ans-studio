@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-11-16T11:32:12.479Z",
+  "runId": "43848313583",
+  "definition": "lineLevelUniqueIncludingHeaders = uniqueIndentPreservingNames（去耗时、保留缩进、排除 section 头）+ sectionHeaderLines（`✖ failing tests:` 行全部出现次数）；R2–R6 逐字沿用。",
+  "platforms": {
+    "macos_x64": {
+      "fail": 50,
+      "cancelled": 1,
+      "uniqueAuthoritativeNames": 51,
+      "uniqueIndentPreservingNames": 52,
+      "sectionHeaderLines": 3,
+      "lineLevelUniqueIncludingHeaders": 55,
+      "multiIndentNames": [
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "indents": [
+            0,
+            2
+          ]
+        }
+      ]
+    },
+    "windows_x64": {
+      "fail": 51,
+      "cancelled": 0,
+      "uniqueAuthoritativeNames": 51,
+      "uniqueIndentPreservingNames": 52,
+      "sectionHeaderLines": 3,
+      "lineLevelUniqueIncludingHeaders": 55,
+      "multiIndentNames": [
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "indents": [
+            0,
+            2
+          ]
+        }
+      ]
+    }
+  },
+  "arm64": "job cancelled，无工件，无行级口径。",
+  "reconcile": "x64/Windows 均为 51 唯一名 + 1（W19 以 indent 0 与 2 两次出现）+ 3 个 section 头 = 55 行级唯一 ✖，与协调者 50/55 与 51/55 精确吻合。"
+}

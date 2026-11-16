@@ -1,0 +1,51 @@
+卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report	test\编排\trio-worker-report.test.ts
+卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡	test\编排\trio-worker-report.test.ts
+卡文本：运营负责落盘工作流，幕僚不再被暗示为写者	test\门禁引擎\convener-workflow-write.test.ts
+人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒	test\编排\section1-write-preauthorization.test.ts
+渲染过滤：section=roles/routing 与注册表展示字段出现在文本中	test\门禁引擎\governance-matrix-service.test.ts
+有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒	test\编排\section1-write-preauthorization.test.ts
+重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过	test\桌面应用\task-restart.test.ts
+主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）	test\runtime-core\trunk-contract.test.ts
+A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）	test\编排\governance-matrix-injection.test.ts
+AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录	test\测试\git-action-cross-runtime-init.test.ts
+AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）	test\测试\git-action-cross-runtime-audit-failure.test.ts
+AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确	test\测试\git-action-cross-runtime-pi-init.test.ts
+AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）	test\编排\trunk-upgrade-validation.test.ts
+AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝	test\编排\trunk-upgrade-validation.test.ts
+AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）	test\编排\trunk-upgrade-validation.test.ts
+AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）	test\编排\trunk-upgrade-validation.test.ts
+AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）	test\编排\trunk-upgrade-validation.test.ts
+actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt	test\桌面应用\multi-runtime.test.ts
+applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接	test\编排\trunk-service.test.ts
+BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed	test\编排\appointment-roster.test.ts
+BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针	test\编排\appointment-roster.test.ts
+Core-managed binding rejects a provider that did not register its display profile before first prompt	test\runtime-core\session.test.ts
+D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）	test\编排\session-dir.test.ts
+D-1：projectRoot 为空 → 不传 sessionDir（旧行为）	test\编排\session-dir.test.ts
+D-10：质检卡保留可选质量核对与截图上限，不要求录屏	test\门禁引擎\view-image-cards.test.ts
+D3 linked workspace root remains usable; linked target itself is not replaced	test\runtime-core\file-write-safety.test.ts
+dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行	test\runtime-core\dispatch-workflow-writer-copy.test.ts
+dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」	test\runtime-core\dispatch-workflow-writer-copy.test.ts
+doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）	test\runtime-core\version-change-contract.test.ts
+gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录	test\编排\git-action-authorization-gate.test.ts
+gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）	test\编排\git-action-authorization-gate.test.ts
+gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven	test\编排\git-action-authorization-gate.test.ts
+Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority	test\编排\git-capabilities.test.ts
+host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven	test\测试\run-stop-host-continuation-integration.test.ts
+listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告	test\门禁引擎\list-project.test.ts
+listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留	test\门禁引擎\role-group-metadata.test.ts
+openRoleSession：普通角色 settle → 发出 handback（形状正确）	test\编排\handback.test.ts
+P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在	test\测试\git-action-cross-runtime-codex-init.test.ts
+P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界	test\编排\shell-operator-only.test.ts
+Pipeline initial workflow source: actual approved Core request binds task before the real guarded write	test\编排\run-role-submit-capabilities.test.ts
+Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze	test\测试\direct-role-capabilities-e2e.test.ts
+Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed	test\测试\session-admission-approval-q9-integration.test.ts
+Q74 owned Git metadata observer atomic rename race remains bounded and strict	test\测试\git-role-workflows-e2e.test.ts
+real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId	test\编排\chat-handback-scope.test.ts
+Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation	test\编排\direct-role-capabilities.test.ts
+run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned	test\桌面应用\run-pin.test.ts
+test\测试\g5-reasoning-verify\compatibility-loopback.test.ts	test\测试\g5-reasoning-verify\compatibility-loopback.test.ts
+TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）	test\编排\doc-format-specs.test.ts
+v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力	test\编排\trio-worker-report.test.ts
+W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界	test\桌面应用\chief-workflow.test.ts
+W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续	test\桌面应用\chief-workflow.test.ts

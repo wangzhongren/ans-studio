@@ -1,0 +1,51 @@
+卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report	test/编排/trio-worker-report.test.ts
+卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡	test/编排/trio-worker-report.test.ts
+卡文本：运营负责落盘工作流，幕僚不再被暗示为写者	test/门禁引擎/convener-workflow-write.test.ts
+路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）	test/桌面应用/b31-fixed-release-auto-desktop.test.ts
+人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒	test/编排/section1-write-preauthorization.test.ts
+渲染过滤：section=roles/routing 与注册表展示字段出现在文本中	test/门禁引擎/governance-matrix-service.test.ts
+有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒	test/编排/section1-write-preauthorization.test.ts
+重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过	test/桌面应用/task-restart.test.ts
+主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）	test/runtime-core/trunk-contract.test.ts
+A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）	test/编排/governance-matrix-injection.test.ts
+AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）	test/编排/trunk-upgrade-validation.test.ts
+AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝	test/编排/trunk-upgrade-validation.test.ts
+AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）	test/编排/trunk-upgrade-validation.test.ts
+AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）	test/编排/trunk-upgrade-validation.test.ts
+AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）	test/编排/trunk-upgrade-validation.test.ts
+applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接	test/编排/trunk-service.test.ts
+BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed	test/编排/appointment-roster.test.ts
+BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针	test/编排/appointment-roster.test.ts
+Core-managed binding rejects a provider that did not register its display profile before first prompt	test/runtime-core/session.test.ts
+D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）	test/编排/session-dir.test.ts
+D-1：projectRoot 为空 → 不传 sessionDir（旧行为）	test/编排/session-dir.test.ts
+D-10：质检卡保留可选质量核对与截图上限，不要求录屏	test/门禁引擎/view-image-cards.test.ts
+D3 linked workspace root remains usable; linked target itself is not replaced	test/runtime-core/file-write-safety.test.ts
+dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行	test/runtime-core/dispatch-workflow-writer-copy.test.ts
+dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」	test/runtime-core/dispatch-workflow-writer-copy.test.ts
+doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）	test/runtime-core/version-change-contract.test.ts
+Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry	test/编排/git-command.test.ts
+Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority	test/编排/git-capabilities.test.ts
+listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告	test/门禁引擎/list-project.test.ts
+listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留	test/门禁引擎/role-group-metadata.test.ts
+openRoleSession：普通角色 settle → 发出 handback（形状正确）	test/编排/handback.test.ts
+P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界	test/编排/shell-operator-only.test.ts
+Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze	test/测试/direct-role-capabilities-e2e.test.ts
+Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards	test/测试/git-role-workflows-e2e.test.ts
+Q74 owned Git metadata observer atomic rename race remains bounded and strict	test/测试/git-role-workflows-e2e.test.ts
+real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId	test/编排/chat-handback-scope.test.ts
+Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation	test/编排/direct-role-capabilities.test.ts
+run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned	test/桌面应用/run-pin.test.ts
+TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）	test/编排/doc-format-specs.test.ts
+v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力	test/编排/trio-worker-report.test.ts
+W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例	test/测试/2026-11-09_judge-delegated-effectiveness.test.ts
+W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界	test/桌面应用/chief-workflow.test.ts
+W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin	test/桌面应用/chief-workflow.test.ts
+W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin	test/桌面应用/chief-workflow.test.ts
+W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin	test/桌面应用/chief-workflow.test.ts
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后	test/桌面应用/chief-workflow.test.ts
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后	test/桌面应用/chief-workflow.test.ts
+W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续	test/桌面应用/chief-workflow.test.ts
+W34 真实首文档发布与原创建者关闭后派团队规划保独立scope	test/桌面应用/chief-workflow.test.ts
+W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝	test/桌面应用/chief-workflow.test.ts
+W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒	test/桌面应用/chief-workflow.test.ts
