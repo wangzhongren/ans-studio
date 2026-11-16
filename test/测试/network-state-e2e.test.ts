@@ -41,12 +41,14 @@ after(() => {
 
 const environment = { PATH: process.env.PATH, HOME: process.env.HOME, ANTHROPIC_API_KEY: "fixture-api-secret" };
 const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
-async function until(predicate: () => boolean, label = "等待实际事件超时"): Promise<void> {
-  for (let i = 0; i < 400; i += 1) {
-    if (predicate()) return;
+async function until(predicate: () => boolean, label = "等待实际事件超时", timeoutMs = 8_000): Promise<void> {
+  // B5（2026-11-16）：有界等待统一 8s（原 2s）。CI 负载下 drain/事件排空可超过 2s；只放宽等待
+  // 上界，不放宽「离线保留/恢复恰一次/系统行」等断言。
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) assert.fail(label);
     await tick(5);
   }
-  assert.fail(label);
 }
 
 function writeAt(root: string, rel: string, text: string): void {
@@ -338,7 +340,7 @@ function handback(taskId: string): TaskHandback {
   };
 }
 
-function listing(): ProjectListing {
+function listing(projectRoot: string): ProjectListing {
   const mk = (roleId: string, builtIn = false): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: builtIn ? "" : `角色卡/${roleId}/role-card.md`,
@@ -353,11 +355,17 @@ function listing(): ProjectListing {
         },
     builtIn: builtIn ? true : undefined,
   });
-  return { projectRoot: "/proj", roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+  return { projectRoot, roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
 function makeQueueHarness(gate: NetworkGate) {
-  const l = listing();
+  // B5（2026-11-16）：真实 mkdtemp 项目根（B7-3 口径）。v2.0.0 B3-2b host-inventory publication
+  // 对不可解析根 fail-closed；旧夹具用 "/proj"（CI 三平台均不存在，本机仅因残留 C:\proj 才绿）
+  // ⇒ CI 上会话开不出来、回交不入队（`离线回交未入队` / `回合未开跑`）。
+  const projectRoot = mkdtempSync(join(ROOT, "queue-proj-"));
+  writeAt(projectRoot, "角色卡/A/role-card.md", "# A\n");
+  writeAt(projectRoot, "角色卡/A/boundary.yaml", "role: A\nentries: []\n");
+  const l = listing(projectRoot);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
   const roleStates: QueueStateSnapshot[] = [];
@@ -411,15 +419,23 @@ function makeQueueHarness(gate: NetworkGate) {
     networkGate: gate,
     now: () => Date.now(),
   });
-  return { mgr, streams, sent, roleStates, emitted, latest: (roleId: string) => roleStates.filter((s) => s.roleId === roleId).at(-1) };
+  return {
+    mgr, projectRoot, streams, sent, roleStates, emitted,
+    latest: (roleId: string) => roleStates.filter((s) => s.roleId === roleId).at(-1),
+    async cleanup() {
+      try { await mgr.stop(null); } finally { rmSync(projectRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
+    },
+  };
 }
 
 test("e2e 队列：离线保留并标 blockedReason=network；恢复后按既有 drain 继续且恰投递一次", async () => {
   const gate = createNetworkGate();
   const h = makeQueueHarness(gate);
   try {
-    await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
-    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    const openA = await h.mgr.open({ projectRoot: h.projectRoot, roleId: "A", runtime: "demo" });
+    assert.equal(openA.ok, true, openA.error ?? "open failed");
+    const openSu = await h.mgr.open({ projectRoot: h.projectRoot, roleId: "su", runtime: "demo" });
+    assert.equal(openSu.ok, true, openSu.error ?? "open failed");
     await tick(30);
     gate.apply(offlineState());
     h.mgr.applyNetworkState(offlineState());
@@ -443,7 +459,7 @@ test("e2e 队列：离线保留并标 blockedReason=network；恢复后按既有
     assert.equal(h.sent.su.length, 1, "已投递条目不得重复投递");
     assert.equal(h.latest("su")?.blockedReason, null, "恢复且队列空后无阻塞原因");
   } finally {
-    await h.mgr.stop(null);
+    await h.cleanup();
   }
 });
 
@@ -462,8 +478,10 @@ test("e2e F1 队列：已知离线 + 探针异常 ⇒ 不解除 network 阻塞�
   const { probeNow } = monitor;
   try {
     monitor.start(); // 在线
-    await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
-    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    const openA = await h.mgr.open({ projectRoot: h.projectRoot, roleId: "A", runtime: "demo" });
+    assert.equal(openA.ok, true, openA.error ?? "open failed");
+    const openSu = await h.mgr.open({ projectRoot: h.projectRoot, roleId: "su", runtime: "demo" });
+    assert.equal(openSu.ok, true, openSu.error ?? "open failed");
     await tick(30);
     probeMode = "offline";
     probeNow(); // 第 1 次离线采样
@@ -492,7 +510,7 @@ test("e2e F1 队列：已知离线 + 探针异常 ⇒ 不解除 network 阻塞�
     assert.equal(h.sent.su.length, 1, "不得重复投递");
   } finally {
     monitor.stop();
-    await h.mgr.stop(null);
+    await h.cleanup();
   }
 });
 
@@ -500,9 +518,10 @@ test("e2e 网络失败系统行：settled(failed, network-offline-timeout) ⇒ �
   const gate = createNetworkGate();
   const h = makeQueueHarness(gate);
   try {
-    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    const openSu = await h.mgr.open({ projectRoot: h.projectRoot, roleId: "su", runtime: "demo" });
+    assert.equal(openSu.ok, true, openSu.error ?? "open failed");
     await tick(30);
-    const pending = h.mgr.send("网络失败系统行", undefined, { projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    const pending = h.mgr.send("网络失败系统行", undefined, { projectRoot: h.projectRoot, roleId: "su", runtime: "demo" });
     await until(() => h.latest("su")?.busy === true, "回合未开跑");
     h.streams.su.push({
       kind: "settled",
@@ -526,6 +545,6 @@ test("e2e 网络失败系统行：settled(failed, network-offline-timeout) ⇒ �
     assert.match(human, /等待恢复超时/);
     assert.doesNotMatch(human, /network-offline-timeout|NetworkOfflineError|ECONN|stack|https?:/i, "客户可见系统行不含技术 code");
   } finally {
-    await h.mgr.stop(null);
+    await h.cleanup();
   }
 });

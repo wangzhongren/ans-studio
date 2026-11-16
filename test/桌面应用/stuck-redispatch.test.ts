@@ -368,7 +368,7 @@ test("C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，�
   }
 });
 
-test("C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口", async () => {
+test("C-04 decision 开关开启（真实 channel）：v2.0.0 decision 卡不经 judge 代选（0 结果行）；客户作答 terminate ⇒ 失败报告、不自动收口", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-escalation-switch-on-"));
   const pushed: OperatorRequestPayload[] = [];
   const rows: OperatorJudgeResultPayload[] = [];
@@ -394,20 +394,36 @@ test("C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项�
   const h = harness(root, { customerInput: channel.customerInput });
   try {
     await seedMaxChain(root, "t-switch-on");
-    const result = await settledWithin(h.mgr.redispatchTask({ projectRoot: root, taskId: "t-switch-on-r2" }),
-      "C-04 decision 开关开启：judge 代选未在有界窗口内结算（无客户裁决事件）", () => ({ pushed: pushed.length, rows: rows.length }));
+    const pending = h.mgr.redispatchTask({ projectRoot: root, taskId: "t-switch-on-r2" });
+    // v2.0.0（e71501c）删除了 `tryAutoSelectDecision`：decision 卡在 `planJudge` 直接 undefined
+    // （本文件 C-04 switch-off 钉同一语义），「替我决策」开关开启不再让 judge 代选；卡片按既有
+    // 客户通道呈现，必须由客户本人作答（主权卡最后防线也会拒绝 judge/directive 结算）。
+    await until(() => pushed.length === 1);
+    assert.equal(pushed.length, 1, "开关开启不再代选 ⇒ 原卡呈现客户");
+    assert.equal(rows.length, 0, "decision 卡不进入 judge ⇒ 零 judge 结果行");
+    assert.equal(pushed[0]!.request.cardKind, "decision");
+    const pushedRequest = pushed[0]!.request;
+    assert.equal(pushedRequest.kind, "choice");
+    const pushedOptions = pushedRequest.kind === "choice" ? pushedRequest.options : [];
+    assert.deepEqual(pushedOptions.filter((option) => option.recommended === true).map((option) => option.id), ["terminate"], "唯一推荐项仍在卡面上（仅作展示/推荐，不触发代选）");
+    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["terminate"] } }).ok, true);
+    const result = await settledWithin(pending,
+      "C-04 decision 开关开启：客户作答后 redispatchTask 未在有界窗口内结算", () => ({ pushed: pushed.length, rows: rows.length }));
     assert.equal(result.escalated, true, result.message);
-    assert.equal(pushed.length, 0, "开关开启且代批成功 ⇒ 不呈现客户卡");
-    assert.equal(rows.length, 1, "恰一条 judge 结果行（可见性条件）");
-    assert.equal(rows[0]!.cardKind, "decision");
-    assert.deepEqual(rows[0]!.selected, ["terminate"]);
     assert.equal(result.selected, "terminate");
+    assert.equal(rows.length, 0, "全程无 judge 代选结果行");
     const state = await readTaskState(root);
-    assert.equal(state.records.get("t-switch-on-r2")?.closed?.note, "stuck-escalation:terminate", "代选后按 terminate 处置");
+    // e71501c 起：terminate 由 recordTaskFailure 写 failed 报告，任务保持未收口（本文件其余 B4 用例同口径）。
+    assert.equal(state.records.get("t-switch-on-r2")?.closed, undefined, "terminate 不再 close（当前语义：失败报告、未收口）");
+    const failed = state.records.get("t-switch-on-r2")?.reports.at(-1);
+    assert.equal(failed?.status, "failed");
+    assert.match(failed?.summary ?? "", /stuck-escalation:terminate/);
   } finally {
-    await settledWithin(h.mgr.stop(null), "C-04 清理阶段 stop 未在有界窗口内返回", () => ({ pushed: pushed.length }));
+    // 失败路径清理顺序（B5 硬化）：先让通道把所有未决请求结算，再 stop；否则 stop 返回后通道回包
+    // 仍可能异步写 .ans，Windows 下与 fs.rm 竞态成 ENOTEMPTY（掩盖真实断言失败）。
     channel.rejectAllPending("cleanup");
-    await fs.rm(root, { recursive: true, force: true });
+    await settledWithin(h.mgr.stop(null), "C-04 清理阶段 stop 未在有界窗口内返回", () => ({ pushed: pushed.length }));
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 

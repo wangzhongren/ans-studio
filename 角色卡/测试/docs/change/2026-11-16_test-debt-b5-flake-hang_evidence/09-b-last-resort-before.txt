@@ -1,0 +1,10 @@
+# b-last-resort 固定 tick 对兜底计时器武装点的假设（B5 去抖依据）
+
+- 修改前本机 3× 一致：test 级 `test timed out after 10000ms`（pass 2 / cancelled 1，EXIT=1）。
+- 探针（mock timers 包装 global setTimeout 打点）显示：send 开始后 300ms 兜底计时器并非在
+  mock t0 武装，而是在首个 `tick(100)` 之后（mock t0+100）才武装——发送链在武装前有一个由
+  mock timer 驱动的持久化/装配 await。timer 到期点因此是 mock t0+400，而旧测试只推进到
+  t0+300（100+200）便开始 `await rejected`，无界等待直到 10s 测试超时。
+- 修改：断言「100ms > 检查时限 40ms、< 兜底 300ms」后，按 20ms 步进推进 mock 时钟（总推进
+  上限 2s 有效时间）直到 send 拒绝；`turnLastResortMs=300` 语义与 `settled(timed_out)/
+  「最后兜底」文案/abort` 断言逐字不变。修改后 3× 绿（3/3 pass）。

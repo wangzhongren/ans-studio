@@ -1,0 +1,16 @@
+# C-04 switch-on：e71501c 已删除 decision 卡 judge 代选（测试同步依据）
+
+- 直接证据：git show e71501c -- app/desktop/customer-input.ts 删除了 tryAutoSelectDecision
+  （原 decision 卡「默认推荐」代选实现）。
+- 当前实现：app/desktop/customer-input.ts::planJudge 对 cardKind === DECISION_CARD_KIND 直接
+  return undefined（decision 卡不进模型 judge）；presentEntryNow 走 isChiefBusinessCard →
+  tryChiefDecision（仅 delegation 开关）→ 否则 presentNow（原卡呈现客户）。
+- 同源先例（测试角色 B3-1 记录，2026-11-12_release-blocker-directive-decision-hang.md §3.2）：
+  「v2.0.0 中 decision 卡不再进入 judge（planJudge 对 decision 直接 undefined）」；旧期望
+  judge:demo 来自 e71501c 已删除的 tryAutoSelectDecision。
+- terminate 的收口语义（同文件 B4 已更新）：recordTaskFailure 写 task.reported(failed,
+  "stuck-escalation:terminate")，任务保持未收口；不再写 task.closed。
+- 因此 C-04 switch-on 旧期望（judge 代选 + 0 客户卡 + judge 结果行 + closed.note）无法在当前语义下成立；
+  B5 将用例按 v2.0.0 语义更新（客户卡呈现、0 judge 行、客户作答 terminate、failed 报告），并重命名为：
+  「C-04 decision 开关开启（真实 channel）：v2.0.0 decision 卡不经 judge 代选（0 结果行）；客户作答
+  terminate ⇒ 失败报告、不自动收口」。旧名退役，新名 3× 绿。

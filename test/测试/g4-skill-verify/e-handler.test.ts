@@ -24,6 +24,25 @@ async function openRole(h: G4Harness, roleId: string): Promise<void> {
   assert.equal(opened.ok, true, `开启 ${roleId} 会话应成功`);
 }
 
+/**
+ * 桌面 handler 本体的直调端口（B5，2026-11-16）：e71501c 起，真实能力注入的外层绑定先做
+ * 「调用来源/执行范围」身份核验（`stillUnmanaged`），无活轮次或伪造 origin 会先以
+ * `effect-scope-unproven` fail-closed——这层在 handler 的 `not-customer-turn` 护栏之前。
+ * 矩阵既要钉真实绑定层的拒绝，也要钉 handler 自身护栏；后者经同一实现 `applySkillChange`
+ * 直调（无副作用、无绕过产品判定——只是不经能力闭包）。
+ */
+type RawApplySkillChange = (
+  action: "installed",
+  projectRoot: string,
+  runtime: "demo",
+  callerRoleId: string,
+  payload: { roleId: string; name: string },
+) => Promise<{ ok: boolean; reason?: string; message?: string }>;
+const rawInstall = (h: G4Harness): RawApplySkillChange => {
+  const env = (h.mgr as unknown as { sessionEnv: { applySkillChange: RawApplySkillChange } }).sessionEnv;
+  return env.applySkillChange.bind(env) as RawApplySkillChange;
+};
+
 // —————————————————————— ① 轮次护栏对抗矩阵 ——————————————————————
 
 test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行", async () => {
@@ -35,10 +54,17 @@ test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-tu
       await openRole(h, "X");
       await openRole(h, "su");
       const before = snapshotTree(h.root);
-      const r = await h.suInstall()!({ roleId: "X", name: "k1" });
+      // 真实能力闭包（v2.0.0/e71501c 绑定层）：无活轮次 ⇒ 执行范围未证明，先于 handler 护栏拒绝。
+      const bound = await h.suInstall()!({ roleId: "X", name: "k1" });
+      assert.equal(bound.ok, false);
+      assert.equal((bound as { reason: string }).reason, "effect-scope-unproven", "无轮次 ⇒ 真实绑定层执行范围未证明，fail-closed");
+      assert.match((bound as { message: string }).message, /执行范围尚未完成核验/, "绑定层文案如实");
+      assert.deepEqual(snapshotTree(h.root), before, "零副作用（绑定层拒绝，盘快照一致）");
+      // handler 自身护栏（矩阵原断言逐字不变）：直调同一实现仍按 not-customer-turn 拒绝。
+      const r = await rawInstall(h)("installed", h.root, "demo", "su", { roleId: "X", name: "k1" });
       assert.equal(r.ok, false);
-      assert.equal((r as { reason: string }).reason, "not-customer-turn", "无轮次 ⇒ 护栏拒绝");
-      assert.equal((r as { message: string }).message, "本动作仅可在客户消息发起的轮次执行——未执行。", "文案逐字");
+      assert.equal(r.reason, "not-customer-turn", "无轮次 ⇒ 护栏拒绝");
+      assert.equal(r.message, "本动作仅可在客户消息发起的轮次执行——未执行。", "文案逐字");
       assert.deepEqual(snapshotTree(h.root), before, "零副作用（盘快照一致）");
       assert.equal(h.disposed("X"), 0, "零重建");
     } finally {
@@ -90,9 +116,14 @@ test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-tu
       const key = `${h.root}\u0000su\u0000demo`;
       mgr.sessions.get(key)!.busy = true;
       mgr.activeDeliveries.set(key, { kind: "dispatch" });
-      const r = await h.suInstall()!({ roleId: "X", name: "k1" });
+      // 真实绑定层：私有面只注入了 static busy/kind，没有 identity-bound origin ⇒ 执行范围未证明。
+      const bound = await h.suInstall()!({ roleId: "X", name: "k1" });
+      assert.equal(bound.ok, false);
+      assert.equal((bound as { reason: string }).reason, "effect-scope-unproven", "伪造 dispatch 轮（无真实 origin）⇒ 绑定层 fail-closed");
+      // handler 护栏本体（矩阵原断言逐字不变）：busy 但 origins.running 不是客户 message 轮 ⇒ 拒绝。
+      const r = await rawInstall(h)("installed", h.root, "demo", "su", { roleId: "X", name: "k1" });
       assert.equal(r.ok, false);
-      assert.equal((r as { reason: string }).reason, "not-customer-turn", "dispatch 类投递开的轮 ⇒ 护栏拒绝");
+      assert.equal(r.reason, "not-customer-turn", "dispatch 类投递开的轮 ⇒ 护栏拒绝");
     } finally {
       await h.cleanup();
     }
