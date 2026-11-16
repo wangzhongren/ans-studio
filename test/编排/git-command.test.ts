@@ -72,26 +72,42 @@ test("Git final spawn fence: real pending-record interruption records no launch 
   assert.equal(processFacts.some(fact => mutatingVerb(fact) === "update-ref"), false, "The final ref mutation must not launch while the interrupted lease is held");
   assert.ok(processFacts.every(fact => ["hash-object", "mktree", "commit-tree"].includes(String(mutatingVerb(fact)))),
     "Only object plumbing may be attempted before the fence; no other mutation family may launch");
-  // 显式两路分类（平台时序相关）：fs.watch 投递可能晚于产品「check 与 spawn 之间无 await」的最终栅栏
-  // （macOS FSEvents；见 misc2 延迟探针 0ms/100ms）。两路都在 ref 发布前 fail-closed，但延迟路会先跑完
-  // 内部 Git plumbing 命令，因此不能断言「records no launch」；改为钉住下列可证明的安全不变量。
+  // 显式三路分类（平台时序相关）：fs.watch 投递可能晚于产品「check 与 spawn 之间无 await」的最终栅栏
+  // （macOS FSEvents；见 misc2 延迟探针 0ms/100ms）。三路都在 ref 发布前 fail-closed：
+  //  - 路 C（R9 arm64）：中断在首个 mutating 命令的 host-lease 预检前被观察，产品在 pending 记录写入前
+  //    即以 `git-host-lease-invalid-before-command` fail-closed（executeGit:728）——零 owned 进程的安全拒绝；
+  //  - 路 A（watch 投递在首个 spawn 边界前）：恰好一条 cancelled-before-spawn；
+  //  - 路 B（延迟投递）：先跑完内部 Git plumbing，后续 mutation 在启动前被拒绝或在取证窗口内被最终栅栏取消。
+  // 因此不能对路 B/C 断言「records no launch」；改为钉住下列可证明的安全不变量，并把实际 message 带进诊断。
   const cancelled = processFacts.filter(fact => fact.launch === "cancelled-before-spawn");
   const launched = processFacts.filter(fact => fact.launch === "started");
   assert.equal(cancelled.length + launched.length, processFacts.length,
-    "Every persisted record must be an explicit pre-spawn cancellation or a started process; pending/unknown evidence would keep the fence held");
+    `Every persisted record must be an explicit pre-spawn cancellation or a started process; pending/unknown evidence would keep the fence held; actual message: ${message}`);
   assert.ok(cancelled.every(fact => fact.pid === undefined && fact.exitCode === null && fact.termination === "unknown"),
-    "No fake successful OS exit is invented for an unlaunched command");
+    `No fake successful OS exit is invented for an unlaunched command; actual message: ${message}`);
   assert.ok(launched.every(fact => fact.pid !== undefined && fact.termination === "exited" && fact.exitCode === 0),
-    "Every launched internal command must be a settled success; an unknown termination would be an unresolved owned process");
-  if (launched.length === 0) {
+    `Every launched internal command must be a settled success; an unknown termination would be an unresolved owned process; actual message: ${message}`);
+  const fenceRoute = processFacts.length === 0 ? "C" : launched.length === 0 ? "A" : "B";
+  console.log(JSON.stringify({ fenceRoute, message, processFacts: processFacts.length, launched: launched.length, cancelled: cancelled.length }));
+  if (processFacts.length === 0) {
+    // 路 C（R9 arm64）：中断在首个 mutating 命令的 lease 预检前被观察。产品以 host-lease 栅栏 fail-closed
+    // 拒绝且不伪造任何进程记录（pending 记录写入在 executeGit:728 之后）；无 owned 进程、update-ref 必然未启动。
+    assert.equal(launched.length, 0, `The pre-record path must not start any owned process; actual message: ${message}`);
+    assert.equal(cancelled.length, 0, `The pre-record path must not fabricate a cancellation record for a never-spawned process; actual message: ${message}`);
+    assert.equal(await objects.readRef(candidateRef), null,
+      `The pre-record rejection must leave the candidate ref unpublished; actual message: ${message}`);
+    assert.match(message, /^git-host-lease-invalid-before-command$/,
+      `The pre-record path must still reject through the host lease fence; actual message: ${message}`);
+  } else if (launched.length === 0) {
     // 路 A（watch 投递在首个 spawn 边界前）：恰好一条显式 cancelled-before-spawn，prepare 以 pre-spawn 取消拒绝。
-    assert.equal(cancelled.length, 1, "The never-launched path must record exactly one explicit pre-spawn cancellation");
-    assert.match(message, /^git-command-failed:null:unknown:/);
+    assert.equal(cancelled.length, 1, `The never-launched path must record exactly one explicit pre-spawn cancellation; actual message: ${message}`);
+    assert.match(message, /^git-command-failed:null:unknown:/,
+      `The pre-spawn cancellation path must reject via git-command-failed; actual message: ${message}`);
   } else {
     // 路 B（延迟投递，macOS FSEvents）：至少一条内部 plumbing 已启动并退出；记录被观察到后，
     // 下一次 mutation 在自身启动前被拒绝（或在其取证窗口内被最终栅栏取消）。
     assert.match(message, /^(git-host-lease-invalid-before-command|git-command-failed:null:unknown:)/,
-      "The delayed-observation path must still reject through a fail-closed fence");
+      `The delayed-observation path must still reject through a fail-closed fence; actual message: ${message}`);
   }
   // 真实重试（新 lease）必须成功，且 candidate ref 只能由一条 launched/exited-0 的 update-ref 进程证据背书。
   const retryLease = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(retryLease.ok); if (!retryLease.ok) return;
