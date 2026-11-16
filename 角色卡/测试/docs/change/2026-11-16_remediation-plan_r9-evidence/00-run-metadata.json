@@ -1,0 +1,64 @@
+{
+  "run": {
+    "id": 43887939365,
+    "name": "Test matrix (development feedback)",
+    "workflowPath": ".github/workflows/test-ci.yml",
+    "workflowId": 417223744,
+    "event": "workflow_dispatch",
+    "headBranch": "main",
+    "headSha": "77d3505703785ced0d3a760515f18d40bd553219",
+    "createdAt": "2026-11-16T14:38:57Z",
+    "runStartedAt": "2026-11-16T14:38:57Z",
+    "updatedAt": "2026-11-16T15:37:37Z",
+    "conclusion": "failure",
+    "note": "R9 = this run. SHA 77d3505 is BEFORE #137 (da805ec); the workflow at this SHA uses --test-timeout=300000. R9 worktree branch analysis/test-debt-r9 is based on da805ec (= origin/main, includes #137) and did not trigger any CI."
+  },
+  "jobs": [
+    {
+      "name": "test (macos-15, mac, arm64)",
+      "conclusion": "failure",
+      "startedAt": "2026-11-16T14:44:01Z",
+      "completedAt": "2026-11-16T15:15:32Z",
+      "jobDuration": "31m31s",
+      "testStep": "failure (Full regression tests (bounded; development feedback))",
+      "typecheckStep": "success",
+      "artifact": {"name": "test-logs-mac-arm64", "sizeInBytes": 306908}
+    },
+    {
+      "name": "test (windows-2025, win, x64)",
+      "conclusion": "failure",
+      "startedAt": "2026-11-16T14:39:00Z",
+      "completedAt": "2026-11-16T15:17:40Z",
+      "jobDuration": "38m40s",
+      "testStep": "failure",
+      "typecheckStep": "success",
+      "artifact": {"name": "test-logs-win-x64", "sizeInBytes": 360075}
+    },
+    {
+      "name": "test (macos-15-intel, mac, x64)",
+      "conclusion": "failure",
+      "startedAt": "2026-11-16T14:39:03Z",
+      "completedAt": "2026-11-16T15:37:36Z",
+      "jobDuration": "58m33s",
+      "testStep": "failure",
+      "typecheckStep": "success",
+      "artifact": {"name": "test-logs-mac-x64", "sizeInBytes": 373100}
+    }
+  ],
+  "ciCommandAtRunSha": "node --test --test-concurrency=1 --test-timeout=300000 --test-force-exit \"test/**/*.test.ts\"",
+  "localArtifacts": {
+    "downloadCommand": "gh run download 43887939365 -D /tmp/r11-art",
+    "downloadStatus": "success on first attempt (exit 0); no retry needed; three artifact directories present",
+    "note": "Git Bash /tmp = C:\\Users\\51054\\AppData\\Local\\Temp; raw artifacts are NOT committed",
+    "files": [
+      {"path": "/tmp/r11-art/test-logs-mac-arm64/test-ci-output.log", "bytes": 953740},
+      {"path": "/tmp/r11-art/test-logs-mac-x64/test-ci-output.log", "bytes": 1652441},
+      {"path": "/tmp/r11-art/test-logs-win-x64/test-ci-output.log", "bytes": 1630118}
+    ]
+  },
+  "comparisonRuns": {
+    "r8": {"id": 43867573699, "sha": "5661a73", "cliTimeoutMs": 300000},
+    "r7": {"id": 43859105048, "sha": "d1f256f", "cliTimeoutMs": 300000},
+    "post137Main": {"sha": "da805ec", "cliTimeoutMs": 600000, "note": "R9 analysis branch base; not part of this run"}
+  }
+}
