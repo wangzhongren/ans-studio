@@ -1,0 +1,157 @@
+
+## macOS arm64：D3 lstat ENOTDIR（L7301-L7318）
+test at test/runtime-core/file-write-safety.test.ts:113:1
+✖ D3 lstat ENOTDIR is a status error, never a new-file fallback (3.537167ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /无法读取目标状态.*ENOTDIR/. Input:
+  
+  "write_file 拒绝写入：[file-write-protection] canonical identity unavailable; no write (ENOTDIR: not a directory, lstat '/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-core-d3-wxhGrO/file.txt/child.txt')"
+  
+      at file:///Users/runner/work/ans-studio/ans-studio/test/runtime-core/file-write-safety.test.ts:125:14
+      at async withRoot (file:///Users/runner/work/ans-studio/ans-studio/test/runtime-core/file-write-safety.test.ts:19:9)
+      at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/runtime-core/file-write-safety.test.ts:114:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "write_file 拒绝写入：[file-write-protection] canonical identity unavailable; no write (ENOTDIR: not a directory, lstat '/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-core-d3-wxhGrO/file.txt/child.txt')",
+    expected: /无法读取目标状态.*ENOTDIR/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+## macOS arm64：Git final spawn fence / init journal / protection facts（L8606-L8695）
+✖ Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry (149.791625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /git-command-failed:null:unknown/. Input:
+  
+  'Error: git-host-lease-invalid-before-command'
+  
+      at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-command.test.ts:49:9)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: git-host-lease-invalid-before-command
+        at executeGit (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-command.ts:724:137)
+        at async writeTree (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-candidate-store.ts:204:32)
+        at async writeTree (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-candidate-store.ts:201:60)
+        at async writeTree (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-candidate-store.ts:201:60)
+        at async Object.prepare (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-candidate-store.ts:206:21)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-command.test.ts:49:9)
+        at async Test.run (node:internal/test_runner/test:1125:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:787:7),
+    expected: /git-command-failed:null:unknown/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at test/编排/git-command.test.ts:95:1
+✖ Git init journal: restart discovery binds the original operation and excludes FS/ref media (14.134875ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(listed.ok)
+  
+      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-command.test.ts:101:82)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/编排/git-command.test.ts:263:1
+✖ Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit (98.084042ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-command.test.ts:265:55)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/编排/git-operation-sidecar-tolerance.test.ts:58:1
+✖ I0-11: a safe sidecar-only operation directory is tolerated by the journal scanner and effective-manifest reads (1091.138584ms)
+  Error: git-journal-directory-invalid
+      at listGitOperationJournals (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-command.ts:446:92)
+      at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-operation-sidecar-tolerance.test.ts:60:18)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at test/编排/git-operation-sidecar-tolerance.test.ts:74:1
+✖ I0-11: sidecar plus an unknown extra file stays fail-closed (1141.998833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /authorization-sidecar-directory-unknown/. Input:
+  
+  'Error: git-journal-directory-invalid'
+  
+      at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-operation-sidecar-tolerance.test.ts:80:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: git-journal-directory-invalid
+        at listGitOperationJournals (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-command.ts:446:92)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-operation-sidecar-tolerance.test.ts:80:3)
+        at async Test.run (node:internal/test_runner/test:1125:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:787:7),
+    expected: /authorization-sidecar-directory-unknown/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+## macOS arm64：Git operation media（L8759-L8780）
+test at test/编排/git-trunk-store.test.ts:230:1
+✖ Git operation media: restart enumeration discovers both formats and refuses same-id rebinding (437.39975ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(all.ok)
+  
+      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-trunk-store.test.ts:240:100)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/编排/governance-matrix-injection.test.ts:316:1
+✖ A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入） (8.355375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+
+## macOS arm64：Pipeline initial workflow source（L8818-L8836）
+test at test/编排/run-role-submit-capabilities.test.ts:440:1
+✖ Pipeline initial workflow source: actual approved Core request binds task before the real guarded write (1104.501666ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"reason":"missing","message":"Error: ENOENT: no such file or directory, realpath '/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-o10-workflow-source-lqIGH8/.ans/trunk/operations/59ff13f4e32417eab058606e1beb81f9eb341923c52db7c50dcddf562dc30223/stable-source.json'"}
+      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/run-role-submit-capabilities.test.ts:501:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/编排/section1-write-preauthorization.test.ts:248:1
+✖ 有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒 (5.880666ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:
+  
+  'Role drafts require the actual completed plan and current D3 selection; no old appointment-write card can substitute'

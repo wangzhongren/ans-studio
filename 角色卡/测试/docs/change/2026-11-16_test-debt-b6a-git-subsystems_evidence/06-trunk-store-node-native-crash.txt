@@ -1,0 +1,37 @@
+execution-bases:first-document-source-captured
+execution-bases:delivered-code-newer-document-selected
+execution-bases:old-source-and-stale-cas-verified
+
+  #  C:\Users\51054\AppData\Local\Programs\nodejs\node.exe[7892]: void __cdecl node::CleanupQueue::Add(Callback, void *) at src\cleanup_queue-inl.h:24
+  #  Assertion failed: (insertion_info.second) == (true)
+
+----- Native stack trace -----
+
+ 1: 00007FF640186536 node::SetAbortHandler+54
+ 2: 00007FF6401860E7 node::MultiIsolatePlatform::DisposeIsolate+781383
+ 3: 00007FF64029D5C3 node::SetCppgcReference+356435
+ 4: 0000019F1FDCF77E 
+
+----- JavaScript stack trace -----
+
+1: destroyTracking (node:internal/async_hooks:344:3)
+2: promiseInitHookWithDestroyTracking (node:internal/async_hooks:338:3)
+3: lstat (node:internal/fs/promises:1741:24)
+4: noLinks (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6a/src/provider/trunk/impl/git-command.ts:553:61)
+
+
+✖ test\编排\git-trunk-store.test.ts (23126.6054ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23130.8705
+
+✖ failing tests:
+
+test at test\编排\git-trunk-store.test.ts:1:1
+✖ test\编排\git-trunk-store.test.ts (23126.6054ms)
+  'test failed'

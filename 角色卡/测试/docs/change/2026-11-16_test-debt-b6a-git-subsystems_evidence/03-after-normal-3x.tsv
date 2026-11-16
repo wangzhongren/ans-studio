@@ -1,0 +1,21 @@
+file	run	exit	tests	pass	fail	notes
+test/编排/git-operation-sidecar-tolerance.test.ts	1	0	6	6	0	—
+test/编排/git-operation-sidecar-tolerance.test.ts	2	0	6	6	0	—
+test/编排/git-operation-sidecar-tolerance.test.ts	3	0	6	6	0	—
+test/编排/git-command.test.ts	1	0	17	17	0	含 spawn fence（Windows 绿）
+test/编排/git-command.test.ts	2	0	17	17	0	—
+test/编排/git-command.test.ts	3	0	17	17	0	—
+test/编排/git-trunk-store.test.ts	1	1	1	0	1	Node 24.22.1 原生崩溃（CleanupQueue 断言，async_hooks destroyTracking），非测试断言失败；见 06-trunk-store-node-native-crash.txt。随后 7 次连续全绿。
+test/编排/git-trunk-store.test.ts	2	0	13	13	0	—
+test/编排/git-trunk-store.test.ts	3	0	13	13	0	—
+test/编排/git-trunk-store.test.ts	4	0	13	13	0	—
+test/编排/git-trunk-store.test.ts	5	0	13	13	0	—
+test/编排/git-trunk-store.test.ts	6	0	13	13	0	—
+test/编排/git-trunk-store.test.ts	7	0	13	13	0	—
+test/编排/git-trunk-store.test.ts	8	0	13	13	0	—
+test/编排/run-role-submit-capabilities.test.ts	1	0	14	14	0	整文件
+test/编排/run-role-submit-capabilities.test.ts	2	0	14	14	0	整文件
+test/编排/run-role-submit-capabilities.test.ts	3	0	14	14	0	整文件
+test/runtime-core/file-write-safety.test.ts	1	1	11	6	1	仅既有 known-red-62「D3 linked workspace root remains usable…」（EPERM symlink，非 B6a 范围）；D3 ENOTDIR ✔（Windows 分支）
+test/runtime-core/file-write-safety.test.ts	2	1	11	6	1	同上（3/3 一致，零新增）
+test/runtime-core/file-write-safety.test.ts	3	1	11	6	1	同上

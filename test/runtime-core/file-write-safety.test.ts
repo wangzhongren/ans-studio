@@ -122,7 +122,9 @@ test("D3 lstat ENOTDIR is a status error, never a new-file fallback", async () =
       // 若 Node/Windows 以后改报 ENOTDIR，则回到守卫拒绝的同一文案，故两个形态都接受。
       assert.match(result.message, /无法读取目标状态.*ENOTDIR|写入失败（建目录）：file\.txt\/child\.txt.*EEXIST.*file\.txt/);
     } else {
-      assert.match(result.message, /无法读取目标状态.*ENOTDIR/);
+      // B6a（2026-11-16）：现行守卫在 canonical-distinct 预检（finalFileProtection）即拒绝，
+      // 早于 fs-write 的「无法读取目标状态」层；ENOTDIR 仍是状态错误、绝不回退为新建文件。
+      assert.match(result.message, /canonical identity unavailable; no write \(ENOTDIR/);
     }
     assert.deepEqual(await readdir(root), ["file.txt"]);
     assert.equal(await readFile(path.join(root, "file.txt"), "utf8"), "original");

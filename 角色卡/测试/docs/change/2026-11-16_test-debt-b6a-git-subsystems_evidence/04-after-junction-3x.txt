@@ -1,0 +1,21 @@
+# B6a 修复后 junction（CI 非规范根形态）3× 验证
+# TEMP=TMP=C:/Users/51054/AppData/Local/Temp/b6a-repro/temp-link（junction → real-temp）
+# 目的：证明原 10 个 CI-red 名在 CI 的非规范根形态下转绿；正常环境 3× 见 03-after-normal-3x.tsv。
+
+## test/编排/git-operation-sidecar-tolerance.test.ts：3/3 绿色（6/6 pass，EXIT=0）
+run1: tests 6 / pass 6 / fail 0
+run2: tests 6 / pass 6 / fail 0
+run3: tests 6 / pass 6 / fail 0
+
+## test/编排/git-command.test.ts：3/3 绿色（17/17 pass，EXIT=0）
+run1-3: tests 17 / pass 17 / fail 0（含 Git init journal、Git protection facts、spawn fence）
+
+## test/编排/git-trunk-store.test.ts：3/3 绿色（13/13 pass，EXIT=0）
+run1-3: tests 13 / pass 13 / fail 0（含 Git operation media）
+
+## test/编排/run-role-submit-capabilities.test.ts（目标名）：3/3 绿色（1/1 pass，EXIT=0）
+run1-3: Pipeline initial workflow source ✔
+
+## test/runtime-core/file-write-safety.test.ts：3/3 结果与基线一致（零新增）
+tests 11 / pass 6 / fail 1 / skipped 4；唯一失败仍为 known-red-62「D3 linked workspace root remains usable…」（EPERM symlink，非 B6a 范围）
+D3 lstat ENOTDIR ✔（Windows 分支，非 win32 分支本机不可执行）

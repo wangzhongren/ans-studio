@@ -38,7 +38,9 @@ test("Git protection freshness: only the issued observation survives unchanged c
   assert.equal(checkGitProtectionFactsCurrent(unknown), false);
 });
 const raw = promisify(execFile);
-async function fixture() { const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-git-command-")); await initializeGitRepository(root); return root; }
+// B6a（2026-11-16）：产品按**真实根**返回保护事实/执行固定传输；CI 的 os.tmpdir() 可能是非规范拼写
+//（macOS `/var` → `/private/var`、Windows 8.3 短名 `RUNNER~1`）。夹具统一持有规范根，断言与产品同口径。
+async function fixture() { const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "ans-git-command-"))); await initializeGitRepository(root); return root; }
 
 test("Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry", async () => {
   const root = await fixture(), objects = createGitCandidateStore(root), dir = path.join(root, ".git/ans/processes"); await fs.mkdir(dir, { recursive: true });
@@ -78,7 +80,7 @@ test("Git final spawn fence: real pending-record interruption records no launch 
 });
 test("Git init Provider: final real root/file hashes fence initialization and persist original operation process identity", async () => {
   const base = process.platform === "win32" && process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Temp") : "/tmp";
-  const root = await fs.mkdtemp(path.join(base, "ans-init-fence-")); await fs.mkdir(path.join(root, ".ans"));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(base, "ans-init-fence-"))); await fs.mkdir(path.join(root, ".ans"));
   const relative = ".ans/actual-source.json", bytes = "actual binding bytes", sha256 = createHash("sha256").update(bytes).digest("hex");
   await fs.writeFile(path.join(root, relative), bytes);
   const initial = await readGitInitializationFacts(root), fence = { operationId: "actual-fenced-init", qualificationDigest: initial.qualificationDigest, expectedFiles: [{ path: relative, sha256 }] };
@@ -93,7 +95,7 @@ test("Git init Provider: final real root/file hashes fence initialization and pe
   assert.equal(observedProcess.operationId, fence.operationId); assert.equal(observedProcess.termination, "exited"); assert.equal(observedProcess.exitCode, 0);
 });
 test("Git init journal: restart discovery binds the original operation and excludes FS/ref media", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-init-journal-")); await fs.mkdir(path.join(root, ".ans"));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "ans-init-journal-"))); await fs.mkdir(path.join(root, ".ans"));
   const record = { media: "git-initialization/v1" as const, operationId: "unique-init-op", requestDigest: "a".repeat(64), projectRoot: root,
     taskId: "actual-task", runId: "actual-run", flowId: "demo", sourceId: "init-source-" + "b".repeat(64), sourceSha256: "c".repeat(64),
     qualificationDigest: "d".repeat(64), expectedFiles: [], stage: "prepared" as const };

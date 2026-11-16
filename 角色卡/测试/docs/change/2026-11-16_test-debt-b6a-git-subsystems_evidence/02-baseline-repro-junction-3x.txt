@@ -1,0 +1,30 @@
+# B6a 修复前基线 3× 复现（junction 临时根模拟 CI 非规范根）
+# 环境：TEMP=TMP=C:/Users/51054/AppData/Local/Temp/b6a-repro/temp-link（junction → real-temp）
+# 命令：node --test --test-timeout=120000 --test-force-exit <file>
+# 说明：junction 形态仅用于复现 CI 的「非规范根」条件；正常临时根下 12 名中 10 名在 Windows 本机为绿（与 R5 Windows 绿一致）。
+
+## test/编排/git-operation-sidecar-tolerance.test.ts：3/3 次均 6 fail
+✖ I0-11: a safe sidecar-only operation directory is tolerated by the journal scanner and effective-manifest reads
+✖ I0-11: sidecar plus an unknown extra file stays fail-closed
+✖ I0-11: unsafe sidecars (hardlink nlink≠1, oversized file, non-regular file) stay fail-closed
+✖ I0-11: a normal journal with a sidecar is unaffected (journal remains authoritative)
+✖ I0-12: stable-source plus only a safe authorization.jsonl is tolerated; unknown extra files and unsafe sidecars stay fail-closed
+✖ I0-12: a corrupted stable-source stays fail-closed even with a sidecar present
+错误：Error: git-journal-directory-invalid（listGitOperationJournals git-command.ts:446），及由同一错误导致的 3 个 regex 不符。
+
+## test/编排/git-command.test.ts：3/3 次均 2 fail
+✖ Git init journal: restart discovery binds the original operation and excludes FS/ref media（assert.ok(listed.ok) falsy）
+✖ Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit（protectedGitRoots.includes(root/.git) false !== true）
+（Git final spawn fence 在 Windows 3/3 绿。）
+
+## test/编排/git-trunk-store.test.ts：3/3 次均 1 fail
+✖ Git operation media: restart enumeration discovers both formats and refuses same-id rebinding（assert.ok(all.ok) falsy）
+
+## test/编排/run-role-submit-capabilities.test.ts（--test-name-pattern="Pipeline initial workflow source"）：3/3 次均 1 fail
+✖ Pipeline initial workflow source: actual approved Core request binds task before the real guarded write
+错误：ENOENT realpath .../.ans/trunk/operations/59ff13f4.../stable-source.json（产品因非规范根未安装 stable-source）
+
+## test/runtime-core/file-write-safety.test.ts（正常临时根）：3/3 次结果相同
+✔ D3 lstat ENOTDIR is a status error, never a new-file fallback（Windows 分支；D3 ENOTDIR 仅 macOS 红）
+✖ D3 linked workspace root remains usable; linked target itself is not replaced（EPERM symlink；known-red-62，非 B6a 范围，CI 双平台同红）
+ℹ tests 11 / pass 6 / fail 1 / skipped 4（3/3 次一致）

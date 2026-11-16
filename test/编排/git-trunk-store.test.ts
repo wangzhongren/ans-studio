@@ -14,7 +14,9 @@ import { completeSnapshotDigest } from "../../src/provider/version-change/public
 import { TRUNK_APPLY_JOURNAL_SCHEMA, TRUNK_MANIFEST_SCHEMA, type TrunkApplyJournal, type TrunkManifest, type CompleteSnapshot } from "../../src/model/trunk.ts";
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const b64 = (value: string | Buffer) => Buffer.from(value).toString("base64");
-async function fixture(format: "sha1" | "sha256" = "sha1") { const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-git-store-")); const identity = await initializeGitRepository(root, format); return { root, identity, candidates: createGitCandidateStore(root), refs: createGitRefStore(root) }; }
+// B6a（2026-11-16）：操作媒体枚举/迁移拒绝非规范根（`realpath(dir) === dir`）；CI 的 os.tmpdir()
+// 可能是 macOS `/var` 符号链接或 Windows 8.3 短名（`RUNNER~1`），夹具统一持有规范根。
+async function fixture(format: "sha1" | "sha256" = "sha1") { const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "ans-git-store-"))); const identity = await initializeGitRepository(root, format); return { root, identity, candidates: createGitCandidateStore(root), refs: createGitRefStore(root) }; }
 
 test("Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time", async () => {
   // Ordinary stored source DTOs exercise storage identity/ancestry only. No accepted task or business pin is fabricated here.
