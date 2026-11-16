@@ -1,0 +1,52 @@
+diff --git a/test/测试/git-action-cross-runtime-fixture.ts b/test/测试/git-action-cross-runtime-fixture.ts
+index c9f9f7e..6e5004e 100644
+--- a/test/测试/git-action-cross-runtime-fixture.ts
++++ b/test/测试/git-action-cross-runtime-fixture.ts
+@@ -45,9 +45,12 @@ export function fixtureRole(id: string): ResolvedRole {
+ /** 受保护项目 host 文件守卫事实（`.git` 根；与 W3b/W2 gate 夹具同口径）。
+  *  B3c（2026-11-16）：guard 的期望根由调用方根经 `canonicalProjectRoot`（realpath）构造；
+  *  macOS CI 的 `/var` 符号链接与 Windows CI 的 8.3 短名会让 mkdtemp 原拼写与真实根不同，
+- *  因此夹具发布的 protectedGitRoots 必须是同一真实根的规范拼写（真实目录已由 mkdtemp 建立）。 */
++ *  因此夹具发布的 protectedGitRoots 必须是同一真实根的规范拼写（真实目录已由 mkdtemp 建立）。
++ *  B3c-followup（2026-11-16）：必须用 `realpathSync.native`——同步 JS `realpathSync` 在 Windows
++ *  只做 lstat/readlink 游走，不展开 8.3 短名（CI TEMP 拼写为 `RUNNER~1`，本地 junction 可解析，
++ *  故 junction 模拟测不出）；`.native` 与产品 `canonicalProjectRoot` 同一语义（展开短名/解析链接）。 */
+ export function fileGateOptions(root: string): Partial<RuntimeSessionOptions> {
+-  const canonical = realpathSync(root);
++  const canonical = realpathSync.native(root);
+   const protectedGitRoots = [path.join(canonical, ".git")];
+   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
+     fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
+diff --git a/test/测试/run-stop-host-continuation-integration.test.ts b/test/测试/run-stop-host-continuation-integration.test.ts
+index a0c5332..b482a27 100644
+--- a/test/测试/run-stop-host-continuation-integration.test.ts
++++ b/test/测试/run-stop-host-continuation-integration.test.ts
+@@ -56,7 +56,9 @@ function fixtureRole(id: string): ResolvedRole {
+ }
+ function fileGateOptions(root: string): Partial<RuntimeSessionOptions> {
+   // B3c（2026-11-16）：guard 期望根为调用方根的 realpath 规范拼写（macOS `/var` 链接 / Windows 8.3 短名）。
+-  const canonical = realpathSync(root);
++  // B3c-followup（2026-11-16）：用 `realpathSync.native`（与产品 `canonicalProjectRoot` 同语义）；
++  // 同步 JS `realpathSync` 不展开 Windows 8.3 短名（CI TEMP = `RUNNER~1`，junction 模拟测不出）。
++  const canonical = realpathSync.native(root);
+   const protectedGitRoots = [path.join(canonical, ".git")];
+   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
+     fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
+diff --git a/test/编排/git-action-authorization-gate.test.ts b/test/编排/git-action-authorization-gate.test.ts
+index e32b35e..9048c9a 100644
+--- a/test/编排/git-action-authorization-gate.test.ts
++++ b/test/编排/git-action-authorization-gate.test.ts
+@@ -39,9 +39,11 @@ after(async () => {
+ 
+ /** 受保护项目的 host 文件守卫事实（本测试项目没有 .git；H7 只核 [projectRoot/.git]）。
+  *  B3c（2026-11-16）：guard 用调用方根的 realpath 规范拼写构造期望根；macOS `/var` 符号链接与
+- *  Windows 8.3 短名会让 mkdtemp 原拼写不同，夹具按真实根发布 protectedGitRoots。 */
++ *  Windows 8.3 短名会让 mkdtemp 原拼写不同，夹具按真实根发布 protectedGitRoots。
++ *  B3c-followup（2026-11-16）：用 `realpathSync.native`（与产品 `canonicalProjectRoot` 同语义）；
++ *  同步 JS `realpathSync` 不展开 Windows 8.3 短名（CI TEMP = `RUNNER~1`，junction 模拟测不出）。 */
+ function fileGateOptions(root: string): Partial<RuntimeSessionOptions> {
+-  const canonical = realpathSync(root);
++  const canonical = realpathSync.native(root);
+   const protectedGitRoots = [path.join(canonical, ".git")];
+   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
+     fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };

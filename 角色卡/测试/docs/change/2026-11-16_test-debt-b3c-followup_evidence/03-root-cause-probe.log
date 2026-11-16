@@ -1,0 +1,34 @@
+# Root-cause probes (local, 2026-11-16)
+# Short-name root: C:\Users\51054\AppData\Local\Temp\ANF967~3 -> C:\Users\51054\AppData\Local\Temp\ans-b3cfu-shortname-probe-abcdef
+
+== probe A: sync JS realpathSync vs realpathSync.native vs fsp.realpath (short TEMP)
+plain : C:\Users\51054\AppData\Local\Temp\ANF967~3
+native: C:\Users\51054\AppData\Local\Temp\ans-b3cfu-shortname-probe-abcdef
+equal : false
+promises: C:\Users\51054\AppData\Local\Temp\ans-b3cfu-shortname-probe-abcdef
+
+== probe B: fixture fileGateOptions(root) vs guard expected [canonicalProjectRoot(root)/.git] (short TEMP)
+tmpdir             : C:\Users\51054\AppData\Local\Temp\ANF967~3
+mkdtemp root       : C:\Users\51054\AppData\Local\Temp\ANF967~3\ans-b3cfu-probe-zioS83
+realpathSync       : C:\Users\51054\AppData\Local\Temp\ANF967~3\ans-b3cfu-probe-zioS83
+realpathSync.native: C:\Users\51054\AppData\Local\Temp\ans-b3cfu-shortname-probe-abcdef\ans-b3cfu-probe-zioS83
+fsp.realpath       : C:\Users\51054\AppData\Local\Temp\ans-b3cfu-shortname-probe-abcdef\ans-b3cfu-probe-zioS83
+fixture protected  : C:\Users\51054\AppData\Local\Temp\ans-b3cfu-shortname-probe-abcdef\ans-b3cfu-probe-zioS83\.git
+guard expected     : C:\Users\51054\AppData\Local\Temp\ans-b3cfu-shortname-probe-abcdef\ans-b3cfu-probe-zioS83\.git
+H12 key match      : true
+
+== probe C: three root shapes (ml realpathSync == native?)
+-- plain
+{"tmpdir":"C:\\Users\\51054\\AppData\\Local\\Temp","root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-shape-rLK9AU","realpathSync":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-shape-rLK9AU","native":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-shape-rLK9AU","equal":true}
+-- junction
+{"shape":"junction","tmpdir":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-sim\\junction","root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-sim\\junction\\ans-b3cfu-shape-kOUA31","realpathSync":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-sim\\real\\ans-b3cfu-shape-kOUA31","native":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-sim\\real\\ans-b3cfu-shape-kOUA31","equal":true}
+-- short
+{"shape":"short","tmpdir":"C:\\Users\\51054\\AppData\\Local\\Temp\\ANF967~3","root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ANF967~3\\ans-b3cfu-shape-Ft8aEB","realpathSync":"C:\\Users\\51054\\AppData\\Local\\Temp\\ANF967~3\\ans-b3cfu-shape-Ft8aEB","native":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-shortname-probe-abcdef\\ans-b3cfu-shape-Ft8aEB","equal":false}
+
+== probe D: old (realpathSync) vs new (realpathSync.native) fixture value against H12 expected root (short TEMP)
+{
+ "root": "C:\\Users\\51054\\AppData\\Local\\Temp\\ANF967~3\\ans-b3cfu-oldnew-J7ZHSH",
+ "expected": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3cfu-shortname-probe-abcdef\\ans-b3cfu-oldnew-J7ZHSH\\.git",
+ "oldStyleH12Match": false,
+ "newStyleH12Match": true
+}

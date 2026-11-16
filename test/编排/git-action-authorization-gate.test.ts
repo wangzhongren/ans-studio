@@ -39,9 +39,11 @@ after(async () => {
 
 /** 受保护项目的 host 文件守卫事实（本测试项目没有 .git；H7 只核 [projectRoot/.git]）。
  *  B3c（2026-11-16）：guard 用调用方根的 realpath 规范拼写构造期望根；macOS `/var` 符号链接与
- *  Windows 8.3 短名会让 mkdtemp 原拼写不同，夹具按真实根发布 protectedGitRoots。 */
+ *  Windows 8.3 短名会让 mkdtemp 原拼写不同，夹具按真实根发布 protectedGitRoots。
+ *  B3c-followup（2026-11-16）：用 `realpathSync.native`（与产品 `canonicalProjectRoot` 同语义）；
+ *  同步 JS `realpathSync` 不展开 Windows 8.3 短名（CI TEMP = `RUNNER~1`，junction 模拟测不出）。 */
 function fileGateOptions(root: string): Partial<RuntimeSessionOptions> {
-  const canonical = realpathSync(root);
+  const canonical = realpathSync.native(root);
   const protectedGitRoots = [path.join(canonical, ".git")];
   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
     fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
