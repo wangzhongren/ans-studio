@@ -1,0 +1,23 @@
+name	inMac	arm64	x64	r3Family	r2Family	sets	errorFirst
+主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）	true	true	true	known-red-62	known-red-62	B0+B7+KR+KR	AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+commit-race	true	true	true	e71501c-drift	e71501c-drift	B0+B7+NEW	AssertionError [ERR_ASSERTION]: Observed the actual dispatch/ledger await lease, without stubbing the append
+Core-managed binding rejects a provider that did not register its display profile before first prompt	true	true	true	known-red-62	known-red-62	B0+B7+KR+KR	AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+D3 linked workspace root remains usable; linked target itself is not replaced	true	true	true	known-red-62	known-red-62	B0+B7+KR+KR	AssertionError [ERR_ASSERTION]: The input did not match the regular expression /符号链接/. Input:
+dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行	true	true	true	known-red-62	known-red-62	B0+B7+KR+KR	AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」	true	true	true	known-red-62	known-red-62	B0+B7+KR+KR	AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）	true	true	true	known-red-62	known-red-62	B0+B7+KR+KR	AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+required	true	true	true	b0-existing-other	b0-existing-other	B0+B7+NEW	AssertionError [ERR_ASSERTION]: The required scope comes from an actual accepted customer turn and child ledger, not a fixture marker
+selected	true	true	true	source-gate	source-gate	B0+B7+NEW	code: 'ERR_ASSERTION',
+W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind	true	true	true	e71501c-drift	e71501c-drift	B0+B7+NEW	
+W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界	true	true	true	e71501c-drift	e71501c-drift	B0+B7+NEW	AssertionError [ERR_ASSERTION]: The actual creator receipt must supply notification source
+W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin	true	true	true	e71501c-drift	e71501c-drift	NEW	code: 'ERR_ASSERTION',
+W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin	false	false	false	unclassified-new	e71501c-drift	NEW	
+W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin	true	true	true	e71501c-drift	e71501c-drift	NEW	code: 'ERR_ASSERTION',
+W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin	true	true	true	e71501c-drift	e71501c-drift	NEW	code: 'ERR_ASSERTION',
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后	true	true	true	e71501c-drift	e71501c-drift	NEW	code: 'ERR_ASSERTION',
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后	true	true	true	e71501c-drift	e71501c-drift	NEW	AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结
+W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续	true	true	true	e71501c-drift	e71501c-drift	B0+B7+NEW	AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+W34 真实首文档发布与原创建者关闭后派团队规划保独立scope	true	true	true	e71501c-drift	e71501c-drift	B0+B7+NEW	AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}"]
+W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝	true	true	true	e71501c-drift	e71501c-drift	NEW	code: 'ERR_ASSERTION',
+W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease	false	false	false	ci-path-canonical	ci-path-canonical	MAC	
+W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝	true	true	true	e71501c-drift	e71501c-drift	B0+B7+NEW	code: 'ERR_ASSERTION',
