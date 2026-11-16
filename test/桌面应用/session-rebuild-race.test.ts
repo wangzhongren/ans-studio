@@ -247,6 +247,18 @@ function waitPoint() {
   return { arrived, release, async wait() { arrive(); await blocked; } };
 }
 
+/** B1（2026-11-16）：内部等待一律有界——未结算即抛带现场快照的可命名失败，不把文件拖到 --test-timeout。 */
+async function settledWithin<T>(promise: Promise<T>, label: string, facts: () => unknown, timeoutMs = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([promise, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label}：${timeoutMs}ms 内未结算 ${JSON.stringify(facts())}`)), timeoutMs);
+    })]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 function addRoleB(root: string, listing: ProjectListing) {
   const role = listing.roles[0];
   listing.roles.push({ ...role, roleId: "B", cardPath: "角色卡/B/role-card.md", boundaryPath: "角色卡/B/boundary.yaml" });
@@ -433,22 +445,26 @@ test("关闭全部与双角色刷新扫描交接：停止返回后没有后续�
       if (roleId === "A" && generation === 3) await firstStopDispose.wait();
     },
   });
+  let refreshSettled = false, stopSettled = false;
+  // B1：超时诊断带 refresh/stop 结算状态与全部夹具现场；断言文本不变。
+  const facts = () => ({ refreshSettled, stopSettled, opened: [...harness.opened], disposed: [...harness.disposed],
+    sent: [...harness.sent], live: harness.mgr.liveRoleIds(), openForRoleId: harness.mgr.openForRoleId() });
   try {
     await harness.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" });
     await harness.mgr.open({ projectRoot: root, roleId: "B", runtime: "demo" });
     for (const roleId of ["A", "B"]) fs.writeFileSync(path.join(root, "角色卡", roleId, "boundary.yaml"), "v: 2\n");
-    const refresh = harness.mgr.refreshStaleBoundaries();
-    await firstOpen.arrived;
-    const stop = harness.mgr.stop(null);
+    const refresh = harness.mgr.refreshStaleBoundaries().finally(() => { refreshSettled = true; });
+    await settledWithin(firstOpen.arrived, "刷新扫描未到达 A 重建 open 等待窗口", facts);
+    const stop = harness.mgr.stop(null).finally(() => { stopSettled = true; });
     firstOpen.release();
-    await firstStopDispose.arrived;
+    await settledWithin(firstStopDispose.arrived, "stop 未到达 A 重建句柄 dispose 等待窗口", facts);
     // 缺陷版会继续扫描 B 并在 stop 释放 A 的窗口临时移出 B；修复版扫描直接完成。
-    await Promise.race([refresh, laterOpen.arrived]);
+    await settledWithin(Promise.race([refresh, laterOpen.arrived]), "刷新扫描/后续重开未在有界窗口内结算", facts);
     firstStopDispose.release();
-    assert.equal((await stop).ok, true);
+    assert.equal((await settledWithin(stop, "stop 未在有界窗口内返回", facts)).ok, true);
     assert.deepEqual(harness.mgr.liveRoleIds(), [], "stop 返回时没有旧句柄");
     laterOpen.release();
-    await refresh;
+    await settledWithin(refresh, "刷新扫描未在有界窗口内返回", facts);
     assert.deepEqual(harness.opened, ["A", "B", "A"], "旧扫描不得再启动 B 的重建");
     assert.deepEqual(harness.mgr.liveRoleIds(), [], "扫描完成也没有复活句柄");
     assert.equal(harness.mgr.openForRoleId(), null);
@@ -458,7 +474,7 @@ test("关闭全部与双角色刷新扫描交接：停止返回后没有后续�
     firstOpen.release();
     firstStopDispose.release();
     laterOpen.release();
-    await harness.mgr.stop(null);
+    await settledWithin(harness.mgr.stop(null), "清理阶段 stop 未在有界窗口内返回", facts);
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

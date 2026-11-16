@@ -85,6 +85,14 @@ async function preservePhaseCleanup(caseTag: string, primary: { error: unknown }
   } catch (error) { failures.push(error); }
   if (cleanupFailure || failures.length > (primary ? 1 : 0)) throw new AggregateError(failures, "Actual phase and cleanup errors; no failure suppressed");
 }
+/** B1（2026-11-16）：证据写入失败不得阻断 driver 释放——否则 fixture HTTP server/interval/会话句柄
+ * 会把文件测试进程留在事件循环里（Windows CI 静默停顿的根因）。保存错误在 dispose 之后如实重抛。 */
+async function saveThenDispose(driver: { save(file: string, extra?: unknown): Promise<void>; dispose(): Promise<void> }, save: () => Promise<void>) {
+  let saveFailure: { error: unknown } | undefined;
+  try { await save(); } catch (error) { saveFailure = { error }; }
+  await driver.dispose();
+  if (saveFailure !== undefined) throw saveFailure.error;
+}
 
 /** Accept only a relay of an exact reply already produced by this fixture's real role HTTP turn. */
 function ownProducedFeedback(body: ChatRequest, trace: readonly HttpTrace[], allowedRoles: readonly string[]) {
@@ -867,8 +875,8 @@ async function runDeliveredTextModification(options: { caseTag: string; proofFil
   } catch (error) { primary = error; throw error;
   } finally {
     let cleanup: unknown;
-    try { await driver.save(path.join(evidence, `${options.caseTag}-full-final-proof.json`), { completed, publishedDelivery: published, integrated, workerReceipt, qualityPath, progress, primaryError: primary === undefined ? null : actualErrorFact(primary) });
-      await driver.dispose(); await driver.save(path.join(evidence, `${options.caseTag}-after-cleanup-proof.json`), { completed, publishedDelivery: published }); assert.deepEqual(driver.errors, []);
+    try { await saveThenDispose(driver, () => driver.save(path.join(evidence, `${options.caseTag}-full-final-proof.json`), { completed, publishedDelivery: published, integrated, workerReceipt, qualityPath, progress, primaryError: primary === undefined ? null : actualErrorFact(primary) }));
+      await driver.save(path.join(evidence, `${options.caseTag}-after-cleanup-proof.json`), { completed, publishedDelivery: published }); assert.deepEqual(driver.errors, []);
     } catch (error) { cleanup = error; }
     await fs.writeFile(path.join(evidence, `${options.caseTag}-error-outcomes.json`), JSON.stringify({ primaryError: primary === undefined ? null : actualErrorFact(primary), cleanupError: cleanup === undefined ? null : actualErrorFact(cleanup), driverErrors: driver.errors }, null, 2), { flag: "wx" });
     if (cleanup !== undefined) throw new AggregateError([...(primary === undefined ? [] : [primary]), cleanup], "Real maintenance failure and cleanup error; none suppressed");
@@ -1107,8 +1115,8 @@ async function runDeliveredRevertWithReviewRepair(options: {
   } catch (error) { primary = error; throw error;
   } finally {
     await preservePhaseCleanup(options.caseTag, primary === undefined ? undefined : { error: primary }, async () => {
-      await driver.save(path.join(evidence, `${options.caseTag}-full-final-proof.json`), { completed, candidateReceipt, publishedDelivery: published, progress, primaryError: primary === undefined ? null : actualErrorFact(primary) });
-      await driver.dispose(); await driver.save(path.join(evidence, `${options.caseTag}-after-cleanup-proof.json`), { completed, publishedDelivery: published }); assert.deepEqual(driver.errors, []);
+      await saveThenDispose(driver, () => driver.save(path.join(evidence, `${options.caseTag}-full-final-proof.json`), { completed, candidateReceipt, publishedDelivery: published, progress, primaryError: primary === undefined ? null : actualErrorFact(primary) }));
+      await driver.save(path.join(evidence, `${options.caseTag}-after-cleanup-proof.json`), { completed, publishedDelivery: published }); assert.deepEqual(driver.errors, []);
     });
   }
 }
@@ -1288,7 +1296,7 @@ test("Q2 real default CodexChat HTTP: chief Git query preserves real metadata an
     assert.deepEqual(live.toolSurface?.native?.nativeBuiltinTools, []);
     assert.equal(observation.inventory.coverage, "unknown");
     assert.deepEqual(await hashFixtureFiles(driver.root), before);
-  } finally { await driver.save(path.join(evidence, `${queryCaseTag}-proof.json`), { gitMetadataBefore: before }); await driver.dispose();
+  } finally { await saveThenDispose(driver, () => driver.save(path.join(evidence, `${queryCaseTag}-proof.json`), { gitMetadataBefore: before }));
     await driver.save(path.join(evidence, `${queryCaseTag}-after-cleanup-proof.json`), { gitMetadataBefore: before, phase: "actual dispose and owned writes returned" }); assert.deepEqual(driver.errors, []); }
 });
 
@@ -2261,18 +2269,24 @@ export async function runFirstNewBusinessCase() {
       ...(Object.hasOwn(error, "code") ? { code: Reflect.get(error, "code") } : {}) } : { thrown: String(error) };
     let cleanupFailure: { error: unknown } | undefined;
     let disposeCompleted = false, finalAssertionsCompleted = false;
-    try { releaseDocumentObservation(); releasePlanObservation(); releaseActivationObservation(); releaseActivationCloseObservation(); releaseWorkflowObservation(); releaseWorkflowCloseObservation(); await driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { primaryError: primaryFailure ? errorFact(primaryFailure.error) : null, handoffReply: handoffReply ?? null, initReply: initReply ?? null,
+    try { releaseDocumentObservation(); releasePlanObservation(); releaseActivationObservation(); releaseActivationCloseObservation(); releaseWorkflowObservation(); releaseWorkflowCloseObservation();
+    // B1（2026-11-16）：证据保存失败不得跳过 dispose（server/interval 泄漏会让文件进程不退出）；
+    // 保存错误在 dispose 与全部清理证据之后如实重抛。
+    let finalSaveFailure: { error: unknown } | undefined;
+    try { await driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { primaryError: primaryFailure ? errorFact(primaryFailure.error) : null, handoffReply: handoffReply ?? null, initReply: initReply ?? null,
     actualSource, initializationReadback, initHandoff: initHandoff ?? null, initCloseReply: initCloseReply ?? null,
     firstDocumentReply: firstDocumentReply ?? null,
     firstDocumentReadback,
     planReply: planReply ?? null,
     planReadback, activationReadback, activationCloseReadback, workflowReadback, workflowCloseReadback, roleProgress,
     budget: { diagnosticQueueOnly: q33QueueDiagnostic, httpRequests: q33QueueDiagnostic ? 96 : q23Business ? 256 : 192, wholeTestMs: q33QueueDiagnostic ? 90000 : q26Business ? 300000 : q25Business ? 240000 : q23Business ? 180000 : 240000, perObservationMs: q33QueueDiagnostic ? 30000 : q26Business ? 150000 : q25Business ? 120000 : 90000, retries: 0, expectedRequestsAtMost: q33QueueDiagnostic ? 48 : q27Business ? 180 : 144, runnerIsolation: "none", diagnosticOnly },
-    repoPrefilled: false, futurePlanningD3CardsPrefilled: false }); await driver.dispose(); disposeCompleted = true;
+    repoPrefilled: false, futurePlanningD3CardsPrefilled: false }); } catch (error) { finalSaveFailure = { error }; }
+    await driver.dispose(); disposeCompleted = true;
     await fs.writeFile(path.join(evidence, `${caseTag}-owned-teardown-facts.json`), JSON.stringify(driver.teardownFacts, null, 2));
     if (q19Diagnostic || q20Profile) { await driver.samplePostCleanupDiagnostics(); timerDiagnostics?.restore(); }
     await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { stage: "after actual NEW dispose and all owned evidence tail writes", wholeNewCase: true });
     assert.deepEqual(driver.errors, [], "Complete NEW must not ignore late fixture or transport callback errors"); finalAssertionsCompleted = true;
+    if (finalSaveFailure !== undefined) throw finalSaveFailure.error;
     } catch (error) { cleanupFailure = { error }; }
     const failures = [...(primaryFailure ? [primaryFailure.error] : []), ...(cleanupFailure ? [cleanupFailure.error] : [])];
     try { await fs.writeFile(path.join(evidence, `${caseTag}-error-outcomes.json`), JSON.stringify({ at: new Date().toISOString(), caseTag, root: driver.root,
@@ -2356,7 +2370,7 @@ export async function preparedMaterialsFirstObservation() {
     assert.deepEqual(driver.errors, [], "A production blocked receipt differs from HTTP script exhaustion");
     assert.match(initReply!, /prepared/,
       "Q2_FIRST_REAL_INIT_BLOCK: do not replace this governed init with fixture git init, fake lease or synthetic accepted state");
-  } finally { await driver.save(path.join(evidence, "q2-new-project-first-block.json"), { initReply: initReply ?? null, existingRepoLifecycleRun: false }); await driver.dispose(); }
+  } finally { await saveThenDispose(driver, () => driver.save(path.join(evidence, "q2-new-project-first-block.json"), { initReply: initReply ?? null, existingRepoLifecycleRun: false })); }
 }
 
 
@@ -2456,9 +2470,8 @@ export async function runDeliveredChangeEntryCase() {
     assert.equal(driver.trace.some(row => row.reply?.tool_calls?.some(call => call.function.name === "ans_git_candidate")), false, "CHANGE entry must not initialize or manufacture a new candidate");
   } catch (error) { phasePrimary = { error }; throw error;
   } finally { await preservePhaseCleanup(caseTag, phasePrimary, async () => {
-    await driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: "existing delivery -> actual v2 product draft -> original creator close", fullChangePass: false,
-      caseTag, deadlineAt, complete, remaining: "Real intent confirmation, new document CAS, rapporteur three-mode selection, execution/quality/delivery still require subsequent receiver phases", queryReply, closeReply });
-    await driver.dispose();
+    await saveThenDispose(driver, () => driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: "existing delivery -> actual v2 product draft -> original creator close", fullChangePass: false,
+      caseTag, deadlineAt, complete, remaining: "Real intent confirmation, new document CAS, rapporteur three-mode selection, execution/quality/delivery still require subsequent receiver phases", queryReply, closeReply }));
     await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { stage: "after actual dispose and all owned tail writes", phaseOnly: true, fullChangePass: false, complete });
     if (complete) assert.deepEqual(driver.errors, [], "A partial CHANGE entry must also reject late fixture callback errors");
   }); }
@@ -2566,9 +2579,9 @@ export async function runChangeIntentAndPlanningCase() {
     for (const [p, content] of Object.entries(documents)) assert.equal(await fs.readFile(path.join(driver.root, p), "utf8"), content);
   } catch (error) { phasePrimary = { error }; throw error;
   } finally { await preservePhaseCleanup(caseTag, phasePrimary, async () => {
-    await driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: true, fullChangePass: false, complete, customerDecisions,
-      priorDraftProofSha256: createHash("sha256").update(draftProofBytes).digest("hex"), priorFixtureErrors, confirmedIntentReadback, remaining: "Actual v2 document publication, run-mode selection, execution/quality/delivery not completed" });
-    await driver.dispose(); await send;
+    await saveThenDispose(driver, () => driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: true, fullChangePass: false, complete, customerDecisions,
+      priorDraftProofSha256: createHash("sha256").update(draftProofBytes).digest("hex"), priorFixtureErrors, confirmedIntentReadback, remaining: "Actual v2 document publication, run-mode selection, execution/quality/delivery not completed" }));
+    await send;
     await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { stage: "after actual dispose, owned tail writes and actual send settlement", phaseOnly: true, fullChangePass: false, complete, priorFixtureErrors });
     if (complete) assert.deepEqual(driver.errors, [], "Completed planning phase must not ignore late fixture errors");
   }); }
@@ -2977,8 +2990,8 @@ export async function runChangePublicationAndModeCase() {
         assert.equal(driver.respond(card.id, { kind: "choice", selected: ["impl"] }).ok, true); }
       signal.throwIfAborted(); await new Promise(resolve => setTimeout(resolve, 10)); } }, { remainingCase: true });
   } catch (error) { phasePrimary = { error }; throw error;
-  } finally { await preservePhaseCleanup(caseTag, phasePrimary, async () => { await driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: true, fullChangePass: false, complete, base, target, targetOid, publicationReply, modeReply, oldRun: before, modeBlockedReport, repairPlanReceipt, recoveryCustomerDecisions });
-    await driver.dispose(); await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { phaseOnly: true, fullChangePass: false, complete });
+  } finally { await preservePhaseCleanup(caseTag, phasePrimary, async () => { await saveThenDispose(driver, () => driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: true, fullChangePass: false, complete, base, target, targetOid, publicationReply, modeReply, oldRun: before, modeBlockedReport, repairPlanReceipt, recoveryCustomerDecisions }));
+    await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { phaseOnly: true, fullChangePass: false, complete });
     if (complete) assert.deepEqual(driver.errors, []); }); }
 }
 
@@ -3057,8 +3070,8 @@ export async function runChangeExecutionAdmissionCase() {
     await driver.sendChief(`接续实际发布和stop-and-restart结果核对目标执行，不把旧pin换成新文档。实际回执材料 ${JSON.stringify(material)}`);
     await driver.bounded("changed execution first actual gate handback", async signal => { while (!chiefReceived) { if (driver.errors.length) throw new Error(driver.errors.join("\n")); signal.throwIfAborted(); await new Promise(resolve => setTimeout(resolve, 10)); } });
     assert.fail(gap ?? "CHANGE_EXECUTION_CONTINUATION_NOT_COVERED");
-  } finally { await driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: true, fullChangePass: false, material, controllerTaskId, actualModule, gap, chiefReceived });
-    await driver.dispose(); await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { phaseOnly: true, fullChangePass: false, gap }); }
+  } finally { await saveThenDispose(driver, () => driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: true, fullChangePass: false, material, controllerTaskId, actualModule, gap, chiefReceived }));
+    await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { phaseOnly: true, fullChangePass: false, gap }); }
 }
 
 test("CHANGE standalone replacement admission diagnostic, not creator-report continuity", { timeout: 90000, skip: process.env.ANS_CHANGE_EXECUTION_STANDALONE !== "1" }, runChangeExecutionAdmissionCase);
@@ -3178,8 +3191,8 @@ async function runChiefOrdinaryClarificationCase() {
   } catch (error) { primary = error; throw error;
   } finally {
     await preservePhaseCleanup(caseTag, primary === undefined ? undefined : { error: primary }, async () => {
-      await driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { asked, completed, scope: "Ordinary clarification/new input only; no Goal/Task/card/approval", primaryError: primary === undefined ? null : actualErrorFact(primary) });
-      await driver.dispose(); await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { asked, completed, scope: "Actual dialogue/drain/cleanup; not LLM classification or execution" }); assert.deepEqual(driver.errors, []);
+      await saveThenDispose(driver, () => driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { asked, completed, scope: "Ordinary clarification/new input only; no Goal/Task/card/approval", primaryError: primary === undefined ? null : actualErrorFact(primary) }));
+      await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { asked, completed, scope: "Actual dialogue/drain/cleanup; not LLM classification or execution" }); assert.deepEqual(driver.errors, []);
     });
   }
 }
@@ -3369,8 +3382,8 @@ export async function runChiefHubDraftCase(options: { productRecovery?: boolean;
       await driver.save(path.join(evidence, `${caseTag}-actual-recovered-same-task.json`), { recoveryTaskId, rejectedPath, rejectedWriteReply, recoveryBefore, recoveryAfterDenial, actualWritten, closeReply });
     }
   } finally {
-    await driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: true, hubDraftOnly: true, productRecoveryOnly: recovery, chiefCoordinatedRecovery: chiefRecovery, blockedPreparationRole: blockedRole, blockedDisposition, completed, actualWritten, writeReply, closeReply, noGitSetup: true, recoveryTaskId, rejectedWriteReply, actualMissingReferenceReply: chiefRecoveryReply });
-    await driver.dispose(); await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { stage: "actual bounded phase drain and dispose/tail writes completed", phaseOnly: true, productRecoveryOnly: recovery, chiefCoordinatedRecovery: chiefRecovery, blockedPreparationRole: blockedRole, blockedDisposition, completed, actualWritten, writeReply, closeReply, recoveryTaskId, rejectedWriteReply, actualMissingReferenceReply: chiefRecoveryReply });
+    await saveThenDispose(driver, () => driver.save(path.join(evidence, `${caseTag}-full-final-proof.json`), { phaseOnly: true, hubDraftOnly: true, productRecoveryOnly: recovery, chiefCoordinatedRecovery: chiefRecovery, blockedPreparationRole: blockedRole, blockedDisposition, completed, actualWritten, writeReply, closeReply, noGitSetup: true, recoveryTaskId, rejectedWriteReply, actualMissingReferenceReply: chiefRecoveryReply }));
+    await driver.save(path.join(evidence, `${caseTag}-after-cleanup-proof.json`), { stage: "actual bounded phase drain and dispose/tail writes completed", phaseOnly: true, productRecoveryOnly: recovery, chiefCoordinatedRecovery: chiefRecovery, blockedPreparationRole: blockedRole, blockedDisposition, completed, actualWritten, writeReply, closeReply, recoveryTaskId, rejectedWriteReply, actualMissingReferenceReply: chiefRecoveryReply });
     if (completed) assert.deepEqual(driver.errors, [], "No late hub draft receiver/transport failure may be hidden");
   }
 }

@@ -1,0 +1,46 @@
+CI facts excerpt (run 43421603526, source: 2026-11-16_remediation-plan_evidence/01-ci-failures.json + 14-timeouts-and-stall.json; derived, not raw logs)
+command: node --test --test-concurrency=1 --test-timeout=300000 "test/**/*.test.ts"
+windows platform: windows-x64 (cancelled) logBytes=904521 lineCount=4147 uniqueNames=117
+lastResultTs: 2026-11-13T12:31:59.3915875Z
+cancelTs: 2026-11-13T14:00:57.8125464Z
+stallBeforeCancelMs: 5338421 (~88.97 min)
+timeouts: [{"name":"关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递","maxDurationMs":300011.3438,"count":1,"files":[],"fileLevel":false},{"name":"C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口","maxDurationMs":300002.0474,"count":1,"files":[],"fileLevel":false}]
+fileLevelNames: []
+
+selected name entries (allNames):
+[
+  {
+    "name": "Q30 fixture HTTP preserves split UTF8 and byte budget",
+    "count": 1,
+    "maxDurationMs": 31.8737,
+    "firstTs": "2026-11-13T12:31:55.9659611Z",
+    "lastTs": "2026-11-13T12:31:55.9659611Z",
+    "errorFirst": null
+  },
+  {
+    "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+    "count": 1,
+    "maxDurationMs": 79.4468,
+    "firstTs": "2026-11-13T12:31:56.0453273Z",
+    "lastTs": "2026-11-13T12:31:56.0453273Z",
+    "errorFirst": null
+  },
+  {
+    "name": "Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface",
+    "count": 1,
+    "maxDurationMs": 67.9154,
+    "firstTs": "2026-11-13T12:31:57.4089635Z",
+    "lastTs": "2026-11-13T12:31:57.4089635Z",
+    "errorFirst": "AssertionError [ERR_ASSERTION]: Fixture inventory path must not traverse unknown links"
+  },
+  {
+    "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+    "count": 1,
+    "maxDurationMs": 1986.7609,
+    "firstTs": "2026-11-13T12:31:59.3907645Z",
+    "lastTs": "2026-11-13T12:31:59.3907645Z",
+    "errorFirst": null
+  }
+]
+
+resultTsGaps: [{"from":"2026-11-13T12:09:09.3727623Z","to":"2026-11-13T12:14:09.3920011Z","gapMs":300020,"nextLine":"✖ 关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递 (300011.3438ms)"},{"from":"2026-11-13T12:14:18.7003112Z","to":"2026-11-13T12:19:18.7063932Z","gapMs":300006,"nextLine":"✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (300002.0474ms)"}]

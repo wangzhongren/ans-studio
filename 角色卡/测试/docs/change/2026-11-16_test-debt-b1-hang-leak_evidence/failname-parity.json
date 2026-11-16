@@ -1,0 +1,141 @@
+{
+  "session-rebuild-race": {
+    "baseline": {
+      "wallSeconds": 301,
+      "exitCode": 1,
+      "names": [
+        "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+        "重建 dispose 等待窗口：stop A 保持用户目标/关闭契约",
+        "重建 dispose 等待窗口：stop all 保持用户目标/关闭契约",
+        "重建 open 等待窗口：stop A 保持用户目标/关闭契约"
+      ]
+    },
+    "after": [
+      {
+        "file": "after-race-run1.log",
+        "wallSeconds": 11,
+        "exitCode": 1,
+        "names": [
+          "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+          "重建 dispose 等待窗口：stop A 保持用户目标/关闭契约",
+          "重建 dispose 等待窗口：stop all 保持用户目标/关闭契约",
+          "重建 open 等待窗口：stop A 保持用户目标/关闭契约"
+        ]
+      },
+      {
+        "file": "after-race-run2.log",
+        "wallSeconds": 11,
+        "exitCode": 1,
+        "names": [
+          "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+          "重建 dispose 等待窗口：stop A 保持用户目标/关闭契约",
+          "重建 dispose 等待窗口：stop all 保持用户目标/关闭契约",
+          "重建 open 等待窗口：stop A 保持用户目标/关闭契约"
+        ]
+      },
+      {
+        "file": "after-race-run3.log",
+        "wallSeconds": 11,
+        "exitCode": 1,
+        "names": [
+          "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+          "重建 dispose 等待窗口：stop A 保持用户目标/关闭契约",
+          "重建 dispose 等待窗口：stop all 保持用户目标/关闭契约",
+          "重建 open 等待窗口：stop A 保持用户目标/关闭契约"
+        ]
+      }
+    ],
+    "added": [],
+    "removedPerAllRuns": []
+  },
+  "stuck-redispatch": {
+    "baseline": {
+      "wallSeconds": 307,
+      "exitCode": 1,
+      "names": [
+        "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）",
+        "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+        "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口",
+        "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递"
+      ]
+    },
+    "after": [
+      {
+        "file": "after-redispatch-run1.log",
+        "wallSeconds": 16,
+        "exitCode": 1,
+        "names": [
+          "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）",
+          "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+          "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口",
+          "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递"
+        ]
+      },
+      {
+        "file": "after-redispatch-run2.log",
+        "wallSeconds": 17,
+        "exitCode": 1,
+        "names": [
+          "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）",
+          "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+          "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口",
+          "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递"
+        ]
+      },
+      {
+        "file": "after-redispatch-run3.log",
+        "wallSeconds": 16,
+        "exitCode": 1,
+        "names": [
+          "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）",
+          "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+          "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口",
+          "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递"
+        ]
+      }
+    ],
+    "added": [],
+    "removedPerAllRuns": []
+  },
+  "git-role-workflows-e2e": {
+    "baseline": {
+      "wallSeconds": 203,
+      "exitCode": 1,
+      "names": [
+        "Q30 fixture HTTP preserves split UTF8 and byte budget",
+        "Q74 owned Git metadata observer atomic rename race remains bounded and strict"
+      ]
+    },
+    "after": [
+      {
+        "file": "after-e2e-run1.log",
+        "wallSeconds": 186,
+        "exitCode": 1,
+        "names": [
+          "Q30 fixture HTTP preserves split UTF8 and byte budget",
+          "Q74 owned Git metadata observer atomic rename race remains bounded and strict"
+        ]
+      },
+      {
+        "file": "after-e2e-run2.log",
+        "wallSeconds": 187,
+        "exitCode": 1,
+        "names": [
+          "Q30 fixture HTTP preserves split UTF8 and byte budget",
+          "Q74 owned Git metadata observer atomic rename race remains bounded and strict"
+        ]
+      },
+      {
+        "file": "after-e2e-run3.log",
+        "wallSeconds": 190,
+        "exitCode": 1,
+        "names": [
+          "Q30 fixture HTTP preserves split UTF8 and byte budget",
+          "Q74 owned Git metadata observer atomic rename race remains bounded and strict"
+        ]
+      }
+    ],
+    "added": [],
+    "removedPerAllRuns": []
+  }
+}
