@@ -84,6 +84,8 @@ test("重启：未决申请 orphaned、未决审批 expired；已结算不重复
     assert.equal(after.events.filter((event) => event.kind === "approval.expired").length, 1);
   } finally {
     await mgr.stop(null);
-    await fs.rm(root, { recursive: true, force: true });
+    // Windows 清理竞态：mgr.stop(null) 后仍有 `.ans/state` 异步落盘，裸 rm 可能 ENOTEMPTY。
+    // 有界重试（Node 仅对 EBUSY/EMFILE/ENFILE/ENOTEMPTY/EPERM 重试；耗尽仍如实抛错）。
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
