@@ -1,0 +1,20 @@
+Q2 P2 与 B6a spawn fence：平台候选分类（仅分类/文档；未改测试）
+
+本机环境：Windows 11 / Node v24.22.1 / Git 2.55.0。本机不可执行 macOS-only 分支，以下 macOS 事实来自
+R5 CI 工件（run 43829367008，/tmp/r8-art/test-logs-mac-arm64/test-ci-output.log）与 B3c/B5/B6a 记录。
+
+A. Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
+- 实际文件：test/测试/git-role-workflows-e2e.test.ts（B5 §2 已核对；任务书曾写 git-action-delivery-claude-e2e.test.ts，该文件内无此名）。
+- macOS arm64：✖ 2819.687375ms；最终 section（L8250）AssertionError 1 !== 0（子进程业务用例失败）。
+- macOS 关键错误体：write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required（B3c/B5 同源定性；macOS 工件内 55 处该码，含本用例子进程）。
+- Windows CI：✔ 210,868.0483ms（远慢但绿）。
+- 本机 Windows 3×（B5 §2）：183,927 / 182,539 / 186,480ms 全绿；B6b §1.4 在 B6b 修改该文件后再次全文件 3× 绿（7 pass/12 skip，含本用例）。
+- 分类：macOS-only 产品 host facts/protection currency 候选 / 平台候选；本机无可复现产品错误。不阻塞本批；需 macOS 定向复跑或 owner 裁决（R5 §6.2 #6）。
+
+B. Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry
+- 文件：test/编排/git-command.test.ts。
+- macOS arm64：✖ 149.791625ms；AssertionError：输入未匹配 /git-command-failed:null:unknown/，实际 'Error: git-host-lease-invalid-before-command'（栈在 executeGit … git-command.ts:724，mutating 命令前 host lease 终检；L8606）。
+- Windows CI：✔ 843.9806ms。
+- 本机 Windows：B6a §3/§4.1 正常与 junction（CI 非规范根形态）双口径 3× 绿；本批在 HEAD 单测复跑 ✔ 725.8482ms（runs/spawn-fence-current.txt）。
+- 机理（B6a §3）：测试用 fs.watch 期望中断落在「pending 写入→spawn」最终窗口；macOS FSEvents 延迟/合并使回调落在下一个 mutating 命令前，产生另一条 fail-closed 码（不发布 ref、不伪造退出回执、真实重试可成功）。两路都是 fail-closed，属平台文件系统事件时序，不是产品契约缺陷。
+- 分类：macOS-only 平台时序候选；本机无可复现产品错误；不改（改为接受两码会放宽断言、skip 会删覆盖）。待 macOS 定向复跑/owner 裁决（R5 §6.2/ B6a §3）。
