@@ -1,0 +1,28 @@
+Neutral-root control (linked-worktree symptom check)
+=====================================================
+Purpose: distinguish `runtime-protection-scope-unknown` / `.git`-file / checkout-shape symptoms from real assertion failures, per KR-33 methodology.
+
+Root: %TEMP%\kr29-canon
+- Created by `git archive HEAD | tar -x -C <root>` at HEAD 5661a73 (same commit as worktree).
+- No `.git` entry (verified NO_GIT_OK).
+- node_modules: directory junction to worktree refactor-session-ts-b7 (same lockfile hashes).
+
+Command:
+node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit \
+  test/门禁引擎/{view-image-cards,role-group-metadata,list-project,convener-workflow-write,governance-matrix-service}.test.ts \
+  test/编排/{governance-matrix-injection,trunk-upgrade-validation,appointment-roster,session-dir,git-capabilities,shell-operator-only,direct-role-capabilities,doc-format-specs,trunk-service,shell-authorized-routine,handback,chat-handback-scope,trio-worker-report,section1-write-preauthorization,git-action-authorization-wiring}.test.ts
+
+Result: tests 269 / pass 239 / fail 28 / skipped 2 / duration 43096.8661 ms; EXIT=1
+
+Failure set comparison
+----------------------
+- Worktree targeted red names (28) == neutral-root red names (28), name-for-name.
+- Gates 5: red in both (with LF-normalized gates in worktree; archive is already LF).
+- Orchestration 23 red: red in both.
+- `node test外指符号链接路径不获委托...`: red in both because the same machine lacks Windows symlink privilege (EPERM), not because of `.git`.
+- `wiring guards...`: green in both (already fixed by B3c; stale frozen name).
+- No `runtime-protection-scope-unknown` or other `.git`-file symptom appears among the 29.
+
+Conclusion
+----------
+None of the 28 red names is a linked-worktree environment symptom. 27 of them are also red in normal CI checkouts on both macOS x64 and Windows x64; the remaining one (symlink) is local-platform-only and green in CI.

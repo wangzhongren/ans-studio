@@ -1,0 +1,37 @@
+KR-29 classification run metadata (2026-11-16)
+================================================
+Worktree  : C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\kr29ana
+Branch    : analysis/test-debt-kr29
+HEAD      : 5661a73d532f37e92cc872badf9dbf077419b453 (origin/main at task start)
+Node      : v24.22.1
+Environment prep: node_modules directory junction -> worktree refactor-session-ts-b7 (package.json SHA-256 c37e1e49...e3c, package-lock a5e315ca...d63 identical).
+
+Commands and results
+--------------------
+1) Gates (task rubric; temporary LF normalization):
+   - Source files normalized from `git cat-file blob HEAD:<path>`:
+     src/common/门禁引擎/workflows/chief/chief-workflow.md
+     src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+   - Command: node --test --test-concurrency=1 "test/门禁引擎/**/*.test.ts"
+   - Result: tests 577 / pass 571 / fail 5 / cancelled 0 / skipped 1 / duration 94949.6447 ms; EXIT=1
+   - Restore: `git checkout --` both files; verified CRLF 61 and 136 lines, bare LF 0; `git status --short` empty.
+
+2) Orchestration (task rubric; 137 files + git-trunk-store split):
+   - Command A: node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit <137 files from `rg --files -g "*.test.ts" test/编排` minus git-trunk-store.test.ts>
+   - Result A: tests 1375 / pass 1350 / fail 23 / cancelled 0 / skipped 2 / duration 142481.7511 ms; EXIT=1
+   - Command B: node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit test/编排/git-trunk-store.test.ts
+   - Result B: tests 13 / pass 13 / fail 0 / skipped 0 / duration 59131.0326 ms; EXIT=0
+   - --test-force-exit only affects process exit after all tests complete (same rationale as R6/B0); it does not alter execution or assertions.
+
+3) Neutral-root control (no `.git`):
+   - Root: %TEMP%\kr29-canon created by `git archive HEAD | tar -x -C`; node_modules junction reused; `.git` absent.
+   - Command: node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit <20 targeted files covering all 5 gates + 23 orchestration reds + wiring guard>
+   - Result: tests 269 / pass 239 / fail 28 / skipped 2 / duration 43096.8661 ms; EXIT=1
+   - Failure set identical to worktree for the 28 red names; `wiring guards...` green in both.
+
+4) CI artifacts used (read-only):
+   - R6 run 43848313583 (Test matrix (development feedback), main @ 82dc180), artifacts `/tmp/r9-art/test-logs-mac-x64/test-ci-output.log` and `/tmp/r9-art/test-logs-win-x64/test-ci-output.log`.
+   - Per-name status: 27 of the 29 FAIL on both macOS x64 and Windows x64; 2 PASS (green): `node test外指符号链接路径不获委托...`, `wiring guards...`.
+   - R6 known-red-62 intersection 33 = gates 5 + orchestration 22 + runtime-core 6; the 29 missing are 27 runtime-core environment reds + these 2 green names. This is consistent with the R6 set summary (kr_not_current=29).
+
+Raw TAP/log files (gates-lf.tap, orch-137.tap, orch-git-trunk-store.tap, canon-targeted.tap, CI logs) remain under /tmp and are not committed. Only derived tables/bodies are stored in this evidence directory.

@@ -1,0 +1,367 @@
+===== [G] D-10：质检卡保留可选质量核对与截图上限，不要求录屏
+file: test\门禁引擎\view-image-cards.test.ts:32
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /可选质量核对/. Input:
+  '# 角色：质检（内置角色）\n' +
+    '\n' +
+    '职能：独立质量核对与验收执行者——新任务仅由 Chief 创建、收报和收口；不批准、不代客户验收。\n' +
+    '- 收到验收任务：读需求依据/名单/实现证据；执行核对（真实运行/测试/查证据）；报告写 `docs/quality/<flowId>-report-v1.md`，证据附件写 `docs/verification/`。\n' +
+    '- 独立质检结论及物证必须由你真实核对；缺证据写 insufficient evidence，不让幕僚代造通过。发 `request_choice(cardKind=acceptance, flowId, accept/reject)`，在幕僚唯一入口由客户或有效委托的真实 chief 作最终业务选择；你不得自批、不得代选，chief-delegated 不冒充客户决定，也不替代你的独立质检判断。\n' +
+    '- 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。\n' +
+    '- Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。\n' +
+    '- 回退与报告：保留task/run、原基线/候选完整OID、拒绝code/missing/owner和真实错误证据，报告回 task.created.from；责任owner是修复线索，不授权你互派或代改。对应owner在原合法范围真实修复后，重新核当前依据/权限/指定最终OID再恢复；缺证据不补造批准/ref/停稳，不重开已取消卡。无新信息不重试，原来源链预算不清零；危险或未知外部副作用零自动重派，取消执行须确认实际停止，不释放成功依赖。\n' +
+    '- Chief枢纽：新 Product、Rapporteur、Nominator、Convener、Verifier 任务全部由 Chief 创建、接收正式报告并按真实创建者收口；Convener 仅创建和管理项目实现 worker，worker 先回 Convener，不能解决再报 Chief。历史任务仍按真实 task.created.from 报告/收口，不重写旧 creator、parent 或 accepted。普通 Chief→builtin 派发可只读准备、并行、跳过、
+
+===== [G] listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+file: test\门禁引擎\role-group-metadata.test.ts:47
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  23 !== 15
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/role-group-metadata.test.ts:49:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 23,
+    expected: 15,
+    operator: 'strictEqual',
+
+===== [G] listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+file: test\门禁引擎\list-project.test.ts:23
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  + [
+  +   '角色卡/招募：缺少 role-card.md，已跳过'
+  + ]
+  - []
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/list-project.test.ts:51:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+
+===== [G] 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+file: test\门禁引擎\convener-workflow-write.test.ts:42
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\/workflow\.md` 由运营落盘维护/. Input:
+  '# 角色：幕僚（内置角色）\n' +
+    '\n' +
+    '职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。\n' +
+    '- 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。\n' +
+    '- 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。\n' +
+    '- 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。\n' +
+    '- 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。\n' +
+    '- Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。\n' +
+    '意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。\n' +
+
+===== [G] 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+file: test\门禁引擎\governance-matrix-service.test.ts:514
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:
+  '# 治理权力矩阵（运行时派生只读摘要；schema governance-matrix/v1）\n' +
+    '> 生成于 2026-11-05T10:00:00+08:00；治理模型 trio。\n' +
+    '> 本摘要不新增、不改变任何权限。权威来源：治理角色注册表、角色卡/<role>/boundary.yaml 与 role-card.md、以及门禁判定。unknown 不等于允许，也不等于禁止。\n' +
+    '> 矩阵未列出≠无权限；宿主未注入≠角色无权。\n' +
+    '\n' +
+    '## 内置治理角色（6）\n' +
+    '\n' +
+    '### chief 幕僚（built-in）\n' +
+    '- 职能定位：唯一客户入口与五builtin派发/收报/收口枢纽；按真实反馈自主选路，明确委托时按证据作真实业务决定。（来源：注册表）\n' +
+
+===== [O] A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）
+file: test\编排\governance-matrix-injection.test.ts:316
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  + {
+  +   protectedGitRoots: [
+  +     'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-matrix-2sxLpK\\.git'
+  +   ]
+  + }
+  - undefined
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/governance-matrix-injection.test.ts:325:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+
+===== [O] AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）
+file: test\编排\trunk-upgrade-validation.test.ts:171
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  false !== true
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:177:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+
+===== [O] AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）
+file: test\编排\trunk-upgrade-validation.test.ts:202
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  false !== true
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:209:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+
+===== [O] AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）
+file: test\编排\trunk-upgrade-validation.test.ts:216
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  false !== true
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:222:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+
+===== [O] AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝
+file: test\编排\trunk-upgrade-validation.test.ts:184
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  false !== true
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:195:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+
+===== [O] AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）
+file: test\编排\trunk-upgrade-validation.test.ts:148
+  AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.
+  false !== true
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:163:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+
+===== [O] BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针
+file: test\编排\appointment-roster.test.ts:425
+  AssertionError [ERR_ASSERTION]: 角色卡路径必须经同一 resolveWrite 探测为 allowed
+  false !== true
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/appointment-roster.test.ts:438:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+
+===== [O] BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed
+file: test\编排\appointment-roster.test.ts:445
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  false !== true
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/appointment-roster.test.ts:452:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+
+===== [O] D-1：projectRoot 为空 → 不传 sessionDir（旧行为）
+file: test\编排\session-dir.test.ts:114
+  Error: ENOENT: no such file or directory, realpath ''
+      at async realpath (node:internal/fs/promises:1896:10)
+      at async readGitProtectionFacts (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/src/provider/trunk/impl/git-command.ts:626:16)
+      at async openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/src/pipeline/orchestration/run-role.ts:1543:25)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/session-dir.test.ts:118:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'realpath',
+
+===== [O] D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）
+file: test\编排\session-dir.test.ts:138
+  AssertionError [ERR_ASSERTION]: runRole（一次性路径）不传 AdapterCapabilities
+  + actual - expected
+  + {
+  +   protectedGitRoots: [
+  +     'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-sessiondir-nTrOr9\\.git'
+  +   ]
+  + }
+  - undefined
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/session-dir.test.ts:148:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+
+===== [O] Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+file: test\编排\git-capabilities.test.ts:515
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"trunk-item-invalid","message":"The actual publication task has no original Chief input source"}
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/git-capabilities.test.ts:541:82)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+
+===== [O] P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界
+file: test\编排\shell-operator-only.test.ts:511
+  AssertionError [ERR_ASSERTION]: git clean -fdx：审批通过 ⇒ 放行
+  false !== true
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/shell-operator-only.test.ts:577:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+
+===== [O] Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+file: test\编排\direct-role-capabilities.test.ts:70
+  AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration
+  + actual - expected
+    {
+      code: 'conflict',
+  +   message: 'frozen-conflict: docs/product/demo-intent-v2.md',
+  -   message: 'frozen-conflict',
+      ok: false
+    }
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:91:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+
+===== [O] TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+file: test\编排\doc-format-specs.test.ts:1312
+  AssertionError [ERR_ASSERTION]: 未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1
+  + actual - expected
+  + [
+  +   'ans-basis/v1',
+  +   'ans-release/v1',
+  +   'ans-task-git-shell/v1',
+  +   'ans-workflow/v1',
+  +   'chief-workflow/v2',
+  +   'legacy/v1',
+  +   'two-fixed-paths/v1'
+
+===== [O] applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+file: test\编排\trunk-service.test.ts:507
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+    {
+      applied: false,
+  +   errorCode: 'stable-manifest-unavailable',
+  +   message: 'missing',
+      pendingReattach: true
+    }
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/trunk-service.test.ts:584:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+
+===== [O] node test外指符号链接路径不获委托；项目内测试路径获委托
+file: test\编排\shell-authorized-routine.test.ts:184
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-routine-outside-YtANIo\outside.test.ts' -> 'C:\Users\51054\AppData\Local\Temp\ans-routine-paths-H2qzSh\test\external.test.ts'
+      at Object.symlinkSync (node:fs:1937:11)
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/shell-authorized-routine.test.ts:191:8)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+
+===== [O] openRoleSession：普通角色 settle → 发出 handback（形状正确）
+file: test\编排\handback.test.ts:116
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  + 'blocked'
+  - 'unreported'
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/handback.test.ts:137:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+
+===== [O] real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId
+file: test\编排\chat-handback-scope.test.ts:59
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+    [
+      [
+        '1',
+        'A',
+        'completed'
+  ...
+        '5',
+
+===== [O] v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力
+file: test\编排\trio-worker-report.test.ts:184
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /主链顺序（必须）/. Input:
+  '# 角色：幕僚（内置角色）\n' +
+    '\n' +
+    '职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。\n' +
+    '- 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。\n' +
+    '- 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。\n' +
+    '- 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。\n' +
+    '- 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。\n' +
+    '- Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。\n' +
+    '意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。\n' +
+
+===== [O] wiring guards: append sits after current gate and before effects with the frozen R2 digest mapping; run-change/stop paths never append
+LOCAL_GREEN (wiring guards)
+
+===== [O] 人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒
+file: test\编排\section1-write-preauthorization.test.ts:304
+  AssertionError [ERR_ASSERTION]: D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）
+  false !== true
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:315:14
+      at async withRoot (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:75:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:305:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+
+===== [O] 卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report
+file: test\编排\trio-worker-report.test.ts:162
+  AssertionError [ERR_ASSERTION]: 幕僚卡必须写明派发后结束本轮
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/trio-worker-report.test.ts:165:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+
+===== [O] 卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡
+file: test\编排\trio-worker-report.test.ts:214
+  AssertionError [ERR_ASSERTION]: 运营卡必须写明验收由 dispatch 质检发起
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/trio-worker-report.test.ts:218:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+
+===== [O] 有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒
+file: test\编排\section1-write-preauthorization.test.ts:248
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:
+  'Role drafts require the actual completed plan and current D3 selection; no old appointment-write card can substitute'
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:265:14
+      at async withRoot (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:75:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/kr29ana/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:249:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Role drafts require the actual completed plan and current D3 selection; no old appointment-write card can substitute',
+

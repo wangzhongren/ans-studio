@@ -1,0 +1,25 @@
+KR-29 name-set diff (frozen 29 vs reproductions)
+=================================================
+Canonical:
+  gates 5  = 角色卡/运行时核心/docs/change/2026-11-10_B2_two-fixed-workflow-paths-evidence/07-gates-failure-names.txt (CRLF read as LF)
+  orch 24  = 角色卡/编排/docs/change/2026-11-11_B17_two-fixed-workflow-paths_evidence/b17-05-known-red-failnames.txt (CRLF read as LF)
+
+Local worktree (5661a73, gates LF-normalized; orch 137-file run):
+  red 28 / green 1
+  green: wiring guards: append sits after current gate and before effects with the frozen R2 digest mapping; run-change/stop paths never append
+  (all other 28 = gates 5 + orchestration 23; no extra red outside the frozen set)
+
+Neutral root (git archive HEAD, no .git; targeted 20 files):
+  red 28 / green 1; failure set identical to local worktree (same 28 names; wiring guards green).
+  `node test外指符号链接路径不获委托...` still red locally in the neutral root because it is the machine's Windows symlink privilege (EPERM), not a checkout-shape symptom.
+
+R6 CI (run 43848313583, artifacts mac-x64 + win-x64):
+  both platforms: 27 FAIL / 2 PASS
+  FAIL both: all 5 gates + 22 orchestration names
+  PASS both (green): `node test外指符号链接路径不获委托；项目内测试路径获委托`, `wiring guards...`
+
+Set arithmetic:
+  29 frozen = 27 red on both CI platforms + 1 local-only env red (symlink; CI green) + 1 already green everywhere (wiring guards).
+  R6 known-red-62: 33 present = 5 gates + 22 orchestration + 6 runtime-core; missing 29 = 27 runtime-core environment reds + 2 orchestration green names. Consistent with R6 08-set-summary.json (kr_not_current=29).
+
+Conclusion: none of the 28 red names is a linked-worktree `.git`-file symptom; the neutral root reproduces the same set, and 27/28 are also red in normal CI checkouts on both platforms.
