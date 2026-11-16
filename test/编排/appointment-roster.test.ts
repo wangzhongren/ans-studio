@@ -422,6 +422,9 @@ test("appointment-write 目录校验：boundary 目录在名单授权目录内 �
   assert.equal(outside.judgeContext, undefined, "结构校验失败不产生 judgeContext");
 });
 
+// 冻结名保留（历史标题），语义按 2026-11-16 现行直写模型：appointment-write 旧卡不再能替代
+// 真实完成计划 + 当前 D3（`run-role.ts` roleDraftWritePaths guard）；judge 事实仍含角色可写根，
+// 但无真实计划/D3 时同一 resolveWrite 探测应 fail-closed 拒绝。
 test("BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针", async () => {
   const allowed = await appointmentWriteOutcome([boundaryPath("src/")]);
   assert.equal(allowed.outcome, "answered", allowed.reason ?? "");
@@ -435,13 +438,14 @@ test("BUG-3：appointment-write judge 事实含角色可写根（角色卡/<targ
     ctx.allowedPathRoots?.includes("src/"),
     `allowedPathRoots 必须含名单授权目录，实际：${JSON.stringify(ctx.allowedPathRoots)}`,
   );
-  assert.equal(
-    ctx.pathProbes?.find((probe) => probe.path === "角色卡/implementer/boundary.yaml")?.allowed,
-    true,
-    "角色卡路径必须经同一 resolveWrite 探测为 allowed",
-  );
+  // 现行语义（KR-29 B / E3）：无真实完成计划与当前 D3 ⇒ roleDraftWritePaths 为空；旧 appointment-write
+  // 卡不得替代 ⇒ 同一 resolveWrite 探测为拒绝，并给出 roleDraftWritePaths 文案（fail-closed 不放宽）。
+  const probe = ctx.pathProbes?.find((candidate) => candidate.path === "角色卡/implementer/boundary.yaml");
+  assert.equal(probe?.allowed, false, "无真实计划/D3 时角色卡路径必须被拒（旧卡不得替代）");
+  assert.match(probe?.reason ?? "", /Role drafts require the actual completed plan and current D3 selection/);
 });
 
+// 冻结名保留（历史标题）。现行语义：两条候选路径都经同一 resolveWrite 探测；仍无真实计划/D3 ⇒ 均拒。
 test("BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed", async () => {
   const both = await appointmentWriteOutcome([boundaryPath("src/")], undefined, {
     paths: ["角色卡/implementer/role-card.md", "角色卡/implementer/boundary.yaml"],
@@ -449,8 +453,12 @@ test("BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite
   });
   assert.equal(both.outcome, "answered", both.reason ?? "");
   const probes = both.judgeContext?.pathProbes ?? [];
-  assert.equal(probes.find((probe) => probe.path === "角色卡/implementer/role-card.md")?.allowed, true);
-  assert.equal(probes.find((probe) => probe.path === "角色卡/implementer/boundary.yaml")?.allowed, true);
+  const roleCardProbe = probes.find((probe) => probe.path === "角色卡/implementer/role-card.md");
+  const boundaryProbe = probes.find((probe) => probe.path === "角色卡/implementer/boundary.yaml");
+  assert.equal(roleCardProbe?.allowed, false, "无真实计划/D3：role-card.md 探测拒绝");
+  assert.equal(boundaryProbe?.allowed, false, "无真实计划/D3：boundary.yaml 探测拒绝");
+  assert.match(roleCardProbe?.reason ?? "", /Role drafts require the actual completed plan and current D3 selection/);
+  assert.match(boundaryProbe?.reason ?? "", /Role drafts require the actual completed plan and current D3 selection/);
   assert.equal(probes.length, 2, "逐条声明路径都要有探针");
 });
 

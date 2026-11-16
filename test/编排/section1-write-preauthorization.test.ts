@@ -262,7 +262,11 @@ test("有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条�
       assert.equal(captured.gate!("docs/skills/example.md").allowed, true, "任务 writeSet 内路径放行");
       const roleCard = captured.gate!("角色卡/A/role-card.md");
       assert.equal(roleCard.allowed, false, "有任务 writeSet 时不并入 Section 1（不扩大）");
-      assert.match((roleCard as { reason: string }).reason, /不在任务 writeSet 内（F4）/);
+      // 现行拒绝文案来自 roleDraftWritePaths guard（真实完成计划 + 当前 D3）；行为仍是拒绝。
+      assert.match(
+        (roleCard as { reason: string }).reason,
+        /Role drafts require the actual completed plan and current D3 selection/,
+      );
       assert.equal(captured.gate!("docs/scheduling/plan.md").allowed, false, "他人写区照拒");
     } finally {
       await handle.dispose();
@@ -312,8 +316,16 @@ test("人事（Nominator）：无任务收窄时 Section 1 条目直接放行；
     );
     try {
       assert.equal(calls.n, 0, "预授权写入不发起客户确认");
-      assert.equal(captured.gate!("角色卡/A/role-card.md").allowed, true, "D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）");
       assert.equal(captured.gate!("docs/skills/example.md").allowed, true, "技能文档直接写");
+      // 2026-11-16 现行直写模型（KR-29 B / run-role.ts roleDraftWritePaths guard）：角色卡写入
+      // 必须命中真实完成计划 + 当前 D3；无计划/D3 时 Section 1 单独不再放行（旧 appointment-write 卡
+      // 不得替代），行为 fail-closed。
+      const roleCard = captured.gate!("角色卡/A/role-card.md");
+      assert.equal(roleCard.allowed, false, "无真实计划/D3：角色卡写入被 roleDraftWritePaths guard 拒");
+      assert.match(
+        (roleCard as { reason: string }).reason,
+        /Role drafts require the actual completed plan and current D3 selection/,
+      );
       assert.equal(captured.gate!("docs/proposals/flow-a-v1.md").allowed, false, "他人写区照拒");
       assert.equal(captured.gate!(".ans/project.json").allowed, false, "应用目录照拒");
     } finally {

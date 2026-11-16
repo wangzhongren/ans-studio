@@ -512,7 +512,7 @@ test("Git initialization Service effect: storage fixture rechecks bytes, rejects
 });
 
 
-test("Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority", async () => {
+test("Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority", { timeout: 180000 }, async () => {
   const project = await createTrunkProject({ withRun: false }), fsStore = createFsTrunkStore(project.root), documents = project.snapshot().documents;
   const snapshot = await fsStore.captureSnapshot!({ snapshotId: "o7-real-planning-basis", createdAt: at, files: Object.values(documents) });
   assert.ok(snapshot.ok); if (!snapshot.ok) return;
@@ -523,11 +523,22 @@ test("Git team plan publication and active-only activation: real tasks and struc
   await initializeGitRepository(project.root);
   assert.ok((await migrateLegacyTrunkToGit(project.root, { operationId: "o7-existing-fixture-migration", expected: { version: 1, digest: initial.digest } })).ok);
   await fs.unlink(path.join(project.root, PATHS.roleCard)); await fs.unlink(path.join(project.root, PATHS.boundary)); await fs.unlink(path.join(project.root, PATHS.workflow));
-  const runId = "run-o7-planning", taskId = "task-o7-real-convener";
-  assert.ok((await fsStore.compareAndSwapRunRecord!(runId, null, { schema: "ans-run/v1", runId, flowId: "demo", state: "draft", documents: {}, createdAt: at })).ok);
-  assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "task.created", taskId, from: "chief", to: "convener", text: "Prepare the real plan",
-    sideEffect: "docs", idempotencyKey: taskId, flowId: "demo", runId, runState: "draft" } })).ok);
+  // 发布任务必须绑定真实原始 Chief 输入源（api-spec:1286/1667；apply-journal 发布前置）。
+  // 经 Service 的生产 `prepareRoleDispatch`（chief-hub-v1）生成真实初始化源与 planning run，
+  // 再按其 initializationSource 给 `task.created` 附 workSourceRef；不伪造来源字段。
   const service = createTrunkService({ projectRoot: project.root }), sha = (text: string) => createHash("sha256").update(text).digest("hex");
+  const canonicalRoot = await fs.realpath(project.root);
+  const dispatch = await service.prepareRoleDispatch({ fromRoleId: "chief", targetRoleId: "convener", flowId: "demo",
+    hubRouting: "chief-hub-v1", hostInitialization: {
+      registration: { source: "native-directory-selection", selectionId: "o7-real-planning-selection", selectedRoot: canonicalRoot,
+        projectRoot: canonicalRoot, selectedAt: at, listingGeneration: 1 },
+      parent: { roleId: "chief", runtime: "codex", sessionId: "o7-real-chief-session", turnId: "o7-plan-turn", kind: "message", inputAccepted: true, settled: false },
+    } });
+  assert.ok(dispatch.ok, JSON.stringify(dispatch)); if (!dispatch.ok || !dispatch.value.runId || !dispatch.value.initializationSource) return;
+  const runId = dispatch.value.runId, taskId = "task-o7-real-convener", dispatchSource = dispatch.value.initializationSource;
+  assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "task.created", taskId, from: "chief", to: "convener", text: "Prepare the real plan",
+    sideEffect: "docs", idempotencyKey: taskId, flowId: "demo", runId, runState: "draft", hubRouting: "chief-hub-v1",
+    workSourceRef: { kind: dispatchSource.kind ?? "chief-customer-turn", sourceId: dispatchSource.sourceId, path: dispatchSource.path, sha256: dispatchSource.sha256 } } })).ok);
   const planPath = "docs/scheduling/demo-team-v2.md", text = `---\n${JSON.stringify({ schema: "teamPlanSchema:3", flowId: "demo", version: 2, modules: documents.modules, roster: documents.roster,
     roleRows: [{ roleId: "impl", modules: ["impl-core"], writesets: ["src/impl/"], dependsOn: [] }] })}\n---\n# Real future plan\n`;
   await fs.writeFile(path.join(project.root, planPath), text);
@@ -555,6 +566,7 @@ test("Git team plan publication and active-only activation: real tasks and struc
     const committed = await service.commitPreparedTeamPlan!(value, { hostLeaseId: lease.leaseId, taskId, candidateVerdict, publicationVerdict }); assert.equal(committed.status, "applied", JSON.stringify(committed));
     assert.equal(committed.source?.kind === "role-direct" && committed.source.action, "complete-team-plan");
   } finally { endGitHostAction({ projectRoot: project.root, leaseId: lease.leaseId }); }
+
   const current = await createProjectTrunkStore(project.root).readManifest(); assert.ok(current.ok); if (!current.ok) return;
   assert.equal(current.value.trunkVersion, 2); assert.deepEqual(current.value.artifacts.documents, initial.artifacts.documents); assert.equal(current.value.artifacts.workflow, undefined);
   const replay = await service.completeTeamPlan(input, "convener"); assert.equal(replay.status, "applied", JSON.stringify(replay));
@@ -572,9 +584,20 @@ test("Git team plan publication and active-only activation: real tasks and struc
   const unchanged = await createProjectTrunkStore(project.root).readManifest(); assert.ok(unchanged.ok); if (!unchanged.ok) return;
   assert.deepEqual(unchanged.value, current.value, "No-op leaves the actual document, role and run pointers unchanged");
   assert.ok(replay.planRef && replay.rosterRef); if (!replay.planRef || !replay.rosterRef) return;
+  // 人事激活任务同样必须绑定真实原始 Chief 输入源；经生产 hub 路由（chief→nominator）
+  // 生成真实初始化源与专属 planning run（不借用发布任务的来源）。
+  const nominationDispatch = await service.prepareRoleDispatch({ fromRoleId: "chief", targetRoleId: "nominator", flowId: "demo",
+    hubRouting: "chief-hub-v1", hostInitialization: {
+      registration: { source: "native-directory-selection", selectionId: "o8-real-nominator-selection", selectedRoot: canonicalRoot,
+        projectRoot: canonicalRoot, selectedAt: at, listingGeneration: 1 },
+      parent: { roleId: "chief", runtime: "codex", sessionId: "o8-real-chief-session", turnId: "o8-nominator-turn", kind: "message", inputAccepted: true, settled: false },
+    } });
+  assert.ok(nominationDispatch.ok, JSON.stringify(nominationDispatch)); if (!nominationDispatch.ok || !nominationDispatch.value.runId || !nominationDispatch.value.initializationSource) return;
+  const nominationRunId = nominationDispatch.value.runId, nominationSource = nominationDispatch.value.initializationSource;
   const nominationTaskId = "task-o8-real-nominator";
   assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "task.created", taskId: nominationTaskId, from: "chief", to: "nominator", text: "Create and activate the real selected role",
-    sideEffect: "docs", idempotencyKey: nominationTaskId, flowId: "demo", runId, runState: "draft" } })).ok);
+    sideEffect: "docs", idempotencyKey: nominationTaskId, flowId: "demo", runId: nominationRunId, runState: "draft", hubRouting: "chief-hub-v1",
+    workSourceRef: { kind: nominationSource.kind ?? "chief-customer-turn", sourceId: nominationSource.sourceId, path: nominationSource.path, sha256: nominationSource.sha256 } } })).ok);
   assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "request.created", requestId: "o8-actual-d3", flowId: "demo", sourceRoleId: "nominator",
     cardKind: "appointment", title: "Select the actual roster", options: [{ id: "impl", label: "Implementation" }] } })).ok);
   assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "request.resolved", requestId: "o8-actual-d3", decisionId: "o8-customer-selected-impl", by: "customer",
@@ -635,7 +658,7 @@ test("Git team plan publication and active-only activation: real tasks and struc
   const activeCloseBasis = await service.prepareCreatedTaskClose(nominationTaskId, "chief"); assert.ok(activeCloseBasis.ok, JSON.stringify(activeCloseBasis)); if (!activeCloseBasis.ok) return;
   assert.equal(activeCloseBasis.value.activationCommit?.kind, "current-active-completion"); assert.equal(activeCloseBasis.value.activationCommit?.roles[0]?.operationId, activationInput.operationId);
   assert.equal(activeCloseBasis.value.initializationCommit, undefined); assert.ok(activeCloseBasis.value.reportRef);
-  const closeInput = { operationId: "o9-close-active-role-report", taskId: nominationTaskId, runId, reportRef: activeCloseBasis.value.reportRef, basisDigest: activeCloseBasis.value.basisDigest, outcome: "accepted" as const };
+  const closeInput = { operationId: "o9-close-active-role-report", taskId: nominationTaskId, runId: nominationRunId, reportRef: activeCloseBasis.value.reportRef, basisDigest: activeCloseBasis.value.basisDigest, outcome: "accepted" as const };
   assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "task.reported", taskId: nominationTaskId, from: "nominator", status: "done", summary: "A newer actual completion report", evidence: reportEvidence } })).ok);
   const staleClose = await service.closeCreatedTask(closeInput, "chief"); assert.ok(!staleClose.ok); assert.equal(staleClose.errorCode, "task-close-stale");
   await fs.writeFile(path.join(project.root, PATHS.roleCard), card + "Drift after the actual active commit\n");
@@ -742,7 +765,9 @@ test("Git team plan publication and active-only activation: real tasks and struc
   traceExecution("workflow-creator-close-complete");
   assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at: workflowAt, kind: "task.created", taskId: executionTaskId,
     from: "chief", to: "convener", flowId: "demo", runId, runState: "draft", text: "Organize execution using the actual published materials",
-    sideEffect: "code", idempotencyKey: executionTaskId } })).ok);
+    sideEffect: "code", idempotencyKey: executionTaskId, hubRouting: "chief-hub-v1",
+    // 同一真实 Chief Hub 工作源绑定该 planning run（worker 祖先溯源要求 controller 带原始 Chief 来源）。
+    workSourceRef: { kind: dispatchSource.kind ?? "chief-customer-turn", sourceId: dispatchSource.sourceId, path: dispatchSource.path, sha256: dispatchSource.sha256 } } })).ok);
   const parent = await inspectAssignedTask({ projectRoot: project.root, actorRoleId: "convener", taskId: executionTaskId });
   assert.ok(parent.ok, JSON.stringify(parent)); if (!parent.ok) return; assert.equal(parent.value.runId, runId); assert.equal(parent.value.flowId, "demo");
   const assignedParent = await prepareParentTaskRef({ projectRoot: project.root, actorRoleId: "convener", taskId: executionTaskId, flowId: "demo", runId });

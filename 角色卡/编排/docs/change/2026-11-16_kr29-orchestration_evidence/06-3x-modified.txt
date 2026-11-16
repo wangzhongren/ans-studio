@@ -1,0 +1,22 @@
+modified-files=14 runs=3 natural-exit (no --test-force-exit)
+RUN1 EXIT=0 duration=137s
+ℹ tests 220
+ℹ pass 218
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+---
+RUN2 EXIT=0 duration=133s
+ℹ tests 220
+ℹ pass 218
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+---
+RUN3 EXIT=0 duration=135s
+ℹ tests 220
+ℹ pass 218
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+---

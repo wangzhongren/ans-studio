@@ -1,0 +1,22 @@
+git-trunk-store.test.ts runs=3 --test-concurrency=1 --test-timeout=120000 --test-force-exit
+RUN1 EXIT=0 duration=58s
+ℹ tests 13
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+---
+RUN2 EXIT=0 duration=57s
+ℹ tests 13
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+---
+RUN3 EXIT=0 duration=57s
+ℹ tests 13
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+---

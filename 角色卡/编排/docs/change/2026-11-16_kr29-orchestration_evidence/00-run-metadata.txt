@@ -1,0 +1,35 @@
+KR-29 批次 B（编排）run metadata (2026-11-16)
+================================================
+Worktree : C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\kr29b
+Branch   : fix/test-debt-kr29-orchestration
+HEAD     : 5661a73d532f37e92cc872badf9dbf077419b453 (origin/main at task start)
+Node     : v24.22.1
+环境准备 : node_modules 目录联接 -> worktree refactor-session-ts-b7（package.json SHA-256 c37e1e49…e3c、
+           package-lock a5e315ca…d63，与 kr29ana 分类记录一致；未跟踪环境准备，不是仓库改动）。
+写集     : src/pipeline/orchestration/run-role.ts + 14 个 test/编排 文件 + 本记录/证据目录。
+
+命令与结果
+----------
+1) 定向 23 名（14 文件）：
+   node --test --test-timeout=120000 <13 quick files> → 204/204 pass（含重写后的 AC-5/guards/资源卡等）
+   node --test --test-timeout=120000 test/编排/git-capabilities.test.ts → 14 pass / 0 fail / 2 skip
+   node --test --test-timeout=120000 test/编排/trunk-upgrade-validation.test.ts test/编排/direct-role-capabilities.test.ts → 53/53
+   冻结名逐字核验：checked=23 missing=0（03-frozen-names-check.txt）
+   全量 run2 内逐名绿：passed=23 not_passed=0（03b-23-green-run2.txt）
+
+2) 全量拆分口径（137 文件 + git-trunk-store 单文件；--test-concurrency=1 --test-timeout=120000 --test-force-exit）：
+   RUN1（per-test 超时适配前）：1375 / 1372 pass / 0 fail / 1 cancelled / 2 skip；EXIT=1
+     （git-capabilities 冻结名测试被 CLI 120s 取消：120000.19ms；完整链路本机约 117s，09-timeout-profile.txt）
+   RUN2（该测试声明 { timeout: 180000 } 后）：1375 / 1373 pass / 0 fail / 0 cancelled / 2 skip；EXIT=0
+   RUN3：1375 / 1373 pass / 0 fail / 0 cancelled / 2 skip；duration 253446.6ms；EXIT=0（与 RUN2 一致）
+   （--test-force-exit 只影响全部用例结束后的进程退出，不改变执行/判定；per-test 超时覆盖不改变任何断言。）
+
+3) git-trunk-store 单文件 3×：13/13、EXIT=0（58s/57s/57s；08-git-trunk-store.txt）。
+
+4) 修改文件 3× 自然退出（无 --test-force-exit）：220 tests / 218 pass / 0 fail / 0 cancelled / 2 skip，
+   EXIT=0（137s/133s/135s；06-3x-modified.txt）。
+
+5) npm run typecheck：EXIT=0（07-typecheck.txt）。
+
+原始大日志（定向/全量 TAP、run1-3 完整输出）保留在 %TEMP%\kr29b-probe\，不入库；本证据目录只保留派生计数、
+逐名表、diff、哈希与诊断摘录。

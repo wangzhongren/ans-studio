@@ -313,6 +313,8 @@ test("A4 single/su：无提示段、无工具（逐字兼容）", async () => {
   }
 });
 
+// 冻结名保留（历史标题「不收到 capabilities」）。现行语义（e71501c 起）：一次性路径仍传
+// `{protectedGitRoots}` 宿主事实；A5 的本意「治理矩阵不注入」不变——只断言矩阵/上下文档缺席。
 test("A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）", async () => {
   const fixture = makeProject({ workers: { alpha: {} } });
   try {
@@ -322,7 +324,11 @@ test("A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵�
       { createAdapter: capture.createAdapter },
     );
     assert.equal(result.code, 0);
-    assert.equal(capture.capabilities(), undefined);
+    const capabilities = capture.capabilities();
+    assert.ok(capabilities !== undefined, "一次性路径现传宿主 Git 保护事实（protectedGitRoots）");
+    assert.ok(Array.isArray(capabilities.protectedGitRoots), "Git 保护根来自宿主探测，不是治理矩阵");
+    assert.equal(capabilities.governanceMatrix, undefined, "治理矩阵不注入（A5 本意）");
+    assert.equal(capabilities.contextSections, undefined, "一次性路径无上下文提示段");
   } finally {
     fixture.cleanup();
   }

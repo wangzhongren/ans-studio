@@ -73,6 +73,9 @@ test("Retained intent confirmation: real migration keeps history and only the ex
     builtInRoles: ["chief", "product"], governanceBoundary: { path: "角色卡/governance-boundary.yaml", acceptance: { accepted: true, source: "test:trusted-host" } } };
   assert.ok((await createVersionChangeStack({ projectRoot: root }).ensureInitialized()).ok);
   const intentPath = "docs/product/demo-intent-v2.md", intent = "---\nschema: project-intent/v1\nflowId: demo\nversion: 2\n---\n# Exact new intent\nPreserve the actual approved bytes.\n";
+  // 2026-11-16（KR-29 #18）：guard-freeze-registry 的冻结冲突 message 现带目标路径后缀
+  // （`${reason}: ${path}`；W2 记录已披露）。兼容断言改为精确新格式，不放宽其余冲突语义。
+  const frozenConflict = `frozen-conflict: ${intentPath}`;
   const product = await openRoleSession({ roleId: "product", project, runtime: "demo", autoRepin: false }, { runtimeOptions: { writeRoot: root,
     providerFactories: { demo: options => createDemoRuntimeAdapter(options, [{ name: "write_file", args: { path: intentPath, content: intent } }]) } } });
   await product.send("Write a new intent version"); await product.dispose();
@@ -88,9 +91,13 @@ test("Retained intent confirmation: real migration keeps history and only the ex
   const freeze = { schema: "doc-freeze/v1" as const, applicationId: `intent-${source.requestId}`, reason: "intent-confirmed" as const,
     origin: "customer" as const, decidedBy: "customer" as const, decisionId: source.decisionId, source, snapshotRef: prepared.value.snapshotRef, frozenAt: at };
   const denied = await registry.appendDocFreezeRecords([{ path: intentPath, version: 2, sha256: sha(intent), freeze }]);
-  assert.deepEqual(denied, { ok: false, code: "conflict", message: "frozen-conflict" }, "A shape-shaped confirmation without the real request/decision cannot promote migration");
+  assert.deepEqual(denied, { ok: false, code: "conflict", message: frozenConflict }, "A shape-shaped confirmation without the real request/decision cannot promote migration");
   const wrongHash = await registry.appendDocFreezeRecords([{ path: intentPath, version: 2, sha256: "0".repeat(64), freeze }]);
-  assert.ok(!wrongHash.ok && wrongHash.message === "hash-mismatch");
+  // 同一诊断格式（`${reason}: ${path}`）：hash 漂移 reason 不变，message 带目标路径。
+  assert.ok(!wrongHash.ok, "hash 漂移必须拒绝");
+  if (wrongHash.ok) return;
+  assert.ok(wrongHash.message?.startsWith("hash-mismatch"), `实际：${wrongHash.message}`);
+  assert.match(wrongHash.message ?? "", /demo-intent-v2\.md/);
   const chief = await openRoleSession({ roleId: "chief", project, runtime: "demo", autoRepin: false, customerInput: async request => {
     assert.equal(request.kind, "choice"); if (request.kind !== "choice") return { outcome: "unavailable" };
     const created: RequestCreatedEvent = { v: 1, at, kind: "request.created", requestId: source.requestId, flowId: "demo", sourceRoleId: "chief",
@@ -101,11 +108,11 @@ test("Retained intent confirmation: real migration keeps history and only the ex
     assert.ok((await recordTaskObservation({ projectRoot: root, event: resolved })).ok);
     const wrongDecision = await registry.appendDocFreezeRecords([{ path: intentPath, version: 2, sha256: sha(intent),
       freeze: { ...freeze, decisionId: "another-decision", source: { ...source, decisionId: "another-decision" } } }]);
-    assert.deepEqual(wrongDecision, { ok: false, code: "conflict", message: "frozen-conflict" });
+    assert.deepEqual(wrongDecision, { ok: false, code: "conflict", message: frozenConflict });
     const unpresented = await createFsTrunkStore(root).captureSnapshot!({ snapshotId: "s-unpresented-intent", createdAt: at, files: [{ path: intentPath, sha256: sha(intent) }] });
     assert.ok(unpresented.ok, JSON.stringify(unpresented));
     if (unpresented.ok) assert.deepEqual(await registry.appendDocFreezeRecords([{ path: intentPath, version: 2, sha256: sha(intent),
-      freeze: { ...freeze, snapshotRef: unpresented.value } }]), { ok: false, code: "conflict", message: "frozen-conflict" }, "Equal bytes in an unpresented snapshot do not satisfy the exact retained-card marker");
+      freeze: { ...freeze, snapshotRef: unpresented.value } }]), { ok: false, code: "conflict", message: frozenConflict }, "Equal bytes in an unpresented snapshot do not satisfy the exact retained-card marker");
     return { outcome: "answered", value: { selected: ["confirm"] }, decisionId: source.decisionId };
   } }, { runtimeOptions: { writeRoot: root, providerFactories: { demo: options => createDemoRuntimeAdapter(options, [{ name: "request_choice", args: {
     title: "Confirm migrated exact intent", flowId: "demo", cardKind: "intent-confirm", options: [{ id: "confirm", label: "Confirm" }, { id: "revise", label: "Revise" }],

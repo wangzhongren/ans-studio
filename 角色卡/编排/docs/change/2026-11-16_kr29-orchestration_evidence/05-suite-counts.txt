@@ -1,0 +1,20 @@
+KR-29 批次 B（编排）套件计数：前（分类基线）→ 后（本次）
+==========================================================
+基线（kr29ana 2026-11-16，5661a73；分类 00-run-metadata）：
+  编排 137 文件：1375 tests / 1350 pass / 23 fail / 0 cancelled / 2 skipped（142481.8ms，EXIT=1）
+  git-trunk-store 单文件：13 tests / 13 pass / 0 fail（59131.0ms，EXIT=0）
+
+本次（kr29b，同一拆分口径：137 文件 + git-trunk-store 单文件；--test-concurrency=1 --test-timeout=120000 --test-force-exit）：
+
+RUN 1（加 per-test 超时适配前；发现 git-capabilities 冻结名测试被 CLI 120s 默认取消）：
+  1375 tests / 1372 pass / 0 fail / 1 cancelled / 2 skipped；EXIT=1
+  唯一取消：Git team plan publication and active-only activation…（120000.19ms，test timed out after 120000ms）
+  备注：该测试完整真实 Git 链路本机 ~117s（分类基线早失败未跑到后半段）；已单独声明 { timeout: 180000 }（Node per-test 覆盖，断言不变）。
+
+RUN 2（per-test 超时适配后）：
+  1375 tests / 1373 pass / 0 fail / 0 cancelled / 2 skipped；duration 252988.1ms；EXIT=0
+  2 skipped 为既有（Delivered Hub/legacy code provenance）；全量失败名 0。
+
+RUN 3（稳定性复跑）：
+  1375 tests / 1373 pass / 0 fail / 0 cancelled / 2 skipped；duration 253446.6ms；EXIT=0
+  全量失败名 0；23 名逐名绿（与 run2 相同；见 03b-23-green-run2.txt 与 run3 日志）。

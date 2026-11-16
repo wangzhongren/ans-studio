@@ -181,18 +181,49 @@ for (const [label, pm, expectedA] of [
   });
 }
 
-test("node test外指符号链接路径不获委托；项目内测试路径获委托", () => {
+// KR-29 #21（环境/平台，沿用 KR-33 K4 口径）：Windows 无 SeCreateSymbolicLinkPrivilege 时文件
+// symlink 创建会 EPERM。先做能力探测：能建文件符号链接按原语义断言；否则改用目录 junction
+// （lstat().isSymbolicLink() 同样为 true，realpath 解析到项目外 ⇒ 不获委托，语义等价）；
+// 两者都无权限才诊断 skip（CI macOS/Windows 两平台原本已绿）。断言不放宽。
+test("node test外指符号链接路径不获委托；项目内测试路径获委托", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-routine-paths-"));
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), "ans-routine-outside-"));
+  const fileLink = path.join(root, "test", "external.test.ts");
+  const dirLink = path.join(root, "test", "external");
   try {
     fs.mkdirSync(path.join(root, "test"));
     fs.writeFileSync(path.join(root, "test", "inside.test.ts"), "");
-    fs.writeFileSync(path.join(outside, "outside.test.ts"), "");
-    fs.symlinkSync(path.join(outside, "outside.test.ts"), path.join(root, "test", "external.test.ts"));
+    fs.mkdirSync(path.join(outside, "nested"), { recursive: true });
+    fs.writeFileSync(path.join(outside, "nested", "outside.test.ts"), "");
     const current = { ...policy, projectRoot: root };
     assert.equal(matchesDelegatedRoutineCheck(["node", "--test", "test/inside.test.ts"], root, current), true);
-    assert.equal(matchesDelegatedRoutineCheck(["node", "--test", "test/external.test.ts"], root, current), false);
-  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(outside, { recursive: true, force: true }); }
+    let linked: "symlink" | "junction" | undefined;
+    try {
+      fs.symlinkSync(path.join(outside, "nested", "outside.test.ts"), fileLink, "file");
+      assert.equal(matchesDelegatedRoutineCheck(["node", "--test", "test/external.test.ts"], root, current), false, "外指文件符号链接不获委托");
+      linked = "symlink";
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+    }
+    if (linked === undefined) {
+      try {
+        fs.symlinkSync(path.join(outside, "nested"), dirLink, "junction");
+        assert.equal(matchesDelegatedRoutineCheck(["node", "--test", "test/external/outside.test.ts"], root, current), false, "外指目录 junction 不获委托");
+        linked = "junction";
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+      }
+    }
+    if (linked === undefined) {
+      t.diagnostic("本机无文件符号链接与目录 junction 权限（EPERM），外指链接语义未在本机验证；CI macOS/Windows 两平台已绿");
+      t.skip("环境限制：无法创建外指链接（EPERM）");
+    }
+  } finally {
+    try { fs.rmSync(dirLink, { recursive: false, force: true }); } catch { /* 链接可能未创建 */ }
+    try { fs.unlinkSync(fileLink); } catch { /* 链接可能未创建 */ }
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
 });
 
 test("openRoleSession真正把宿主政策传到shell装配，su仍只读（非白名单命令）", async () => {

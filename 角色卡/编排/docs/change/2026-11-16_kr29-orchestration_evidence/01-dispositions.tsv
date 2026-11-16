@@ -1,0 +1,28 @@
+# KR-29 批次 B（编排）逐名 dispositions
+# 分类引用：kr29ana 角色卡/测试/docs/change/2026-11-16_kr29-classification.md 与 _evidence/01-kr29-master.tsv。
+# 冻结测试名全部逐字保留；仅更新断言体/夹具/环境守卫。cls_id 为分类表 #。file:line 为分类基线定位。
+
+cls_id	suite	frozen_name	file_line	category	disposition
+6	O	A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）	test/编排/governance-matrix-injection.test.ts:316	测试假设过时	断言改为「传 {protectedGitRoots} 宿主事实 + governanceMatrix/contextSections 缺席」；A5 矩阵不注入本意不变（E4）。
+7	O	AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）	test/编排/trunk-upgrade-validation.test.ts:171	测试假设过时	改走 submitDirect（真实 operationId/base/expectedFrom hash）；断言 receipt errorCode=vca-target-invalid（D3 targetRoleId 不在 roster）、无批准/应用、trunk 指针不变、旧 run 不 re-pin（E2）。
+8	O	AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）	test/编排/trunk-upgrade-validation.test.ts:202	测试假设过时	submitDirect 准备完整快照时读取真实角色卡字节，缺失 ⇒ receipt vca-target-invalid + 无记录/状态变化（E2）。
+9	O	AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）	test/编排/trunk-upgrade-validation.test.ts:216	测试假设过时	submitDirect 合法单契约升级 ok=true/applied、trunk t1→t2；按 api-spec:1227 direct 发布不重 pin 旧 run（E2）。
+10	O	AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝	test/编排/trunk-upgrade-validation.test.ts:184	测试假设过时	roster v2 用合法 body（含 topology 块）并引用 proposal v1；submitDirect 在 executeDirect 的 validateUpgradeChain 处拒绝（契约版本链不匹配），receipt=vca-target-invalid（E2）。
+11	O	AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）	test/编排/trunk-upgrade-validation.test.ts:148	测试假设过时	同 #7 direct 链：roster 非法 ⇒ receipt vca-target-invalid；断言未冻结目标/无批准事件/trunk 与 run 不变（E2）。
+12	O	BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针	test/编排/appointment-roster.test.ts:425	测试假设过时	allowedPathRoots 断言保留；无真实完成计划+D3 时 roleDraftWritePaths 为空，同一 resolveWrite 探测为 false 且 reason 为 roleDraftWritePaths 文案（E3；旧 appointment-write 卡不得替代）。
+13	O	BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed	test/编排/appointment-roster.test.ts:445	测试假设过时	两条声明路径仍逐条产生探针（length=2），均经同一 gate 探测为 false + roleDraftWritePaths reason（E3）。
+14	O	D-1：projectRoot 为空 → 不传 sessionDir（旧行为）	test/编排/session-dir.test.ts:114	产品回归	产品最小修复：run-role.ts 空 projectRoot 短路为 unmanaged/空 protectedGitRoots，不做 realpath('')；sessionDirFor 旧空根守卫语义保留（E13）。
+15	O	D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）	test/编排/session-dir.test.ts:138	测试假设过时	一次性路径现传 {protectedGitRoots}；断言 sessionDir/governanceMatrix/contextSections 缺席（一局即止语义不变）（E4）。
+16	O	Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority	test/编排/git-capabilities.test.ts:515	测试假设过时	任务创建附真实 workSourceRef：经 Service.prepareRoleDispatch(chief-hub-v1) 生成初始化源与 planning run（convener/nominator 各一）；发布/激活来源绑定校验通过（E7；api-spec:1286/1667）。
+17	O	P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界	test/编排/shell-operator-only.test.ts:511	测试假设过时	git clean -fdx / git checkout -- . 移入静态硬拒组：allow=false 且 reason 含「裸 Git 硬拒」，不弹卡（E8；W3-G）。
+18	O	Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation	test/编排/direct-role-capabilities.test.ts:70	测试假设过时	frozen-conflict/hash-mismatch message 带 `${reason}: ${path}` 后缀；断言精确新格式（frozen-conflict: docs/product/demo-intent-v2.md）与 hash-mismatch 前缀+路径（E9；W2 已披露）。
+19	O	TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）	test/编排/doc-format-specs.test.ts:1312	测试假设过时	SCHEMA_WHITELIST 增 7 条内部账本/矩阵/资源标识（ans-basis/v1、ans-release/v1、ans-workflow/v1、ans-task-git-shell/v1、chief-workflow/v2、legacy/v1、two-fixed-paths/v1），逐条写非文档格式理由；扫描范围不减（E10）。
+20	O	applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接	test/编排/trunk-service.test.ts:507	测试假设过时	pending 深比较补真实诊断字段 errorCode=stable-manifest-unavailable、message=missing；不升版本/不虚构快照断言保留（E11；api-spec:1714）。
+21	O	node test外指符号链接路径不获委托；项目内测试路径获委托	test/编排/shell-authorized-routine.test.ts:184	环境/平台	symlink 能力探测：优先文件 symlink；Windows EPERM ⇒ 目录 junction（lstat 同为 symbolic link，realpath 外指 ⇒ 不获委托）；两者均不可用才 diagnostic skip；断言不放宽（E14；KR-33 K4 口径）。本机 junction 路径实跑绿。
+22	O	openRoleSession：普通角色 settle → 发出 handback（形状正确）	test/编排/handback.test.ts:116	测试假设过时	合成 taskId 无真实任务 ⇒ assignedTaskWritePaths 空集、写入被拒（blocked）。会话改无 taskId 聊天形态（写入按 Section 1 放行），经 send 显式 handback intent 绑定 T-1；handback 形状断言保留（E5）。
+23	O	real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId	test/编排/chat-handback-scope.test.ts:59	测试假设过时	api-spec:1458 修订 2：required:false 仍保留宿主核验的显式 taskId；第 5 行期望 "ignored"（标题为历史名，语义按现行契约）（E6）。
+24	O	v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力	test/编排/trio-worker-report.test.ts:184	测试假设过时	改断言资源驱动模型：chief 卡委派 chief-workflow.md；资源含「按缺口选择责任者」、五角色责任与同轮并行纪律；worker 卡产物/回报断言保留；convener dispatch=true（E12）。
+26	O	人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒	test/编排/section1-write-preauthorization.test.ts:304	测试假设过时	角色卡条目不再由 Section 1 单独放行：无真实计划/D3 ⇒ roleDraftWritePaths guard 拒绝并给出新 reason；技能文档放行/他人写区/应用目录拒绝断言保留（E3）。
+27	O	卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report	test/编排/trio-worker-report.test.ts:162	测试假设过时	chief 卡断言委派句（不使用卡内副本）；「结束本轮/禁 sleep/禁轮询/等待真实回报」改断言 chief-workflow.md 资源正文；五张 worker 卡 submit_report 断言保留（E12）。
+28	O	卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡	test/编排/trio-worker-report.test.ts:214	测试假设过时	现行 fixed 模型：运营卡「由 Chief 创建 Verifier 任务/不派新质检/不发 acceptance 卡/不代客户验收」；chief-workflow-v2 资源「固定路径不发 acceptance 卡」+「验收=质检报告+Chief 决策+应用归档」；verifier acceptance 发起句保留（E12）。
+29	O	有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒	test/编排/section1-write-preauthorization.test.ts:248	测试假设过时	行为仍拒绝；reason 断言改为 roleDraftWritePaths 文案（真实完成计划+D3；旧 appointment-write 卡不得替代）（E3）。

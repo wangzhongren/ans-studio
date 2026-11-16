@@ -7,8 +7,9 @@
 //     `deps.createAdapter(gate, { sessionDir })` 传给适配器（「注入才注册」同族）。
 //   · **编排只算路径、不预建目录**——目录创建归适配器在真正落盘时做（保「不预建 `.ans`」既有
 //     语义/断言；避免空目录）——测试**反向断言** openRoleSession 后该目录**不存在**。
-//   · projectRoot 为空 / roleId 不安全（空、含 `/`、`\`、`..`）→ **不传**（旧行为）。
-//   · 每个角色会话都拿到（含治理角色 su——「对每个角色」）；一次性路径 `runRole` **不传**。
+//   · projectRoot 为空 / roleId 不安全（空、含 `/`、`\`、`..`）→ **不传 sessionDir**（旧行为）。
+//   · 每个角色会话都拿到（含治理角色 su——「对每个角色」）；一次性路径 `runRole` **不传**
+//     sessionDir/治理矩阵（e71501c 起仍传宿主 Git 保护事实 `protectedGitRoots`）。
 // 全程桩适配器，不触网、不落盘（桩不实现任何写）。
 
 import { test } from "node:test";
@@ -135,6 +136,8 @@ test("D-1：roleId 不安全（含路径分隔符 / ..）→ 不传 sessionDir�
   }
 });
 
+// 冻结名保留（历史标题「不传能力面」）。现行语义（e71501c 起）：一次性路径仍传宿主 Git 保护事实
+// `{protectedGitRoots}`；「一局即止」的本意——不传 sessionDir/治理矩阵/上下文段——不变。
 test("D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）", async () => {
   const project = makeTempProject();
   try {
@@ -145,7 +148,12 @@ test("D-1：一次性路径 runRole **不传**能力面（一局即止，无持�
     );
     assert.equal(result.code, 0);
     assert.equal(stub.calls.length, 1, "runRole 应经 createAdapter 建一次适配器");
-    assert.equal(stub.calls[0], undefined, "runRole（一次性路径）不传 AdapterCapabilities");
+    const capabilities = stub.calls[0];
+    assert.ok(capabilities !== undefined, "一次性路径现传宿主 Git 保护事实");
+    assert.ok(Array.isArray(capabilities.protectedGitRoots), "protectedGitRoots 为宿主探测事实");
+    assert.equal(capabilities.sessionDir, undefined, "一次性路径不传 sessionDir（无持久化/恢复语义）");
+    assert.equal(capabilities.governanceMatrix, undefined, "一次性路径不注入治理矩阵");
+    assert.equal(capabilities.contextSections, undefined, "一次性路径无上下文提示段");
     assert.equal(fs.existsSync(path.join(project.projectRoot, ".ans")), false);
   } finally {
     cleanup(project);

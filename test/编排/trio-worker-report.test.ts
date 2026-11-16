@@ -13,6 +13,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type { CustomerInputFn, CustomerInputRequest } from "../../src/model/runtime.ts";
@@ -25,6 +26,11 @@ import type { HandbackEvent, OrchestrationEvent } from "../../src/common/编排/
 import { governanceCapabilitiesOf, governanceRoleOf } from "../../src/common/门禁引擎/governance-roles.ts";
 
 const WORKER_IDS = ["product", "rapporteur", "nominator", "convener", "verifier"] as const;
+
+/** 仓库根（本文件位于 test/编排/）：chief 流程资源是卡文的单一来源。 */
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const readChiefResource = (name: "chief-workflow.md" | "chief-workflow-v2.md"): string =>
+  fs.readFileSync(path.join(REPO_ROOT, "src/common/门禁引擎/workflows/chief", name), "utf8");
 
 /** trio 项目夹具（内置治理角色经 builtInRoles 声明；五个 worker + chief）。 */
 function trioProject(): ProjectConfig {
@@ -159,13 +165,18 @@ test("内建 worker 交报告：回交事件取报告值（status/summary/eviden
   }
 });
 
+// 冻结名保留（历史标题「幕僚卡要求…」）。现行模型（e71501c）：chief 卡只委派流程给应用注入的
+// `chief-workflow.md` 资源（不使用卡内副本）；纪律正文在资源中，worker 卡的 submit_report 要求不变。
 test("卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report", () => {
   const chief = governanceRoleOf("chief");
   assert.ok(chief, "注册表应有 chief");
-  assert.match(chief!.cardText, /派发后立即结束本轮/, "幕僚卡必须写明派发后结束本轮");
-  assert.match(chief!.cardText, /不要用 `run_shell` sleep/, "幕僚卡必须禁止 run_shell sleep 等待");
-  assert.match(chief!.cardText, /连续 `role_status` 轮询/, "幕僚卡必须禁止连续 role_status 轮询空转");
-  assert.match(chief!.cardText, /短报\/任务回报会作为新消息送达你并开启新一轮/, "幕僚卡必须说明短报会开启新一轮");
+  assert.match(chief!.cardText, /Chief自身流程以实际注入的独立 chief-workflow\.md 为准/, "幕僚卡必须委派流程资源");
+  assert.match(chief!.cardText, /不使用卡内另一份流程副本/, "幕僚卡不得保留第二份流程副本");
+  const workflow = readChiefResource("chief-workflow.md");
+  assert.match(workflow, /完成本轮必要的派发后结束本轮/, "流程资源必须写明派发后结束本轮");
+  assert.match(workflow, /不要 sleep、连续轮询 role_status 或空转/, "流程资源必须禁止 sleep/轮询空转");
+  assert.match(workflow, /等待真实回报或系统巡检输入/, "流程资源必须说明由真实回报驱动下一轮");
+  assert.equal(chief!.cardText.includes("派发后立即结束本轮"), false, "卡内不再复制流程纪律（资源单一来源）");
   assert.equal(chief!.cardText.includes("收到幕僚派发的任务"), false, "幕僚卡不得含 worker 专用的「收到幕僚派发的任务」句");
 
   for (const roleId of WORKER_IDS) {
@@ -181,16 +192,19 @@ test("卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询�
 });
 
 
+// 冻结名保留（历史 v4.1 标题）。现行资源驱动：主链顺序/一步一派被 `chief-workflow.md` 的
+// 「按缺口选择责任者」与同轮并行纪律取代；五角色产物/回报责任与 convener dispatch 能力仍成立。
 test("v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力", () => {
   const chief = governanceRoleOf("chief")!.cardText;
-  assert.match(chief, /主链顺序（必须）/);
-  assert.match(chief, /①产品出「产品意图文档」/);
-  assert.match(chief, /②策划出「方案 \+ 人员名单 \+ 项目架构」/);
-  assert.match(chief, /③人事按名单招人写卡/);
-  assert.match(chief, /④把项目交付运营/);
-  assert.match(chief, /不直接给项目 worker 派实现任务/);
-  assert.match(chief, /派人事：应用要求名单存在且合法/);
-  assert.match(chief, /派运营：应用要求 D3 选中的角色卡已写好/);
+  assert.match(chief, /chief-workflow\.md/);
+  assert.match(chief, /不使用卡内另一份流程副本/);
+  const workflow = readChiefResource("chief-workflow.md");
+  assert.match(workflow, /按缺口选择责任者/, "流程资源按真实缺口选择责任者（不固定角色顺序）");
+  assert.match(workflow, /Product 补产品目标、范围和验收依据/, "产品产物/责任保留");
+  assert.match(workflow, /Rapporteur 契约\/名单缺项或 run 切换未就绪/, "策划契约/名单责任保留");
+  assert.match(workflow, /Nominator 的 plan\/D3\/三文档或范围错误/, "人事计划/D3/三文档责任保留");
+  assert.match(workflow, /Verifier 缺标准、候选或物证/, "质检标准/候选/物证责任保留");
+  assert.match(workflow, /独立任务可在同一轮并行派发/, "现行派发纪律允许同轮并行（不再强制一步一派）");
 
   assert.match(governanceRoleOf("product")!.cardText, /docs\/product\/<flowId>-intent-vN\.md/);
   assert.match(governanceRoleOf("rapporteur")!.cardText, /project-roster\/v3/);
@@ -205,24 +219,26 @@ test("v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/�
   assert.match(governanceRoleOf("nominator")!.cardText, /decisionId/);
   assert.match(governanceRoleOf("convener")!.cardText, /D3 选中/);
   assert.match(governanceRoleOf("convener")!.cardText, /不得发 appointment/);
-  assert.match(governanceRoleOf("verifier")!.cardText, /发起方/);
+  assert.match(governanceRoleOf("verifier")!.cardText, /request_choice\(cardKind=acceptance/);
 
   assert.equal(governanceCapabilitiesOf("convener")!.dispatchTask, true, "v4.1：运营拥有 dispatch 能力（作用域由前置校验执行）");
   assert.equal(governanceCapabilitiesOf("nominator")!.dispatchTask, false);
 });
 
+// 冻结名保留（历史标题「验收卡发起权归质检」）。现行 fixed 模型：验收 = 独立质检报告 + Chief
+// 业务决策 + 应用归档 `docs/acceptance/`；固定路径不发 acceptance 卡（chief-workflow-v2.md），
+// Chief 直接创建 Verifier 任务（运营不派新质检、不发 acceptance 卡）。
 test("卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡", () => {
   const convener = governanceRoleOf("convener")!.cardText;
-  const chief = governanceRoleOf("chief")!.cardText;
   const verifier = governanceRoleOf("verifier")!.cardText;
-  assert.match(convener, /可发起验收＝用 `dispatch_task` 派质检（verifier）执行核对/, "运营卡必须写明验收由 dispatch 质检发起");
-  assert.match(convener, /验收卡（acceptance）由质检发起/, "运营卡必须写明 acceptance 卡由质检发起");
-  assert.match(convener, /不得发 acceptance 卡/, "运营卡必须写明自己不得发 acceptance 卡");
-  assert.match(convener, /不得代客户验收/, "既有纪律保留：运营不得代客户验收");
-  assert.match(chief, /最终验收：由质检（verifier）发起验收卡/, "幕僚卡必须写明最终验收卡由质检发起");
-  assert.match(chief, /不要要求运营（convener）提交验收卡/, "幕僚卡必须禁止要求运营提交验收卡");
-  assert.match(chief, /让运营 dispatch 质检/, "幕僚卡必须给出需要验收时的调度路线");
+  const fixed = readChiefResource("chief-workflow-v2.md");
+  assert.match(convener, /由 Chief 创建 Verifier 任务、接收报告并收口/, "运营卡：质检任务由 Chief 创建");
+  assert.match(convener, /你不派新质检、不发 acceptance 卡、不代客户验收/, "运营卡：不派新质检/不发 acceptance/不代客户验收");
+  assert.match(fixed, /固定路径.*不发 acceptance 卡/, "fixed 资源：固定路径不发 acceptance 卡");
+  assert.match(fixed, /验收 = 独立质检报告 \+ 你的业务决策 \+ 应用写 `docs\/acceptance\/` 归档/, "fixed 资源：验收由质检报告+Chief 决策+应用归档构成");
+  assert.match(fixed, /你只发 stage-request，或直接创建 verifier\/验收角色的独立验收任务/, "fixed 资源：Chief 直接创建验收任务，不经运营发验收卡");
   assert.match(verifier, /request_choice\(cardKind=acceptance/, "质检卡原有 acceptance 发起句不得受影响");
+  assert.equal(convener.includes("可发起验收＝用 `dispatch_task` 派质检"), false, "旧「运营 dispatch 质检」文案已退役");
 });
 
 test("cardKind 越权拒绝：convener 发 acceptance ⇒ 不弹卡，文案指出由质检发起并给出改派办法", async () => {

@@ -66,7 +66,9 @@ test("real ACK binds task → Q1/Q2 chat → next task even with delayed consump
     await handle.send("next", { handback: { required: true, taskId: "B" } });
     await handle.send("report", { handback: { required: false, taskId: "ignored" } });
     const { result, reports } = await collect(handle.events());
-    assert.deepEqual(reports.map(event => [event.handback.turnId, event.handback.taskId, event.handback.status]), [["1", "A", "completed"], ["4", "B", "unreported"], ["5", undefined, "completed"]]);
+    // 冻结名保留（历史「drops old taskId」）。api-spec:1458 修订 2：`required:false` 仍保留宿主核验的
+    // 显式 taskId（第 5 轮传入 "ignored"）；只有不带 taskId 的显式新聊天意图才清旧身份。
+    assert.deepEqual(reports.map(event => [event.handback.turnId, event.handback.taskId, event.handback.status]), [["1", "A", "completed"], ["4", "B", "unreported"], ["5", "ignored", "completed"]]);
     assert.equal(result.filter(event => event.kind === "settled").length, 10);
     for (const event of reports) assert.equal(result[result.indexOf(event) + 1].kind, "settled");
     // The skipped chat is also closed: late report cannot create a new result for turn 2.
