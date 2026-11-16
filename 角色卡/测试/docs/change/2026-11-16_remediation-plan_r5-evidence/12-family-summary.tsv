@@ -1,0 +1,8 @@
+known-red-62	33	5:trunk-upgrade-validation.test.ts, 3:trio-worker-report.test.ts, 2:section1-write-preauthorization.test.ts, 2:appointment-roster.test.ts, 2:session-dir.test.ts, 2:dispatch-workflow-writer-copy.test.ts
+unclassified-new	22	6:git-operation-sidecar-tolerance.test.ts, 3:git-action-authorization-gate.test.ts, 3:git-command.test.ts, 1:git-action-cross-runtime-init.test.ts, 1:git-action-cross-runtime-audit-failure.test.ts, 1:git-action-cross-runtime-pi-init.test.ts
+b0-existing-other	17	3:h-scope-audit.test.ts, 3:t1-pipeline-integration.test.ts, 2:trunk-stable-write-integration.test.ts, 2:git-role-workflows-e2e.test.ts, 1:pi-loopback-verify.test.ts, 1:session.test.ts
+flake-timing	16	3:session-rebuild-race.test.ts, 3:network-state-e2e.test.ts, 2:f2-claim-release.test.ts, 1:e-handler.test.ts, 1:download-requests-integration.test.ts, 1:download-request.test.ts
+source-gate	14	10:run-pin.test.ts, 2:run-change-trigger.test.ts, 2:i-full-chain.test.ts
+e71501c-drift	10	10:chief-workflow.test.ts
+hang-timeout	3	1:session-rebuild-race.test.ts, 1:stuck-redispatch.test.ts, 1:2026-11-09_judge-delegated-effectiveness.test.ts
+ci-path-canonical	1	1:git-role-workflows-e2e.test.ts
