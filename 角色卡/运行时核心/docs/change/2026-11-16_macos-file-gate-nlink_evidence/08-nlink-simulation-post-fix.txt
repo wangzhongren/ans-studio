@@ -1,0 +1,6 @@
+absent coverage: complete check: true
+absent after root nlink+1 (POSIX mkdir docs/): true
+present coverage: complete reasons: [] check: true
+present after real mkdir docs/ on win32 : true
+present after simulated POSIX root nlink+1: true
+present after nlink restored: true

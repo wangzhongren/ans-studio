@@ -1,0 +1,10 @@
+W52 init actual Core registry [{"sessionId":"13e44b2e-a244-4037-bce3-27b1185ae1b7","roleId":"chief","state":"active","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"f03faf2d-24f9-41b8-8f14-81bb9dc45458","roleId":"convener","state":"active","lifecycleStatus":"unknown","providerFinished":false,"processCoverage":"complete"}]
+✔ W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后 (6671.3655ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7133.7791

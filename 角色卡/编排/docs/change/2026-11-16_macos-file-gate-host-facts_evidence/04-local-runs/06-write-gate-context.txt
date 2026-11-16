@@ -1,0 +1,19 @@
+✔ F6/write_file：首次与写前复核均收到真实最终字节 sha256 与 operation=write (21.8837ms)
+✔ F6/edit_file：写前复核 gate 收到编辑后最终字节（BOM 保留）sha256 与 operation=edit (19.6496ms)
+✔ F6/向后兼容：旧单参数 WriteGate 实现与直接单参调用零变化 (9.8664ms)
+✔ F6/写前复核拒绝：携带内容上下文时拒绝 ⇒ write/edit 均不落盘 (8.0089ms)
+✔ F6/类型形状：纯phase型不是读取/写入权限，最终hash与operation保持 (0.2099ms)
+✔ R20 issued stages bind invocation/path/op/stage, expire on gate return, and write only after pure final policy (15.7781ms)
+✔ R20 authorized stable edit preserves BOM, exact current SHA and permit base/final SHA policy (22.7016ms)
+✔ R20 unapproved lexical/canonical paths, unknown coverage, legacy consumers and I/O failures never read unauthorized bytes (6.5804ms)
+✔ R20 host drift, final base drift, hardlinks and canonical parent replacement fail without commit (15.8478ms)
+✔ R20 final deny and real rename failure preserve target bytes and remove only the owned temp (13.6662ms)
+✔ R20 production schema/raw refuse staged host fields before gate, while legacy nonmanaged calls keep old behavior (16.2722ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 386.6228

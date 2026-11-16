@@ -1,0 +1,13 @@
+# 基线 = 角色卡/测试/docs/change/2026-11-13_refactor-session-ts-b0_evidence/04a-knownred-runtime-core-33.txt（33 名）
+# 实际 = 角色卡/运行时核心/docs/change/2026-11-16_macos-file-gate-nlink_evidence/07-runtime-core-full.tap 的 not ok（去重）
+# 运行时由本批最终产品文件生成：sha256 3227f37c34046a352f55bf998298a8fe04b29049a5995e08ee5cd0e2f238063f
+
+# tests 607
+# pass 570
+# fail 33
+# cancelled 0
+# skipped 4
+# todo 0
+
+# 逐名 diff（基线 vs 实际；空 = 冻结 33 名逐名一致）
+(empty)

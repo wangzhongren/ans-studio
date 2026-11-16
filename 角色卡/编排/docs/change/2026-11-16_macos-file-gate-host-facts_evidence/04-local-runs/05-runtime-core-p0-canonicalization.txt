@@ -1,0 +1,26 @@
+✔ P0 根规范化：符号链接祖先的临时根被接受（同一真实根的不同书写形式） (24.2656ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-p0-alias-jPDvHp\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-p0-alias-jPDvHp\\real-parent\\project","state":"required"}
+✔ P0 根规范化：最终根自身是符号链接仍拒绝（noncanonical-project-root） (2.7683ms)
+✔ P0 根规范化：初始化源记录指向不同真实根仍 fail-closed 拒绝 (10.0107ms)
+✔ P0 根规范化：既有控制路径符号链接拒绝不放宽（.ans/trunk、.git 文件） (6.6313ms)
+✔ P0 根规范化：初始化事实/真实 Git 初始化在符号链接祖先根下成立，最终根链接仍拒绝 (50.9964ms)
+✔ P0 根规范化：fileGateProtection 指向不同真实根 ⇒ 丢弃事实、写 fail-closed (15.8665ms)
+✔ P0 根规范化：Core 绑定与 host-facts file gate 在符号链接祖先根下工作 (26.6984ms)
+ℹ {"platform":"win32","session":"438a6f9f-bd27-41c7-b8d1-13071fe07440","protectionRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-p0-core-aiD8aQ\\real-parent\\project","sessionRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-p0-core-aiD8aQ\\alias-parent\\project"}
+✔ B3-2b 根规范化：host coordinator 按真实根归一符号链接祖先；不同真实根仍隔离 (3.5814ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-alias-lSmuBS\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-alias-lSmuBS\\real-parent\\project","leaseId":"1208a54d-31cb-4166-bb2c-a9bf56a194ac"}
+✔ B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid (415.1964ms)
+ℹ {"platform":"win32","shortRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\AN5F2E~2\\PROJEC~1","canonicalRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-short-VG4UpK\\project-with-a-very-long-directory-name","leaseId":"281aa594-11fc-4cc7-a75f-28e69606838a"}
+✔ B3-2b 根规范化：不可解析根 fail-closed（不为未知拼写创建可命中的 coordinator） (0.4134ms)
+✔ B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe） (194.5939ms)
+ℹ {"platform":"win32","shortRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\AN14C4~3\\PROJEC~1","canonicalRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2c-short-JRZFv6\\project-with-a-very-long-directory-name"}
+✔ B3-2c git 控制路径：符号链接祖先根归一；最终根/控制路径自身链接仍拒 (8.4856ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2c-control-c2RoKw\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2c-control-c2RoKw\\real-parent\\project"}
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 986.0686

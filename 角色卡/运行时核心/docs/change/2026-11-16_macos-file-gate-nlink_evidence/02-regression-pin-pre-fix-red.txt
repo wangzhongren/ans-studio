@@ -1,0 +1,33 @@
+# 修复前（HEAD d1f256f 原文）回归钉：命令 node --test --test-timeout=120000 --test-force-exit test/runtime-core/git-protection-topology-nlink.test.ts
+# 期望：目录 nlink 模拟项红（证明回归钉咬住旧 describe()）；真实 mkdir/文件 nlink 两项在 Windows/旧代码亦为绿。
+✔ macOS file-gate：present-repo 根下创建一级目录后 protection facts 仍 current (50.9024ms)
+✖ macOS file-gate：目录 nlink +1（POSIX mkdir 效果模拟）不进入 topology digest (42.1817ms)
+✔ macOS file-gate：普通文件 nlink 变化仍 fail-closed（.git/config 硬链接被拒绝） (46.0444ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 353.136
+
+✖ failing tests:
+
+test at test\runtime-core\git-protection-topology-nlink.test.ts:62:1
+✖ macOS file-gate：目录 nlink +1（POSIX mkdir 效果模拟）不进入 topology digest (42.1817ms)
+  AssertionError [ERR_ASSERTION]: 根目录 nlink +1 不得改变 protection topology digest
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/macgate/test/runtime-core/git-protection-topology-nlink.test.ts:70:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT=1
