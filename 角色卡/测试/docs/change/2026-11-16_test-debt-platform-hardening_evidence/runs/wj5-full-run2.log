@@ -1,0 +1,12 @@
+=== run 2 (final file) ===
+✔ W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例 (59017.9537ms)
+ℹ {"wj5BudgetMs":{"buildWriteChain":40272,"r9BaselineAndFallbackNegatives":40276,"fallbackNegatives":40436,"judgeD3AndPin":42146,"verifyReviewIntentEndToEnd":57591,"activationReplayAndIdempotency":59017,"complete":59017}}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 59346.8889
+EXIT=0

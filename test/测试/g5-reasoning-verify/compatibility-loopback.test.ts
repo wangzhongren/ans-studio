@@ -1,14 +1,20 @@
 // 独立真实 SDK/CLI 验证：仅 localhost、临时目录和假 key，不注入兼容实现或修改模型目录。
+//
+// 2026-11-16 平台加固（Windows-only 原生 libuv `UV_HANDLE_CLOSING`，R6 首次观测）：
+// 三个真实子用例各自在**独立 Node 子进程**中串行运行，父进程只做编排与判定。仅当子进程在
+// **全部断言完成之后**、于进程收尾期发生原生崩溃（完成哨兵已写 + 原生断言签名）才做有界重试
+// （最多 3 次）；断言失败/测试中途崩溃/超时一律不重试、直接失败。隔离与重试不改变任何业务
+// 断言，也不把失败伪装成通过（重试耗尽仍失败，门禁口径不放松）。详见
+// 角色卡/测试/docs/change/2026-11-16_test-debt-platform-hardening.md。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type ServerResponse } from "node:http";
-import { mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
-import * as claudeSdk from "@anthropic-ai/claude-agent-sdk";
-import { createClaudeRuntimeAdapter } from "../../../src/provider/claude/session.ts";
-import { createCodexRuntimeAdapter } from "../../../src/provider/codex/session.ts";
-import { createRealPiRuntimeAdapter } from "../../../src/common/pi-adapter/real-adapter.ts";
+import type * as ClaudeSdk from "@anthropic-ai/claude-agent-sdk";
 import { createInteractionGate } from "../../../src/common/runtime-core/timeout.ts";
 import type { RoleSession, SessionEvent } from "../../../src/model/runtime.ts";
 import { makeRole, removeTempDirEventually } from "./helpers.ts";
@@ -93,7 +99,14 @@ function states(events: SessionEvent[], state: string) {
   });
 }
 
-test("独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config，同任务及下一轮 completed", { timeout: 60000 }, async context => {
+interface ScenarioContext { diagnostic: (message: string) => void }
+interface Scenario { name: "claude" | "codex" | "pi"; title: string; timeout: number; run: (context: ScenarioContext) => Promise<void> }
+
+async function runClaude(context: ScenarioContext): Promise<void> {
+  const [claudeSdk, { createClaudeRuntimeAdapter }] = await Promise.all([
+    import("@anthropic-ai/claude-agent-sdk"),
+    import("../../../src/provider/claude/session.ts"),
+  ]);
   const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-claude-"));
   const server = await gateway((body, response) => {
     if (body.thinking !== undefined || body.output_config !== undefined) rejectField(response, body.output_config !== undefined ? "output_config.effort" : "thinking");
@@ -101,7 +114,7 @@ test("独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config�
   });
   const savedEnvironment = { PATH: process.env.PATH, HOME: root, TMPDIR: root, ANTHROPIC_API_KEY: FAKE_KEY };
   const snapshot = JSON.stringify(savedEnvironment);
-  const configurations: claudeSdk.Options[] = [];
+  const configurations: ClaudeSdk.Options[] = [];
   const options = { runtime: "claude" as const, projectRoot: root, skillRoot: root, modelId: "claude-sonnet-4-6", baseUrl: server.baseUrl, reasoningEffort: "low" as const, tools: [], interactionGate: createInteractionGate(), currentTurnId: () => "independent-claude", turnLastResortMs: 45000 };
   const session = await createClaudeRuntimeAdapter(options, {
     env: savedEnvironment,
@@ -140,9 +153,10 @@ test("独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config�
   assert.deepEqual(outcomes(observed.events), ["completed", "completed"]);
   assert.equal(states(observed.events, "trying").length, 1);
   assert.equal(states(observed.events, "compatible").length, 1);
-});
+}
 
-test("独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去参，同任务及下一轮完成", { timeout: 60000 }, async context => {
+async function runCodex(context: ScenarioContext): Promise<void> {
+  const { createCodexRuntimeAdapter } = await import("../../../src/provider/codex/session.ts");
   const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-codex-"));
   const server = await gateway((body, response) => {
     if ((body.reasoning as { effort?: unknown })?.effort !== undefined) rejectField(response, "reasoning.effort");
@@ -166,10 +180,13 @@ test("独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去
   assert.deepEqual(outcomes(observed.events), ["completed", "completed"]);
   assert.equal(states(observed.events, "trying").length, 1);
   assert.equal(states(observed.events, "completed").length, 1);
-});
+}
 
-test("独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次", { timeout: 30000 }, async context => {
-  const pi = await import("@earendil-works/pi-coding-agent");
+async function runPi(context: ScenarioContext): Promise<void> {
+  const [{ createRealPiRuntimeAdapter }, pi] = await Promise.all([
+    import("../../../src/common/pi-adapter/real-adapter.ts"),
+    import("@earendil-works/pi-coding-agent"),
+  ]);
   const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-pi-"));
   let toolCalls = 0;
   let promptCalls = 0;
@@ -211,4 +228,66 @@ test("独立真实 Pi：工具完成后下一请求兼容保留 tool_result，�
   assert.deepEqual(outcomes(observed.events), ["completed"]);
   assert.equal(states(observed.events, "compatibility-attempt").length, 1);
   assert.equal(states(observed.events, "compatibility-confirmed").length, 1);
-});
+}
+
+const SCENARIOS: readonly Scenario[] = [
+  { name: "claude", title: "独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config，同任务及下一轮 completed", timeout: 60000, run: runClaude },
+  { name: "codex", title: "独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去参，同任务及下一轮完成", timeout: 60000, run: runCodex },
+  { name: "pi", title: "独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次", timeout: 30000, run: runPi },
+];
+const WORKER_ENV = "ANS_G5_LOOPBACK_WORKER";
+const SENTINEL_ENV = "ANS_G5_LOOPBACK_SENTINEL";
+// 仅限 Windows libuv 原生收尾断言（R6 工件：`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c`）。
+const nativeCrashSignature = /Assertion failed:.*(?:UV_HANDLE_CLOSING|src[\\/]win[\\/]async\.c)/;
+const maxIsolatedAttempts = 3;
+
+if (process.env[WORKER_ENV]) {
+  // 子进程模式：只注册被选中的真实子用例；全部断言完成后写完成哨兵，供父进程区分「收尾期原生崩溃」与「真实断言失败」。
+  const scenario = SCENARIOS.find(item => item.name === process.env[WORKER_ENV]);
+  if (!scenario) throw new Error(`unknown ${WORKER_ENV}: ${process.env[WORKER_ENV]}`);
+  test(scenario.title, { timeout: scenario.timeout }, async context => {
+    await scenario.run(context);
+    const sentinel = process.env[SENTINEL_ENV];
+    if (sentinel) await writeFile(sentinel, JSON.stringify({ completed: true, scenario: scenario.name }), "utf8");
+  });
+} else {
+  // 父进程模式：三个真实子用例串行隔离到独立子进程；判词见 runIsolated。
+  for (const scenario of SCENARIOS) test(scenario.title, { timeout: scenario.timeout + 120000 }, async () => { await runIsolated(scenario); });
+}
+
+async function exists(file: string): Promise<boolean> { return access(file).then(() => true, () => false); }
+function tailOf(text: string, limit = 4000): string { return text.length > limit ? text.slice(-limit) : text; }
+
+function runWorker(scenario: Scenario, sentinel: string): Promise<{ failed: boolean; stdout: string; stderr: string }> {
+  const env: NodeJS.ProcessEnv = { ...process.env, [WORKER_ENV]: scenario.name, [SENTINEL_ENV]: sentinel };
+  // 外层 runner 的 file-child 上下文标记不能泄漏进嵌套 runner（否则子进程会按 IPC 子模式运行）。
+  delete env.NODE_TEST_CONTEXT;
+  return new Promise(resolve => {
+    execFile(process.execPath, ["--test", "--test-reporter=tap", `--test-timeout=${scenario.timeout + 30000}`, fileURLToPath(import.meta.url)], {
+      env, timeout: scenario.timeout + 60000, windowsHide: true, maxBuffer: 16 * 1024 * 1024,
+    }, (error, stdout, stderr) => resolve({ failed: !!error, stdout: String(stdout), stderr: String(stderr) }));
+  });
+}
+
+async function runIsolated(scenario: Scenario): Promise<void> {
+  const controlRoot = await mkdtemp(path.join(os.tmpdir(), `ans-loopback-isolation-${scenario.name}-`));
+  try {
+    let lastOutput = "";
+    for (let attempt = 1; attempt <= maxIsolatedAttempts; attempt += 1) {
+      const sentinel = path.join(controlRoot, `attempt-${attempt}.json`);
+      const result = await runWorker(scenario, sentinel);
+      lastOutput = `${result.stdout}\n${result.stderr}`.trim();
+      if (!result.failed) {
+        assert.equal(await exists(sentinel), true, `isolated ${scenario.name} exited 0 without the completion sentinel`);
+        return;
+      }
+      const assertionsCompleted = await exists(sentinel);
+      const nativeCrash = nativeCrashSignature.test(lastOutput);
+      // 只有「全部断言完成后的进程级原生收尾崩溃」允许有界重试；断言失败/中途崩溃/超时立即失败，绝不重试。
+      if (!assertionsCompleted || !nativeCrash) {
+        assert.fail(`Isolated ${scenario.name} failed on attempt ${attempt}/${maxIsolatedAttempts} (assertionsCompleted=${assertionsCompleted}, nativeCrash=${nativeCrash}); non-native failures are never retried:\n${tailOf(lastOutput)}`);
+      }
+    }
+    assert.fail(`Isolated ${scenario.name} reproducibly hit the native teardown crash in ${maxIsolatedAttempts} bounded attempts; keeping the gate red:\n${tailOf(lastOutput)}`);
+  } finally { await removeTempDirEventually(controlRoot); }
+}

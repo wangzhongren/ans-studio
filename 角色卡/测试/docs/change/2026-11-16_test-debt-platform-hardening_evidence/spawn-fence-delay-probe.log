@@ -1,0 +1,194 @@
+{
+ "delayMs": 0,
+ "observed": true,
+ "error": "git-command-failed:null:unknown:",
+ "candidateRefPublished": false,
+ "updateRefLaunched": false,
+ "records": [
+  {
+   "launch": "cancelled-before-spawn",
+   "termination": "unknown",
+   "exitCode": null,
+   "verb": "hash-object"
+  }
+ ]
+}
+{
+ "delayMs": 20,
+ "observed": true,
+ "error": "git-host-lease-invalid-before-command",
+ "candidateRefPublished": false,
+ "updateRefLaunched": false,
+ "records": [
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 12172,
+   "verb": "hash-object"
+  }
+ ]
+}
+{
+ "delayMs": 40,
+ "observed": true,
+ "error": "git-host-lease-invalid-before-command",
+ "candidateRefPublished": false,
+ "updateRefLaunched": false,
+ "records": [
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 19780,
+   "verb": "hash-object"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 23004,
+   "verb": "mktree"
+  }
+ ]
+}
+{
+ "delayMs": 80,
+ "observed": true,
+ "error": "git-command-failed:null:unknown:",
+ "candidateRefPublished": false,
+ "updateRefLaunched": false,
+ "records": [
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 19356,
+   "verb": "mktree"
+  },
+  {
+   "launch": "cancelled-before-spawn",
+   "termination": "unknown",
+   "exitCode": null,
+   "verb": "mktree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 16732,
+   "verb": "hash-object"
+  }
+ ]
+}
+{
+ "delayMs": 100,
+ "observed": true,
+ "error": "git-host-lease-invalid-before-command",
+ "candidateRefPublished": false,
+ "updateRefLaunched": false,
+ "records": [
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 16572,
+   "verb": "mktree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 20820,
+   "verb": "hash-object"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 9880,
+   "verb": "mktree"
+  }
+ ]
+}
+{
+ "delayMs": 120,
+ "observed": true,
+ "error": "git-host-lease-invalid-before-command",
+ "candidateRefPublished": false,
+ "updateRefLaunched": false,
+ "records": [
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 14048,
+   "verb": "mktree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 19244,
+   "verb": "mktree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 2004,
+   "verb": "mktree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 18984,
+   "verb": "hash-object"
+  }
+ ]
+}
+{
+ "delayMs": 200,
+ "observed": true,
+ "error": "git-host-lease-invalid-before-command",
+ "candidateRefPublished": false,
+ "updateRefLaunched": false,
+ "records": [
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 4076,
+   "verb": "commit-tree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 8132,
+   "verb": "mktree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 10692,
+   "verb": "mktree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 20612,
+   "verb": "mktree"
+  },
+  {
+   "launch": "started",
+   "termination": "exited",
+   "exitCode": 0,
+   "pid": 10752,
+   "verb": "hash-object"
+  }
+ ]
+}
