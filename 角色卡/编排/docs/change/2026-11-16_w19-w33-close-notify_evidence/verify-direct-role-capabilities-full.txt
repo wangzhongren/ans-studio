@@ -1,0 +1,154 @@
+✖ Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority (715.3698ms)
+✖ Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation (96.6096ms)
+✔ Judge-delegated intent confirmation (W-J2/J4): real judge approve freezes exact retained bytes, reads back and replays without customer fields (95.5877ms)
+✔ Judge-delegated intent confirmation negatives (W-J2/J5/J14): forged or mismatched judge sources stay trunk-item-invalid, never freeze and never throw (247.8509ms)
+✔ Judge-delegated D3 (W-J2/J8/J9/J10): judge appointment resolution activates, pins and drafts through the shared predicate; negative sources stay fail-closed (581.034ms)
+✔ Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk (361.4348ms)
+✔ complete team plan / activation / new pin: actual planning-only basis and independent pointers (1294.0417ms)
+✔ complete team plan / activation / new pin: actual existing workflow basis and independent pointers (1408.114ms)
+✖ Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts (218.7342ms)
+✖ Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts (198.1456ms)
+✔ Provider: complete snapshot preserves arbitrary bytes, survives live deletion, rejects mutation (28.3964ms)
+✔ Provider: CAS commits one complete target, rejects stale base/flow and missing unchanged refs (49.4907ms)
+✔ Run storage/Service: byte CAS has one writer; executable reads require real workflow and all same-pin refs (448.8021ms)
+✔ Provider: frozen role evidence requires all eight refs in one immutable snapshot; no live fallback (11.2155ms)
+✔ Provider: document and active-role CAS fence both dimensions and preserve independent snapshots/history (87.1111ms)
+✔ Provider: raw baseline primitives enforce lock fencing, byte CAS and one initialisation (27.2216ms)
+✔ Provider: independent processes compete on one CAS; a crashed lock owner cannot tear or double-commit the pointer (457.1565ms)
+✔ Service: whole direct commit preserves unchanged bytes and truthful source; replay/no-op do not upgrade again (134.9515ms)
+✔ Service: any invalid target/hash/role or precommit failure leaves the complete old baseline (117.6903ms)
+✔ Service: postcommit metadata failure reports committed-pending-recovery; restart uses frozen bytes, never re-pins (83.8957ms)
+✔ Service: concurrent direct submissions with one base commit exactly once and retain both operation journals (162.8629ms)
+✔ Service: lost CAS acknowledgement and metadata-write failure never claim a committed target was rejected (95.0663ms)
+✔ Service: direct VCA metadata goes draft to applied with the real committed source; legacy approval cannot impersonate it (107.2009ms)
+✔ Service: first direct publication uses confirmed intent and null CAS, creates no workflow or execution authority (111.8982ms)
+✔ Service: detail amendment binds all frozen items to the complete target; no partial apply and true no-op (139.9339ms)
+✔ chief evidence: initial real target/request bytes produce a bounded immutable basis; isCurrent rechecks actual hashes (22.3649ms)
+✔ chief evidence: missing targets, secret paths, excessive bytes and unbound old pinned runs refuse automatic decisions (20.4149ms)
+✔ chief evidence: pinned run uses its immutable bytes and remains current when live files or document trunk change (49.1757ms)
+✔ chief evidence: draft planning run needs bound document hashes and never requires future execution authorisation (19.8174ms)
+✔ chief evidence (A1): empty draft manifest binds actual flow bytes into a verifiable complete snapshot and never writes the manifest (30.8083ms)
+✔ chief evidence (A2): draft binding fails closed on changed bytes and new versions; re-prepare reads the new bytes (37.6222ms)
+✔ chief evidence (A3): empty targets and role self-reported paths stay unbound and produce no snapshot (7.0416ms)
+✔ chief evidence (A4): unreadable, secret, oversized, non-text and criteria-hash-mismatched draft targets keep the existing fail-closed classification (32.6908ms)
+✔ chief evidence (A5): manifest-bound draft refs keep their authority over request targets (5.9936ms)
+✔ chief evidence: ordinary request without host artifacts discovers actual flow materials and notices a new version (14.8388ms)
+✔ Service: committed chief-delegated freeze preserves its true source on reload without customer fields (19.8986ms)
+✔ Service: legacy pending requests stay unchanged and require an explicit direct resubmission link (112.7351ms)
+✔ Service: legacy no-op materialises exact immutable bytes without upgrading or rewriting historical customer metadata (144.9272ms)
+✔ Service: malformed execution document rejects the entire otherwise valid detail amendment (36.5283ms)
+✔ Pipeline: real direct submit persists a whole commit and truthful audit without cards, old approval or re-pin (163.7837ms)
+✔ Pipeline: lost notification acknowledgement returns pending, then recovers one keyed delivery and one version (181.5556ms)
+✔ Parent source: real assignment, durable child reference and locked parent CAS reject stale or cancelled origins (1020.5555ms)
+✔ Provider strict scan: real non-ENOENT directory failure is never a complete empty TOFU scan (4.8246ms)
+✔ Team plan (P-1/P-6/P-8): derived baseDigest/plan.sha256, marker/journal byte anchors, NoOp and replay variants hold (250.8049ms)
+✔ Team plan (P-2/P-3/P-15): declared values are strict assertions (uppercase rejected), canonical path enforced, no side effects (59.4118ms)
+✔ Team plan (P-4): frozen-vs-live source selection (i)/(ii)/(iii) keeps baseline semantics; both-unreadable fails closed (476.3873ms)
+✔ Team plan (P-5/P-7): missing effective trunk stays trunk-unavailable; run assertions bind real runs and reject foreign/absent runs (157.143ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 43
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10486.6653
+
+✖ failing tests:
+
+test at test\编排\direct-role-capabilities.test.ts:31:1
+✖ Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority (715.3698ms)
+  AssertionError [ERR_ASSERTION]: Real task closes do not broadcast document-change turns to Chief or old unrelated Convener assignments
+  + actual - expected
+  
+  + [
+  +   'chief',
+  +   'convener',
+  +   'chief',
+  +   'convener',
+  +   'chief',
+  +   'convener',
+  +   'chief',
+  +   'convener',
+  +   'chief',
+  +   'convener'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:63:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [
+      'chief', 'convener',
+      'chief', 'convener',
+      'chief', 'convener',
+      'chief', 'convener',
+      'chief', 'convener'
+    ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\编排\direct-role-capabilities.test.ts:69:1
+✖ Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation (96.6096ms)
+  AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration
+  + actual - expected
+  
+    {
+      code: 'conflict',
+  +   message: 'frozen-conflict: docs/product/demo-intent-v2.md',
+  -   message: 'frozen-conflict',
+      ok: false
+    }
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:90:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { ok: false, code: 'conflict', message: 'frozen-conflict: docs/product/demo-intent-v2.md' },
+    expected: { ok: false, code: 'conflict', message: 'frozen-conflict' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\编排\direct-role-capabilities.test.ts:660:53
+✖ Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts (218.7342ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"status":"committed-pending-recovery","operationId":"close-draft-chief","applicationId":"close-630aa00e219a11cea31c9e7e088d18a815577f3f145d3a5cbfc03424fdcf64c2","journalId":"task-close-21c568d5006f40a8db5dfdb2c208a74b4bed971bcff41adaaf21b52d8ab533a6","taskId":"planning-chief","eventId":"task-close-21c568d5006f40a8db5dfdb2c208a74b4bed971bcff41adaaf21b52d8ab533a6","taskStatus":"closed","baseDigest":"10b924f74da350733e8fbd4e1e78bb69584aad22256657dbabff15b8ccad993a","targetDigest":"483dea2805c582c18eb36c47a93ea70895f155914e9e0235707fdd444383a117","source":{"kind":"role-direct","actorRoleId":"chief","action":"close-created-task","operationId":"close-draft-chief","applicationId":"close-630aa00e219a11cea31c9e7e088d18a815577f3f145d3a5cbfc03424fdcf64c2","journalId":"task-close-21c568d5006f40a8db5dfdb2c208a74b4bed971bcff41adaaf21b52d8ab533a6","runId":"run-draft-chief","baseDigest":"10b924f74da350733e8fbd4e1e78bb69584aad22256657dbabff15b8ccad993a","targetDigest":"483dea2805c582c18eb36c47a93ea70895f155914e9e0235707fdd444383a117","at":"2026-11-16T08:23:22.975Z"},"errorCode":"direct-notifications-pending","message":"Error: Idempotent direct notification sink is unavailable"}
+  + actual - expected
+  
+  + 'committed-pending-recovery'
+  - 'applied'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:713:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'committed-pending-recovery',
+    expected: 'applied',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\编排\direct-role-capabilities.test.ts:660:53
+✖ Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts (198.1456ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"status":"committed-pending-recovery","operationId":"close-draft-convener","applicationId":"close-59705785e41c7df2b4d80a9caf96ef1a799082c4135a7dee58c3bfee62e33b06","journalId":"task-close-542ad7f0311529dcede83c14e9c48fd95f90f4fcf30522016efb2a65b090fdb0","taskId":"planning-convener","eventId":"task-close-542ad7f0311529dcede83c14e9c48fd95f90f4fcf30522016efb2a65b090fdb0","taskStatus":"closed","baseDigest":"f28289a5bd6255cfdd436cbbd1302bdd035327710b2cd69036cd4c0ec70d3d64","targetDigest":"36986ef026c7fca265b87268310c496a5c9ac3c0f8a6c9d5b52a71b3d92ce0a6","source":{"kind":"role-direct","actorRoleId":"convener","action":"close-created-task","operationId":"close-draft-convener","applicationId":"close-59705785e41c7df2b4d80a9caf96ef1a799082c4135a7dee58c3bfee62e33b06","journalId":"task-close-542ad7f0311529dcede83c14e9c48fd95f90f4fcf30522016efb2a65b090fdb0","runId":"run-draft-convener","baseDigest":"f28289a5bd6255cfdd436cbbd1302bdd035327710b2cd69036cd4c0ec70d3d64","targetDigest":"36986ef026c7fca265b87268310c496a5c9ac3c0f8a6c9d5b52a71b3d92ce0a6","at":"2026-11-16T08:23:23.173Z"},"errorCode":"direct-notifications-pending","message":"Error: Idempotent direct notification sink is unavailable"}
+  + actual - expected
+  
+  + 'committed-pending-recovery'
+  - 'applied'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:713:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'committed-pending-recovery',
+    expected: 'applied',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

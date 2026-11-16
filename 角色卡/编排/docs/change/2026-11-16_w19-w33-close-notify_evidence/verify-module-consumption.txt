@@ -1,0 +1,29 @@
+✔ X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用） (16.0214ms)
+✔ X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3 (8.0815ms)
+✔ X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用 (7.9636ms)
+✔ X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码 (5.0002ms)
+✔ X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选） (1.2494ms)
+✔ X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值 (0.3735ms)
+✔ X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位 (1.5449ms)
+✔ X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排 (1.1178ms)
+✔ team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变 (243.3492ms)
+✔ X-R1 run-role：trio product 注入 submitVersionChange；single+product 结构不可达（P-6 旧口径） (10.8103ms)
+✔ X-R1 VCA direct：product preflight allow 不替代 Service——合法提交仍由既有 direct 链路落盘 (193.8276ms)
+✔ X-R1 VCA direct：product 模块 deny 映射既有回执码，且拒绝不落盘 (40.3307ms)
+✔ X-R1 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 product 策略 (4.03ms)
+✔ X-R2 run-role：trio rapporteur 注入模块声明的三工具（同一引用）；未提供 ⇒ 缺席；single 结构不可达 (17.5866ms)
+✔ X-R2 卡种：rapporteur 模块 cards 与迁移前表逐项一致；默认卡走模块且 decision 不默认化（源码锚点） (2.0168ms)
+✔ X-R2/X-R4 run-role：requestRequirementChange 角色声明读模块（rapporteur/convener；旧内联谓词已删除） (0.9862ms)
+✔ X-R2 VCA direct：rapporteur detail-amendment 事实包被模块接受；allow 不替代 Service（畸形目标仍按既有码拒绝） (37.5088ms)
+✔ X-R2 run-change：模块事实包；直接 wrapper 的 deny 与迁移前 Service 首检码/文案逐字一致（旧/新双跑） (1.8236ms)
+✔ X-R2 run-change：stop/stop-and-restart 保留 Service `run-stop-unverified`；preflight 只做角色侧判定 (1.2081ms)
+✔ X-R2 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 rapporteur 策略 (2.1023ms)
+✔ W2 C5 commitPreparedRunChange：run-stop 终止证据改运行时中立 drain（native/processCoverage 前提删除；direct-stop 拒绝与 host fence 不变；不写 sidecar） (0.9171ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 613.5501

@@ -1550,6 +1550,7 @@ test("W19 实际Core回报与Git回调同assignment；报告续父/通知/新cha
     await waitFor(() => optionsByTurn.some(row => row.text === "W19 new customer chat"), "New raw-manager message must reach its actual send boundary");
     assert.deepEqual(optionsByTurn.find(row => row.text === "W19 new customer chat")?.options, { required: false });
     await waitFor(() => manager.executionInventoryFacts(root).queuedDispatches.some(row => row.roleId === "convener" && row.kind === "system") && !manager.executionInventoryFacts(root).activeDeliveries.some(row => row.roleId === "convener"), "Wrong-source notice remains pending after the later customer message settles");
+    await waitFor(() => manager.executionInventoryFacts(root).queuedDispatches.find(row => row.operationId === actualCloseNotice!.source.operationId)?.lastAttempt.state === "failed", "Wrong-source notice must record its failed delivery attempt before its persisted effect is observed");
     assert.equal(captures.filter(row => row.role === "convener" && row.text.includes(actualCloseNotice!.message)).length, 0, "Neither exact retired notice nor unknown source becomes a model prompt");
     const queuedNotice = manager.executionInventoryFacts(root).queuedDispatches.find(row => row.operationId === actualCloseNotice!.source.operationId);
     assert.ok(queuedNotice, "Readonly projection must identify the actual queued source operation");
@@ -1845,7 +1846,9 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3�
       }
       const state = await readTaskState(root), init = [...state.records.values()].find(row => row.created?.idempotencyKey === "w29-real-init"), draft = [...state.records.values()].find(row => row.created?.idempotencyKey === "w21-draft");
       assert.ok(init?.closed && draft?.closed); assert.equal(init.closed.outcome, "accepted"); assert.equal(draft.closed.outcome, "accepted");
-      assert.notEqual(init.created?.runId, draft.created?.runId); assert.match(draft.created?.runId ?? "", /^run-docs-/);
+      // e71501c 起 chief→product 文档准备同样走 hub 来源（run-hub / purpose=builtin-preparation），
+      // 不再是 legacy document-preparation/run-docs 命名；独立 run 与 creator 报告绑定断言保持。
+      assert.notEqual(init.created?.runId, draft.created?.runId); assert.match(draft.created?.runId ?? "", /^run-hub-/);
       assert.equal(draft.created?.workSourceRef?.kind, "chief-creator-report"); assert.ok(draft.created?.workSourceRef);
       const draftSource = JSON.parse(await fs.readFile(path.join(root, draft.created.workSourceRef.path), "utf8"));
       assert.equal(draftSource.parent.kind, "handback"); assert.equal(draftSource.creatorReports[0]?.taskId, init.taskId);

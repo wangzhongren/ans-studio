@@ -1,0 +1,40 @@
+﹣ Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources (0.5236ms) # SKIP
+﹣ Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources (0.0725ms) # SKIP
+✔ Review assignment: an expected OID or built-in name cannot replace a real integrated run and host criterion (92.3871ms)
+✔ Chief final review and resume: exact host-shaped refs cannot invent integration, quality or reopen an ordinary preparation (112.8297ms)
+✔ Delivery authority: expected object refs and a role name do not replace real accepted independent quality (423.9494ms)
+✔ Revert Service/Pipeline: real objects and a controller title cannot invent a pin or Chief quality (431.0047ms)
+✔ Git Service/Pipeline: actual task/run plus G exact argv/read policy permits a bounded query (485.6304ms)
+✔ Git Service: policy result binds current repo/task/run/revision and cannot be reused after actual ledger change (244.9601ms)
+✔ Git modification Service: no self-reported proof or script identity can open mutations; Git metadata stays unchanged (255.6222ms)
+✔ Git normal read tool: host-bound query reaches real Git; a global query does not fabricate a task (407.4261ms)
+✔ Git host coordination: ordinary unknown inventory serializes real host actions without minting a mutation permit (58.772ms)
+✔ Git cross-project admission: one actual mutation lease excludes new actors everywhere and emergency facts invalidate without releasing it (1.5556ms)
+✔ Formal new-project route: filesystem emptiness cannot replace native selection and an actual chief parent turn (42.2547ms)
+✔ Git initialization Service effect: storage fixture rechecks bytes, rejects copied preparation and replays actual empty candidate (5938.3756ms)
+✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (2237.1118ms)
+✔ Git team plan prepare→commit (P-9): omitted values derive at prepare, prepared input stays exact, replay and post-prepare drift stay fail-closed (8286.9326ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 19361.4538
+
+✖ failing tests:
+
+test at test\编排\git-capabilities.test.ts:515:1
+✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (2237.1118ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"trunk-item-invalid","message":"The actual publication task has no original Chief input source"}
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E7%BC%96%E6%8E%92/git-capabilities.test.ts:541:82)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

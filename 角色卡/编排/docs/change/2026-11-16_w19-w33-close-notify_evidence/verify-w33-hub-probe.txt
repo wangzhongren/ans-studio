@@ -1,0 +1,11 @@
+W52 init actual Core registry [{"sessionId":"ca9ca1f0-f16b-4948-a004-53f97fcb0a4a","roleId":"chief","state":"active","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"3bacaf01-a412-47f8-a1f0-94dc8ffa79da","roleId":"convener","state":"active","lifecycleStatus":"unknown","providerFinished":false,"processCoverage":"complete"}]
+B1b post-suite active resources pid=10868: ["TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]
+✔ W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续 (2328.2113ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2796.2893

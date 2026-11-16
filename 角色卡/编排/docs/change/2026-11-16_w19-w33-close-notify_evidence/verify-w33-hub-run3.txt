@@ -1,0 +1,10 @@
+W52 init actual Core registry [{"sessionId":"6e9d3549-c4ec-4f3f-b7d6-8a46c6e8c61c","roleId":"chief","state":"active","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"7e53e4b7-505d-4e47-8535-1d413cbc8932","roleId":"convener","state":"active","lifecycleStatus":"unknown","providerFinished":false,"processCoverage":"complete"}]
+✔ W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续 (2203.3415ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2672.1568

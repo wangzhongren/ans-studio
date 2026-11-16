@@ -1,0 +1,4 @@
+# classifyClosedTaskNotice probe against the W33 project root (post-close, hub cross-run notice)
+# command: node .tmp-classify-w33.mjs (relative import of src/pipeline/orchestration/trunk-runtime.ts)
+# inputs: projectRoot=...ans-w21-notice-eK9Epg recipientRoleId=convener boundTaskId=t-mwizqlkz-bb1de12e operationId=w33-close-product-draft source=evidence w19-w33-first-notice-projection.json closeSamples[0].notificationSource
+classify: {"ok":false,"code":"closed-task-notice-unproven","message":"The actual recipient assignment and source fact do not share the same original project flow/run"}
