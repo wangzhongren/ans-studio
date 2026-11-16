@@ -52,12 +52,19 @@ async function exportWj5(name: string, value: unknown): Promise<void> {
   await fsp.writeFile(path.join(dir, name), `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例", { timeout: 180000 }, async context => {
+test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例", { timeout: 300000 }, async context => {
   // 预算观测（2026-11-16 平台加固，不改语义/断言）：x64 runner 在 R3/R5/R6 三度于本用例自带 180s 上限
   // 超时且无任何断言失败；同轮 arm64/Windows ✔ ~69–71s，本机 Windows ✔ ~61s。本文件不含固定 sleep，
   // 成本几乎全在真实跨层链（本机分段：buildWriteChain ≈41s、verifyReviewIntent 端到端 ≈15s、其余 ≈3s）。
   // 分段耗时写入 diagnostic（File: 行内可见），供 x64 复现时区分「真实链路成本」与「runner 负载/泄漏」。
-  // 不调整 180s 上限：无测试缺陷证据时抬高上限只会掩盖潜在 x64 性能/泄漏问题（misc3 §4 结论）。
+  // R9 复审（2026-11-16，批次 F，owner 裁决）：per-test 上限 180s→300s（与同类慢 e2e 预算一致）：
+  //   - R8/R9 x64 均在 180s 触顶（180,003.4ms / 180,002.8ms）且无断言失败，同轮 arm64 81.8s、
+  //     Windows 102.0s；同轮 x64/arm64 同类慢化比 2.2–2.5×，外推 x64 本链约 180–210s——放宽后
+  //     大概率通过（x64 未证，由第九轮三平台 CI 复跑验证；若仍触顶 → 拆测试，不再继续抬预算）。
+  //   - #137 的 CLI `--test-timeout=600000` 不覆盖本用例：显式 `{ timeout }` 优先于 CLI（Node 探针
+  //     实证，见 角色卡/测试/docs/change/2026-11-16_remediation-plan_r9-evidence/09-budget-evidence.md §1）。
+  //   - 此前的 misc3 §4 口径（无测试缺陷证据不抬上限）已按 R8/R9 累计证据 + owner 裁决更新；
+  //     300s 仍只把真实链路超预算变成可命名的失败，不跳过、不放宽任何断言/用例。
   const budgetStart = Date.now(), budgetMarks: Record<string, number> = {};
   const budgetMark = (label: string) => { budgetMarks[label] = Date.now() - budgetStart; };
   // G1：超长 reason/model 原值跨层逐字复制（不截断、不设上界）。
