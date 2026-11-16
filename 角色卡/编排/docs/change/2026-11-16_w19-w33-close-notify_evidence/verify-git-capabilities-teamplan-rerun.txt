@@ -1,0 +1,25 @@
+✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (2464.6292ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2792.5362
+
+✖ failing tests:
+
+test at test\编排\git-capabilities.test.ts:515:1
+✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (2464.6292ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"trunk-item-invalid","message":"The actual publication task has no original Chief input source"}
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E7%BC%96%E6%8E%92/git-capabilities.test.ts:541:82)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

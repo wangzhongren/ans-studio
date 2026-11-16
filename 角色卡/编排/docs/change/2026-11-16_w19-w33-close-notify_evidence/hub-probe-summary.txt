@@ -1,0 +1,28 @@
+{
+  "firstProjection": {
+    "closeSamples": [
+      {
+        "operationId": "w33-close-product-draft",
+        "roleId": "convener",
+        "systemAssignmentTaskId": "t-mwj4hx29-32d46c3d",
+        "lastAttempt": {
+          "state": "unknown"
+        }
+      }
+    ],
+    "queuedForOperation": []
+  },
+  "afterCrossRun": {
+    "initRun": "run-hub-12fa253df5ad5bea36c5eacefb78d4cda52053b5b2114796",
+    "draftRun": "run-hub-92c2058c6fdf76a14991774e54431ad65b0f98f42db774fa",
+    "initTo": "convener",
+    "draftTo": "product",
+    "draftHub": "chief-hub-v1",
+    "sourcePurpose": "builtin-preparation",
+    "sourceHubRouting": "chief-hub-v1",
+    "sourceTargetRoleId": "product",
+    "sourcePlanningRunId": "run-hub-92c2058c6fdf76a14991774e54431ad65b0f98f42db774fa",
+    "queuedForOperation": []
+  },
+  "queueAfterCount": 0
+}

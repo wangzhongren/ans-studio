@@ -832,8 +832,10 @@ export function createDirectRoleRuntime(input: { projectRoot: string; actorRoleI
     if (signal?.aborted) return { ok: false, status: "rejected", operationId: request.operationId, taskId: request.taskId, baseDigest: request.basisDigest,
       targetDigest: null, errorCode: "task-close-cancelled", message: "The turn was cancelled before invocation" };
     // A task lifecycle receipt belongs to its actual creator/caller and persisted UI task state.
-    // It is not a document/permission effect and must not start unrelated model turns.
-    return service.closeCreatedTask(request, input.actorRoleId);
+    // It is not a document/permission effect and must not start unrelated model turns; the same
+    // idempotent notify sink only adds this exact close receipt (consumed as information-only).
+    const receipt = await service.closeCreatedTask(request, input.actorRoleId);
+    const pending = await notify(receipt); return pending ? { ...receipt, ...pending } : receipt;
   }, completeTeamPlan: async (request, signal) => {
     if (signal?.aborted) return { ok: false, status: "rejected", operationId: request.operationId, baseDigest: request.baseDigest ?? null,
       targetDigest: null, errorCode: "plan-cancelled", message: "The turn was cancelled before invocation" };

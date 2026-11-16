@@ -1,0 +1,95 @@
+W52 isolated unknown actor child output W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+W52 W19 actual custom Core binding [{"sessionId":"4497477a-1be3-4d68-9888-1d872a5186ed","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"c9c0f2f1-33d7-46a4-be03-d70926982557","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"73b93520-1a20-4788-97c4-1dd3232f928a","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"}]
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (637.771ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1118.8771
+
+✖ failing tests:
+
+test at test\桌面应用\chief-workflow.test.ts:1422:1
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (637.771ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unknown'
+  - 'failed'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1561:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unknown',
+    expected: 'failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (1158.4913ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1639.7879
+
+✖ failing tests:
+
+test at test\桌面应用\chief-workflow.test.ts:1422:1
+✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (1158.4913ms)
+  AssertionError [ERR_ASSERTION]: W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+  W52 W19 actual custom Core binding [{"sessionId":"4497477a-1be3-4d68-9888-1d872a5186ed","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"c9c0f2f1-33d7-46a4-be03-d70926982557","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"73b93520-1a20-4788-97c4-1dd3232f928a","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"}]
+  ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (637.771ms)
+  ℹ tests 1
+  ℹ suites 0
+  ℹ pass 0
+  ℹ fail 1
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  ℹ duration_ms 1118.8771
+  
+  ✖ failing tests:
+  
+  test at test\桌面应用\chief-workflow.test.ts:1422:1
+  ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (637.771ms)
+    AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'unknown'
+    - 'failed'
+    
+        at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1561:12)
+        at async Test.run (node:internal/test_runner/test:1409:7)
+        at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+      generatedMessage: true,
+      code: 'ERR_ASSERTION',
+      actual: 'unknown',
+      expected: 'failed',
+      operator: 'strictEqual',
+      diff: 'simple'
+    }
+  
+  
+  1 !== 0
+  
+      at isolateUnknownCoreCase (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:125:60)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1423:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

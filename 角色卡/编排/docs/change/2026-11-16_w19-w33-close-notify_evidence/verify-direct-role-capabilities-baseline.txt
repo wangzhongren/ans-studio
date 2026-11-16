@@ -1,0 +1,80 @@
+✔ Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority (698.8736ms)
+✖ Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation (110.7018ms)
+✔ Judge-delegated intent confirmation (W-J2/J4): real judge approve freezes exact retained bytes, reads back and replays without customer fields (88.3928ms)
+✔ Judge-delegated intent confirmation negatives (W-J2/J5/J14): forged or mismatched judge sources stay trunk-item-invalid, never freeze and never throw (245.8763ms)
+✔ Judge-delegated D3 (W-J2/J8/J9/J10): judge appointment resolution activates, pins and drafts through the shared predicate; negative sources stay fail-closed (651.02ms)
+✔ Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk (399.935ms)
+✔ complete team plan / activation / new pin: actual planning-only basis and independent pointers (1278.4056ms)
+✔ complete team plan / activation / new pin: actual existing workflow basis and independent pointers (1410.1851ms)
+✔ Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts (281.752ms)
+✔ Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts (312.7637ms)
+✔ Provider: complete snapshot preserves arbitrary bytes, survives live deletion, rejects mutation (21.8899ms)
+✔ Provider: CAS commits one complete target, rejects stale base/flow and missing unchanged refs (47.3858ms)
+✔ Run storage/Service: byte CAS has one writer; executable reads require real workflow and all same-pin refs (406.258ms)
+✔ Provider: frozen role evidence requires all eight refs in one immutable snapshot; no live fallback (8.8808ms)
+✔ Provider: document and active-role CAS fence both dimensions and preserve independent snapshots/history (97.1828ms)
+✔ Provider: raw baseline primitives enforce lock fencing, byte CAS and one initialisation (25.9386ms)
+✔ Provider: independent processes compete on one CAS; a crashed lock owner cannot tear or double-commit the pointer (437.4249ms)
+✔ Service: whole direct commit preserves unchanged bytes and truthful source; replay/no-op do not upgrade again (128.1579ms)
+✔ Service: any invalid target/hash/role or precommit failure leaves the complete old baseline (109.5844ms)
+✔ Service: postcommit metadata failure reports committed-pending-recovery; restart uses frozen bytes, never re-pins (98.7229ms)
+✔ Service: concurrent direct submissions with one base commit exactly once and retain both operation journals (135.5947ms)
+✔ Service: lost CAS acknowledgement and metadata-write failure never claim a committed target was rejected (89.034ms)
+✔ Service: direct VCA metadata goes draft to applied with the real committed source; legacy approval cannot impersonate it (102.5632ms)
+✔ Service: first direct publication uses confirmed intent and null CAS, creates no workflow or execution authority (108.2383ms)
+✔ Service: detail amendment binds all frozen items to the complete target; no partial apply and true no-op (136.6983ms)
+✔ chief evidence: initial real target/request bytes produce a bounded immutable basis; isCurrent rechecks actual hashes (23.8047ms)
+✔ chief evidence: missing targets, secret paths, excessive bytes and unbound old pinned runs refuse automatic decisions (8.7003ms)
+✔ chief evidence: pinned run uses its immutable bytes and remains current when live files or document trunk change (42.9971ms)
+✔ chief evidence: draft planning run needs bound document hashes and never requires future execution authorisation (24.5007ms)
+✔ chief evidence (A1): empty draft manifest binds actual flow bytes into a verifiable complete snapshot and never writes the manifest (19.7817ms)
+✔ chief evidence (A2): draft binding fails closed on changed bytes and new versions; re-prepare reads the new bytes (31.1079ms)
+✔ chief evidence (A3): empty targets and role self-reported paths stay unbound and produce no snapshot (17.363ms)
+✔ chief evidence (A4): unreadable, secret, oversized, non-text and criteria-hash-mismatched draft targets keep the existing fail-closed classification (24.0029ms)
+✔ chief evidence (A5): manifest-bound draft refs keep their authority over request targets (2.3299ms)
+✔ chief evidence: ordinary request without host artifacts discovers actual flow materials and notices a new version (13.6147ms)
+✔ Service: committed chief-delegated freeze preserves its true source on reload without customer fields (19.3465ms)
+✔ Service: legacy pending requests stay unchanged and require an explicit direct resubmission link (111.641ms)
+✔ Service: legacy no-op materialises exact immutable bytes without upgrading or rewriting historical customer metadata (123.2641ms)
+✔ Service: malformed execution document rejects the entire otherwise valid detail amendment (42.2607ms)
+✔ Pipeline: real direct submit persists a whole commit and truthful audit without cards, old approval or re-pin (190.0313ms)
+✔ Pipeline: lost notification acknowledgement returns pending, then recovers one keyed delivery and one version (173.7231ms)
+✔ Parent source: real assignment, durable child reference and locked parent CAS reject stale or cancelled origins (962.0994ms)
+✔ Provider strict scan: real non-ENOENT directory failure is never a complete empty TOFU scan (4.3474ms)
+✔ Team plan (P-1/P-6/P-8): derived baseDigest/plan.sha256, marker/journal byte anchors, NoOp and replay variants hold (225.0296ms)
+✔ Team plan (P-2/P-3/P-15): declared values are strict assertions (uppercase rejected), canonical path enforced, no side effects (58.6329ms)
+✔ Team plan (P-4): frozen-vs-live source selection (i)/(ii)/(iii) keeps baseline semantics; both-unreadable fails closed (423.0119ms)
+✔ Team plan (P-5/P-7): missing effective trunk stays trunk-unavailable; run assertions bind real runs and reject foreign/absent runs (142.474ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 46
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10468.9154
+
+✖ failing tests:
+
+test at test\编排\direct-role-capabilities.test.ts:69:1
+✖ Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation (110.7018ms)
+  AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration
+  + actual - expected
+  
+    {
+      code: 'conflict',
+  +   message: 'frozen-conflict: docs/product/demo-intent-v2.md',
+  -   message: 'frozen-conflict',
+      ok: false
+    }
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/w19/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:90:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { ok: false, code: 'conflict', message: 'frozen-conflict: docs/product/demo-intent-v2.md' },
+    expected: { ok: false, code: 'conflict', message: 'frozen-conflict' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

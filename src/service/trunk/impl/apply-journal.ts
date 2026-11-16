@@ -2332,15 +2332,24 @@ export async function classifyClosedTaskNotice(deps: TrunkServiceDeps, input: Pa
       if (source?.ok && source.value.path === ref.path && source.value.sha256 === ref.sha256.toLowerCase() && run?.ok) {
         const value: unknown = JSON.parse(Buffer.from(source.value.bytesBase64, "base64").toString("utf8"));
         const root = await readGitInitializationFacts(deps.projectRoot);
-        sourcePlanningDraft = evidenceObject(value) && value.schema === "repository-work-source/v1" && value.purpose === "document-preparation"
-          && value.kind === (ref.kind === "chief-creator-report" ? "creator-report" : "customer-turn") && value.sourceId === ref.sourceId
-          && value.projectRoot === root.projectRoot && value.flowId === created.event.flowId && value.targetRoleId === created.event.to
-          && value.planningRunId === created.event.runId && evidenceObject(value.parent) && value.parent.roleId === "chief"
-          && run.value.value.state === "draft" && run.value.value.flowId === created.event.flowId && run.value.value.documentPreparationSource === ref.sourceId
-          && bound.event.from === created.event.from;
-        if (sourcePlanningDraft && evidenceObject(value) && value.kind === "creator-report") {
-          const historical = await creatorReportSource(deps, created.event.flowId!, value.creatorReports, false);
-          sourcePlanningDraft = historical.ok;
+        if (evidenceObject(value)) {
+          // Cross-run information-only retirement is a strict provenance whitelist: the legacy
+          // document-preparation source or the Chief hub source (builtin-preparation with matching
+          // hubRouting and the run's builtinPreparationSource). Any other purpose/source stays unproven.
+          const common = value.schema === "repository-work-source/v1"
+            && value.kind === (ref.kind === "chief-creator-report" ? "creator-report" : "customer-turn") && value.sourceId === ref.sourceId
+            && value.projectRoot === root.projectRoot && value.flowId === created.event.flowId && value.targetRoleId === created.event.to
+            && value.planningRunId === created.event.runId && evidenceObject(value.parent) && value.parent.roleId === "chief"
+            && run.value.value.state === "draft" && run.value.value.flowId === created.event.flowId
+            && bound.event.from === created.event.from;
+          const legacyPrepared = common && value.purpose === "document-preparation" && run.value.value.documentPreparationSource === ref.sourceId;
+          const hubPrepared = common && value.purpose === "builtin-preparation" && created.event.hubRouting === "chief-hub-v1"
+            && value.hubRouting === created.event.hubRouting && run.value.value.builtinPreparationSource === ref.sourceId;
+          sourcePlanningDraft = legacyPrepared || hubPrepared;
+          if (sourcePlanningDraft && value.kind === "creator-report") {
+            const historical = await creatorReportSource(deps, created.event.flowId!, value.creatorReports, false);
+            sourcePlanningDraft = historical.ok;
+          }
         }
         sourcePlanningDraft = sourcePlanningDraft && boundClosed?.ok === true && boundClosed.event.kind === "task.closed"
           && boundClosed.event.actionSource?.kind === "role-direct" && boundClosed.event.actionSource.action === "close-created-task"

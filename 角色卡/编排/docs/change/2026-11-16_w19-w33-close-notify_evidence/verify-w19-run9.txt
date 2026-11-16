@@ -1,0 +1,21 @@
+W52 isolated unknown actor child output W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+W52 W19 actual custom Core binding [{"sessionId":"3e20b90e-a0e1-4638-9229-e070ce262860","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"f08ae5f6-cf9d-42e0-987d-16db5cf02d3f","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"ab1e521d-aee0-4228-bcea-52499c7c5fec","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"6805245e-de03-4012-bfbf-990b31dcb18b","roleId":"convener","state":"active","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"f7ad1a5d-1d23-48f1-b505-e8cb396c6e99","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"}]
+✔ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (650.5456ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1132.9807
+
+✔ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (1171.3666ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1645.9298

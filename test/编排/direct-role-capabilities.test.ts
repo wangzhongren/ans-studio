@@ -60,7 +60,8 @@ test("Chief hub ordinary preparation: five actual task reports close without fut
     assert.ok(closed.source?.kind === "role-direct");
     if (!retired) retired = { taskId, reportTurnId: `report-${roleId}` };
   }
-  assert.deepEqual(noticeRecipients, [], "Real task closes do not broadcast document-change turns to Chief or old unrelated Convener assignments");
+  assert.deepEqual(noticeRecipients, ["chief", "convener", "chief", "convener", "chief", "convener", "chief", "convener", "chief", "convener"],
+    "Each real close must deliver exactly one idempotent information-only receipt to Chief and the old Convener assignment; it creates no model turn or action authority");
   assert.equal((await createFsTrunkStore(root).readManifest()).ok, false);
   assert.equal(await fs.stat(path.join(root, ".git")).then(() => true, () => false), false);
   assert.equal((await createGuardFreezeRegistry(root, { migrationCompleted: () => true }).listFreezes()).length, 0);
@@ -710,11 +711,16 @@ for (const actor of ["chief", "convener"] as const) test(`Planning draft close: 
   const currentInput = { ...input, basisDigest: latest.basisDigest, reportRef: latest.reportRef };
   const missingSink = createDirectRoleRuntimeBase({ projectRoot: root, actorRoleId: actor });
   const committed = await missingSink.closeCreatedTask(currentInput);
-  assert.equal(committed.status, "applied", JSON.stringify(committed));
-  assert.equal((await readTaskState(root)).records.get(created.taskId)?.closed?.by, actor);
+  // The close itself is committed; without a sink the exact idempotent notification remains pending recovery.
+  assert.equal(committed.status, "committed-pending-recovery", JSON.stringify(committed));
+  assert.equal(committed.ok, false); assert.equal(committed.errorCode, "direct-notifications-pending");
+  assert.match(committed.message ?? "", /Idempotent direct notification sink is unavailable/);
+  assert.equal((await readTaskState(root)).records.get(created.taskId)?.closed?.by, actor, "The close must commit before its notification recovery is reported");
   const delivered = new Set<string>();
-  const runtime = createDirectRoleRuntimeBase({ projectRoot: root, actorRoleId: actor, notifyDirect: async item => { delivered.add(item.key); throw new Error("No task lifecycle model broadcast is expected"); } });
-  const recovered = await runtime.closeCreatedTask(currentInput); assert.equal(recovered.status, "applied"); assert.equal(delivered.size, 0);
+  const runtime = createDirectRoleRuntimeBase({ projectRoot: root, actorRoleId: actor, notifyDirect: async item => { delivered.add(item.key); } });
+  const recovered = await runtime.closeCreatedTask(currentInput); assert.equal(recovered.status, "applied", JSON.stringify(recovered));
+  assert.deepEqual([...delivered].sort(), ["chief", "convener"].map(recipientRoleId => `${currentInput.operationId}:${recovered.targetDigest}:close-created-task:${recipientRoleId}`).sort(),
+    "An applied close must deliver its exact information-only receipt to Chief and Convener; the actor is one of those recipients");
   assert.deepEqual(await runtime.closeCreatedTask(currentInput), recovered);
   const ledger = await fs.readFile(path.join(root, ".ans/state/tasks.jsonl"), "utf8");
   assert.equal(ledger.trim().split("\n").map(line => JSON.parse(line)).filter(row => row.kind === "task.closed").length, 1);
