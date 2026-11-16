@@ -1,0 +1,46 @@
+KR-29 batch A (gates 5) — run metadata
+date: 2026-11-16
+workspace: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\kr29a
+branch: fix/test-debt-kr29-gates
+HEAD: 5661a73d532f37e92cc872badf9dbf077419b453 (= origin/main at task start)
+node: v24.22.1 (Windows 11)
+environment prep (untracked, gitignored): node_modules directory junction -> refactor-session-ts-b7\node_modules
+  package.json SHA-256      c37e1e4903d2a64ae9af65311026b59c3b6b5c7d89aa395d35e87049b9130e3c (identical)
+  package-lock.json SHA-256 a5e315ca976467bb6dc8a28c6854d7a387cf9dc13fdbb0d36aea99c8a5de8d63 (identical)
+
+BASELINE (frozen calibration)
+  sed -i 's/\r$//' src/common/门禁引擎/workflows/chief/chief-workflow.md src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+  node --test --test-concurrency=1 "test/门禁引擎/**/*.test.ts"
+  git checkout -- <the two chief md files>
+  result: tests 577 / pass 571 / fail 5 / skipped 1 / duration_ms 92341.3644 / EXIT=1
+  failing names (verbatim, 5/5 match frozen gates-5):
+    D-10：质检卡保留可选质量核对与截图上限，不要求录屏
+    listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+    listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+    卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+    渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+  restore: RESTORE_EXIT=0; both files back to CRLF; git status --porcelain -- src/common/门禁引擎/workflows/chief/ empty
+
+AFTER (targeted 5 files)
+  node --test --test-concurrency=1 test/门禁引擎/view-image-cards.test.ts test/门禁引擎/role-group-metadata.test.ts test/门禁引擎/list-project.test.ts test/门禁引擎/convener-workflow-write.test.ts test/门禁引擎/governance-matrix-service.test.ts
+  result: tests 47 / pass 47 / fail 0 / skipped 0 / EXIT=0
+
+AFTER (full gates suite 3x, same LF-normalize + restore procedure)
+  run1: 577 / 576 / 0 / 1, duration_ms 92063.3269, TEST_EXIT=0, RESTORE_EXIT=0, CRLF restored, status clean
+  run2: 577 / 576 / 0 / 1, duration_ms 90276.6162, TEST_EXIT=0, RESTORE_EXIT=0, CRLF restored, status clean
+  run3: 577 / 576 / 0 / 1, duration_ms 95668.7541, TEST_EXIT=0, RESTORE_EXIT=0, CRLF restored, status clean
+  only skip: unreadable（权限）：文件不可读 → status=unreadable、actual=null (pre-existing, unrelated)
+
+TYPECHECK
+  npm run typecheck -> tsc --noEmit -> EXIT=0
+
+CHANGE SCOPE
+  git status --porcelain (tracked files): only the 5 test files below
+  git diff --stat: 5 files changed, 26 insertions(+), 12 deletions(-)
+
+MODIFIED FILE SHA-256 (after edits)
+  test/门禁引擎/view-image-cards.test.ts         a8eb534004d5dcef82568718789e37bbbcd78e67e34fe10f9ef8838512b21af8
+  test/门禁引擎/role-group-metadata.test.ts      0a1acf53e6c38c93d094209a832dc0bd7650265d87c169463350fe7b4d8b8a2c
+  test/门禁引擎/list-project.test.ts             0361327eb271fc3ecd9d85ed017103554261870f12380aa73b9c455f7e36be86
+  test/门禁引擎/convener-workflow-write.test.ts  78d9eec7ae701e8e861b76983652142a5cdebb37dfc5a156b10de44b461a6cf8
+  test/门禁引擎/governance-matrix-service.test.ts 90c29ce1dca1ee1d4eb22518c0eb1556b2a7c891892a8e8c3e35686fbfea642e

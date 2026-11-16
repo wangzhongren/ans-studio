@@ -1,0 +1,105 @@
+diff --git a/test/门禁引擎/convener-workflow-write.test.ts b/test/门禁引擎/convener-workflow-write.test.ts
+index e5a2acd..e189d6b 100644
+--- a/test/门禁引擎/convener-workflow-write.test.ts
++++ b/test/门禁引擎/convener-workflow-write.test.ts
+@@ -44,7 +44,10 @@ test("卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+   assert.match(convenerCard, /项目工作流：由你落盘并维护 `docs\/workflow\.md`/);
+   assert.match(convenerCard, /可写：`docs\/workflow\.md`（项目工作流）/);
+   const chiefCard = governanceRoleOf("chief")!.cardText;
+-  assert.match(chiefCard, /项目工作流文件 `docs\/workflow\.md` 由运营落盘维护/);
++  // e71501c 起 chief 卡改为资源驱动：项目实现流程与 docs/workflow.md 均明示由 Convener 维护/管 impl，
++  // 幕僚卡不再承担工作流落盘职责；冻结名保留为历史标题。
++  assert.match(chiefCard, /项目实现流程由 Convener 维护/);
++  assert.match(chiefCard, /仍由 Convener 管impl/);
+ });
+ 
+ test("注册表完整性：仍恰为六角色，convener 能力位不变（写权恢复不扩张能力）", () => {
+diff --git a/test/门禁引擎/governance-matrix-service.test.ts b/test/门禁引擎/governance-matrix-service.test.ts
+index 91873c9..755e0ca 100644
+--- a/test/门禁引擎/governance-matrix-service.test.ts
++++ b/test/门禁引擎/governance-matrix-service.test.ts
+@@ -527,7 +527,11 @@ test("渲染过滤：section=roles/routing 与注册表展示字段出现在文
+   assert.doesNotMatch(routingOnly, /## 内置治理角色/);
+ 
+   const text = renderAll(matrix);
+-  assert.match(text, /工作流管理、按序派发、短报汇总/);
+-  assert.match(text, /按名单招人；角色卡\/边界\/技能\/MCP 治理写入/);
++  // e71501c 起 chief 展示摘要改为资源驱动（读 chief-workflow.md；docs/workflow.md 仍由 Convener 管 impl），
++  // 旧短语「工作流管理、按序派发、短报汇总」已从 BUILT_IN_ROLE_MATRIX.chief 移除。
++  assert.match(text, /唯一客户入口与五builtin派发\/收报\/收口枢纽/);
++  // 同一重构也重写了 nominator 摘要（旧「按名单招人；角色卡/边界/技能/MCP 治理写入」已移除）：
++  // 现职责为按合法名单与计划保留 D3 并完整激活，无缺口不机械重招。
++  assert.match(text, /真实角色\/权限缺口时按合法名单与计划保留D3并完整激活/);
+   assert.match(text, /矩阵未列出≠无权限；宿主未注入≠角色无权。/);
+ });
+diff --git a/test/门禁引擎/list-project.test.ts b/test/门禁引擎/list-project.test.ts
+index 38c25fb..fe5947f 100644
+--- a/test/门禁引擎/list-project.test.ts
++++ b/test/门禁引擎/list-project.test.ts
+@@ -40,15 +40,15 @@ test("listProject：枚举真实项目（本仓库）全部角色，边界均解
+   assert.equal(listing.primaryRoleId, "su");
+   // 归档约定（客户 2026-10-14，PM 转达）：`角色卡/桌面应用/`（已拆分为 桌面UI/桌面窗口）原位冻结归档，
+   // 其 boundary.yaml **恢复原名**并带顶层 `archived: true`——枚举**静默跳过**：不枚举该角色、不产生任何
+-  // 警告（见 test/门禁引擎/archived-role.test.ts 的夹具用例钉死该约定）。故本仓库 warnings 为空；
+-  // 除该归档目录外出现任何警告即回归。
+-  // 收尾（2026-10-14）：治理侧恢复 boundary.yaml 后本用例已复跑转绿——此前（恢复前，目录仅剩
+-  // boundary.yaml.frozen）走「缺少 boundary.yaml」告警路径的暂时红属预期等待态，已闭。
++  // 警告（见 test/门禁引擎/archived-role.test.ts 的夹具用例钉死该约定）。
++  // 7281792 起 `角色卡/招募/memo.md` 是备忘录目录，缺 role-card.md 的告警是该目录按技能默认路径产生的
++  // 预期提示（memo 明示“非角色卡缺陷”）；冻结名中的「无警告」保留为历史标题，除此一条既定告警外
++  // 出现任何新告警即回归。
+   assert.ok(
+     !ids.includes("桌面应用"),
+     `冻结归档角色不得复活为活角色（应静默跳过，实际：${ids.join(",")}）`,
+   );
+-  assert.deepEqual(listing.warnings, []);
++  assert.deepEqual(listing.warnings, ["角色卡/招募：缺少 role-card.md，已跳过"]);
+ });
+ 
+ test("listProject：内置治理角色 su 永远排在第一位，无角色目录，边界为内置（未接受）", async () => {
+diff --git a/test/门禁引擎/role-group-metadata.test.ts b/test/门禁引擎/role-group-metadata.test.ts
+index c45659c..da24b71 100644
+--- a/test/门禁引擎/role-group-metadata.test.ts
++++ b/test/门禁引擎/role-group-metadata.test.ts
+@@ -46,10 +46,15 @@ const EXPECTED_RUNTIME_GROUP = new Map([
+ 
+ test("listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留", async () => {
+   const listing = await listProject(REPO_ROOT);
+-  assert.equal(listing.roles.filter((item) => item.builtIn !== true).length, 15);
++  // 冻结名保留「15 个活项目角色」为历史标题（KR-29 冻结名不得改名）。7281792 起实际为 23：
++  // 15 + 8 个开发侧 code 角色（chief-code/product-code/rapporteur-code/nominator-code/
++  // convener-code/verifier-code/shared-code/gates-code）。
++  assert.equal(listing.roles.filter((item) => item.builtIn !== true).length, 23);
+   assert.equal(listing.roles[0].roleId, listing.primaryRoleId);
+   assert.equal(listing.hasRoles, true);
+-  assert.deepEqual(listing.warnings, []);
++  // 7281792 memo：`角色卡/招募/memo.md` 是备忘录目录，缺 role-card.md 的告警是该目录按技能默认路径
++  // 产生的预期提示（memo 明示“非角色卡缺陷”）；除这一条既定告警外任何新告警仍回归。
++  assert.deepEqual(listing.warnings, ["角色卡/招募：缺少 role-card.md，已跳过"]);
+   assert.equal(listing.roles.some((item) => item.roleId === "桌面应用"), false);
+   for (const [roleId, groupDuty] of EXPECTED_RUNTIME_GROUP) {
+     const summary = listing.roles.find((item) => item.roleId === roleId);
+diff --git a/test/门禁引擎/view-image-cards.test.ts b/test/门禁引擎/view-image-cards.test.ts
+index 9b7b0b0..1c219ae 100644
+--- a/test/门禁引擎/view-image-cards.test.ts
++++ b/test/门禁引擎/view-image-cards.test.ts
+@@ -3,7 +3,7 @@
+ //
+ // D-03/D-10 要求强制质量/证据基线撤除；本文件按新角色卡语义复核：
+ //   · 六张内置治理角色卡不得要求必须 view_image、必须真实运行/强制证据或强制验收报告；
+-//   · 质检卡保留「可选质量核对」与「证据最多真实运行截图」的边界，不要求录屏；
++//   · 质检卡保留「独立质量核对」与「证据最多真实运行截图」的边界，不要求录屏；
+ //   · 旧 flow/gate/分诊/产物汇报文本零命中。
+ 
+ import assert from "node:assert/strict";
+@@ -32,7 +32,9 @@ test("D-10：六角色卡不强制 view_image、真实运行、强制证据或
+ test("D-10：质检卡保留可选质量核对与截图上限，不要求录屏", () => {
+   const verifier = cards.find((role) => role.id === "verifier");
+   assert.ok(verifier);
+-  assert.match(verifier!.text, /可选质量核对/);
++  // e71501c 起 verifier 模块卡文为「独立质量核对与验收执行者」（新任务仅由 Chief 创建、收报和收口）；
++  // D-10 语义（可选证据/不强制录屏）由本卡其余断言继续守护。
++  assert.match(verifier!.text, /独立质量核对/);
+   assert.match(verifier!.text, /证据最多真实运行截图/);
+   assert.match(verifier!.text, /不要求录屏/);
+   assert.equal(verifier!.text.includes("不要求录屏，缺录屏不判失败"), true);

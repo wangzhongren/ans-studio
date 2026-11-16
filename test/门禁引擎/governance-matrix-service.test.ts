@@ -527,7 +527,11 @@ test("渲染过滤：section=roles/routing 与注册表展示字段出现在文�
   assert.doesNotMatch(routingOnly, /## 内置治理角色/);
 
   const text = renderAll(matrix);
-  assert.match(text, /工作流管理、按序派发、短报汇总/);
-  assert.match(text, /按名单招人；角色卡\/边界\/技能\/MCP 治理写入/);
+  // e71501c 起 chief 展示摘要改为资源驱动（读 chief-workflow.md；docs/workflow.md 仍由 Convener 管 impl），
+  // 旧短语「工作流管理、按序派发、短报汇总」已从 BUILT_IN_ROLE_MATRIX.chief 移除。
+  assert.match(text, /唯一客户入口与五builtin派发\/收报\/收口枢纽/);
+  // 同一重构也重写了 nominator 摘要（旧「按名单招人；角色卡/边界/技能/MCP 治理写入」已移除）：
+  // 现职责为按合法名单与计划保留 D3 并完整激活，无缺口不机械重招。
+  assert.match(text, /真实角色\/权限缺口时按合法名单与计划保留D3并完整激活/);
   assert.match(text, /矩阵未列出≠无权限；宿主未注入≠角色无权。/);
 });

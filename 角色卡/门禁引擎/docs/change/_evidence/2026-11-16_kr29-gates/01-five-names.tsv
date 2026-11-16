@@ -1,0 +1,6 @@
+id	suite	frozen_name	file_line	old_assertion	current_semantics_new_assertion	evidence
+1	G	D-10：质检卡保留可选质量核对与截图上限，不要求录屏	test/门禁引擎/view-image-cards.test.ts:32	/可选质量核对/	/独立质量核对/ (keep /证据最多真实运行截图/, /不要求录屏/, includes("不要求录屏，缺录屏不判失败"))	src/common/roles/verifier/index.ts:51,60; e71501c (2026-11-07)
+2	G	listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留	test/门禁引擎/role-group-metadata.test.ts:47	nonBuiltin count === 15; warnings === []	count === 23; warnings deepEqual ["角色卡/招募：缺少 role-card.md，已跳过"]	7281792 (2026-11-08, 8 code roles 15+8=23); 角色卡/招募/memo.md:13 (warning is expected memo note, not a card defect)
+3	G	listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告	test/门禁引擎/list-project.test.ts:23	warnings === []	warnings deepEqual ["角色卡/招募：缺少 role-card.md，已跳过"]	7281792; 角色卡/招募/memo.md:13
+4	G	卡文本：运营负责落盘工作流，幕僚不再被暗示为写者	test/门禁引擎/convener-workflow-write.test.ts:42	chief card /项目工作流文件 `docs/workflow.md` 由运营落盘维护/	chief card /项目实现流程由 Convener 维护/ and /仍由 Convener 管impl/	src/common/roles/chief/internal/card-text.ts:23,26; e71501c
+5	G	渲染过滤：section=roles/routing 与注册表展示字段出现在文本中	test/门禁引擎/governance-matrix-service.test.ts:514	chief /工作流管理、按序派发、短报汇总/; nominator /按名单招人；角色卡/边界/技能/MCP 治理写入/	chief /唯一客户入口与五builtin派发\/收报\/收口枢纽/; nominator /真实角色\/权限缺口时按合法名单与计划保留D3并完整激活/	src/common/门禁引擎/governance-roles.ts:143,179; e71501c

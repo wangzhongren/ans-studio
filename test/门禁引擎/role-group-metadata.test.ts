@@ -46,10 +46,15 @@ const EXPECTED_RUNTIME_GROUP = new Map([
 
 test("listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留", async () => {
   const listing = await listProject(REPO_ROOT);
-  assert.equal(listing.roles.filter((item) => item.builtIn !== true).length, 15);
+  // 冻结名保留「15 个活项目角色」为历史标题（KR-29 冻结名不得改名）。7281792 起实际为 23：
+  // 15 + 8 个开发侧 code 角色（chief-code/product-code/rapporteur-code/nominator-code/
+  // convener-code/verifier-code/shared-code/gates-code）。
+  assert.equal(listing.roles.filter((item) => item.builtIn !== true).length, 23);
   assert.equal(listing.roles[0].roleId, listing.primaryRoleId);
   assert.equal(listing.hasRoles, true);
-  assert.deepEqual(listing.warnings, []);
+  // 7281792 memo：`角色卡/招募/memo.md` 是备忘录目录，缺 role-card.md 的告警是该目录按技能默认路径
+  // 产生的预期提示（memo 明示“非角色卡缺陷”）；除这一条既定告警外任何新告警仍回归。
+  assert.deepEqual(listing.warnings, ["角色卡/招募：缺少 role-card.md，已跳过"]);
   assert.equal(listing.roles.some((item) => item.roleId === "桌面应用"), false);
   for (const [roleId, groupDuty] of EXPECTED_RUNTIME_GROUP) {
     const summary = listing.roles.find((item) => item.roleId === roleId);

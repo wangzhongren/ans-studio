@@ -3,7 +3,7 @@
 //
 // D-03/D-10 要求强制质量/证据基线撤除；本文件按新角色卡语义复核：
 //   · 六张内置治理角色卡不得要求必须 view_image、必须真实运行/强制证据或强制验收报告；
-//   · 质检卡保留「可选质量核对」与「证据最多真实运行截图」的边界，不要求录屏；
+//   · 质检卡保留「独立质量核对」与「证据最多真实运行截图」的边界，不要求录屏；
 //   · 旧 flow/gate/分诊/产物汇报文本零命中。
 
 import assert from "node:assert/strict";
@@ -32,7 +32,9 @@ test("D-10：六角色卡不强制 view_image、真实运行、强制证据或�
 test("D-10：质检卡保留可选质量核对与截图上限，不要求录屏", () => {
   const verifier = cards.find((role) => role.id === "verifier");
   assert.ok(verifier);
-  assert.match(verifier!.text, /可选质量核对/);
+  // e71501c 起 verifier 模块卡文为「独立质量核对与验收执行者」（新任务仅由 Chief 创建、收报和收口）；
+  // D-10 语义（可选证据/不强制录屏）由本卡其余断言继续守护。
+  assert.match(verifier!.text, /独立质量核对/);
   assert.match(verifier!.text, /证据最多真实运行截图/);
   assert.match(verifier!.text, /不要求录屏/);
   assert.equal(verifier!.text.includes("不要求录屏，缺录屏不判失败"), true);

@@ -44,7 +44,10 @@ test("卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
   assert.match(convenerCard, /项目工作流：由你落盘并维护 `docs\/workflow\.md`/);
   assert.match(convenerCard, /可写：`docs\/workflow\.md`（项目工作流）/);
   const chiefCard = governanceRoleOf("chief")!.cardText;
-  assert.match(chiefCard, /项目工作流文件 `docs\/workflow\.md` 由运营落盘维护/);
+  // e71501c 起 chief 卡改为资源驱动：项目实现流程与 docs/workflow.md 均明示由 Convener 维护/管 impl，
+  // 幕僚卡不再承担工作流落盘职责；冻结名保留为历史标题。
+  assert.match(chiefCard, /项目实现流程由 Convener 维护/);
+  assert.match(chiefCard, /仍由 Convener 管impl/);
 });
 
 test("注册表完整性：仍恰为六角色，convener 能力位不变（写权恢复不扩张能力）", () => {

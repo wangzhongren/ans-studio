@@ -1,0 +1,34 @@
+KR-29 batch A (gates 5) — full gates suite 3x summaries
+command (each run): sed -i 's/\r$//' src/common/门禁引擎/workflows/chief/chief-workflow.md src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+                    node --test --test-concurrency=1 "test/门禁引擎/**/*.test.ts"
+                    git checkout -- <the two chief md files>
+
+run1: ℹ tests 577 | ℹ pass 576 | ℹ fail 0 | ℹ skipped 1 | ℹ duration_ms 92063.3269 | TEST_EXIT=0 | RESTORE_EXIT=0
+run2: ℹ tests 577 | ℹ pass 576 | ℹ fail 0 | ℹ skipped 1 | ℹ duration_ms 90276.6162 | TEST_EXIT=0 | RESTORE_EXIT=0
+run3: ℹ tests 577 | ℹ pass 576 | ℹ fail 0 | ℹ skipped 1 | ℹ duration_ms 95668.7541 | TEST_EXIT=0 | RESTORE_EXIT=0
+
+restore evidence (after each run): both chief md files show "with CRLF line terminators"; git status --porcelain -- src/common/门禁引擎/workflows/chief/ is empty.
+
+frozen gates-5 lines per run:
+run1:
+✔ 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者 (0.076ms)
+✔ 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中 (0.5554ms)
+✔ listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告 (51.0062ms)
+✔ listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留 (41.7731ms)
+✔ D-10：质检卡保留可选质量核对与截图上限，不要求录屏 (0.1344ms)
+run2:
+✔ 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者 (0.0667ms)
+✔ 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中 (0.5462ms)
+✔ listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告 (42.7742ms)
+✔ listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留 (41.8152ms)
+✔ D-10：质检卡保留可选质量核对与截图上限，不要求录屏 (0.1428ms)
+run3:
+✔ 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者 (0.0664ms)
+✔ 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中 (0.5233ms)
+✔ listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告 (42.4277ms)
+✔ listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留 (43.5881ms)
+✔ D-10：质检卡保留可选质量核对与截图上限，不要求录屏 (0.1455ms)
+
+skipped (pre-existing, unrelated): ﹣ unreadable（权限）：文件不可读 → status=unreadable、actual=null (0.0853ms) # SKIP
+
+targeted (5 files, before full 3x): ℹ tests 47 | ℹ pass 47 | ℹ fail 0 | ℹ skipped 0 | EXIT=0
