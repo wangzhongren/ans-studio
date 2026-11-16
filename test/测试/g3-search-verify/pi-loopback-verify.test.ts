@@ -101,21 +101,40 @@ async function withDiagnostics<T>(run: (readAll: () => Promise<Record<string, un
 const silentLogger = { stage() {}, trace() {}, traceEnabled: false };
 
 let turnSeq = 0;
+let activeTurnId: string | undefined;
+/**
+ * 2026-11-16（B6b）：`currentTurnId` 是**当前轮 id 的读取器**（生产实现 `src/provider/pi/session.ts`：
+ * `() => turn.id`），不是「每次调用分配新 id」。e71501c 的 native-observation 层会在同一逻辑轮再读一次，
+ * 旧的「每次调用自增」夹具因此把第二轮推成 turn-3。这里在真实 `prompt()` 边界推进轮次，
+ * 读取器本身保持稳定（同一轮多次读同值）。
+ */
 function makeAdapter(loopback: Loopback, extra: Record<string, unknown> = {}) {
   turnSeq = 0;
-  return createRealPiRuntimeAdapter({
+  activeTurnId = undefined;
+  const adapter = createRealPiRuntimeAdapter({
     runtime: "pi",
     projectRoot: process.cwd(),
     skillRoot: process.cwd(),
     tools: [],
     interactionGate: createInteractionGate(),
-    currentTurnId: () => `g3-turn-${(turnSeq += 1)}`,
+    currentTurnId: () => activeTurnId,
     config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: 131072, contextWindowSource: "explicit" },
     logger: silentLogger,
     promptTimeoutMs: 30000,
     constructTimeoutMs: 60000,
     ...extra,
   } as never);
+  const bindRole = adapter.bindRole.bind(adapter);
+  adapter.bindRole = async (roleArg) => {
+    const session = await bindRole(roleArg);
+    const prompt = session.prompt.bind(session);
+    session.prompt = async (text, opts) => {
+      activeTurnId = `g3-turn-${(turnSeq += 1)}`;
+      return prompt(text, opts);
+    };
+    return session;
+  };
+  return adapter;
 }
 
 async function drain(session: { dispose(): Promise<void>; events(): AsyncIterable<SessionEvent> }): Promise<SessionEvent[]> {

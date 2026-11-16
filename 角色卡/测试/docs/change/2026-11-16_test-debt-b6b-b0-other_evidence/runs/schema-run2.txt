@@ -1,0 +1,18 @@
+✔ 直接 if/then/else：命中执行 then，未命中执行 else，两侧反例都拒绝 (4.754ms)
+✔ if 无 else：未命中保持原行为；then 仅追加约束 (0.5602ms)
+✔ not 反向语义：单条 required 与 anyOf 组合都强制执行（含嵌套路径） (0.7717ms)
+✔ 条件约束覆盖嵌套 properties、数组 items 与 additionalProperties (2.2058ms)
+✔ 真实 git_query/git_candidate/git_publish：oid 按 objectFormat 强制 sha1 40 位 / sha256 64 位 (9.0934ms)
+✔ 真实 dispatch_task：reviewOid 与 resumeController 条件均被强制执行 (2.6908ms)
+✔ 真实 decide_pending_request：disposition 条件（select⇒selected；reject/revise⇒无 selected） (0.9933ms)
+✔ 真实 submit_version_change：if 内 contains 与 then 全体目标 expectedFromSha256 条件 (2.9734ms)
+✔ 未知关键字与非法条件片段仍被拒绝（不静默丢弃约束） (0.5158ms)
+✔ 无条件的旧 schema 行为与 z.fromJSONSchema 完全一致 (1.1595ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 167.7346

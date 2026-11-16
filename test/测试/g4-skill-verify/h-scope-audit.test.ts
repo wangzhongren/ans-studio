@@ -63,13 +63,15 @@ test("范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工�
   // 能力位：2026-10-17（三权 V1，评审 §5.6）编排改读能力矩阵（`cap.installMcp`，trio=Nominator、
   // single=su）；桌面注入判据 `canNominate = governanceFunction === "nomination" || legacyBuiltIn`。
   const src = read("src/pipeline/orchestration/run-role.ts");
-  assert.ok(/const installMcp = cap\?\.installMcp === true \? input\.installMcp : undefined;/.test(src), "installMcp 透传判据＝能力矩阵（唯一）");
-  assert.ok(/const uninstallMcp = cap\?\.installMcp === true \? input\.uninstallMcp : undefined;/.test(src), "uninstallMcp 同判据");
+  // 当前语义（v2.0.0/e71501c）：能力矩阵仍是唯一透传判据；另有 input 在场前置与
+  // `blockedRoleCapabilities`（角色能力保护）回落——两者都不放宽矩阵门，断言逐字钉当前实现。
+  assert.ok(/const installMcp = cap\?\.installMcp === true && input\.installMcp !== undefined \? blockedRoleCapabilities\?\.installMcp \?\? input\.installMcp : undefined;/.test(src), "installMcp 透传判据＝能力矩阵（唯一）");
+  assert.ok(/const uninstallMcp = cap\?\.installMcp === true && input\.uninstallMcp !== undefined \? blockedRoleCapabilities\?\.uninstallMcp \?\? input\.uninstallMcp : undefined;/.test(src), "uninstallMcp 同判据");
   const sess = readSessionSource();
   assert.ok(/const canNominate = governanceFunction === "nomination" \|\| legacyBuiltIn;/.test(sess), "canNominate 判据");
   for (const [fn, ty] of [["installMcp", "InstallMcpFn"], ["uninstallMcp", "UninstallMcpFn"]] as const) {
     assert.ok(
-      new RegExp(`const ${fn}: ${ty} \\| undefined =\\s*\\n\\s*canNominate`).test(sess),
+      new RegExp(`const ${fn}: ${ty} \\| undefined =\\s*\\n?\\s*canNominate`).test(sess),
       `${fn} 桌面注入判据＝canNominate（single=su / trio=Nominator）`,
     );
   }
@@ -167,12 +169,14 @@ test("范围③（行为）：真实装配 su 会话——install_skill 全链�
 
 test("范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册", () => {
   const src = read("src/pipeline/orchestration/run-role.ts");
+  // 当前语义（v2.0.0/e71501c）：能力矩阵仍是唯一透传判据；input 在场前置与
+  // `blockedRoleCapabilities` 回落是角色能力保护的新增层，不放宽矩阵门。
   assert.ok(
-    /const installSkill = cap\?\.installSkill === true \? input\.installSkill : undefined;/.test(src),
+    /const installSkill = cap\?\.installSkill === true && input\.installSkill !== undefined \? blockedRoleCapabilities\?\.installSkill \?\? input\.installSkill : undefined;/.test(src),
     "installSkill 透传判据＝能力矩阵（唯一）",
   );
   assert.ok(
-    /const uninstallSkill = cap\?\.installSkill === true \? input\.uninstallSkill : undefined;/.test(src),
+    /const uninstallSkill = cap\?\.installSkill === true && input\.uninstallSkill !== undefined \? blockedRoleCapabilities\?\.uninstallSkill \?\? input\.uninstallSkill : undefined;/.test(src),
     "uninstallSkill 同判据",
   );
   const sess = readSessionSource();
@@ -230,7 +234,9 @@ test("范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路�
       const base = probe.split("/").at(-1)!.replace(/\.ts$/, "");
       assert.equal(text.includes(base), false, `${f} 不得引用探针 ${base}`);
     }
-    assert.equal(text.includes(".probe"), false, `${f} 不得引用任何 .probe 模块`);
+    // 审计口径＝**模块引用**（import/from/require 的 specifier 含 `.probe`）；属性访问（`audit.probe`）
+    // 与对象展开（`...probeTool()`）不是探针模块引用——旧的裸子串检查会把两者误报（2026-11-16 B6b）。
+    assert.equal(/(?:from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)["'`][^"'`]*\.probe(?:\.[^"'`]*)?["'`]/.test(text), false, `${f} 不得引用任何 .probe 模块`);
   }
   // CI 零执行。
   const ci = read(".github/workflows/release.yml");

@@ -79,18 +79,29 @@ test("listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数
     assert.equal(redispatched.safety, "safe");
     assert.equal(redispatched.retryOf, "t-ui");
     const state = await readTaskState(root);
-    assert.equal(state.records.get("t-ui")?.closed?.outcome, "rework");
+    // e71501c 起（B5 stuck-redispatch 同口径）：原任务由 recordTaskFailure 写 failed 报告
+    // （stuck-terminated:redispatch），不再写 task.closed/rework；任务保持未收口。
+    assert.equal(state.records.get("t-ui")?.closed, undefined, "重派不 close 原任务（当前语义：失败报告、未收口）");
+    const originalFailure = state.records.get("t-ui")?.reports.at(-1);
+    assert.equal(originalFailure?.status, "failed", "原任务末条报告为 failed");
+    assert.match(originalFailure?.summary ?? "", /stuck-terminated:redispatch/, "失败报告带重派终止标记");
     assert.equal(state.records.get(redispatched.taskId!)?.retryOf, "t-ui");
     await tick(120);
-    assert.ok(sent.some((text) => text.includes(redispatched.taskId!)), "新任务已投递");
+    // v2.0.0/e71501c 交付层：项目 worker 的派发投递要求真实受派任务/run 绑定（openInternal →
+    // resolveDeliveryAssignment）；本裸 legacy 任务无 runId/pinned run ⇒ 投递按来源门 fail-closed
+    // （B5 stuck-redispatch 同口径，不是产品回归）。重派回执与新任务账本事实仍如实；不伪造送达。
+    assert.equal(sent.some((text) => text.includes(redispatched.taskId!)), false, "裸 legacy 任务无 run 绑定 ⇒ 不投递（来源门 fail-closed）");
+    assert.equal((await readTaskState(root)).records.get(redispatched.taskId!)?.retryOf, "t-ui", "新任务账本事实保留");
 
-    // B-03 task.closed：幕僚收口（accepted）；重复收口如实失败（不重写历史）。
+    // B-03 演化（v2.0.0/e71501c）：客户面板 closeTask 不得冒充角色收口——收口只由任务原创建者
+    // 经角色能力（close_created_task）执行。接口层级如实拒绝，且不写 task.closed（不重写历史）。
     await appendTaskEvent(root, taskEvent("task.created", { taskId: "t-close", from: "chief", to: "worker", text: "可收口任务", sideEffect: "docs", idempotencyKey: "key-close" }));
     const closed = await iface.closeTask({ projectRoot: root, taskId: "t-close", outcome: "accepted", note: "证据齐全" });
-    assert.equal(closed.ok, true, closed.message);
-    assert.equal((await readTaskState(root)).records.get("t-close")?.closed?.outcome, "accepted");
+    assert.equal(closed.ok, false, "客户面板不得冒充角色收口");
+    assert.match(closed.message ?? "", /原创建者.*收口能力/, `收口拒绝如实指向原创建者：${closed.message}`);
+    assert.equal((await readTaskState(root)).records.get("t-close")?.closed, undefined, "拒绝路径不写 task.closed");
     const closedAgain = await iface.closeTask({ projectRoot: root, taskId: "t-close", outcome: "rework" });
-    assert.equal(closedAgain.ok, false, "已收口任务不重写");
+    assert.equal(closedAgain.ok, false, "重复调用同样如实失败（不重写历史）");
 
     const badRedispatch = await iface.redispatchTask({ projectRoot: root, taskId: "" });
     assert.equal(badRedispatch.ok, false);

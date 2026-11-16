@@ -1,0 +1,35 @@
+# B6b 单列候选：Q normal-new early chain（未修改）
+
+- 文件：`test/测试/direct-role-capabilities-e2e.test.ts`
+- 名：`Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze`
+- 复现：3/3 稳定失败（112.5 / 112.7 / 112.4 ms，Windows 11 x64，Node 24.22.1；`--test-timeout=120000`，自然退出 EXIT=1）。
+- 首个失败：
+  `Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：未找到 docs/product/direct-e2e-intent-vN.md（最新意图缺失）。）`
+  → `workflow-service.ts prepareIntent`（`baseline-document-missing`，约 :1579）。
+- 根因链（只读核对）：
+  1. 空项目无显式 `legacy/v1` ⇒ `workflowMode()` 返回 `fixed`（默认新 flow 即 two-fixed-paths/v1）。
+     intent-confirm 分支 `matrixForFlow(flowId) === "two-fixed-paths/v1"` ⇒ 调 `workflowPrepareIntent`。
+  2. `prepareIntent` 要求 `docs/product/<flowId>-intent-vN.md`（project-intent/v1、version 与文件名一致）
+     且存在活动 fixed workflow、A2 已 completed。
+  3. 本用例是 B1（两条固定路径，2026-11-10）之前的 legacy 直启场景：chief 先写 `docs/intents/direct-e2e.md`
+     （project-intent-entry/v1），立刻发 intent-confirm，之后才让 product 写
+     `docs/product/direct-e2e-intent-v1.md`。当前 fixed 语义要求顺序相反：A1 stage-request → A2 product
+     写产品意图并收口 → A3 chief 写 docs/intents 入口并呈确认卡。
+  4. 用例末段断言 `createVersionChangeIntegration(...).services.freeze.entryOf(...).freeze.reason ===
+     "intent-confirmed"`——这是 **legacy trunk/doc-freeze** 语义；fixed A3（MF-4 / AC-18）明确**不触**
+     trunk/doc-freeze，只写 workflow 账本 `stage.completed A3`。
+- 定性：不是夹具字段漂移，而是**场景被两条固定路径语义取代**。按“产品候选先报告、不改”保留原样。
+  需要 owner 裁定其一：
+  a) 将场景重写为真实 fixed A1→A2→A3 链（新增 chief/convener stage-request 与 product 意图脚本，
+     删除 legacy freeze 末段断言，改钉 workflow A3 完成）；或
+  b) 若「空项目 legacy 早链」仍是产品要求，则产品需为默认 flow 保留 legacy 路径（目前默认 fixed
+     且 prepareIntent fail-closed，属有意语义）。
+- 未做：未改该文件、未改产品；其余 11 文件见 `03-dispositions.tsv`。
+
+## 补充：log-actions 中两处“当前语义”不单列为产品候选
+
+- `redispatchTask` 对裸 legacy 任务返回 ok=true（新任务已建账）但投递被 openInternal→
+  resolveDeliveryAssignment 的来源门 fail-closed（无 runId/pinned run），发送数组为空；
+  已按 B5 stuck-redispatch 同口径把「新任务已投递」改为「不伪造送达 + 账本事实保留」。
+- `Interface.closeTask` 在 v2.0.0 固定为「客户面板不得冒充角色收口」的如实拒绝（原创建者经
+  close_created_task 角色能力收口，另有测试覆盖）。均为有意语义，不是产品回归。

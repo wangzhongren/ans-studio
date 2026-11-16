@@ -1,0 +1,14 @@
+# Q30/Q74 evidence-dir reproduction nuance (fresh checkout)
+
+- Pre-fix run1 (clean worktree, no evidence dir):
+  - Q30: ENOENT `角色卡/测试/docs/change/2026-11-05_git-role-permissions-evidence/q30-utf8-http-probe.json` (finally write)
+  - Q74: ENOENT `.../q74-metadata-observer-race-proof-<pid>-<uuid>.json` (flag wx)
+  - Counts: tests 19 / pass 5 / fail 2 / skipped 12; EXIT=1.
+- The directory is untracked (git ls-files empty) and was historically present in local trees, masking the gap.
+  During pre-fix run1, a later business case created the directory mid-run; therefore pre-fix runs 2 and 3
+  passed Q30/Q74 (7 pass / 0 fail / 12 skip). This is a STATE-DEPENDENT reproduction, not a flake in Q30/Q74 logic.
+- Fix: top-level `await fs.mkdir(evidence, { recursive: true })` in git-role-workflows-e2e.test.ts (module load).
+- Post-fix validation: removed the evidence dir, then run1 green (7/7) from genuinely fresh state;
+  runs 2 and 3 green.
+- Artifact volume disclosure: each full-file run writes ~1 GB of untracked evidence artifacts into this dir
+  (business cases). All such artifacts are cleaned from the worktree after validation; none are committed.

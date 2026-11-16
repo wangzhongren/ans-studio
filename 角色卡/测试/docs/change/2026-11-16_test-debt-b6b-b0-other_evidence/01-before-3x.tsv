@@ -1,0 +1,13 @@
+file	tests	run1	run2	run3	target_failures	notes
+test/测试/g4-skill-verify/h-scope-audit.test.ts	7	4 pass / 3 fail	4 pass / 3 fail	4 pass / 3 fail	范围②, 范围③补＋⑤, 范围⑥	3× stable identical
+test/测试/t1-pipeline-integration.test.ts	8	5 pass / 3 fail	5 pass / 3 fail	5 pass / 3 fail	T1 claude, T1 codex, T1 pi	3× stable identical [true,false,false,true]
+test/测试/trunk-stable-write-integration.test.ts	8	6 pass / 2 fail	6 pass / 2 fail	6 pass / 2 fail	stable workflow, appointment-write	3× stable active-role-evidence-missing-or-mismatched
+test/测试/git-role-workflows-e2e.test.ts	19	5 pass / 2 fail / 12 skip	7 pass / 0 fail / 12 skip	7 pass / 0 fail / 12 skip	Q30, Q74	STATE-DEPENDENT: only run1 red (evidence dir absent at start); run1's later business case created the untracked dir, so runs 2/3 passed. Fresh-state failure is ENOENT.
+test/测试/g3-search-verify/pi-loopback-verify.test.ts	6	5 pass / 1 fail	5 pass / 1 fail	5 pass / 1 fail	跨轮配对	3× stable turn ids "",g3-turn-1,g3-turn-3
+test/桌面应用/session.test.ts	7	6 pass / 1 fail	6 pass / 1 fail	6 pass / 1 fail	AC-8 预算	3× stable index 5244 vs pin 5223
+test/桌面应用/project.test.ts	23	22 pass / 1 fail	22 pass / 1 fail	22 pass / 1 fail	buildProjectConfig	3× stable warning 角色卡/招募
+test/测试/entry-role-minimal-d.test.ts	6	5 pass / 1 fail	5 pass / 1 fail	5 pass / 1 fail	D-04 撤除残留	3× stable; R4 131 hits by token team-plan/flow-service/flow-state/docs/flows
+test/测试/g4v2-mcp-verify/f-handler.test.ts	7	5 pass / 2 fail	5 pass / 2 fail	5 pass / 2 fail	F3 (B5 handoff), F7 (B0)	3× stable; F3 effect-scope-unproven, F7 missing mcp.refused
+test/桌面应用/log-actions.test.ts	1	0 pass / 1 fail	0 pass / 1 fail	0 pass / 1 fail	redispatch/closeTask combined name	3× stable; first at closed.outcome rework, then delivery, then closeTask rejection
+test/测试/direct-role-capabilities-e2e.test.ts	3	2 pass / 1 fail	2 pass / 1 fail	2 pass / 1 fail	Q normal-new early chain	3× identical baseline-document-missing docs/product/direct-e2e-intent-vN.md
+test/claude-adapter/schema.test.ts	10	10 pass / 0 fail	10 pass / 0 fail	10 pass / 0 fail	(none)	R4 `required` artifact not reproducible (B4 already resolved); GREEN 3×

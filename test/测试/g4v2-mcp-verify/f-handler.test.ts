@@ -17,6 +17,25 @@ import { makeFHarness, openSuAndStartTurn, openXAndStartTurn, until, type FHarne
 
 const suTarget = (h: FHarness) => ({ projectRoot: h.root, roleId: "su", runtime: "demo" as const });
 
+/**
+ * handler 本体的直调端口（B5 已为 e-handler 建立同构先例，B6b 复用于 MCP）：
+ * e71501c 起，真实能力注入的外层绑定先做「调用来源/执行范围」身份核验（`stillUnmanaged`），
+ * 无活轮次或伪造 origin 会先以 `effect-scope-unproven` fail-closed——这层在 handler 的
+ * `not-customer-turn` 护栏之前。矩阵既要钉真实绑定层，也要钉 handler 自身护栏；
+ * 后者经同一实现 `applyMcpChange` 直调（无副作用、无绕过产品判定——只是不经能力闭包）。
+ */
+type RawApplyMcpChange = (
+  action: "installed" | "uninstalled",
+  projectRoot: string,
+  runtime: "demo",
+  callerRoleId: string,
+  payload: { roleId: string; name: string },
+) => Promise<{ ok: boolean; reason?: string; message?: string }>;
+const rawInstallMcp = (h: FHarness): RawApplyMcpChange => {
+  const env = (h.mgr as unknown as { sessionEnv: { applyMcpChange: RawApplyMcpChange } }).sessionEnv;
+  return env.applyMcpChange.bind(env) as RawApplyMcpChange;
+};
+
 function sha256Of(abs: string): string {
   return createHash("sha256").update(fs.readFileSync(abs)).digest("hex");
 }
@@ -133,32 +152,53 @@ test("F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-
     writeMcpDeclaration(h.root, "ok", { roles: "X" });
     await h.mgr.open({ projectRoot: h.root, roleId: "su", runtime: "demo" }); // su 开但无轮次
     const install = h.suInstallMcp()!;
+    const raw = rawInstallMcp(h);
+    const before = snapshotTree(h.root);
 
-    // ① 无轮次（idle）⇒ 拒
-    const r1 = (await install({ roleId: "X", name: "ok" })) as { ok: boolean; reason?: string; message?: string };
-    assert.equal(r1.ok, false, "无轮次必须拒");
+    // ① 无轮次（idle）⇒ 真实绑定层先拒：执行范围未证明；handler 护栏仍逐字 not-customer-turn。
+    const bound = (await install({ roleId: "X", name: "ok" })) as { ok: boolean; reason?: string; message?: string };
+    assert.equal(bound.ok, false, "无轮次必须拒");
+    assert.equal(bound.reason, "effect-scope-unproven", "无轮次 ⇒ 真实绑定层执行范围未证明，fail-closed");
+    assert.equal(bound.message, "此安装或卸载操作的执行范围尚未完成核验，未执行。现有配置保持不变，请稍后重试。", "绑定层文案如实");
+    assert.deepEqual(snapshotTree(h.root), before, "零副作用（绑定层拒绝，盘快照一致）");
+    const r1 = (await raw("installed", h.root, "demo", "su", { roleId: "X", name: "ok" })) as { ok: boolean; reason?: string; message?: string };
+    assert.equal(r1.ok, false, "无轮次必须拒（handler）");
     assert.equal(r1.reason, "not-customer-turn");
     assert.equal(r1.message, "本动作仅可在客户消息发起的轮次执行——未执行。", "文案逐字");
+    assert.deepEqual(snapshotTree(h.root), before, "零副作用（handler 护栏拒绝，盘快照一致）");
 
-    // ② su 起客户轮 ⇒ 放行前置满足（本矩阵以判据面验证）；随后**私有面直注**非客户 kind
-    //    （su 在真实装配下不可能是派发目标/回交来源——直注判据代码本身，active.kind === "message"）。
+    // ② su 起客户轮 ⇒ 真实 origins.running.kind=message；随后**私有面直注**非客户 kind
+    //    （su 在真实装配下不可能是派发目标/回交来源——直注判据代码本身 active origin.kind）。
     await h.mgr.send("客户直聊", undefined, suTarget(h));
     await until(() => h.ctl("su").sent.length > 0);
-    const mgrPrivate = h.mgr as unknown as { activeDeliveries: Map<string, { kind: string }> };
-    const key = h.queueKey("su");
+    const mgrPrivate = h.mgr as unknown as { sessions: Map<string, { origins: { running?: { kind: string } } }> };
+    const entry = mgrPrivate.sessions.get(h.queueKey("su"))!;
+    assert.equal(entry.origins.running?.kind, "message", "真实客户轮 origin kind=message");
     for (const kind of ["dispatch", "system", "handback"]) {
-      mgrPrivate.activeDeliveries.set(key, { kind });
-      const r = (await install({ roleId: "X", name: "ok" })) as { ok: boolean; reason?: string };
+      const originalKind = entry.origins.running!.kind;
+      entry.origins.running!.kind = kind;
+      const r = (await install({ roleId: "X", name: "ok" })) as { ok: boolean; reason?: string; message?: string };
       assert.equal(r.ok, false, `${kind} 轮必须拒`);
       assert.equal(r.reason, "not-customer-turn", `${kind} 轮 reason 映射`);
+      assert.equal(r.message, "本动作仅可在客户消息发起的轮次执行——未执行。", `${kind} 轮文案逐字`);
+      assert.deepEqual(snapshotTree(h.root), before, `${kind} 轮零副作用`);
+      entry.origins.running!.kind = originalKind;
     }
-    // ③ 客户消息发起的轮（kind=message / 无 active 条目）⇒ 放行
-    mgrPrivate.activeDeliveries.set(key, { kind: "message" });
+    // ③ 客户消息发起的轮（active origin kind=message）⇒ 放行
     const pass1 = (await install({ roleId: "X", name: "ok" })) as { ok: boolean };
     assert.equal(pass1.ok, true, "客户消息轮放行（active kind=message）");
-    mgrPrivate.activeDeliveries.delete(key);
-    const pass2 = (await install({ roleId: "X", name: "ok" })) as { ok: boolean };
-    assert.equal(pass2.ok, true, "无 active 条目的客户轮放行");
+    // 无 identity-bound origin（旧「无 active 条目」）⇒ e71501c 当前语义 fail-closed，不再视为客户轮。
+    const beforeNoOrigin = snapshotTree(h.root);
+    const savedOrigin = entry.origins.running;
+    delete entry.origins.running;
+    const bound2 = (await install({ roleId: "X", name: "ok" })) as { ok: boolean; reason?: string };
+    assert.equal(bound2.ok, false, "无 identity-bound origin 必须拒");
+    assert.equal(bound2.reason, "effect-scope-unproven", "无 origin ⇒ 绑定层执行范围未证明（e71501c 当前语义）");
+    const r2 = (await raw("installed", h.root, "demo", "su", { roleId: "X", name: "ok" })) as { ok: boolean; reason?: string };
+    assert.equal(r2.ok, false, "无 running origin 必须拒（handler）");
+    assert.equal(r2.reason, "not-customer-turn", "handler 护栏：busy 但无 running origin ⇒ not-customer-turn");
+    assert.deepEqual(snapshotTree(h.root), beforeNoOrigin, "零副作用（无 origin 拒绝）");
+    entry.origins.running = savedOrigin;
   } finally {
     await h.cleanup();
   }
@@ -266,15 +306,32 @@ test("F6 排队客户消息轮：su 忙时再发客户消息处于队列（activ
 test("F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖", async () => {
   const diagDir = fs.mkdtempSync(path.join(os.tmpdir(), "g4v2-f-diag2-"));
   const h = await makeFHarness();
+  const readDiag = (): Record<string, unknown>[] => {
+    const files = fs.readdirSync(diagDir).filter((f) => f.startsWith("ans-diagnostics-"));
+    return files.flatMap((f) => fs.readFileSync(path.join(diagDir, f), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>));
+  };
   try {
     configureDiagnostics({ directory: diagDir });
-    await h.mgr.open({ projectRoot: h.root, roleId: "su", runtime: "demo" }); // idle ⇒ not-customer-turn
+    await h.mgr.open({ projectRoot: h.root, roleId: "su", runtime: "demo" }); // idle ⇒ not-customer-turn / 绑定层 effect-scope-unproven
     const install = h.suInstallMcp()!;
-    await install({ roleId: "X", name: "whatever" });
+
+    // ① 真实能力闭包（e71501c 绑定层）：无活轮次先拒，诊断 capability.effect.refused（reasonCode 如实）。
+    const bound = (await install({ roleId: "X", name: "whatever" })) as { ok: boolean; reason?: string };
+    assert.equal(bound.ok, false);
+    assert.equal(bound.reason, "effect-scope-unproven");
     await flushDiagnostics();
-    const files = fs.readdirSync(diagDir).filter((f) => f.startsWith("ans-diagnostics-"));
-    const rows = files.flatMap((f) => fs.readFileSync(path.join(diagDir, f), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>));
-    const ev = rows.find((rowv) => rowv["event"] === "mcp.refused");
+    const refused = readDiag().find((rowv) => rowv["event"] === "capability.effect.refused");
+    assert.ok(refused, "诊断含 capability.effect.refused");
+    assert.equal(refused!["toolName"], "install_mcp");
+    assert.equal(refused!["reasonCode"], "effect-scope-unproven");
+
+    // ② handler 本体（直调同一实现）：护栏先判 ⇒ mcp.refused 落盘（reasonCode 如实）。
+    const raw = rawInstallMcp(h);
+    const direct = await raw("installed", h.root, "demo", "su", { roleId: "X", name: "whatever" });
+    assert.equal(direct.ok, false);
+    assert.equal(direct.reason, "not-customer-turn");
+    await flushDiagnostics();
+    const ev = readDiag().find((rowv) => rowv["event"] === "mcp.refused");
     assert.ok(ev, "诊断含 mcp.refused");
     assert.equal(ev!["toolName"], "install_mcp");
     assert.equal(ev!["reasonCode"], "not-customer-turn");

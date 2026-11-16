@@ -31,7 +31,12 @@ test("buildProjectConfig：由枚举结果构造角色表，acceptance 透传", 
   // 归档事实（2026-10-14，同日演进——上午过渡做法「boundary.yaml 改名 .frozen ⇒ 跳过并提示」已按
   // 客户决定改为**归档键约定**：boundary.yaml 恢复原名、顶层 `archived: true`）：枚举**静默跳过**归档
   // 目录——零警告、不可开启（resolveRole 拒绝）、边界不予采用；活角色为「桌面UI」与「桌面窗口」两个。
-  assert.deepEqual(listing.warnings, [], "枚举不应有任何警告（归档目录按归档键约定静默跳过、零提示）");
+  // 2026-11-08 起仓库内新增 `角色卡/招募/`（人事备忘录目录，非角色卡）；其 memo.md 明确记载
+  // 「唯一 warning 为 角色卡/招募：缺少 role-card.md，已跳过——这是本备忘录目录按技能默认路径产生的
+  // 预期提示，非角色卡缺陷」。枚举警告按此**逐字**钉住：归档目录仍须零提示，任何其他警告仍失败。
+  assert.deepEqual(listing.warnings, ["角色卡/招募：缺少 role-card.md，已跳过"],
+    "枚举仅招募备忘录目录的既定提示（其 memo 记载）；归档目录按归档键约定静默跳过、零提示");
+  assert.equal(listing.warnings.some((warning) => warning.includes("桌面应用")), false, "归档的「桌面应用」不得产生警告");
   const cfg = buildProjectConfig(listing, { accepted: true, source: "unit-test" }, { ANS_SKILL_ROOT: "/x/skill" });
   assert.equal(cfg.projectRoot, listing.projectRoot);
   assert.equal(cfg.skillRoot, "/x/skill");
