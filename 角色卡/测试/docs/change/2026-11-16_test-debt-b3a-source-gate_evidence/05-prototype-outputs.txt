@@ -1,0 +1,204 @@
+# B3a 原型证据（临时脚本在 worktree 外运行；仅取证，不入库）
+# 共同夹具配方：真实 openRoleSession(createRuntimeAdapterFactory + demo script) + getRegisteredProjectLifecycle
+
+## P2 = run-pin M1/M2/M3→handoff→convener worker（真实 managed chief 会话；脚本内 dispatch_task）
+# 观察：四次 hub 派发全部受理，但 runId 为 trunk planning run（run-hub-*），handoff 不再 pin；worker freeze 报 effective-manifest-missing
+```
+open: true 
+
+== M1 send={"ok":true,"turnId":"ae17572b-5df5-46e7-8c45-7a14a3a25c24","inputAccepted":true,"outcome":"completed","sessionCurrent":true}
+receipt: {
+  "ok": true,
+  "message": "已受理：任务将投递给角色 product 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwiw3jzh-4d60cf46（sideEffect=docs；受理 ≠ 完成）。"
+}
+
+== M2 send={"ok":true,"turnId":"9fe8587b-884f-446e-af25-88ee962ee6e0","inputAccepted":true,"outcome":"completed","sessionCurrent":true}
+receipt: {
+  "ok": true,
+  "message": "已受理：任务将投递给角色 rapporteur 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwiw3kk9-15fd77de（sideEffect=docs；受理 ≠ 完成）。"
+}
+
+== M3 send={"ok":true,"turnId":"6c52a83d-739c-42d7-8802-a18e68fcc460","inputAccepted":true,"outcome":"completed","sessionCurrent":true}
+receipt: {
+  "ok": true,
+  "message": "已受理：任务将投递给角色 nominator 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwiw3l4v-1e18c58e（sideEffect=docs；受理 ≠ 完成）。"
+}
+
+== handoff send={"ok":true,"turnId":"0f3af640-bb1f-4ecf-9db4-0530380e7940","inputAccepted":true,"outcome":"completed","sessionCurrent":true}
+receipt: {
+  "ok": true,
+  "message": "已受理：任务将投递给角色 convener 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwiw3lpk-dd6fced5（sideEffect=read-only；受理 ≠ 完成）。"
+}
+
+tasks: [
+  {
+    id: 't-mwiw3jzh-4d60cf46',
+    created: {
+      to: 'product',
+      runId: 'run-hub-71da78c376f2fa2aa5c356bcf20da066058b9b35cf4eb4db',
+      runState: 'draft',
+      stepId: undefined
+    },
+    delivered: 'product'
+  },
+  {
+    id: 't-mwiw3kk9-15fd77de',
+    created: {
+      to: 'rapporteur',
+      runId: 'run-hub-cac8e3738ce50273c50eff2e99c0bb4e532e62a5c09bd932',
+      runState: 'draft',
+      stepId: undefined
+    },
+    delivered: 'rapporteur'
+  },
+  {
+    id: 't-mwiw3l4v-1e18c58e',
+    created: {
+      to: 'nominator',
+      runId: 'run-hub-6224c87ab3aadae96f7f8ee8ea703e8f2ada689a353d59a4',
+      runState: 'draft',
+      stepId: undefined
+    },
+    delivered: 'nominator'
+  },
+  {
+    id: 't-mwiw3lpk-dd6fced5',
+    created: {
+      to: 'convener',
+      runId: 'run-hub-d32df3e0d656b668d45288e82509f39c3568f0a8ccdc538f',
+      runState: 'draft',
+      stepId: 'project-handoff'
+    },
+    delivered: 'convener'
+  }
+]
+sent convener: [
+  '[派发] 来自 chief 的任务\n任务编号：#t-mwiw3lpk-dd6fced5\n把项目交付运营\n完成后请交回报告（改了什么/结论/证据）。'
+]
+convener open: true 
+
+worker receipt: {
+  "ok": false,
+  "message": "worker-freeze stage=prepare code=trunk-verify-failed parentTaskId=t-mwiw3lpk-dd6fced5 runId=run-hub-d32df3e0d656b668d45288e82509f39c3568f0a8ccdc538f：effective-manifest-missing"
+}
+
+final tasks: [
+  {
+    id: 't-mwiw3jzh-4d60cf46',
+    created: {
+      to: 'product',
+      runId: 'run-hub-71da78c376f2fa2aa5c356bcf20da066058b9b35cf4eb4db',
+      runState: 'draft',
+      moduleDirectory: undefined
+    },
+    delivered: 'product'
+  },
+  {
+    id: 't-mwiw3kk9-15fd77de',
+    created: {
+      to: 'rapporteur',
+      runId: 'run-hub-cac8e3738ce50273c50eff2e99c0bb4e532e62a5c09bd932',
+      runState: 'draft',
+      moduleDirectory: undefined
+    },
+    delivered: 'rapporteur'
+  },
+  {
+    id: 't-mwiw3l4v-1e18c58e',
+    created: {
+      to: 'nominator',
+      runId: 'run-hub-6224c87ab3aadae96f7f8ee8ea703e8f2ada689a353d59a4',
+      runState: 'draft',
+      moduleDirectory: undefined
+    },
+    delivered: 'nominator'
+  },
+  {
+    id: 't-mwiw3lpk-dd6fced5',
+    created: {
+      to: 'convener',
+      runId: 'run-hub-d32df3e0d656b668d45288e82509f39c3568f0a8ccdc538f',
+      runState: 'draft',
+      moduleDirectory: undefined
+    },
+    delivered: 'convener'
+  }
+]
+```
+
+## P3 = 直接 pinRun 后，convener 以真实受派任务(legacy pinned run)派 worker
+# 观察：source 门通过后 worker freeze 硬拒：Old run lacks its historical evidence
+```
+pinned run: run-20261116-focus-08ab9ecf pinned [ 'implementer' ]
+append convener task: {"ok":true,"path":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-proto-LR8ut5\\.ans\\state\\tasks.jsonl"}
+open chief: true
+open convener: true 
+sendBackground: {"ok":true,"turnId":"turn-convener-1","clientMessageId":"ans-app-task:07795fc37926c7e9d8943d7f0aee9c97081fcca649d9b0ea69e6e1d4927fe063","sessionCurrent":true}
+worker receipt: {
+  "ok": false,
+  "message": "worker-freeze stage=prepare code=trunk-verify-failed parentTaskId=t-convener-handoff runId=run-20261116-focus-08ab9ecf：Old run lacks its historical evidence; never refill it from live files"
+}
+tasks: [
+  {
+    id: 't-convener-handoff',
+    created: {
+      to: 'convener',
+      runId: 'run-20261116-focus-08ab9ecf',
+      runState: 'pinned'
+    },
+    delivered: undefined
+  }
+]
+manifest: pinned
+```
+
+## P5 = 直接 pinRun 后 run-change 显式入口（continue-frozen）
+# 观察：卡呈现/落账与测试期望一致 ⇒ run-change 套件可纯夹具修正
+```
+pinned run: run-20261116-focus-14ec3084 pinned [ 'implementer' ]
+open convener: true
+customerInput request: {"cardKind":"decision","application":true}
+requestRunChangeDecision: true 
+outcome: {"outcome":"answered","value":{"selected":["continue-frozen"]},"decisionId":"decision-run-change-proto","operatorId":"customer"}
+manifest: {"state":"pinned","runChange":{"schema":"run-change/v1","decisionId":"decision-run-change-proto","requestId":"run-change-run-20261116-focus-14ec3084","mode":"continue-frozen","decidedBy":"customer","decidedAt":"2026-11-16T06:35:56.101Z","oldRunId":"run-20261116-focus-14ec3084","oldHashes":{"intent":"47e9abddc36e5be06aae1e82eb4abf9f1065eb3671b9717cac4226ee843fb215","proposal":"ed54974283a6d04655dca15bdaa53eec00300792b7af09c4b2cd5fb677fe9135","modules":"9c176f81886924875dcc73df7b2e78b47fb6d40c6eae15c38e19a41928479f2c","roster":"0810b247890ff3e28806caa86d74b21b2c187160e4eeb3c7de28960eef8f0929","topology":"0810b247890ff3e28806caa86d74b21b2c187160e4eeb3c7de28960eef8f0929","architecture":"3546d54679facb3a73f3e524a2c54336a962ec8684d2f7244aceb095f275fe2d"}}}
+```
+
+## P6 = F2 场景：真实 chief 会话 + 基线违规 + 文档准备派发
+# 观察：受理 + 状态提示（未阻断）基线漂移 advisory（本批已据此修正 F2）
+```
+open: true 
+send: {"ok":true,"turnId":"c8828f36-4c2e-4643-a788-b3b4c2b1f076","inputAccepted":true,"outcome":"completed","sessionCurrent":true}
+receipts: [
+  {
+    "ok": true,
+    "message": "已受理：任务将投递给角色 product 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwiw3qna-6cb1441a（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 版本化文档基线有漂移（docs/product/focus-intent-v1.md）；派发不阻断，旧版本写入仍受只读保护。"
+  }
+]
+tasks: [
+  {
+    id: 't-mwiw3qna-6cb1441a',
+    created: {
+      to: 'product',
+      runId: 'run-hub-aa1febf32294b864ab44d4e9717aae706125b1f0c50ca4f0',
+      runState: 'draft'
+    },
+    delivered: 'product'
+  }
+]
+sent product count: 1
+```
+
+## P7 = 仅 fake 句柄 + 注册 lifecycle（无 managed 会话证据）
+# 观察：hub 派发仍 document-planning-source-unavailable（prepareDocumentScope 要真实 sessionId/managed 证据）
+```
+open: true 
+send: {"ok":true,"turnId":"turn-chief-1","sessionCurrent":true}
+receipts: [
+  {
+    "ok": false,
+    "message": "document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。"
+  }
+]
+tasks: []
+sent product count: 0
+```

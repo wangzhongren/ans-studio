@@ -1,0 +1,10 @@
+# schema.test.ts 归属核对（selected / required）
+
+结论：R3 source-gate 族把裸名 selected 挂到 test/claude-adapter/schema.test.ts 是启发式文件归属伪影；
+CI 块级日志与 merged-universe 的 logFiles 均指向 test/桌面应用/chief-workflow.test.ts（e71501c 漂移族）。
+本机 schema.test.ts 3× 10/10 全绿（见 01-reproduction-3x.txt / schema-run*.log）。
+
+- block[macos_arm64] selected files=["test/桌面应用/chief-workflow.test.ts"] codes=["stage-request-required","ERR_ASSERTION"] firstLine="✖ selected (6066.568209ms)"
+- block[macos_arm64] required files=["test/桌面应用/chief-workflow.test.ts"] codes=["ERR_ASSERTION"] firstLine="✖ required (34.370834ms)"
+- block[macos_x64] selected files=["test/桌面应用/chief-workflow.test.ts"] codes=["stage-request-required","ERR_ASSERTION"] firstLine="✖ selected (6146.020514ms)"
+- block[macos_x64] required files=["test/桌面应用/chief-workflow.test.ts"] codes=["ERR_ASSERTION"] firstLine="✖ required (141.239728ms)"
