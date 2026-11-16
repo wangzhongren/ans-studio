@@ -177,7 +177,10 @@ test("Q30 fixture HTTP preserves split UTF8 and byte budget", { timeout: 10000 }
 });
 
 test("Q74 owned Git metadata observer atomic rename race remains bounded and strict", { timeout: 10000 }, async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "q2-git-metadata-observer-")); await initializeGitRepository(root);
+  // R6（2026-11-16）：夹具根必须持有**规范拼写**——`hashFixtureFiles` 以 `realpath(file) === file` 拒绝
+  // 未解析的链接祖先；CI 的 os.tmpdir() 是 macOS `/var`（→ `/private/var`）或 Windows 8.3 短名
+  // （`RUNNER~1`）。原始 mkdtemp 根在两种环境都会让合法夹具被误判，先 realpath（native 语义）规范化。
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "q2-git-metadata-observer-"))); await initializeGitRepository(root);
   const registry = path.join(root, ".git/ans/processes"); await fs.mkdir(registry, { recursive: true });
   const headBefore = await fs.readFile(path.join(root, ".git/HEAD")), stableHash = createHash("sha256").update(headBefore).digest("hex");
   const facts: unknown[] = [];

@@ -1,0 +1,55 @@
+=== macos-x64 ===
+✖ Q74 owned Git metadata observer atomic rename race remains bounded and strict (161.080087ms)
+  AssertionError [ERR_ASSERTION]: Fixture inventory path must not traverse unknown links
+  + actual - expected
+  
+  + '/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/q2-git-metadata-observer-GyikYF/.git/HEAD'
+  - '/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/q2-git-metadata-observer-GyikYF/.git/HEAD'
+  
+      at visit (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-driver.ts:355:18)
+      at async hashFixtureFiles (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-driver.ts:369:11)
+      at async race (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:191:14)
+      at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:198:20)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/q2-git-metadata-observer-GyikYF/.git/HEAD',
+    expected: '/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/q2-git-metadata-observer-GyikYF/.git/HEAD',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/测试/git-role-workflows-e2e.test.ts:35:63
+✖ Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (5417.139341ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+=== windows-x64 ===
+✖ Q74 owned Git metadata observer atomic rename race remains bounded and strict (59.8949ms)
+  AssertionError [ERR_ASSERTION]: Fixture inventory path must not traverse unknown links
+  + actual - expected
+  
+  + 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\q2-git-metadata-observer-CMKmC7\\.git\\ans'
+  - 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\q2-git-metadata-observer-CMKmC7\\.git\\ans'
+  
+      at visit (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-driver.ts:355:18)
+      at async hashFixtureFiles (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-driver.ts:369:11)
+      at async race (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:191:14)
+      at async TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/git-role-workflows-e2e.test.ts:198:20)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\q2-git-metadata-observer-CMKmC7\\.git\\ans',
+    expected: 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\q2-git-metadata-observer-CMKmC7\\.git\\ans',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\run-stop-host-continuation-integration.test.ts:81:1
+✖ host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven (24.857ms)
+  AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/run-stop-host-continuation-integration.test.ts:106:12)

@@ -1,0 +1,112 @@
+diff --git a/test/桌面应用/chief-workflow.test.ts b/test/桌面应用/chief-workflow.test.ts
+index 8b1aec4..b8e09d1 100644
+--- a/test/桌面应用/chief-workflow.test.ts
++++ b/test/桌面应用/chief-workflow.test.ts
+@@ -2107,11 +2107,21 @@ test("W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+   const events: Parameters<Parameters<typeof createDesktopInterface>[0]["emitEvent"]>[0][] = [], cards: OperatorRequestPayload[] = [];
+   const channel = createCustomerInputChannel({ operatorId: "human", presenter: card => cards.push(card) });
+   const trace: Array<{ role: string; text: string; tools: string[] }> = [];
++  // R6（2026-11-16，x64-only W36）：CI 曾出现 `tool.function` 缺席的 tools 元素（TypeError at :2111）。
++  // 记录异常形状样本供失败诊断，不把未知请求猜成幕僚。
++  const toolShapeAnomalies: string[] = [];
+   let requestedRole = "product", desktop: ReturnType<typeof createDesktopInterface> | undefined;
+   let resumeTarget: { taskId: string; flowId: string; runId: string; reviewTaskId: string; reviewCloseOperationId: string } | undefined;
+   const server = createServer(async (request, response) => {
+     let raw = ""; for await (const chunk of request) raw += chunk;
+-    const body = JSON.parse(raw), isChief = body.tools.some((tool: { function: { name: string } }) => tool.function.name === "ans_role_activity_log");
++    const body = JSON.parse(raw);
++    // R6 夹具加固：chat-transport 是嵌套 `{type:"function", function:{name}}`，responses 原生路径是扁平
++    // `{type:"function", name}`；两种真实形状都识别。无名元素只记异常样本（不崩溃、不猜幕僚、不放宽断言）。
++    const rawTools: unknown[] = Array.isArray(body.tools) ? body.tools : [];
++    const toolNames = rawTools.map((tool) => { const value = tool as { function?: { name?: unknown }; name?: unknown } | null;
++      return typeof value?.function?.name === "string" ? value.function.name : typeof value?.name === "string" ? value.name : undefined; });
++    if (toolNames.some((name) => name === undefined)) toolShapeAnomalies.push(JSON.stringify(rawTools.map((tool) => tool !== null && typeof tool === "object" ? Object.keys(tool) : typeof tool)));
++    const isChief = toolNames.includes("ans_role_activity_log");
+     const role = isChief ? "chief" : requestedRole;
+     const text = [...body.messages].reverse().find((message: { role: string }) => message.role === "user")?.content ?? "";
+     const last = body.messages.at(-1), tools = body.messages.filter((message: { role: string }) => message.role === "tool").map((message: { content: string }) => message.content);
+@@ -2126,7 +2136,7 @@ test("W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+     const call = name ? { id, type: "function", function: { name, arguments: JSON.stringify(args) } } : undefined;
+     response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ id: "w36-local", object: "chat.completion", choices: [{ index: 0, finish_reason: call ? "tool_calls" : "stop", message: { role: "assistant", content: call ? null : "已收到真实阻塞报告，由幕僚决定下一步。", ...(call ? { tool_calls: [call] } : {}) } }] }));
+   });
+-  const wait = async (predicate: () => Promise<boolean> | boolean, reason: string) => { const end = Date.now() + 6000; while (!await predicate() && Date.now() < end) await tick(10); assert.ok(await predicate(), reason + JSON.stringify(trace)); };
++  const wait = async (predicate: () => Promise<boolean> | boolean, reason: string) => { const end = Date.now() + 6000; while (!await predicate() && Date.now() < end) await tick(10); assert.ok(await predicate(), reason + JSON.stringify(trace) + JSON.stringify(toolShapeAnomalies)); };
+   try {
+     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); const address = server.address(); assert.ok(address && typeof address !== "string");
+     desktop = createDesktopInterface({ pickDirectory: async () => root, customerInput: channel.customerInput, emitEvent: event => events.push(event),
+diff --git a/test/桌面应用/run-pin.test.ts b/test/桌面应用/run-pin.test.ts
+index b08cb48..3562269 100644
+--- a/test/桌面应用/run-pin.test.ts
++++ b/test/桌面应用/run-pin.test.ts
+@@ -202,7 +202,10 @@ function sourceGatedHarness(root: string, options: { realRoles?: readonly string
+   markLegacyProject(root);
+   const realRoles = new Set<string>(options.realRoles ?? ["chief"]);
+   const scripts: Record<string, ToolCall[]> = {};
+-  const receipts: DispatchReceipt[] = [];
++  // R6 CI（2026-11-16）：回执按「发起角色 + 请求载荷」记录。demo 脚本数组是会话级共享引用，
++  // 回合结束后若不清空，后续无关投递（回交/通知）会重放上一回合的 dispatch_task，产生
++  // 「重复派发已抑制」的第二条 ok 回执（CI run-pin.test.ts:392 true !== false）。
++  const receipts: Array<{ receipt: DispatchReceipt; fromRoleId: string; payload: DispatchTaskPayload }> = [];
+   const customerInputs: Record<string, CustomerInputFn | undefined> = {};
+   const contractChecks: Record<string, ContractCheckFn | undefined> = {};
+   const streams: Record<string, OrchestrationEvent[]> = {};
+@@ -260,7 +263,9 @@ function sourceGatedHarness(root: string, options: { realRoles?: readonly string
+       const dispatch = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
+       const wrapped: DispatchTaskFn | undefined = dispatch === undefined ? undefined : async (d, metadata) => {
+         const receipt = (await dispatch(d, metadata)) as DispatchReceipt | null | undefined;
+-        if (receipt !== null && receipt !== undefined) receipts.push(receipt);
++        if (receipt !== null && receipt !== undefined) receipts.push({ receipt, fromRoleId: input.roleId, payload: d });
++        // 一次性脚本：本角色本回合的 dispatch 已完成，后续无关提示（回交/通知/系统行）不得重放它。
++        script.length = 0;
+         return receipt;
+       };
+       return openRoleSession({ ...input, autoRepin: false, ...(wrapped !== undefined ? { dispatchTask: wrapped } : {}) }, { createAdapter: factory });
+@@ -281,9 +286,13 @@ function sourceGatedHarness(root: string, options: { realRoles?: readonly string
+       ? await mgr.sendBackground({ projectRoot: root, roleId, runtime: "demo", text, kind: "system" })
+       : await mgr.send(text, undefined, { projectRoot: root, roleId, runtime: "demo" });
+     assert.equal(send.ok, true, `真实 ${roleId} 回合应被受理`);
+-    for (let tries = 0; tries < 500 && receipts.length === before; tries += 1) await tick(10);
+-    assert.ok(receipts.length > before, `${roleId} 回合内 dispatch_task 应返回回执`);
+-    return receipts[receipts.length - 1]!;
++    // 只取本回合、本载荷的回执：无关并发投递（如 chief 的重复抑制回执）不得顶替被测 dispatch 的结果。
++    const match = (): DispatchReceipt | undefined => receipts.slice(before)
++      .find((entry) => entry.fromRoleId === roleId && entry.payload.roleId === payload.roleId && entry.payload.task === payload.task)?.receipt;
++    for (let tries = 0; tries < 500 && match() === undefined; tries += 1) await tick(10);
++    const produced = match();
++    assert.ok(produced !== undefined, `${roleId} 回合内 dispatch_task 应返回回执`);
++    return produced;
+   };
+   return {
+     mgr,
+diff --git a/test/测试/git-role-workflows-e2e.test.ts b/test/测试/git-role-workflows-e2e.test.ts
+index da76d25..b199db8 100644
+--- a/test/测试/git-role-workflows-e2e.test.ts
++++ b/test/测试/git-role-workflows-e2e.test.ts
+@@ -177,7 +177,10 @@ test("Q30 fixture HTTP preserves split UTF8 and byte budget", { timeout: 10000 }
+ });
+ 
+ test("Q74 owned Git metadata observer atomic rename race remains bounded and strict", { timeout: 10000 }, async () => {
+-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "q2-git-metadata-observer-")); await initializeGitRepository(root);
++  // R6（2026-11-16）：夹具根必须持有**规范拼写**——`hashFixtureFiles` 以 `realpath(file) === file` 拒绝
++  // 未解析的链接祖先；CI 的 os.tmpdir() 是 macOS `/var`（→ `/private/var`）或 Windows 8.3 短名
++  // （`RUNNER~1`）。原始 mkdtemp 根在两种环境都会让合法夹具被误判，先 realpath（native 语义）规范化。
++  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "q2-git-metadata-observer-"))); await initializeGitRepository(root);
+   const registry = path.join(root, ".git/ans/processes"); await fs.mkdir(registry, { recursive: true });
+   const headBefore = await fs.readFile(path.join(root, ".git/HEAD")), stableHash = createHash("sha256").update(headBefore).digest("hex");
+   const facts: unknown[] = [];
+diff --git a/test/编排/run-role-submit-capabilities.test.ts b/test/编排/run-role-submit-capabilities.test.ts
+index f7a4db9..9b7a111 100644
+--- a/test/编排/run-role-submit-capabilities.test.ts
++++ b/test/编排/run-role-submit-capabilities.test.ts
+@@ -441,7 +441,10 @@ test("Pipeline initial workflow source: actual approved Core request binds task
+   // B6a（2026-11-16）：产品按真实根安装/读取 initial workflow source（git-trunk-store.ts 的
+   // `realpath(dir) === dir` 与读路径 realpath）；CI 的 os.tmpdir() 可能是 macOS `/var` 符号链接或
+   // Windows 8.3 短名。夹具持有规范根，稳定源写入与读取落在同一真实根。
+-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ans-o10-workflow-source-"))), at = new Date().toISOString(), storage = createFsTrunkStore(root), flowId = "workflow-source-fixture";
++  // R6（2026-11-16）：必须用 `realpathSync.native`——同步 JS `realpathSync` 在 Windows 不展开 8.3
++  // 短名（CI TEMP=`C:\Users\RUNNER~1\…`），产品异步 `realpath` 却展开，写路径 `realpath(dir) !== dir`
++  // 会误拒 initial workflow source（R6 Windows 工件 ENOENT realpath stable-source.json）。
++  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "ans-o10-workflow-source-"))), at = new Date().toISOString(), storage = createFsTrunkStore(root), flowId = "workflow-source-fixture";
+   writeFile(root, "docs/actual.txt", "Actual allocated planning fixture");
+   const sha = (text: string) => createHash("sha256").update(text).digest("hex"), snap = await storage.captureSnapshot!({ snapshotId: "o10-source-basis", createdAt: at, files: [{ path: "docs/actual.txt", sha256: sha("Actual allocated planning fixture") }] });
+   assert.ok(snap.ok); if (!snap.ok) return;

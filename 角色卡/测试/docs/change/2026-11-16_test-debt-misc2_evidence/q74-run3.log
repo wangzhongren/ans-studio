@@ -1,0 +1,10 @@
+✔ Q74 owned Git metadata observer atomic rename race remains bounded and strict (73.2991ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 551.0417
+EXIT=0

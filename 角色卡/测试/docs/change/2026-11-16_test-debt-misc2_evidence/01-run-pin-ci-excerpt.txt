@@ -1,0 +1,49 @@
+=== R6 CI run 43848313583 artifact: macos-x64 test-ci-output.log ===
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (3066.267347ms)
+  AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4lu36-676aba20 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:392:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/桌面应用/task-restart.test.ts:57:1
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2087.818041ms)
+  Error: 等待超时
+      at waitUntil (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:21:47)
+
+=== R6 CI run 43848313583 artifact: windows-x64 test-ci-output.log ===
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (1245.4492ms)
+  AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4ggxb-dddf2eee 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:392:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\task-restart.test.ts:57:1
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2048.8072ms)
+  Error: 等待超时
+      at waitUntil (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:21:47)
+      at async TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:88:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at test\测试\direct-role-capabilities-e2e.test.ts:43:1
+✖ Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze (140.93ms)

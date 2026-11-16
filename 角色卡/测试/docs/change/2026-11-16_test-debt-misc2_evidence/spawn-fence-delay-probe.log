@@ -1,0 +1,43 @@
+{
+ "delayMs": 0,
+ "observed": true,
+ "error": "git-command-failed:null:unknown:",
+ "files": 1,
+ "launches": [
+  {
+   "launch": "cancelled-before-spawn",
+   "exitCode": null,
+   "termination": "unknown",
+   "operationId": "actual-before-spawn-cancel"
+  }
+ ]
+}
+{
+ "delayMs": 100,
+ "observed": true,
+ "error": "git-host-lease-invalid-before-command",
+ "files": 3,
+ "launches": [
+  {
+   "launch": "started",
+   "pid": 19760,
+   "exitCode": 0,
+   "termination": "exited",
+   "operationId": "actual-before-spawn-cancel"
+  },
+  {
+   "launch": "started",
+   "pid": 6492,
+   "exitCode": 0,
+   "termination": "exited",
+   "operationId": "actual-before-spawn-cancel"
+  },
+  {
+   "launch": "started",
+   "pid": 19488,
+   "exitCode": 0,
+   "termination": "exited",
+   "operationId": "actual-before-spawn-cancel"
+  }
+ ]
+}

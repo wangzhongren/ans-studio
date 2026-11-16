@@ -1,0 +1,84 @@
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:dispatch] {"role":"chief","to":"product","task":"写产品意图","ok":true,"msg":"已受理：任务将投递给角色 product 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理≠已完"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"product"}
+[runpin:event] {"roleId":"product"}
+[runpin:event] {"roleId":"product"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:dispatch] {"role":"chief","to":"rapporteur","task":"出方案与名单","ok":true,"msg":"已受理：任务将投递给角色 rapporteur 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"rapporteur"}
+[runpin:event] {"roleId":"rapporteur"}
+[runpin:event] {"roleId":"rapporteur"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:dispatch] {"role":"chief","to":"nominator","task":"按名单招人","ok":true,"msg":"已受理：任务将投递给角色 nominator 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理≠"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"nominator"}
+[runpin:event] {"roleId":"nominator"}
+[runpin:event] {"roleId":"nominator"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:dispatch] {"role":"chief","to":"convener","task":"把项目交付运营","ok":true,"msg":"已受理：任务将投递给角色 convener 的会话；投递结果/失败会在其聊天流与 chief 的聊天流如实显示（受理≠已"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"chief"}
+[runpin:before-worker-dispatch] [{"id":"t-mwj72wtx-d51123f8","to":"product","text":"写产品意图","reports":0,"delivered":"product","closed":false},{"id":"t-mwj72wzw-ec601e77","to":"rapporteur","text":"出方案与名单","reports":0,"delivered":"rapporteur","closed":false},{"id":"t-mwj72x5k-7e809919","to":"nominator","text":"按名单招人","reports":0,"delivered":"nominator","closed":false},{"id":"t-mwj72xbg-e07a3afa","to":"convener","text":"把项目交付运营","reports":0,"delivered":"convener","closed":false}]
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:dispatch] {"role":"convener","to":"implementer","task":"实现番茄钟","ok":false,"msg":"worker-freeze stage=prepare code=trunk-verify-failed parentT"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+[runpin:dispatch] {"role":"chief","to":"convener","task":"把项目交付运营","ok":true,"msg":"已受理：任务 #t-mwj72xbg-e07a3afa 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"convener"}
+[runpin:event] {"roleId":"chief"}
+[runpin:event] {"roleId":"chief"}
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (1040.7428ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1494.2579
+
+✖ failing tests:
+
+test at test\桌面应用\run-pin.test.ts:323:1
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (1040.7428ms)
+  AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj72xbg-e07a3afa 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/misc2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:397:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

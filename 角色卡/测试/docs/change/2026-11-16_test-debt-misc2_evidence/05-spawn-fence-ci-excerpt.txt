@@ -1,0 +1,36 @@
+=== macos-x64 (only failing platform) ===
+✖ Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry (272.140674ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /git-command-failed:null:unknown/. Input:
+  
+  'Error: git-host-lease-invalid-before-command'
+  
+      at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-command.test.ts:51:9)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: git-host-lease-invalid-before-command
+        at executeGit (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-command.ts:724:137)
+        at async writeTree (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-candidate-store.ts:204:32)
+        at async writeTree (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-candidate-store.ts:201:60)
+        at async writeTree (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-candidate-store.ts:201:60)
+        at async Object.prepare (file:///Users/runner/work/ans-studio/ans-studio/src/provider/trunk/impl/git-candidate-store.ts:206:21)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E7%BC%96%E6%8E%92/git-command.test.ts:51:9)
+        at async Test.run (node:internal/test_runner/test:1125:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:787:7),
+    expected: /git-command-failed:null:unknown/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at test/编排/governance-matrix-injection.test.ts:316:1
+✖ A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入） (28.717082ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   protectedGitRoots: [
+  +     '/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/ans-matrix-owgQef/.git'
+  +   ]

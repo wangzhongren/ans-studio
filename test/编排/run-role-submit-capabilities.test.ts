@@ -441,7 +441,10 @@ test("Pipeline initial workflow source: actual approved Core request binds task 
   // B6a（2026-11-16）：产品按真实根安装/读取 initial workflow source（git-trunk-store.ts 的
   // `realpath(dir) === dir` 与读路径 realpath）；CI 的 os.tmpdir() 可能是 macOS `/var` 符号链接或
   // Windows 8.3 短名。夹具持有规范根，稳定源写入与读取落在同一真实根。
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ans-o10-workflow-source-"))), at = new Date().toISOString(), storage = createFsTrunkStore(root), flowId = "workflow-source-fixture";
+  // R6（2026-11-16）：必须用 `realpathSync.native`——同步 JS `realpathSync` 在 Windows 不展开 8.3
+  // 短名（CI TEMP=`C:\Users\RUNNER~1\…`），产品异步 `realpath` 却展开，写路径 `realpath(dir) !== dir`
+  // 会误拒 initial workflow source（R6 Windows 工件 ENOENT realpath stable-source.json）。
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "ans-o10-workflow-source-"))), at = new Date().toISOString(), storage = createFsTrunkStore(root), flowId = "workflow-source-fixture";
   writeFile(root, "docs/actual.txt", "Actual allocated planning fixture");
   const sha = (text: string) => createHash("sha256").update(text).digest("hex"), snap = await storage.captureSnapshot!({ snapshotId: "o10-source-basis", createdAt: at, files: [{ path: "docs/actual.txt", sha256: sha("Actual allocated planning fixture") }] });
   assert.ok(snap.ok); if (!snap.ok) return;
