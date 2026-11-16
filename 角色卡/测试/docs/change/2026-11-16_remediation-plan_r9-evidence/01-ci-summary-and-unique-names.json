@@ -1,0 +1,443 @@
+{
+ "note": "R9 = GitHub Actions run 43887939365 (main @ 77d3505, pre-#137 300s CLI cap); three-platform artifacts downloaded to /tmp/r11-art; raw artifacts not committed",
+ "platforms": {
+  "arm64": {
+   "artifact": "test-logs-mac-arm64/test-ci-output.log",
+   "tests": 5828,
+   "pass": 5806,
+   "fail": 3,
+   "cancelled": 0,
+   "skipped": 19,
+   "duration_ms": 1811212.530541,
+   "unique_fail_names": 3,
+   "line_level_unique_x": 4,
+   "timeouts": [],
+   "assertions": [
+    {
+     "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+     "dur": 258059.906917,
+     "file": "test/测试/git-role-workflows-e2e.test.ts",
+     "line": 35
+    },
+    {
+     "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+     "dur": 60228.832459,
+     "file": "test/编排/git-capabilities.test.ts",
+     "line": 515
+    },
+    {
+     "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+     "dur": 227.356958,
+     "file": "test/编排/git-command.test.ts",
+     "line": 45
+    }
+   ],
+   "file_level": []
+  },
+  "x64": {
+   "artifact": "test-logs-mac-x64/test-ci-output.log",
+   "tests": 5828,
+   "pass": 5798,
+   "fail": 6,
+   "cancelled": 5,
+   "skipped": 19,
+   "duration_ms": 3364129.72047,
+   "unique_fail_names": 11,
+   "line_level_unique_x": 12,
+   "timeouts": [
+    {
+     "name": "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+     "dur": 18001.062251
+    },
+    {
+     "name": "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+     "dur": 30001.63774
+    },
+    {
+     "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+     "dur": 180002.752092
+    },
+    {
+     "name": "AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提）",
+     "dur": 300002.347342
+    },
+    {
+     "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+     "dur": 300000.337007
+    }
+   ],
+   "assertions": [
+    {
+     "name": "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+     "dur": 21019.044653,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+     "dur": 21212.862876,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+     "dur": 21309.935228,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+     "dur": 21276.198658,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+     "dur": 20235.586829,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+     "dur": 111347.259299,
+     "file": "test/编排/git-capabilities.test.ts",
+     "line": 515
+    }
+   ],
+   "file_level": []
+  },
+  "windows": {
+   "artifact": "test-logs-win-x64/test-ci-output.log",
+   "tests": 5828,
+   "pass": 5788,
+   "fail": 8,
+   "cancelled": 0,
+   "skipped": 32,
+   "duration_ms": 2235169.9875,
+   "unique_fail_names": 8,
+   "line_level_unique_x": 9,
+   "timeouts": [],
+   "assertions": [
+    {
+     "name": "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+     "dur": 16574.3115,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+     "dur": 16814.2936,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+     "dur": 14830.417,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+     "dur": 16683.2511,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+     "dur": 9535.4355,
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703
+    },
+    {
+     "name": "重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等",
+     "dur": 149.2549,
+     "file": "test/桌面应用/pending-card-restart.test.ts",
+     "line": 29
+    },
+    {
+     "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+     "dur": 278365.6396,
+     "file": "test/测试/git-role-workflows-e2e.test.ts",
+     "line": 35
+    },
+    {
+     "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+     "dur": 62859.5558,
+     "file": "test/编排/git-capabilities.test.ts",
+     "line": 515
+    }
+   ],
+   "file_level": []
+  }
+ },
+ "union_count": 13,
+ "union": [
+  {
+   "name": "AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提）",
+   "platforms": [
+    "x64"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 300002.347342,
+     "kind": "timeout",
+     "file": "test/测试/git-action-delivery-claude-e2e.test.ts",
+     "line": 34,
+     "error_head": "✖ AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提） (300002.347342ms) 'test timed out after 30000"
+    }
+   }
+  },
+  {
+   "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+   "platforms": [
+    "arm64"
+   ],
+   "by_platform": {
+    "arm64": {
+     "dur": 227.356958,
+     "kind": "assertion",
+     "file": "test/编排/git-command.test.ts",
+     "line": 45,
+     "error_head": "✖ Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry (227.356958ms) AssertionError [ERR_ASSERTION]: The"
+    }
+   }
+  },
+  {
+   "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+   "platforms": [
+    "arm64",
+    "x64",
+    "windows"
+   ],
+   "by_platform": {
+    "arm64": {
+     "dur": 60228.832459,
+     "kind": "assertion",
+     "file": "test/编排/git-capabilities.test.ts",
+     "line": 515,
+     "error_head": "✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (60228.832459ms) AssertionError [E"
+    },
+    "x64": {
+     "dur": 111347.259299,
+     "kind": "assertion",
+     "file": "test/编排/git-capabilities.test.ts",
+     "line": 515,
+     "error_head": "✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (111347.259299ms) AssertionError ["
+    },
+    "windows": {
+     "dur": 62859.5558,
+     "kind": "assertion",
+     "file": "test/编排/git-capabilities.test.ts",
+     "line": 515,
+     "error_head": "✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (62859.5558ms) AssertionError [ERR"
+    }
+   }
+  },
+  {
+   "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+   "platforms": [
+    "arm64",
+    "x64",
+    "windows"
+   ],
+   "by_platform": {
+    "arm64": {
+     "dur": 258059.906917,
+     "kind": "assertion",
+     "file": "test/测试/git-role-workflows-e2e.test.ts",
+     "line": 35,
+     "error_head": "✖ Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (258059.906917ms) AssertionError [ERR_ASSERTION]: Exp"
+    },
+    "x64": {
+     "dur": 300000.337007,
+     "kind": "timeout",
+     "file": "test/测试/git-role-workflows-e2e.test.ts",
+     "line": 35,
+     "error_head": "✖ Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (300000.337007ms) 'test timed out after 300000ms'"
+    },
+    "windows": {
+     "dur": 278365.6396,
+     "kind": "assertion",
+     "file": "test/测试/git-role-workflows-e2e.test.ts",
+     "line": 35,
+     "error_head": "✖ Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (278365.6396ms) AssertionError [ERR_ASSERTION]: Expec"
+    }
+   }
+  },
+  {
+   "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+   "platforms": [
+    "x64"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 180002.752092,
+     "kind": "timeout",
+     "file": "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts",
+     "line": 55,
+     "error_head": "✖ W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例 (180002.752092ms) 'test timed out after 180000ms'"
+    }
+   }
+  },
+  {
+   "name": "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+   "platforms": [
+    "x64",
+    "windows"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 21019.044653,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin (21019.044653ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must settle and "
+    },
+    "windows": {
+     "dur": 16574.3115,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin (16574.3115ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must settle and cr"
+    }
+   }
+  },
+  {
+   "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+   "platforms": [
+    "x64",
+    "windows"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 21309.935228,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin (21309.935228ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must"
+    },
+    "windows": {
+     "dur": 14830.417,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin (14830.417ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must se"
+    }
+   }
+  },
+  {
+   "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+   "platforms": [
+    "x64",
+    "windows"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 21212.862876,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin (21212.862876ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must "
+    },
+    "windows": {
+     "dur": 16814.2936,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin (16814.2936ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must se"
+    }
+   }
+  },
+  {
+   "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+   "platforms": [
+    "x64",
+    "windows"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 20235.586829,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后 (20235.586829ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must settle and creator bas"
+    },
+    "windows": {
+     "dur": 16683.2511,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后 (16683.2511ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must settle and creator basis"
+    }
+   }
+  },
+  {
+   "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+   "platforms": [
+    "x64"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 21276.198658,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后 (21276.198658ms) AssertionError [ERR_ASSERTION]: Actual publication/notice turns must settle and creator basis"
+    }
+   }
+  },
+  {
+   "name": "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+   "platforms": [
+    "x64",
+    "windows"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 18001.062251,
+     "kind": "timeout",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope (18001.062251ms) 'test timed out after 18000ms'"
+    },
+    "windows": {
+     "dur": 9535.4355,
+     "kind": "assertion",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope (9535.4355ms) AssertionError [ERR_ASSERTION]: The actual first publication and creator-close must finish before measuring tea"
+    }
+   }
+  },
+  {
+   "name": "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+   "platforms": [
+    "x64"
+   ],
+   "by_platform": {
+    "x64": {
+     "dur": 30001.63774,
+     "kind": "timeout",
+     "file": "test/桌面应用/chief-workflow.test.ts",
+     "line": 1703,
+     "error_head": "✖ W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝 (30001.63774ms) 'test timed out after 30000ms'"
+    }
+   }
+  },
+  {
+   "name": "重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等",
+   "platforms": [
+    "windows"
+   ],
+   "by_platform": {
+    "windows": {
+     "dur": 149.2549,
+     "kind": "assertion",
+     "file": "test/桌面应用/pending-card-restart.test.ts",
+     "line": 29,
+     "error_head": "✖ 重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等 (149.2549ms) [Error: ENOTEMPTY: directory not empty, rmdir 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-pending-resta"
+    }
+   }
+  }
+ ]
+}

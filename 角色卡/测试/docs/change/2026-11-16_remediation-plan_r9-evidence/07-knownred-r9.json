@@ -1,0 +1,25 @@
+{
+ "source": "角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-facade-barrel_evidence/segment3/knownred",
+ "method": "exact name or prefix match against R9 union (13 names)",
+ "result": {
+  "runtime-core-33.txt": {
+   "total": 33,
+   "matched": []
+  },
+  "gates-5.txt": {
+   "total": 5,
+   "matched": []
+  },
+  "orchestration-24.txt": {
+   "total": 24,
+   "matched": [
+    {
+     "frozen": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+     "r9": [
+      "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority"
+     ]
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,21 @@
+platform	stage	at (UTC)	elapsed from child START	source marker
+mac-arm64	child START	15:00:57.198	0.0s	Q_OWNED_BUSINESS_CHILD_START
+mac-arm64	persisted child observed	15:02:33.489	96.3s	Q_PERSISTED_CHILD_OBSERVED (state=pinned)
+mac-arm64	worker candidate prepared	15:02:59.227	122.0s	Q_WORKER_CANDIDATE_PREPARED
+mac-arm64	integrated candidate prepared	15:03:18.657	141.5s	Q_INTEGRATED_CANDIDATE_PREPARED
+mac-arm64	verifier HTTP	15:03:45.813	168.6s	Q_VERIFIER_HTTP (last fixture request; requests=108 at timeout)
+mac-arm64	bounded wait expiry / teardown begin	15:05:13.390	256.2s (+87.6s after verifier)	Q18_DESKTOP_LIFECYCLE begin-owned-cleanup; Q2_TIMEOUT actual worker required surface / scoped write
+mac-arm64	child RETURN completed=false	15:05:14.497	257.3s	Q_OWNED_BUSINESS_CHILD_RETURN
+mac-arm64	test result	-	258,059.9ms test duration	AssertionError 1 !== 0 at e2e:1347:88
+win-x64	child START	14:59:59.317	0.0s	Q_OWNED_BUSINESS_CHILD_START
+win-x64	persisted child observed	15:01:54.163	114.8s	Q_PERSISTED_CHILD_OBSERVED (state=pinned)
+win-x64	worker candidate prepared	15:02:27.331	148.0s	Q_WORKER_CANDIDATE_PREPARED
+win-x64	integrated candidate prepared	15:02:51.710	172.4s	Q_INTEGRATED_CANDIDATE_PREPARED
+win-x64	verifier HTTP	15:03:25.397	206.1s	Q_VERIFIER_HTTP (last fixture request; requests=106 at timeout)
+win-x64	bounded wait expiry / teardown begin	15:04:36.585	277.3s (+71.2s after verifier)	Q18_DESKTOP_LIFECYCLE begin-owned-cleanup; Q2_TIMEOUT actual worker required surface / scoped write
+win-x64	child RETURN completed=false	15:04:36.643	277.3s	Q_OWNED_BUSINESS_CHILD_RETURN
+win-x64	test result	-	278,365.6ms test duration	AssertionError 1 !== 0 at e2e:1347:88
+mac-x64	child START	15:13:53.662	0.0s	Q_OWNED_BUSINESS_CHILD_START
+mac-x64	persisted child observed	15:18:05.329	251.7s	Q_PERSISTED_CHILD_OBSERVED (state=pinned)
+mac-x64	(no further child markers)	-	-	parent test timed out at 300,000.3ms; child absolute deadline 15:18:52.142
+mac-x64	test result	-	300,000.3ms test duration	'test timed out after 300000ms'
