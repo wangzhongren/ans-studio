@@ -1,0 +1,53 @@
+# R8 run 43867573699 artifact: test-logs-mac-x64/test-ci-output.log
+# Extracted failing blocks whose names match the x64 follow-up scope.
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+DUR: 11437.204533
+ERR: AssertionError [ERR_ASSERTION]: Actual publisher notification must reach its actor[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 | at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1775:220) | at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1897:5) | at async Test.run (node:internal/test_runner/test:1125:7)
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+DUR: 513.486814
+ERR: AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-core-in-flight-unproven\",\"message\":\"An actual Core session is still preparing/creating/disposing\"}"] | at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:99) | at process.processTicksAndRejections (node:internal/process/task_queues:104:5) { | generatedMessage: false,
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin
+DUR: 578.442803
+ERR: AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-core-in-flight-unproven\",\"message\":\"An actual Core session is still preparing/creating/disposing\"}"] | at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:99) | at process.processTicksAndRejections (node:internal/process/task_queues:104:5) { | generatedMessage: false,
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin
+DUR: 450.114124
+ERR: AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-core-in-flight-unproven\",\"message\":\"An actual Core session is still preparing/creating/disposing\"}"] | at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:99) | at process.processTicksAndRejections (node:internal/process/task_queues:104:5) { | generatedMessage: false,
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+DUR: 604.813927
+ERR: AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-core-in-flight-unproven\",\"message\":\"An actual Core session is still preparing/creating/disposing\"}"] | at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:99) | at process.processTicksAndRejections (node:internal/process/task_queues:104:5) { | generatedMessage: false,
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+DUR: 398.377961
+ERR: AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-core-in-flight-unproven\",\"message\":\"An actual Core session is still preparing/creating/disposing\"}"] | at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:99) | at process.processTicksAndRejections (node:internal/process/task_queues:104:5) { | generatedMessage: false,
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+DUR: 443.089132
+ERR: AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-core-in-flight-unproven\",\"message\":\"An actual Core session is still preparing/creating/disposing\"}"] | at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:99) | at process.processTicksAndRejections (node:internal/process/task_queues:104:5) { | generatedMessage: false,
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+DUR: 472.472087
+ERR: AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-core-in-flight-unproven\",\"message\":\"An actual Core session is still preparing/creating/disposing\"}"] | at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:99) | at process.processTicksAndRejections (node:internal/process/task_queues:104:5) { | generatedMessage: false,
+
+test/桌面应用/chief-workflow.test.ts:1681
+NAME: W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝
+DUR: 439.680718
+ERR: AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-core-in-flight-unproven\",\"message\":\"An actual Core session is still preparing/creating/disposing\"}"] | at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:99) | at process.processTicksAndRejections (node:internal/process/task_queues:104:5) { | generatedMessage: false,
+
+test/测试/git-role-workflows-e2e.test.ts:35
+NAME: Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
+DUR: 300001.334164
+ERR: 'test timed out after 300000ms'
+

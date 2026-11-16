@@ -1,0 +1,13 @@
+# Q2 P2 timeline (child process) and durations per platform
+== mac-arm64
+Q_OWNED_BUSINESS_CHILD_START {"at":"2026-11-16T12:47:39.287Z"
+Q_PERSISTED_CHILD_OBSERVED {"at":"2026-11-16T12:48:48.865Z"
+Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (214039.32125ms)
+== win-x64
+Q_OWNED_BUSINESS_CHILD_START {"at":"2026-11-16T12:46:14.556Z"
+Q_PERSISTED_CHILD_OBSERVED {"at":"2026-11-16T12:47:21.662Z"
+Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (195593.4415ms)
+== mac-x64
+Q_OWNED_BUSINESS_CHILD_START {"at":"2026-11-16T13:04:10.531Z"
+Q_PERSISTED_CHILD_OBSERVED {"at":"2026-11-16T13:07:56.686Z"
+Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (300001.334164ms)
