@@ -1,0 +1,253 @@
+{
+  "generatedAt": "2026-11-16T07:34:13.651Z",
+  "r3Universe": 194,
+  "r4Universe": 188,
+  "intersection": 188,
+  "r4Only": 0,
+  "r3Only": 6,
+  "perPlatform": {
+    "arm64": {
+      "r3": 189,
+      "r4": 188,
+      "common": 188,
+      "onlyR3": 1,
+      "onlyR4": 0
+    },
+    "x64": {
+      "r3": 192,
+      "r4": 188,
+      "common": 188,
+      "onlyR3": 4,
+      "onlyR4": 0
+    },
+    "win": {
+      "r3": 22,
+      "r4": 179,
+      "common": 14,
+      "onlyR3": 2,
+      "onlyR4": 0
+    }
+  },
+  "familyDelta": {
+    "ci-path-canonical": {
+      "r3": 42,
+      "r4": 41,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 1,
+      "stillInFamily": 41
+    },
+    "known-red-62": {
+      "r3": 33,
+      "r4": 33,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 0,
+      "stillInFamily": 33
+    },
+    "e71501c-drift": {
+      "r3": 32,
+      "r4": 30,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 2,
+      "stillInFamily": 30
+    },
+    "source-gate": {
+      "r3": 23,
+      "r4": 23,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 0,
+      "stillInFamily": 23
+    },
+    "b0-existing-other": {
+      "r3": 18,
+      "r4": 18,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 0,
+      "stillInFamily": 18
+    },
+    "flake-timing": {
+      "r3": 16,
+      "r4": 16,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 0,
+      "stillInFamily": 16
+    },
+    "vca-flow": {
+      "r3": 13,
+      "r4": 13,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 0,
+      "stillInFamily": 13
+    },
+    "unclassified-new": {
+      "r3": 13,
+      "r4": 12,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 1,
+      "stillInFamily": 12
+    },
+    "hang-timeout": {
+      "r3": 4,
+      "r4": 2,
+      "r4NewNames": 0,
+      "disappearedFromFamily": 2,
+      "stillInFamily": 2
+    }
+  },
+  "intersectionSets": {
+    "r4_in_b0": 130,
+    "r4_in_b7": 130,
+    "r4_in_kr62": 33,
+    "r4_in_triage_any": 21,
+    "b0_not_r4": 61,
+    "b7_not_r4": 60,
+    "b0_not_r3": 61,
+    "b7_not_r3": 60
+  },
+  "r4OnlyNames": [],
+  "r3OnlyNames": [
+    {
+      "name": "申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl",
+      "r3Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 117.779542,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/application-line.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 388.844696,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/application-line.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r3Family": "e71501c-drift",
+      "note": "R3 消失 = R4 全平台未复现（R4 Windows 已完整覆盖，不再有「未跑到」解释）"
+    },
+    {
+      "name": "AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提）",
+      "r3Platforms": {
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 300001.858113,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-action-delivery-claude-e2e.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r3Family": "hang-timeout",
+      "note": "R3 消失 = R4 全平台未复现（R4 Windows 已完整覆盖，不再有「未跑到」解释）"
+    },
+    {
+      "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+      "r3Platforms": {
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 180004.77835,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r3Family": "hang-timeout",
+      "note": "R3 消失 = R4 全平台未复现（R4 Windows 已完整覆盖，不再有「未跑到」解释）"
+    },
+    {
+      "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin",
+      "r3Platforms": {
+        "windows_x64_cancelled": {
+          "count": 1,
+          "maxDurationMs": 480.3999,
+          "indents": [
+            0
+          ],
+          "files": []
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r3Family": "unclassified-new",
+      "note": "R3 消失 = R4 全平台未复现（R4 Windows 已完整覆盖，不再有「未跑到」解释）"
+    },
+    {
+      "name": "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒",
+      "r3Platforms": {
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 8322.787636,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r3Family": "e71501c-drift",
+      "note": "R3 消失 = R4 全平台未复现（R4 Windows 已完整覆盖，不再有「未跑到」解释）"
+    },
+    {
+      "name": "W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease",
+      "r3Platforms": {
+        "windows_x64_cancelled": {
+          "count": 1,
+          "maxDurationMs": 1356.6331,
+          "indents": [
+            0
+          ],
+          "files": []
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "MAC"
+      },
+      "r3Family": "ci-path-canonical",
+      "note": "R3 消失 = R4 全平台未复现（R4 Windows 已完整覆盖，不再有「未跑到」解释）"
+    }
+  ]
+}

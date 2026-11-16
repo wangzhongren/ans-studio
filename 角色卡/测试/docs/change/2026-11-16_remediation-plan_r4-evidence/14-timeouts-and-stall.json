@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-11-16T07:33:12.764Z",
+  "runId": "43812832566",
+  "timeoutEntries": [],
+  "fileLevelTimeoutEntries": [],
+  "windowsStall": {
+    "lastResultTs": null,
+    "cancelTs": null,
+    "stallBeforeCancelMs": null,
+    "stallMinutes": null,
+    "lastTopLevelSummaryFound": true,
+    "uniqueNames": 179,
+    "fileLevelCount": 0,
+    "note": "R4 Windows 首次完整跑完（有顶层汇总，无取消标记、无静默间隔）"
+  },
+  "note": "R4 口径与 R2/R3 相同：timeouts = maxDurationMs>=100000 的失败名；三平台均有完整顶层汇总。R4 三平台 300s（≥100s）条目为 0。"
+}

@@ -1,0 +1,3997 @@
+{
+  "generatedAt": "2026-11-16T07:33:29.449Z",
+  "total": 188,
+  "families": [
+    {
+      "family": "ci-path-canonical",
+      "count": 41,
+      "platformCounts": {
+        "macos_arm64": 41,
+        "macos_x64": 41,
+        "windows_x64": 40
+      },
+      "codeCounts": {
+        "git-file-final-guard-unproven": 18,
+        "ERR_ASSERTION": 24,
+        "Actual file/edit handlers do not carry the current canonical metadata roots and link guard": 17,
+        "D1 test wait expired": 3
+      },
+      "files": [
+        {
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "count": 22
+        },
+        {
+          "file": "test/编排/git-action-authorization-gate.test.ts",
+          "count": 3
+        },
+        {
+          "file": "test/测试/git-action-cross-runtime-init.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/git-action-cross-runtime-audit-failure.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/git-action-cross-runtime-pi-init.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/run-stop-host-continuation-integration.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/git-action-cross-runtime-codex-init.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/session-admission-approval-q9-integration.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/git-role-workflows-e2e.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring-document-audit-failure.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring-document.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring-audit-failure.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring-initial-workflow-audit-failure.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring-initial-workflow.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring-publication-audit-failure.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring-publication.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-action-authorization-wiring-retry.test.ts",
+          "count": 1
+        }
+      ],
+      "known": {
+        "b0": 8,
+        "b7": 8,
+        "kr62": 0
+      },
+      "triage": {
+        "null": 41
+      },
+      "productCandidates": [
+        "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards"
+      ],
+      "names": [
+        {
+          "name": "AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录",
+          "file": "test/测试/git-action-cross-runtime-init.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-claude-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）",
+          "file": "test/测试/git-action-cross-runtime-audit-failure.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-ac16\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确",
+          "file": "test/测试/git-action-cross-runtime-pi-init.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-pi-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "D1 test wait expired"
+          ],
+          "errorFirst": "Error: D1 test wait expired",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 background dispatch, queued customer input and handback pin the source engine after selection switches",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'input')",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'input')",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 same role and project across engines and same role across projects keep distinct handles and exact input targets",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'input')",
+          "productCandidate": false
+        },
+        {
+          "name": "D1R2 actual ack preserves a failed delayed terminal and the next aborted original client",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "D1 test wait expired"
+          ],
+          "errorFirst": "Error: D1 test wait expired",
+          "productCandidate": false
+        },
+        {
+          "name": "D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "D1 test wait expired"
+          ],
+          "errorFirst": "Error: D1 test wait expired",
+          "productCandidate": false
+        },
+        {
+          "name": "D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'input')",
+          "productCandidate": false
+        },
+        {
+          "name": "D1R2 direct and queued identical inputs retain original client ID through delayed old settled",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'handle')",
+          "productCandidate": false
+        },
+        {
+          "name": "D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'handle')",
+          "productCandidate": false
+        },
+        {
+          "name": "foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'handle')",
+          "productCandidate": false
+        },
+        {
+          "name": "gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录",
+          "file": "test/编排/git-action-authorization-gate.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "productCandidate": false
+        },
+        {
+          "name": "gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）",
+          "file": "test/编排/git-action-authorization-gate.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未撤销的 prepared 条目必须拒绝（H13）",
+          "productCandidate": false
+        },
+        {
+          "name": "gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+          "file": "test/编排/git-action-authorization-gate.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "productCandidate": false
+        },
+        {
+          "name": "host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+          "file": "test/测试/run-stop-host-continuation-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "productCandidate": false
+        },
+        {
+          "name": "no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'handle')",
+          "productCandidate": false
+        },
+        {
+          "name": "P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在",
+          "file": "test/测试/git-action-cross-runtime-codex-init.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-codex-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed",
+          "file": "test/测试/session-admission-approval-q9-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-q16-pos-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+          "file": "test/测试/git-role-workflows-e2e.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": true
+        },
+        {
+          "name": "same client IDs across sequential actual turns retain separate first public outcomes",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'handle')",
+          "productCandidate": false
+        },
+        {
+          "name": "send rejection before public events remains unknown; later same-client different turns do not borrow outcomes",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'handle')",
+          "productCandidate": false
+        },
+        {
+          "name": "send result reports the original handle is no longer current after replacement while its turn rejects",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'handle')",
+          "productCandidate": false
+        },
+        {
+          "name": "stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session",
+          "file": "test/桌面应用/multi-runtime.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'handle')",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects",
+          "file": "test/编排/git-action-authorization-wiring-document-audit-failure.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: append 失败必须 fail-closed：{\"ok\":false,\"status\":\"blocked\",\"operationId\":\"w3b-doc-audit-blocked\",\"baseDigest\":null,\"targetDigest\":null,\"errorCode\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and li",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit",
+          "file": "test/编排/git-action-authorization-wiring-document.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"status\":\"blocked\",\"operationId\":\"w3b-doc-publication\",\"baseDigest\":null,\"targetDigest\":null,\"errorCode\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no repository, journal or ref effects",
+          "file": "test/编排/git-action-authorization-wiring-audit-failure.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: append 失败必须 fail-closed：{\"operationId\":\"w3b-init-audit-blocked\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring init: sidecar carries actor/task/turn/lease + init,candidate digests before effects",
+          "file": "test/编排/git-action-authorization-wiring.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w3b-init-success\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects",
+          "file": "test/编排/git-action-authorization-wiring-initial-workflow-audit-failure.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "Error: fixture initial workflow plan publication: {\"ok\":false,\"status\":\"blocked\",\"operationId\":\"w3b-iw-plan-blocked\",\"baseDigest\":\"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392\",\"targetDigest\":null,\"errorCode\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit",
+          "file": "test/编排/git-action-authorization-wiring-initial-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "Error: fixture initial workflow plan publication: {\"ok\":false,\"status\":\"blocked\",\"operationId\":\"w3b-iw-plan\",\"baseDigest\":\"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392\",\"targetDigest\":null,\"errorCode\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not car",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects",
+          "file": "test/编排/git-action-authorization-wiring-publication-audit-failure.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: append 失败必须 fail-closed：{\"ok\":false,\"status\":\"blocked\",\"operationId\":\"w3b-plan-audit-blocked\",\"baseDigest\":\"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392\",\"targetDigest\":null,\"errorCode\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit ha",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit",
+          "file": "test/编排/git-action-authorization-wiring-publication.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"status\":\"blocked\",\"operationId\":\"w3b-plan-publication\",\"baseDigest\":\"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392\",\"targetDigest\":null,\"errorCode\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the cu",
+          "productCandidate": false
+        },
+        {
+          "name": "wiring retry: same operationId on a new lease/turn appends a sidecar row without replay/init conflicts",
+          "file": "test/编排/git-action-authorization-wiring-retry.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w3b-init-retry\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "productCandidate": false
+        }
+      ]
+    },
+    {
+      "family": "known-red-62",
+      "count": 33,
+      "platformCounts": {
+        "macos_arm64": 33,
+        "macos_x64": 33,
+        "windows_x64": 33
+      },
+      "codeCounts": {
+        "ERR_ASSERTION": 32,
+        "vca-channel-unavailable": 1
+      },
+      "files": [
+        {
+          "file": "test/编排/trunk-upgrade-validation.test.ts",
+          "count": 5
+        },
+        {
+          "file": "test/编排/trio-worker-report.test.ts",
+          "count": 3
+        },
+        {
+          "file": "test/编排/section1-write-preauthorization.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/编排/appointment-roster.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/编排/session-dir.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/runtime-core/dispatch-workflow-writer-copy.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/门禁引擎/convener-workflow-write.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/门禁引擎/governance-matrix-service.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/runtime-core/trunk-contract.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/governance-matrix-injection.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/trunk-service.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/runtime-core/session.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/门禁引擎/view-image-cards.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/runtime-core/file-write-safety.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/runtime-core/version-change-contract.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-capabilities.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/门禁引擎/list-project.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/门禁引擎/role-group-metadata.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/handback.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/shell-operator-only.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/chat-handback-scope.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/direct-role-capabilities.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/doc-format-specs.test.ts",
+          "count": 1
+        }
+      ],
+      "known": {
+        "b0": 33,
+        "b7": 33,
+        "kr62": 33
+      },
+      "triage": {
+        "null": 27,
+        "KR": 6
+      },
+      "productCandidates": [],
+      "names": [
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "file": "test/编排/trio-worker-report.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 幕僚卡必须写明派发后结束本轮",
+          "productCandidate": false
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "file": "test/编排/trio-worker-report.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 运营卡必须写明验收由 dispatch 质检发起",
+          "productCandidate": false
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "file": "test/门禁引擎/convener-workflow-write.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\\/workflow\\.md` 由运营落盘维护/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "file": "test/编排/section1-write-preauthorization.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）",
+          "productCandidate": false
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "file": "test/门禁引擎/governance-matrix-service.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "file": "test/编排/section1-write-preauthorization.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+          "file": "test/runtime-core/trunk-contract.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": "KR",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "file": "test/编排/governance-matrix-injection.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "file": "test/编排/trunk-upgrade-validation.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "file": "test/编排/trunk-upgrade-validation.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "file": "test/编排/trunk-upgrade-validation.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "vca-channel-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "file": "test/编排/trunk-upgrade-validation.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "file": "test/编排/trunk-upgrade-validation.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "file": "test/编排/trunk-service.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "file": "test/编排/appointment-roster.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "file": "test/编排/appointment-roster.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 角色卡路径必须经同一 resolveWrite 探测为 allowed",
+          "productCandidate": false
+        },
+        {
+          "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+          "file": "test/runtime-core/session.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": "KR",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "file": "test/编排/session-dir.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: runRole（一次性路径）不传 AdapterCapabilities",
+          "productCandidate": false
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "file": "test/编排/session-dir.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: ENOENT: no such file or directory, realpath ''",
+          "productCandidate": false
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "file": "test/门禁引擎/view-image-cards.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /可选质量核对/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+          "file": "test/runtime-core/file-write-safety.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": "KR",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /符号链接/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+          "file": "test/runtime-core/dispatch-workflow-writer-copy.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": "KR",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+          "file": "test/runtime-core/dispatch-workflow-writer-copy.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": "KR",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+          "file": "test/runtime-core/version-change-contract.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": "KR",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "productCandidate": false
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "file": "test/编排/git-capabilities.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"code\":\"trunk-item-invalid\",\"message\":\"The actual publication task has no original Chief input source\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "file": "test/门禁引擎/list-project.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "file": "test/门禁引擎/role-group-metadata.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "file": "test/编排/handback.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "file": "test/编排/shell-operator-only.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git clean -fdx：审批通过 ⇒ 放行",
+          "productCandidate": false
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "file": "test/编排/chat-handback-scope.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "file": "test/编排/direct-role-capabilities.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration",
+          "productCandidate": false
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "file": "test/编排/doc-format-specs.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1",
+          "productCandidate": false
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "file": "test/编排/trio-worker-report.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": true,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /主链顺序（必须）/. Input:",
+          "productCandidate": false
+        }
+      ]
+    },
+    {
+      "family": "e71501c-drift",
+      "count": 30,
+      "platformCounts": {
+        "macos_arm64": 30,
+        "macos_x64": 30,
+        "windows_x64": 24
+      },
+      "codeCounts": {
+        "ERR_ASSERTION": 26,
+        "等待实际事件超时": 2,
+        "document-planning-source-unavailable": 6,
+        "worker-dispatch-source-unavailable": 1,
+        "waitFor 超时": 2,
+        "The actual creator receipt must supply notification source": 1,
+        "git-file-final-guard-unproven": 2,
+        "Actual file/edit handlers do not carry the current canonical metadata roots and link guard": 2
+      },
+      "files": [
+        {
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "count": 12
+        },
+        {
+          "file": "test/桌面应用/star-routing.test.ts",
+          "count": 7
+        },
+        {
+          "file": "test/桌面应用/directive-input.test.ts",
+          "count": 5
+        },
+        {
+          "file": "test/桌面应用/stuck-redispatch.test.ts",
+          "count": 3
+        },
+        {
+          "file": "test/桌面应用/handback-delivery.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/桌面应用/decision-service.test.ts",
+          "count": 1
+        }
+      ],
+      "known": {
+        "b0": 24,
+        "b7": 24,
+        "kr62": 0
+      },
+      "triage": {
+        "null": 18,
+        "NEW": 12
+      },
+      "productCandidates": [
+        "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界"
+      ],
+      "names": [
+        {
+          "name": "2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发",
+          "file": "test/桌面应用/handback-delivery.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION",
+            "等待实际事件超时"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 等待实际事件超时",
+          "productCandidate": false
+        },
+        {
+          "name": "星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝",
+          "file": "test/桌面应用/star-routing.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "业务卡的旧@决策预设不能形成第三个自动执行者",
+          "file": "test/桌面应用/decision-service.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-4.3：洁净派发无 advisory、无诊断噪声",
+          "file": "test/桌面应用/star-routing.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported",
+          "file": "test/桌面应用/handback-delivery.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION",
+            "等待实际事件超时"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 等待实际事件超时",
+          "productCandidate": false
+        },
+        {
+          "name": "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）",
+          "file": "test/桌面应用/stuck-redispatch.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+          "file": "test/桌面应用/stuck-redispatch.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 替代角色收到重派任务",
+          "productCandidate": false
+        },
+        {
+          "name": "BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）",
+          "file": "test/桌面应用/star-routing.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队",
+          "file": "test/桌面应用/star-routing.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /无法打开|未投递/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）",
+          "file": "test/桌面应用/star-routing.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）",
+          "file": "test/桌面应用/star-routing.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "commit-race",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Observed the actual dispatch/ledger await lease, without stubbing the append",
+          "productCandidate": false
+        },
+        {
+          "name": "convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务",
+          "file": "test/桌面应用/star-routing.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "worker-dispatch-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。",
+          "productCandidate": false
+        },
+        {
+          "name": "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递",
+          "file": "test/桌面应用/stuck-redispatch.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道",
+          "file": "test/桌面应用/directive-input.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 命中即有确认面板",
+          "productCandidate": false
+        },
+        {
+          "name": "sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）",
+          "file": "test/桌面应用/directive-input.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /图片/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）",
+          "file": "test/桌面应用/directive-input.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /能力不可用/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账",
+          "file": "test/桌面应用/directive-input.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "waitFor 超时"
+          ],
+          "errorFirst": "Error: waitFor 超时",
+          "productCandidate": false
+        },
+        {
+          "name": "sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂",
+          "file": "test/桌面应用/directive-input.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "waitFor 超时"
+          ],
+          "errorFirst": "Error: waitFor 超时",
+          "productCandidate": false
+        },
+        {
+          "name": "W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [],
+          "errorFirst": null,
+          "productCandidate": false
+        },
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION",
+            "The actual creator receipt must supply notification source"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The actual creator receipt must supply notification source",
+          "productCandidate": true
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "productCandidate": false
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "productCandidate": false
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "productCandidate": false
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "productCandidate": false
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结",
+          "productCandidate": false
+        },
+        {
+          "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:",
+          "productCandidate": false
+        },
+        {
+          "name": "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: [\"git_candidate: {\\\"operationId\\\":\\\"w29-owned-init\\\",\\\"repoId\\\":\\\"uninitialized\\\",\\\"status\\\":\\\"blocked\\\",\\\"code\\\":\\\"git-file-final-guard-unproven\\\",\\\"message\\\":\\\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\\\"}\"]",
+          "productCandidate": false
+        },
+        {
+          "name": "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "git-file-final-guard-unproven",
+            "ERR_ASSERTION",
+            "Actual file/edit handlers do not carry the current canonical metadata roots and link guard"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "productCandidate": false
+        },
+        {
+          "name": "W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝",
+          "file": "test/桌面应用/chief-workflow.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "productCandidate": false
+        }
+      ]
+    },
+    {
+      "family": "source-gate",
+      "count": 23,
+      "platformCounts": {
+        "macos_arm64": 23,
+        "macos_x64": 23,
+        "windows_x64": 23
+      },
+      "codeCounts": {
+        "document-planning-source-unavailable": 14,
+        "ERR_ASSERTION": 23,
+        "stage-request-required": 3,
+        "worker-dispatch-source-unavailable": 4,
+        "chief-hub-flow-unavailable": 2
+      },
+      "files": [
+        {
+          "file": "test/桌面应用/run-pin.test.ts",
+          "count": 11
+        },
+        {
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "count": 9
+        },
+        {
+          "file": "test/测试/governance-e2e-auto/i-full-chain.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/claude-adapter/schema.test.ts",
+          "count": 1
+        }
+      ],
+      "known": {
+        "b0": 23,
+        "b7": 23,
+        "kr62": 0
+      },
+      "triage": {
+        "null": 22,
+        "NEW": 1
+      },
+      "productCandidates": [],
+      "names": [
+        {
+          "name": "宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "显式入口（stop）：requestRunChangeDecision 三模式落账不变",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域",
+          "file": "test/测试/governance-e2e-auto/i-full-chain.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "stage-request-required",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "worker-dispatch-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "worker-dispatch-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "worker-dispatch-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。",
+          "productCandidate": false
+        },
+        {
+          "name": "D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发",
+          "file": "test/测试/governance-e2e-auto/i-full-chain.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "stage-request-required",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "F2：版本化文档基线违规受理 + advisory；基线/文档未被改写",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "worker-dispatch-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。",
+          "productCandidate": false
+        },
+        {
+          "name": "P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "chief-hub-flow-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "chief-hub-flow-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+          "file": "test/桌面应用/run-pin.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        },
+        {
+          "name": "selected",
+          "file": "test/claude-adapter/schema.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "stage-request-required",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "productCandidate": false
+        },
+        {
+          "name": "stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色",
+          "file": "test/桌面应用/run-change-trigger.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "document-planning-source-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。",
+          "productCandidate": false
+        }
+      ]
+    },
+    {
+      "family": "b0-existing-other",
+      "count": 18,
+      "platformCounts": {
+        "macos_arm64": 18,
+        "macos_x64": 18,
+        "windows_x64": 18
+      },
+      "codeCounts": {
+        "ERR_ASSERTION": 15
+      },
+      "files": [
+        {
+          "file": "test/测试/g4-skill-verify/h-scope-audit.test.ts",
+          "count": 3
+        },
+        {
+          "file": "test/测试/t1-pipeline-integration.test.ts",
+          "count": 3
+        },
+        {
+          "file": "test/测试/trunk-stable-write-integration.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/测试/git-role-workflows-e2e.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/测试/g3-search-verify/pi-loopback-verify.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/桌面应用/session.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/桌面应用/project.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/entry-role-minimal-d.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/g4v2-mcp-verify/f-handler.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/桌面应用/log-actions.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/direct-role-capabilities-e2e.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/claude-adapter/schema.test.ts",
+          "count": 1
+        }
+      ],
+      "known": {
+        "b0": 18,
+        "b7": 18,
+        "kr62": 0
+      },
+      "triage": {
+        "null": 17,
+        "NEW": 1
+      },
+      "productCandidates": [
+        "范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su",
+        "范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册"
+      ],
+      "names": [
+        {
+          "name": "范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su",
+          "file": "test/测试/g4-skill-verify/h-scope-audit.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: installMcp 透传判据＝能力矩阵（唯一）",
+          "productCandidate": true
+        },
+        {
+          "name": "范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册",
+          "file": "test/测试/g4-skill-verify/h-scope-audit.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: installSkill 透传判据＝能力矩阵（唯一）",
+          "productCandidate": true
+        },
+        {
+          "name": "范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用",
+          "file": "test/测试/g4-skill-verify/h-scope-audit.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: test/claude-adapter/session.test.ts 不得引用任何 .probe 模块",
+          "productCandidate": false
+        },
+        {
+          "name": "跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串）",
+          "file": "test/测试/g3-search-verify/pi-loopback-verify.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 轮次归属应恰为 g3-turn-1/2：,g3-turn-1,g3-turn-3",
+          "productCandidate": false
+        },
+        {
+          "name": "AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）",
+          "file": "test/桌面应用/session.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 索引字节（B1 实测 pin）",
+          "productCandidate": false
+        },
+        {
+          "name": "appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本）",
+          "file": "test/测试/trunk-stable-write-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: 角色/边界解析失败：active-role-evidence-missing-or-mismatched",
+          "productCandidate": false
+        },
+        {
+          "name": "buildProjectConfig：由枚举结果构造角色表，acceptance 透传",
+          "file": "test/桌面应用/project.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 枚举不应有任何警告（归档目录按归档键约定静默跳过、零提示）",
+          "productCandidate": false
+        },
+        {
+          "name": "D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）",
+          "file": "test/测试/entry-role-minimal-d.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: D-04 撤除残留",
+          "productCandidate": false
+        },
+        {
+          "name": "F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖",
+          "file": "test/测试/g4v2-mcp-verify/f-handler.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 诊断含 mcp.refused",
+          "productCandidate": false
+        },
+        {
+          "name": "listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执",
+          "file": "test/桌面应用/log-actions.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+          "file": "test/测试/direct-role-capabilities-e2e.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：未找到 docs/product/direct-e2e-intent-vN.md（最新意图缺失）。）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。",
+          "productCandidate": false
+        },
+        {
+          "name": "Q30 fixture HTTP preserves split UTF8 and byte budget",
+          "file": "test/测试/git-role-workflows-e2e.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: ENOENT: no such file or directory, open '/Users/runner/work/ans-studio/ans-studio/角色卡/测试/docs/change/2026-11-05_git-role-permissions-evidence/q30-utf8-http-probe.json'",
+          "productCandidate": false
+        },
+        {
+          "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+          "file": "test/测试/git-role-workflows-e2e.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: The input did not match the regular expression /已获准并落盘/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "required",
+          "file": "test/claude-adapter/schema.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": "NEW",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The required scope comes from an actual accepted customer turn and child ledger, not a fixture marker",
+          "productCandidate": false
+        },
+        {
+          "name": "stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift）",
+          "file": "test/测试/trunk-stable-write-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: 角色/边界解析失败：active-role-evidence-missing-or-mismatched",
+          "productCandidate": false
+        },
+        {
+          "name": "T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report",
+          "file": "test/测试/t1-pipeline-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report",
+          "file": "test/测试/t1-pipeline-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report",
+          "file": "test/测试/t1-pipeline-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "productCandidate": false
+        }
+      ]
+    },
+    {
+      "family": "flake-timing",
+      "count": 16,
+      "platformCounts": {
+        "macos_arm64": 16,
+        "macos_x64": 16,
+        "windows_x64": 16
+      },
+      "codeCounts": {
+        "ERR_ASSERTION": 12,
+        "等待超时": 1,
+        "离线回交未入队": 2
+      },
+      "files": [
+        {
+          "file": "test/桌面应用/session-rebuild-race.test.ts",
+          "count": 3
+        },
+        {
+          "file": "test/测试/network-state-e2e.test.ts",
+          "count": 3
+        },
+        {
+          "file": "test/测试/kanban-fixes-verify/f2-claim-release.test.ts",
+          "count": 2
+        },
+        {
+          "file": "test/测试/g4-skill-verify/e-handler.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/download-requests-integration.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/桌面应用/download-request.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/桌面应用/task-restart.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/turn-watch-verify/b-last-resort.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/g4v2-mcp-verify/f-handler.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/测试/queue-recovery-e2e.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/桌面应用/interface.test.ts",
+          "count": 1
+        }
+      ],
+      "known": {
+        "b0": 9,
+        "b7": 9,
+        "kr62": 0
+      },
+      "triage": {
+        "null": 16
+      },
+      "productCandidates": [
+        "requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用"
+      ],
+      "names": [
+        {
+          "name": "护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行",
+          "file": "test/测试/g4-skill-verify/e-handler.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 无轮次 ⇒ 护栏拒绝",
+          "productCandidate": false
+        },
+        {
+          "name": "审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读",
+          "file": "test/测试/download-requests-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 坏行不得影响 request.* 读取",
+          "productCandidate": false
+        },
+        {
+          "name": "一项目一卡：前一张未决时下载卡排队，不呈现",
+          "file": "test/桌面应用/download-request.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: timeout waiting for 第二张下载卡排队",
+          "productCandidate": false
+        },
+        {
+          "name": "重建 dispose 等待窗口：stop A 保持用户目标/关闭契约",
+          "file": "test/桌面应用/session-rebuild-race.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "重建 dispose 等待窗口：stop all 保持用户目标/关闭契约",
+          "file": "test/桌面应用/session-rebuild-race.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 新项目的新句柄接收，旧重建句柄已释放",
+          "productCandidate": false
+        },
+        {
+          "name": "重建 open 等待窗口：stop A 保持用户目标/关闭契约",
+          "file": "test/桌面应用/session-rebuild-race.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "file": "test/桌面应用/task-restart.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "等待超时"
+          ],
+          "errorFirst": "Error: 等待超时",
+          "productCandidate": false
+        },
+        {
+          "name": "B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案明确「最后兜底」",
+          "file": "test/测试/turn-watch-verify/b-last-resort.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": null,
+          "productCandidate": false
+        },
+        {
+          "name": "e2e 队列：离线保留并标 blockedReason=network；恢复后按既有 drain 继续且恰投递一次",
+          "file": "test/测试/network-state-e2e.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION",
+            "离线回交未入队"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 离线回交未入队",
+          "productCandidate": false
+        },
+        {
+          "name": "e2e 网络失败系统行：settled(failed, network-offline-timeout) ⇒ 恰一条人话 delivery-note，无技术 code",
+          "file": "test/测试/network-state-e2e.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 回合未开跑",
+          "productCandidate": false
+        },
+        {
+          "name": "e2e F1 队列：已知离线 + 探针异常 ⇒ 不解除 network 阻塞、不 drain；真正恢复后恰投递一次",
+          "file": "test/测试/network-state-e2e.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION",
+            "离线回交未入队"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 离线回交未入队",
+          "productCandidate": false
+        },
+        {
+          "name": "F-2 场景 1（跨目标不阻塞）：A 的 send 挂起期间派发 B ⇒ B 立即收到（不待 A 轮结束）",
+          "file": "test/测试/kanban-fixes-verify/f2-claim-release.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: su 会话应注入派发能力",
+          "productCandidate": false
+        },
+        {
+          "name": "F-2 场景 2（同目标仍排队）：投递进行中再派同目标 ⇒ 排队不并发；settled 后按序放行",
+          "file": "test/测试/kanban-fixes-verify/f2-claim-release.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "TypeError: dispatch is not a function",
+          "productCandidate": false
+        },
+        {
+          "name": "F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行",
+          "file": "test/测试/g4v2-mcp-verify/f-handler.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 restore 后自动续投一次（重启不排空不复现）",
+          "file": "test/测试/queue-recovery-e2e.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 回交未持久化",
+          "productCandidate": false
+        },
+        {
+          "name": "requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用",
+          "file": "test/桌面应用/interface.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: 项目正在处理派发或权限变更，选择尚未更改。请稍后重试。",
+          "productCandidate": true
+        }
+      ]
+    },
+    {
+      "family": "vca-flow",
+      "count": 13,
+      "platformCounts": {
+        "macos_arm64": 13,
+        "macos_x64": 13,
+        "windows_x64": 13
+      },
+      "codeCounts": {
+        "ERR_ASSERTION": 13,
+        "vca-role-not-allowed": 3,
+        "vca-channel-unavailable": 4
+      },
+      "files": [
+        {
+          "file": "test/测试/version-change-integration.test.ts",
+          "count": 9
+        },
+        {
+          "file": "test/桌面应用/version-change.test.ts",
+          "count": 4
+        }
+      ],
+      "known": {
+        "b0": 13,
+        "b7": 13,
+        "kr62": 0
+      },
+      "triage": {
+        "null": 13
+      },
+      "productCandidates": [],
+      "names": [
+        {
+          "name": "冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）",
+          "file": "test/桌面应用/version-change.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "vca-role-not-allowed",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base",
+          "productCandidate": false
+        },
+        {
+          "name": "bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "vca-channel-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "productCandidate": false
+        },
+        {
+          "name": "SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常",
+          "file": "test/桌面应用/version-change.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\\[工作结果\\]/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）",
+          "file": "test/桌面应用/version-change.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "vca-role-not-allowed",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）",
+          "file": "test/桌面应用/version-change.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "vca-role-not-allowed",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变）",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "vca-channel-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试）",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码）",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用）",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin）",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "vca-channel-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "productCandidate": false
+        },
+        {
+          "name": "VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖",
+          "file": "test/测试/version-change-integration.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "vca-channel-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "productCandidate": false
+        }
+      ]
+    },
+    {
+      "family": "unclassified-new",
+      "count": 12,
+      "platformCounts": {
+        "macos_arm64": 12,
+        "macos_x64": 12,
+        "windows_x64": 10
+      },
+      "codeCounts": {
+        "ERR_ASSERTION": 9
+      },
+      "files": [
+        {
+          "file": "test/编排/git-operation-sidecar-tolerance.test.ts",
+          "count": 6
+        },
+        {
+          "file": "test/编排/git-command.test.ts",
+          "count": 3
+        },
+        {
+          "file": "test/runtime-core/file-write-safety.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/git-trunk-store.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/编排/run-role-submit-capabilities.test.ts",
+          "count": 1
+        }
+      ],
+      "known": {
+        "b0": 0,
+        "b7": 0,
+        "kr62": 0
+      },
+      "triage": {
+        "MAC": 1,
+        "null": 11
+      },
+      "productCandidates": [],
+      "names": [
+        {
+          "name": "D3 lstat ENOTDIR is a status error, never a new-file fallback",
+          "file": "test/runtime-core/file-write-safety.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": "MAC",
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /无法读取目标状态.*ENOTDIR/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+          "file": "test/编排/git-command.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /git-command-failed:null:unknown/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "Git init journal: restart discovery binds the original operation and excludes FS/ref media",
+          "file": "test/编排/git-command.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:",
+          "productCandidate": false
+        },
+        {
+          "name": "Git operation media: restart enumeration discovers both formats and refuses same-id rebinding",
+          "file": "test/编排/git-trunk-store.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:",
+          "productCandidate": false
+        },
+        {
+          "name": "Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit",
+          "file": "test/编排/git-command.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "productCandidate": false
+        },
+        {
+          "name": "I0-11: a normal journal with a sidecar is unaffected (journal remains authoritative)",
+          "file": "test/编排/git-operation-sidecar-tolerance.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: git-journal-directory-invalid",
+          "productCandidate": false
+        },
+        {
+          "name": "I0-11: a safe sidecar-only operation directory is tolerated by the journal scanner and effective-manifest reads",
+          "file": "test/编排/git-operation-sidecar-tolerance.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: git-journal-directory-invalid",
+          "productCandidate": false
+        },
+        {
+          "name": "I0-11: sidecar plus an unknown extra file stays fail-closed",
+          "file": "test/编排/git-operation-sidecar-tolerance.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /authorization-sidecar-directory-unknown/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "I0-11: unsafe sidecars (hardlink nlink≠1, oversized file, non-regular file) stay fail-closed",
+          "file": "test/编排/git-operation-sidecar-tolerance.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /authorization-sidecar-file-unsafe/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "I0-12: a corrupted stable-source stays fail-closed even with a sidecar present",
+          "file": "test/编排/git-operation-sidecar-tolerance.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /stable-work-source-corrupt/. Input:",
+          "productCandidate": false
+        },
+        {
+          "name": "I0-12: stable-source plus only a safe authorization.jsonl is tolerated; unknown extra files and unsafe sidecars stay fail-closed",
+          "file": "test/编排/git-operation-sidecar-tolerance.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: git-journal-directory-invalid",
+          "productCandidate": false
+        },
+        {
+          "name": "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+          "file": "test/编排/run-role-submit-capabilities.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": false,
+          "b7": false,
+          "kr62": false,
+          "triage": null,
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"reason\":\"missing\",\"message\":\"Error: ENOENT: no such file or directory, realpath '/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-o10-workflow-source-LVZ4UD/.ans/trunk/operations/59ff13f4e32417eab058606e1beb81f9eb341923c52db7c50dcddf562dc30223/stable-",
+          "productCandidate": false
+        }
+      ]
+    },
+    {
+      "family": "hang-timeout",
+      "count": 2,
+      "platformCounts": {
+        "macos_arm64": 2,
+        "macos_x64": 2,
+        "windows_x64": 2
+      },
+      "codeCounts": {},
+      "files": [
+        {
+          "file": "test/桌面应用/session-rebuild-race.test.ts",
+          "count": 1
+        },
+        {
+          "file": "test/桌面应用/stuck-redispatch.test.ts",
+          "count": 1
+        }
+      ],
+      "known": {
+        "b0": 2,
+        "b7": 2,
+        "kr62": 0
+      },
+      "triage": {
+        "null": 2
+      },
+      "productCandidates": [],
+      "names": [
+        {
+          "name": "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+          "file": "test/桌面应用/session-rebuild-race.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: 刷新扫描/后续重开未在有界窗口内结算：10000ms 内未结算 {\"refreshSettled\":false,\"stopSettled\":false,\"opened\":[\"A\",\"B\",\"A\"],\"disposed\":[\"A\"],\"sent\":[],\"live\":[\"B\"],\"openForRoleId\":\"B\"}",
+          "productCandidate": false
+        },
+        {
+          "name": "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口",
+          "file": "test/桌面应用/stuck-redispatch.test.ts",
+          "platforms": [
+            "macos_arm64",
+            "macos_x64",
+            "windows_x64"
+          ],
+          "b0": true,
+          "b7": true,
+          "kr62": false,
+          "triage": null,
+          "codes": [],
+          "errorFirst": "Error: C-04 decision 开关开启：judge 代选未在有界窗口内结算（无客户裁决事件）：10000ms 内未结算 {\"pushed\":1,\"rows\":0}",
+          "productCandidate": false
+        }
+      ]
+    }
+  ]
+}
