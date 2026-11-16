@@ -444,7 +444,11 @@ export async function createRealHttpDriver(scripts: HttpScripts, options: {
     assert.deepEqual(actual, publication.published.oid, "Existing entry must retain its real published delivery, no baseline seeded or defaulted");
     existingOwnedInput = { proofFile, proofSha256, root, delivered: publication };
   } else {
-    root = await fs.mkdtemp(path.join(os.tmpdir(), `q2-git-${options.tag}-`));
+    // B1（2026-11-16）：先 realpath 规范化夹具根。Windows CI 的 os.tmpdir() 是 8.3 短名
+    // （C:\Users\RUNNER~1\...）；mkdtemp 返回短名根，而 fs.promises.realpath 走 native 实现会展开长名，
+    // hashFixtureFiles 的 realpath 严格断言随之抛错。异常若发生在 save 阶段会跳过 dispose，fixture
+    // HTTP server/interval/会话句柄留在事件循环里，文件测试进程永不退出（Windows CI 静默停顿根因）。
+    root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), `q2-git-${options.tag}-`)));
     assert.deepEqual(await fs.readdir(root), []);
   }
   // Only the separate query/existing-repo case supplies setup; the new-project case leaves this absent.
@@ -661,7 +665,9 @@ export async function createRealHttpDriver(scripts: HttpScripts, options: {
     assert.ok(actual.toLowerCase().startsWith(temp.toLowerCase() + path.sep), "UI application state must stay in its owned OS TEMP directory");
     assert.equal(actual, applicationData); const stat = await fs.lstat(applicationData); assert.ok(stat.isDirectory() && !stat.isSymbolicLink());
   }
-  const desktop = createDesktopInterface({ pickDirectory: async () => root, emitRoleState: info => {
+  let desktop: ReturnType<typeof createDesktopInterface>;
+  try {
+    desktop = createDesktopInterface({ pickDirectory: async () => root, emitRoleState: info => {
     options.emitUiRoleState?.(info);
     writeTail("actual-role-state", tailScalars(info, ["projectRoot", "roleId", "runtime", "phase", "status", "busy", "activeTurnId", "clientMessageId", "taskId"]));
   }, emitEvent: event => {
@@ -698,6 +704,12 @@ export async function createRealHttpDriver(scripts: HttpScripts, options: {
     ...(applicationData ? { preferencesPath: path.join(applicationData, "ans/preferences.json") } : {}),
     customerInput: channel.customerInput, decisionJudgeSwitch: delegation,
   });
+  } catch (error) {
+    // B1（2026-11-16）：构造失败也必须关闭 fixture HTTP server——监听句柄会把文件测试进程留在事件循环里。
+    server.closeAllConnections();
+    if (server.listening) await new Promise<void>(resolve => server.close(() => { httpCounts.serverCloseCallbacks++; resolve(); }));
+    throw error;
+  }
   // Finite, read-only same-process sampling while the real Core effect handler is active.
   const actorSampler = setInterval(() => {
     if (pinProbeRequested && !pinProbeBusy && !pinnedChildObservations.length && pinProbeAttempts < 1200 && Date.now() - pinProbeLastMs >= 50) {
@@ -775,11 +787,17 @@ export async function createRealHttpDriver(scripts: HttpScripts, options: {
     async dispose() {
       if (closed) return; closed = true;
       captureTeardown("begin-owned-cleanup");
+      // B1（2026-11-16）：任何一步失败都不得阻断 fixture HTTP server/interval 的释放；先收齐错误，
+      // server 关闭后再如实抛出（单错原样，多错 AggregateError），避免事件循环句柄泄漏。
+      const failures: unknown[] = [];
       clearInterval(actorSampler);
-      channel.rejectAllPending("Q2 isolated fixture shutdown; no task approval/cancellation inferred");
+      try { channel.rejectAllPending("Q2 isolated fixture shutdown; no task approval/cancellation inferred"); } catch (error) { failures.push(error); }
       captureTeardown("before-desktop-stop-all");
-      await desktop.stopSession(); captureTeardown("all-desktop-sessions-stopped");
-      captureTeardown("before-documents-dispose"); desktop.disposeProjectDocuments(); captureTeardown("after-documents-dispose");
+      try { await desktop.stopSession(); } catch (error) { failures.push(error); }
+      captureTeardown("all-desktop-sessions-stopped");
+      captureTeardown("before-documents-dispose");
+      try { desktop.disposeProjectDocuments(); } catch (error) { failures.push(error); }
+      captureTeardown("after-documents-dispose");
       server.closeAllConnections(); if (server.listening) await new Promise<void>(resolve => server.close(() => { httpCounts.serverCloseCallbacks++; resolve(); }));
       captureTeardown("owned-http-server-closed");
       if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
@@ -793,6 +811,8 @@ export async function createRealHttpDriver(scripts: HttpScripts, options: {
       }
       writeTail("owned-dispose-awaited", { http: { ...httpCounts }, ownSockets: ownSockets.size, errorCount: errors.length });
       process.stdout.write(`Q_DRIVER_DISPOSE_AWAITED ${JSON.stringify({ at: new Date().toISOString(), resources: process.getActiveResourcesInfo() })}\n`);
+      if (failures.length === 1) throw failures[0];
+      if (failures.length > 1) throw new AggregateError(failures, "Owned fixture dispose failures; HTTP server and interval already released");
       // Keep all isolated files and Git objects for diagnosis. Never clean a user or dev checkout.
     },
     async samplePostCleanupDiagnostics() {

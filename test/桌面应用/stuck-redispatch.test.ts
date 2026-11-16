@@ -28,6 +28,18 @@ async function until(condition: () => boolean, timeoutMs = 3000): Promise<void> 
   }
 }
 
+/** B1（2026-11-16）：产品回执等待一律有界——未结算即抛带现场的可命名失败，不把文件拖到 --test-timeout。 */
+async function settledWithin<T>(promise: Promise<T>, label: string, facts: () => unknown, timeoutMs = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([promise, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label}：${timeoutMs}ms 内未结算 ${JSON.stringify(facts())}`)), timeoutMs);
+    })]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 function listing(root: string, extraWorker = false): ProjectListing {
   const roles: ProjectListing["roles"] = [
     { roleId: "chief", cardPath: "", boundaryPath: "", cardText: "chief", boundary: { entries: [], boundarySource: "<built-in:chief>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "chief" },
@@ -326,7 +338,7 @@ test("C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，�
       "恰一个唯一推荐项",
     );
     assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["continue"] } }).ok, true);
-    const result = await pending;
+    const result = await settledWithin(pending, "C-04 升级卡裁决后 redispatchTask 未在有界窗口内返回", () => ({ pushed: pushed.length }));
     assert.equal(result.escalated, true, result.message);
     assert.equal(result.selected, "continue");
     const state = await readTaskState(root);
@@ -337,7 +349,7 @@ test("C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，�
       "continue 的人工处置必须写入角色日志（可追溯）",
     );
   } finally {
-    await h.mgr.stop(null);
+    await settledWithin(h.mgr.stop(null), "C-04 清理阶段 stop 未在有界窗口内返回", () => ({ pushed: pushed.length }));
     channel.rejectAllPending("cleanup");
     await fs.rm(root, { recursive: true, force: true });
   }
@@ -369,7 +381,8 @@ test("C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项�
   const h = harness(root, { customerInput: channel.customerInput });
   try {
     await seedMaxChain(root, "t-switch-on");
-    const result = await h.mgr.redispatchTask({ projectRoot: root, taskId: "t-switch-on-r2" });
+    const result = await settledWithin(h.mgr.redispatchTask({ projectRoot: root, taskId: "t-switch-on-r2" }),
+      "C-04 decision 开关开启：judge 代选未在有界窗口内结算（无客户裁决事件）", () => ({ pushed: pushed.length, rows: rows.length }));
     assert.equal(result.escalated, true, result.message);
     assert.equal(pushed.length, 0, "开关开启且代批成功 ⇒ 不呈现客户卡");
     assert.equal(rows.length, 1, "恰一条 judge 结果行（可见性条件）");
@@ -379,7 +392,7 @@ test("C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项�
     const state = await readTaskState(root);
     assert.equal(state.records.get("t-switch-on-r2")?.closed?.note, "stuck-escalation:terminate", "代选后按 terminate 处置");
   } finally {
-    await h.mgr.stop(null);
+    await settledWithin(h.mgr.stop(null), "C-04 清理阶段 stop 未在有界窗口内返回", () => ({ pushed: pushed.length }));
     channel.rejectAllPending("cleanup");
     await fs.rm(root, { recursive: true, force: true });
   }

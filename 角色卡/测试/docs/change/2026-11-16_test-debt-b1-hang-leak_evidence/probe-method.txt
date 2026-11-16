@@ -1,0 +1,44 @@
+Probe method (2026-11-16, Windows 11 / Node v24.22.1; raw CI logs not re-committed)
+
+1) Windows 8.3 short-name reproduction (leak A)
+   - Create a long-named directory under %TEMP%; obtain its 8.3 short name (e.g. via `cmd /c dir /x`;
+     here: C:\Users\51054\AppData\Local\Temp\ans-studio-8dot3-long-name-b1 -> ...\AN7AEF~1).
+   - Export TEMP/TMP/TMPDIR=short path.
+   - Run the leak case only:
+     node --test --test-concurrency=1 --test-timeout=300000
+       --test-name-pattern="Q2 real default CodexChat HTTP"
+       "test/测试/git-role-workflows-e2e.test.ts"
+   - Pre-fix (pre-fix-8dot3-query-hang.log): test fails in 64.7111ms with
+     "Fixture inventory path must not traverse unknown links" (same as CI); the file process
+     produces no further output and does not exit within 120s (external `timeout -k 10 120` kills it, EXIT=124).
+   - Post-fix (post-fix-8dot3-query-pass.log): test passes (326.7566ms, duration_ms 810.134) and the
+     process exits naturally (EXIT=0).
+   - Why: fs.promises.realpath uses the native implementation and expands short names; fs.mkdtemp
+     returns the short spelling, so `realpath(file) === file` fails unless the fixture root is
+     canonicalized first (driver fix). Local probe also showed fs.realpathSync (JS impl) preserves the
+     short spelling while fs.promises.realpath expands it.
+
+2) session-rebuild-race circular-wait probe (hang B)
+   - A scratch script equivalent to the failing test was run from .tmp-b1 (not committed), with the
+     SessionManager real modules and the same wait gates. It logged rebuild/handle/open lifecycles and
+     a 15s watchdog state dump.
+   - probe-race-stack.log shows the gen-3 rebuilt handle's dispose entering from
+     LifecycleOpen.freezeBindings (app/desktop/session/lifecycle/open.ts:1316) ->
+     disposeObservedHandle -> handle.dispose, i.e. the open self-disposes when stop is detected;
+     stop simultaneously awaits the same rebuild chain; the test's dispose gate is only released after
+     the refresh/stop race. After the bound is added, the test reports
+     refreshSettled=false, stopSettled=false, live=["B"], openForRoleId="B" within 10s.
+
+3) dispose-order probe (failure-path hardening)
+   - A scratch script (not committed) creates a real driver, injects an evidence-save failure, and
+     calls driver.dispose() exactly like the e2e helper's ordering.
+   - probe-dispose-order.log shows dispose returned in 4ms, serverCloseCallbacks=1, the save error was
+     rethrown afterwards, and the process exited naturally (EXIT=0).
+
+4) 3x verification and parity
+   - Logs after-{race,redispatch,e2e}-run{1,2,3}.log; failname-parity.json is machine-extracted from
+     these logs plus the pre-fix baseline logs.
+   - For e2e runs, the generated evidence directory
+     (角色卡/测试/docs/change/2026-11-05_git-role-permissions-evidence/) was removed before each run so
+     every run starts from the same pristine state as a clean CI checkout (Q30/Q74 write proofs into
+     that directory and fail with ENOENT when it does not exist).
