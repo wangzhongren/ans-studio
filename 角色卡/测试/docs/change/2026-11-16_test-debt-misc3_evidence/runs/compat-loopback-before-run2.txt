@@ -1,0 +1,14 @@
+✔ 独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config，同任务及下一轮 completed (842.9723ms)
+ℹ {"runtime":"claude","wire":[{"model":"claude-sonnet-4-6","thinking":{"type":"adaptive","display":"updates"},"outputConfig":{"effort":"low"}},{"model":"claude-sonnet-4-6","thinking":null,"outputConfig":null},{"model":"claude-sonnet-4-6","thinking":null,"outputConfig":null}],"configurations":[{"effort":"low","effortEnv":null,"thinkingEnv":null},{"effort":null,"effortEnv":"unset","thinkingEnv":"1"}]}
+✔ 独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去参，同任务及下一轮完成 (823.2337ms)
+ℹ {"runtime":"codex","wire":[{"model":"gpt-5.5","reasoning":{"effort":"high"}},{"model":"gpt-5.5","reasoning":{}},{"model":"gpt-5.5","reasoning":{}}],"outcomes":["completed","completed"]}
+✔ 独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次 (624.7399ms)
+ℹ {"runtime":"pi","promptCalls":1,"toolCalls":1,"wire":[{"model":"independent-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"toolResultPresent":false},{"model":"independent-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"toolResultPresent":true},{"model":"independent-model","thinking":null,"toolResultPresent":true}]}
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2507.4858

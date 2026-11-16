@@ -801,10 +801,19 @@ test("路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户
     const closed = await convener!.closeCreatedTaskFixed!({ operationId: "op-close-b3-auto-1", taskId: "t-b3", outcome: "accepted" });
     assert.equal((closed as { ok: boolean }).ok, true, JSON.stringify(closed));
     assert.equal((closed as { stageCompleted?: boolean }).stageCompleted, true);
+    // R6 x64 CI（b31:819）：`release.merged` 先落发布账本，`workflow.closed delivered` 由
+    // `completeReleaseWorkflow` 在后续 await 才落 workflow 账本；只等 release.merged 时，
+    // 慢 runner 上紧接着的视图读取可能尚未关闭（closed.outcome undefined≠delivered）。
+    // 屏障改为等待**最终投影**收敛；断言不放宽（随后仍逐字断言 closed.outcome==="delivered"）。
     await until(async () => {
       const releases = (await readReleaseLedger(root)).events.filter((event) => event.workflowId === WF_B);
-      return releases.some((event) => event.kind === "release.merged");
-    }, "B3 accepted 后应自动呈 merge-main 并由客户确认合并");
+      if (!releases.some((event) => event.kind === "release.merged")) return false;
+      const view = deriveWorkflowView(
+        (await readWorkflowLedger(root)).events.filter((event) => event.workflowId === WF_B),
+        (await readTaskState(root)).events,
+      );
+      return view.closed?.outcome === "delivered";
+    }, "B3 accepted 后应自动呈 merge-main、由客户确认合并并交付关闭（workflow.closed delivered）");
     assert.equal(h.requests.length, 1);
     assert.equal(h.requests[0]!.cardKind, MERGE_MAIN_CARD_KIND);
     assert.match(h.requests[0]!.preview ?? "", new RegExp(WF_B));
