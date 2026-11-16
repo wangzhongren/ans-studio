@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects
+ok 1 - wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects
+  ---
+  duration_ms: 1723.5421
+  type: 'test'
+  ...
+# Subtest: wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+ok 2 - wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+  ---
+  duration_ms: 4058.6405
+  type: 'test'
+  ...
+# Subtest: wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects
+ok 3 - wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects
+  ---
+  duration_ms: 11330.3661
+  type: 'test'
+  ...
+# Subtest: wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit
+ok 4 - wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit
+  ---
+  duration_ms: 15050.6593
+  type: 'test'
+  ...
+# Subtest: wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects
+ok 5 - wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects
+  ---
+  duration_ms: 3988.8421
+  type: 'test'
+  ...
+# Subtest: wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+ok 6 - wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+  ---
+  duration_ms: 7244.7651
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15463.6398

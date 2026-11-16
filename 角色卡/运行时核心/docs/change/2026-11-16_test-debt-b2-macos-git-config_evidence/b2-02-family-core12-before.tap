@@ -1,0 +1,1390 @@
+TAP version 13
+# Subtest: R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference
+ok 1 - R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference
+  ---
+  duration_ms: 2.3951
+  type: 'test'
+  ...
+# Subtest: R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments
+ok 2 - R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments
+  ---
+  duration_ms: 3.6137
+  type: 'test'
+  ...
+# Subtest: R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success
+ok 3 - R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success
+  ---
+  duration_ms: 1.3767
+  type: 'test'
+  ...
+# Subtest: R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks
+ok 4 - R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks
+  ---
+  duration_ms: 0.4325
+  type: 'test'
+  ...
+# Subtest: R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded
+ok 5 - R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded
+  ---
+  duration_ms: 1.6448
+  type: 'test'
+  ...
+# Subtest: R24 malformed apply replies never become committed and delegated selection retains its real source
+ok 6 - R24 malformed apply replies never become committed and delegated selection retains its real source
+  ---
+  duration_ms: 2.046
+  type: 'test'
+  ...
+# Subtest: R24 model host result fields are rejected before the real choice callback and never enter request schema
+ok 7 - R24 model host result fields are rejected before the real choice callback and never enter request schema
+  ---
+  duration_ms: 1.6536
+  type: 'test'
+  ...
+# Subtest: R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field
+ok 8 - R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field
+  ---
+  duration_ms: 0.6553
+  type: 'test'
+  ...
+# Subtest: R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks
+ok 9 - R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks
+  ---
+  duration_ms: 1.0966
+  type: 'test'
+  ...
+# Subtest: R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis
+ok 10 - R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis
+  ---
+  duration_ms: 0.5657
+  type: 'test'
+  ...
+# Subtest: R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs
+ok 11 - R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs
+  ---
+  duration_ms: 0.9993
+  type: 'test'
+  ...
+# Subtest: R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages
+ok 12 - R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages
+  ---
+  duration_ms: 250.9866
+  type: 'test'
+  ...
+# {"actualDefaultCoreAndChat":true,"roots":["C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r20-default-chat-CNw0Hn","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r20-default-chat-CNw0Hn\\\\actual-skills-root"],"sourceBasisDigest":"22af381e69a8bbafa35d1170a6359075fd25a291cdb70bb0914fe25662489991","http":4,"stages":["write:lexical-read","write:canonical-read","write:final-write","edit:lexical-read","edit:canonical-read","edit:final-write"],"modelHostInjection":"rejected-before-gate"}
+# Subtest: R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent
+ok 13 - R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent
+  ---
+  duration_ms: 0.4184
+  type: 'test'
+  ...
+# Subtest: R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload
+ok 14 - R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload
+  ---
+  duration_ms: 0.4017
+  type: 'test'
+  ...
+# Subtest: R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch
+ok 15 - R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch
+  ---
+  duration_ms: 20.0415
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r18-parent-tool-K73ILF","actualDefaultChat":true,"http":3,"normalDispatchCallbacks":1,"forgedParentCallbacks":0}
+# Subtest: R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight
+ok 16 - R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight
+  ---
+  duration_ms: 32.1411
+  type: 'test'
+  ...
+# Subtest: R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write
+ok 17 - R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write
+  ---
+  duration_ms: 17.098
+  type: 'test'
+  ...
+# Subtest: R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt
+ok 18 - R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt
+  ---
+  duration_ms: 21.4382
+  type: 'test'
+  ...
+# Subtest: R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission
+ok 19 - R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission
+  ---
+  duration_ms: 55.8328
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r15-required-L8oy6X","actualRegisteredTools":["install_skill","uninstall_skill","install_mcp","uninstall_mcp"],"blockedResults":4,"oldEffects":0,"nativeConstructions":1,"http":2,"filesAndRegistrationsUnchanged":true}
+# Subtest: R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties
+ok 20 - R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties
+  ---
+  duration_ms: 6.783
+  type: 'test'
+  ...
+# Subtest: R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work
+ok 21 - R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work
+  ---
+  duration_ms: 205.22
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-required-Xq2vOf","unmanaged":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-unmanaged-FPtCce","requiredScripts":["run_shell","start_background_task","list_background_tasks","read_background_task","stop_background_task"],"rejectedNativeConstructions":0,"rejectedHttp":0,"rejectedMarkerWrites":0,"admittedNativeConstructions":3,"actualHttp":5,"ownedMarker":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-unmanaged-FPtCce\\\\owned-node-marker.txt"}
+# Subtest: R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind
+ok 22 - R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind
+  ---
+  duration_ms: 1.9874
+  type: 'test'
+  ...
+# Subtest: R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write
+ok 23 - R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write
+  ---
+  duration_ms: 3.4009
+  type: 'test'
+  ...
+# Subtest: R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction
+ok 24 - R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction
+  ---
+  duration_ms: 13.5131
+  type: 'test'
+  ...
+# Subtest: R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+not ok 25 - R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+  ---
+  duration_ms: 1.7816
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\runtime-core\\git-capability-tools.test.ts:739:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /coordinator-busy/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/src/service/runtime/session.ts:1298:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:747:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:747:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 interruption during async factory preparation prevents the subsequent native bind
+not ok 26 - R12 interruption during async factory preparation prevents the subsequent native bind
+  ---
+  duration_ms: 1.731
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\runtime-core\\git-capability-tools.test.ts:770:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /lease-interrupted/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/src/service/runtime/session.ts:1298:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:779:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:779:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+not ok 27 - R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+  ---
+  duration_ms: 1.3098
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\runtime-core\\git-capability-tools.test.ts:783:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/src/service/runtime/session.ts:1298:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:791:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation
+ok 28 - R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation
+  ---
+  duration_ms: 26.2829
+  type: 'test'
+  ...
+# Subtest: R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary
+ok 29 - R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary
+  ---
+  duration_ms: 0.8386
+  type: 'test'
+  ...
+# Subtest: R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task
+ok 30 - R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task
+  ---
+  duration_ms: 0.4942
+  type: 'test'
+  ...
+# Subtest: R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source
+ok 31 - R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source
+  ---
+  duration_ms: 0.413
+  type: 'test'
+  ...
+# Subtest: Git capabilities register only when injected; all six roles/worker may query a host-bound template
+ok 32 - Git capabilities register only when injected; all six roles/worker may query a host-bound template
+  ---
+  duration_ms: 0.8515
+  type: 'test'
+  ...
+# Subtest: Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields
+ok 33 - Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields
+  ---
+  duration_ms: 1.1312
+  type: 'test'
+  ...
+# Subtest: full object-format OIDs and literal paths replace short revisions/pathspecs/user refs
+ok 34 - full object-format OIDs and literal paths replace short revisions/pathspecs/user refs
+  ---
+  duration_ms: 0.7858
+  type: 'test'
+  ...
+# Subtest: candidate actions have exact shapes and trusted scope; prepared is not published
+ok 35 - candidate actions have exact shapes and trusted scope; prepared is not published
+  ---
+  duration_ms: 0.456
+  type: 'test'
+  ...
+# Subtest: publish scope and actual expected-ref/OID result are checked; no raw success on mismatch
+ok 36 - publish scope and actual expected-ref/OID result are checked; no raw success on mismatch
+  ---
+  duration_ms: 0.4459
+  type: 'test'
+  ...
+# Subtest: Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit
+ok 37 - Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit
+  ---
+  duration_ms: 0.53
+  type: 'test'
+  ...
+# Subtest: Git schema declarations are strict nested templates, with no host-only fields
+ok 38 - Git schema declarations are strict nested templates, with no host-only fields
+  ---
+  duration_ms: 0.2269
+  type: 'test'
+  ...
+# Subtest: actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+not ok 39 - actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+  ---
+  duration_ms: 3.7305
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\runtime-core\\git-capability-tools.test.ts:985:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/src/service/runtime/session.ts:1298:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:987:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 a custom factory cannot self-report the default Codex Chat production provenance
+not ok 40 - R8 a custom factory cannot self-report the default Codex Chat production provenance
+  ---
+  duration_ms: 1.5161
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\runtime-core\\git-capability-tools.test.ts:1022:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/src/service/runtime/session.ts:1298:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:1023:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 native registry/instance/role/runtime/activity mismatches remain unknown
+not ok 41 - R8 native registry/instance/role/runtime/activity mismatches remain unknown
+  ---
+  duration_ms: 1.182
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\runtime-core\\git-capability-tools.test.ts:1039:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/src/service/runtime/session.ts:1298:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:1056:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 active HTTP inference alone is not treated as an uncontrolled execution program
+not ok 42 - R8 active HTTP inference alone is not treated as an uncontrolled execution program
+  ---
+  duration_ms: 0.8394
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\runtime-core\\git-capability-tools.test.ts:1068:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/src/service/runtime/session.ts:1298:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/runtime-core/git-capability-tools.test.ts:1069:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate
+ok 43 - R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate
+  ---
+  duration_ms: 259.267
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz","commands":[["git","init","--quiet","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\repo"],["git","-C","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\repo","-c","user.name=R9 fixture","-c","user.email=r9@example.invalid","commit","--quiet","--allow-empty","-m","owned fixture"],["git","-C","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\repo","worktree","add","--quiet","--detach","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\other-worktree","HEAD"],["git","init","--quiet","--separate-git-dir","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\common-dir","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\separate-repo"]],"gateCalls":18,"evidence":[{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\repo\\\\.git\\\\config","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\hardlink-0.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\common-dir\\\\config","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\hardlink-1.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\other-worktree\\\\owned.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\hardlink-2.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9","afterSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\repo\\\\.git\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\junction-0\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\common-dir\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\junction-1\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\other-worktree\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-bgBhmz\\\\junction-2\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"}]}
+# Subtest: R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots
+ok 44 - R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots
+  ---
+  duration_ms: 37.8067
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-final-80LbAb","ordinary":"write+edit succeeded","lateHardlink":"both rejected","newRepo":"no .git created"}
+# Subtest: R9 Service binds defensive host roots without claiming FS confinement or complete discovery
+ok 45 - R9 Service binds defensive host roots without claiming FS confinement or complete discovery
+  ---
+  duration_ms: 7.3697
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：符号链接祖先的临时根被接受（同一真实根的不同书写形式）
+ok 46 - P0 根规范化：符号链接祖先的临时根被接受（同一真实根的不同书写形式）
+  ---
+  duration_ms: 23.7033
+  type: 'test'
+  ...
+# {"platform":"win32","aliasRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-p0-alias-K8ypE2\\\\alias-parent\\\\project","realRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-p0-alias-K8ypE2\\\\real-parent\\\\project","state":"required"}
+# Subtest: P0 根规范化：最终根自身是符号链接仍拒绝（noncanonical-project-root）
+ok 47 - P0 根规范化：最终根自身是符号链接仍拒绝（noncanonical-project-root）
+  ---
+  duration_ms: 6.0348
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：初始化源记录指向不同真实根仍 fail-closed 拒绝
+ok 48 - P0 根规范化：初始化源记录指向不同真实根仍 fail-closed 拒绝
+  ---
+  duration_ms: 15.571
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：既有控制路径符号链接拒绝不放宽（.ans/trunk、.git 文件）
+ok 49 - P0 根规范化：既有控制路径符号链接拒绝不放宽（.ans/trunk、.git 文件）
+  ---
+  duration_ms: 12.8602
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：初始化事实/真实 Git 初始化在符号链接祖先根下成立，最终根链接仍拒绝
+ok 50 - P0 根规范化：初始化事实/真实 Git 初始化在符号链接祖先根下成立，最终根链接仍拒绝
+  ---
+  duration_ms: 76.0461
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：fileGateProtection 指向不同真实根 ⇒ 丢弃事实、写 fail-closed
+ok 51 - P0 根规范化：fileGateProtection 指向不同真实根 ⇒ 丢弃事实、写 fail-closed
+  ---
+  duration_ms: 23.507
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：Core 绑定与 host-facts file gate 在符号链接祖先根下工作
+ok 52 - P0 根规范化：Core 绑定与 host-facts file gate 在符号链接祖先根下工作
+  ---
+  duration_ms: 43.968
+  type: 'test'
+  ...
+# {"platform":"win32","session":"38004cf0-f22f-47d9-ab1d-a2762f79fcab","protectionRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-p0-core-Z7kabI\\\\real-parent\\\\project","sessionRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-p0-core-Z7kabI\\\\alias-parent\\\\project"}
+# Subtest: B3-2b 根规范化：host coordinator 按真实根归一符号链接祖先；不同真实根仍隔离
+ok 53 - B3-2b 根规范化：host coordinator 按真实根归一符号链接祖先；不同真实根仍隔离
+  ---
+  duration_ms: 7.0094
+  type: 'test'
+  ...
+# {"platform":"win32","aliasRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-b3-2b-alias-J0M0UQ\\\\alias-parent\\\\project","realRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-b3-2b-alias-J0M0UQ\\\\real-parent\\\\project","leaseId":"d8f44bb5-d981-4ed1-a3c9-3328979a5674"}
+# Subtest: B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid
+ok 54 - B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid
+  ---
+  duration_ms: 1736.5708
+  type: 'test'
+  ...
+# {"platform":"win32","shortRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\AN674A~2\\\\PROJEC~1","canonicalRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-b3-2b-short-RIjJxX\\\\project-with-a-very-long-directory-name","leaseId":"4e2deed4-2403-4dd9-bdcf-814825aae3ae"}
+# Subtest: B3-2b 根规范化：不可解析根 fail-closed（不为未知拼写创建可命中的 coordinator）
+ok 55 - B3-2b 根规范化：不可解析根 fail-closed（不为未知拼写创建可命中的 coordinator）
+  ---
+  duration_ms: 0.6669
+  type: 'test'
+  ...
+# Subtest: B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe）
+ok 56 - B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe）
+  ---
+  duration_ms: 806.7321
+  type: 'test'
+  ...
+# {"platform":"win32","shortRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\AN9F01~6\\\\PROJEC~1","canonicalRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-b3-2c-short-QYQ6yE\\\\project-with-a-very-long-directory-name"}
+# Subtest: B3-2c git 控制路径：符号链接祖先根归一；最终根/控制路径自身链接仍拒
+ok 57 - B3-2c git 控制路径：符号链接祖先根归一；最终根/控制路径自身链接仍拒
+  ---
+  duration_ms: 15.682
+  type: 'test'
+  ...
+# {"platform":"win32","aliasRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-b3-2c-control-VmEQXV\\\\alias-parent\\\\project","realRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-b3-2c-control-VmEQXV\\\\real-parent\\\\project"}
+# Subtest: W5-T1 bootstrap 4-target 全链：9 文件快照 → vca.prepareDirect 接受 → candidate/publication allowed → 真实 t1 提交
+ok 58 - W5-T1 bootstrap 4-target 全链：9 文件快照 → vca.prepareDirect 接受 → candidate/publication allowed → 真实 t1 提交
+  ---
+  duration_ms: 5243.8336
+  type: 'test'
+  ...
+# Subtest: W5-T2 7-target 同 kind 多版本单请求：service trunk-item-invalid / 全链 vca-target-invalid，无副作用（M1）
+ok 59 - W5-T2 7-target 同 kind 多版本单请求：service trunk-item-invalid / 全链 vca-target-invalid，无副作用（M1）
+  ---
+  duration_ms: 1258.4436
+  type: 'test'
+  ...
+# Subtest: W5-T3 bootstrap 闭合 fail-closed：历史 frozen 文件缺失、漂移、不可读均拒绝且无 manifest/ref/snapshot
+ok 60 - W5-T3 bootstrap 闭合 fail-closed：历史 frozen 文件缺失、漂移、不可读均拒绝且无 manifest/ref/snapshot
+  ---
+  duration_ms: 2875.8101
+  type: 'test'
+  ...
+# Subtest: W5-T6 账本坏行、未知 event、非法 freeze 形状：真实注册表整体 fail-closed（不跳过、无副作用）
+ok 61 - W5-T6 账本坏行、未知 event、非法 freeze 形状：真实注册表整体 fail-closed（不跳过、无副作用）
+  ---
+  duration_ms: 3084.0766
+  type: 'test'
+  ...
+# Subtest: W5-T7 同 path 两种 sha（意图证据 vs frozen 记录）：fail-closed，消息含冲突路径
+ok 62 - W5-T7 同 path 两种 sha（意图证据 vs frozen 记录）：fail-closed，消息含冲突路径
+  ---
+  duration_ms: 1000.6756
+  type: 'test'
+  ...
+# Subtest: W5-T17 异 flow 冻结行逐行 fail-closed（不静默过滤，消息含 flowId）
+ok 63 - W5-T17 异 flow 冻结行逐行 fail-closed（不静默过滤，消息含 flowId）
+  ---
+  duration_ms: 1306.143
+  type: 'test'
+  ...
+# Subtest: W5-T18 record.path 已是 -vN.md 且后缀 ≠ record.version：真实注册表拒绝；注入注册表下服务侧防御性拒绝
+ok 64 - W5-T18 record.path 已是 -vN.md 且后缀 ≠ record.version：真实注册表拒绝；注入注册表下服务侧防御性拒绝
+  ---
+  duration_ms: 1750.3363
+  type: 'test'
+  ...
+# Subtest: W5-T19 未证明 snapshot-content（docs/proposals 非槽位非 frozen）：candidate/publication 仍 git-policy-raw-write-scope；证明后放行
+ok 65 - W5-T19 未证明 snapshot-content（docs/proposals 非槽位非 frozen）：candidate/publication 仍 git-policy-raw-write-scope；证明后放行
+  ---
+  duration_ms: 90.7005
+  type: 'test'
+  ...
+# Subtest: W5-回归 t1 之后：非 bootstrap direct 快照仅含新 target；team-plan 快照仅 directRefs（不含 versions/历史）
+ok 66 - W5-回归 t1 之后：非 bootstrap direct 快照仅含新 target；team-plan 快照仅 directRefs（不含 versions/历史）
+  ---
+  duration_ms: 6400.1932
+  type: 'test'
+  ...
+# Subtest: Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources
+ok 67 - Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources # SKIP
+  ---
+  duration_ms: 0.6047
+  type: 'test'
+  ...
+# Subtest: Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources
+ok 68 - Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources # SKIP
+  ---
+  duration_ms: 0.0783
+  type: 'test'
+  ...
+# Subtest: Review assignment: an expected OID or built-in name cannot replace a real integrated run and host criterion
+ok 69 - Review assignment: an expected OID or built-in name cannot replace a real integrated run and host criterion
+  ---
+  duration_ms: 139.3712
+  type: 'test'
+  ...
+# Subtest: Chief final review and resume: exact host-shaped refs cannot invent integration, quality or reopen an ordinary preparation
+ok 70 - Chief final review and resume: exact host-shaped refs cannot invent integration, quality or reopen an ordinary preparation
+  ---
+  duration_ms: 186.1723
+  type: 'test'
+  ...
+# Subtest: Delivery authority: expected object refs and a role name do not replace real accepted independent quality
+ok 71 - Delivery authority: expected object refs and a role name do not replace real accepted independent quality
+  ---
+  duration_ms: 570.1702
+  type: 'test'
+  ...
+# Subtest: Revert Service/Pipeline: real objects and a controller title cannot invent a pin or Chief quality
+ok 72 - Revert Service/Pipeline: real objects and a controller title cannot invent a pin or Chief quality
+  ---
+  duration_ms: 564.5735
+  type: 'test'
+  ...
+# Subtest: Git Service/Pipeline: actual task/run plus G exact argv/read policy permits a bounded query
+ok 73 - Git Service/Pipeline: actual task/run plus G exact argv/read policy permits a bounded query
+  ---
+  duration_ms: 674.001
+  type: 'test'
+  ...
+# Subtest: Git Service: policy result binds current repo/task/run/revision and cannot be reused after actual ledger change
+ok 74 - Git Service: policy result binds current repo/task/run/revision and cannot be reused after actual ledger change
+  ---
+  duration_ms: 298.3926
+  type: 'test'
+  ...
+# Subtest: Git modification Service: no self-reported proof or script identity can open mutations; Git metadata stays unchanged
+ok 75 - Git modification Service: no self-reported proof or script identity can open mutations; Git metadata stays unchanged
+  ---
+  duration_ms: 326.354
+  type: 'test'
+  ...
+# Subtest: Git normal read tool: host-bound query reaches real Git; a global query does not fabricate a task
+ok 76 - Git normal read tool: host-bound query reaches real Git; a global query does not fabricate a task
+  ---
+  duration_ms: 531.5545
+  type: 'test'
+  ...
+# Subtest: Git host coordination: ordinary unknown inventory serializes real host actions without minting a mutation permit
+ok 77 - Git host coordination: ordinary unknown inventory serializes real host actions without minting a mutation permit
+  ---
+  duration_ms: 77.4176
+  type: 'test'
+  ...
+# Subtest: Git cross-project admission: one actual mutation lease excludes new actors everywhere and emergency facts invalidate without releasing it
+ok 78 - Git cross-project admission: one actual mutation lease excludes new actors everywhere and emergency facts invalidate without releasing it
+  ---
+  duration_ms: 3.5854
+  type: 'test'
+  ...
+# Subtest: Formal new-project route: filesystem emptiness cannot replace native selection and an actual chief parent turn
+ok 79 - Formal new-project route: filesystem emptiness cannot replace native selection and an actual chief parent turn
+  ---
+  duration_ms: 54.0761
+  type: 'test'
+  ...
+# Subtest: Git initialization Service effect: storage fixture rechecks bytes, rejects copied preparation and replays actual empty candidate
+ok 80 - Git initialization Service effect: storage fixture rechecks bytes, rejects copied preparation and replays actual empty candidate
+  ---
+  duration_ms: 7334.4821
+  type: 'test'
+  ...
+# Subtest: Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+not ok 81 - Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+  ---
+  duration_ms: 3165.348
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\编排\\git-capabilities.test.ts:515:1'
+  failureType: 'testCodeFailure'
+  error: '{"ok":false,"code":"trunk-item-invalid","message":"The actual publication task has no original Chief input source"}'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/%E7%BC%96%E6%8E%92/git-capabilities.test.ts:541:82)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Git team plan prepare→commit (P-9): omitted values derive at prepare, prepared input stays exact, replay and post-prepare drift stay fail-closed
+ok 82 - Git team plan prepare→commit (P-9): omitted values derive at prepare, prepared input stays exact, replay and post-prepare drift stay fail-closed
+  ---
+  duration_ms: 10007.6578
+  type: 'test'
+  ...
+# Subtest: NoGit protection absence: private issued facts protect potential metadata and reject a new ancestor association
+ok 83 - NoGit protection absence: private issued facts protect potential metadata and reject a new ancestor association
+  ---
+  duration_ms: 15.4867
+  type: 'test'
+  ...
+# Subtest: Git protection freshness: only the issued observation survives unchanged config/topology
+ok 84 - Git protection freshness: only the issued observation survives unchanged config/topology
+  ---
+  duration_ms: 75.2588
+  type: 'test'
+  ...
+# Subtest: Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry
+ok 85 - Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry
+  ---
+  duration_ms: 1166.4784
+  type: 'test'
+  ...
+# Subtest: Git init Provider: final real root/file hashes fence initialization and persist original operation process identity
+ok 86 - Git init Provider: final real root/file hashes fence initialization and persist original operation process identity
+  ---
+  duration_ms: 91.5738
+  type: 'test'
+  ...
+# Subtest: Git init journal: restart discovery binds the original operation and excludes FS/ref media
+ok 87 - Git init journal: restart discovery binds the original operation and excludes FS/ref media
+  ---
+  duration_ms: 42.0452
+  type: 'test'
+  ...
+# Subtest: Git init process fence: a previous unknown instance cannot be overwritten even while .git is absent
+ok 88 - Git init process fence: a previous unknown instance cannot be overwritten even while .git is absent
+  ---
+  duration_ms: 8.4817
+  type: 'test'
+  ...
+# Subtest: Git protection requirement: actual source binds scope; deleting evidence cannot clear it; an unknown association is not unmanaged
+ok 89 - Git protection requirement: actual source binds scope; deleting evidence cannot clear it; an unknown association is not unmanaged
+  ---
+  duration_ms: 14.252
+  type: 'test'
+  ...
+# Subtest: Git empty plan: computed sha1 object bytes match actual fixed-date Git readback
+ok 90 - Git empty plan: computed sha1 object bytes match actual fixed-date Git readback
+  ---
+  duration_ms: 337.504
+  type: 'test'
+  ...
+# Subtest: Git empty plan: computed sha256 object bytes match actual fixed-date Git readback
+ok 91 - Git empty plan: computed sha256 object bytes match actual fixed-date Git readback
+  ---
+  duration_ms: 321.1375
+  type: 'test'
+  ...
+# {"repoId":"809d9b0a6ec8b80a20e379a2f9db7318b15bf206dae863b05d903f56db38b1d3","executable":"C:\\\\Program Files\\\\Git\\\\cmd\\\\git.exe","argv":["--no-pager","--no-optional-locks","--literal-pathspecs","-c","core.fsmonitor=false","-c","core.hooksPath=NUL","-c","core.untrackedCache=false","-c","core.excludesFile=NUL","-c","core.pager=cat","-c","pager.status=false","-c","pager.diff=false","-c","maintenance.auto=false","-c","gc.auto=0","-c","protocol.allow=never","-c","diff.external=","-c","core.attributesFile=NUL","status","--porcelain=v1","-z","--untracked-files=normal","--ignore-submodules=all","--","actual.txt"],"termination":"exited"}
+# Subtest: Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config
+ok 92 - Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config
+  ---
+  duration_ms: 105.1944
+  type: 'test'
+  ...
+# Subtest: Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query
+ok 93 - Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query
+  ---
+  duration_ms: 193.488
+  type: 'test'
+  ...
+# Subtest: B30 user section accepted: desktop identity defaults (name=ANS/email=ans@local) no longer block inspect or status
+ok 94 - B30 user section accepted: desktop identity defaults (name=ANS/email=ans@local) no longer block inspect or status
+  ---
+  duration_ms: 158.6381
+  type: 'test'
+  ...
+# Subtest: B30 user section stays fail-closed: illegal keys/values and every other dangerous section still reject
+ok 95 - B30 user section stays fail-closed: illegal keys/values and every other dangerous section still reject
+  ---
+  duration_ms: 522.8363
+  type: 'test'
+  ...
+# Subtest: Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported
+ok 96 - Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported
+  ---
+  duration_ms: 52.4728
+  type: 'test'
+  ...
+# Subtest: Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit
+ok 97 - Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit
+  ---
+  duration_ms: 408.2007
+  type: 'test'
+  ...
+# Subtest: I0-11: a safe sidecar-only operation directory is tolerated by the journal scanner and effective-manifest reads
+ok 98 - I0-11: a safe sidecar-only operation directory is tolerated by the journal scanner and effective-manifest reads
+  ---
+  duration_ms: 1918.9034
+  type: 'test'
+  ...
+# Subtest: I0-11: sidecar plus an unknown extra file stays fail-closed
+ok 99 - I0-11: sidecar plus an unknown extra file stays fail-closed
+  ---
+  duration_ms: 1529.6354
+  type: 'test'
+  ...
+# Subtest: I0-11: unsafe sidecars (hardlink nlink≠1, oversized file, non-regular file) stay fail-closed
+ok 100 - I0-11: unsafe sidecars (hardlink nlink≠1, oversized file, non-regular file) stay fail-closed
+  ---
+  duration_ms: 3895.7964
+  type: 'test'
+  ...
+# Subtest: I0-11: a normal journal with a sidecar is unaffected (journal remains authoritative)
+ok 101 - I0-11: a normal journal with a sidecar is unaffected (journal remains authoritative)
+  ---
+  duration_ms: 1466.4368
+  type: 'test'
+  ...
+# Subtest: I0-12: stable-source plus only a safe authorization.jsonl is tolerated; unknown extra files and unsafe sidecars stay fail-closed
+ok 102 - I0-12: stable-source plus only a safe authorization.jsonl is tolerated; unknown extra files and unsafe sidecars stay fail-closed
+  ---
+  duration_ms: 4245.4599
+  type: 'test'
+  ...
+# Subtest: I0-12: a corrupted stable-source stays fail-closed even with a sidecar present
+ok 103 - I0-12: a corrupted stable-source stays fail-closed even with a sidecar present
+  ---
+  duration_ms: 1481.9719
+  type: 'test'
+  ...
+# execution-bases:first-document-source-captured
+# execution-bases:delivered-code-newer-document-selected
+# execution-bases:old-source-and-stale-cas-verified
+# execution-bases:actual-ancestry-selected-ambiguous-heads-denied
+# Subtest: Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time
+ok 104 - Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time
+  ---
+  duration_ms: 35815.9781
+  type: 'test'
+  ...
+# Subtest: Git delivery bytes: real sha1 raw commits and null/existing ref CAS preserve the code basis
+ok 105 - Git delivery bytes: real sha1 raw commits and null/existing ref CAS preserve the code basis
+  ---
+  duration_ms: 2987.0064
+  type: 'test'
+  ...
+# Subtest: Git delivery bytes: real sha256 raw commits and null/existing ref CAS preserve the code basis
+ok 106 - Git delivery bytes: real sha256 raw commits and null/existing ref CAS preserve the code basis
+  ---
+  duration_ms: 2775.1351
+  type: 'test'
+  ...
+# {"format":"sha1","first":{"objectFormat":"sha1","hex":"f8691981da6883c555dc0862292245f6bb1f6a82"},"next":{"objectFormat":"sha1","hex":"530243a8931305ba9c89532fbcaaabb59de3f548"},"tree":{"objectFormat":"sha1","hex":"fc47c6d69618bdded84c851c9ff2584bebdd6f15"},"parents":[{"objectFormat":"sha1","hex":"f8691981da6883c555dc0862292245f6bb1f6a82"}]}
+# Subtest: Git candidates: real sha1 complete trees preserve unchanged arbitrary bytes and isolate the user index
+ok 107 - Git candidates: real sha1 complete trees preserve unchanged arbitrary bytes and isolate the user index
+  ---
+  duration_ms: 976.2155
+  type: 'test'
+  ...
+# {"format":"sha256","first":{"objectFormat":"sha256","hex":"edcabb8492c05de81861380178a5fb8e0f9f256d25eda2c9be554f84a3a47b31"},"next":{"objectFormat":"sha256","hex":"dbbe9c580d8d45dab62d4e4aee5ed59cc9b4bffcffbe6a611a4b804da0c546dc"},"tree":{"objectFormat":"sha256","hex":"01c1d13911908cf1c77a5fd880e9f4fa4bdf6bbbb1f5f6a1caffb4793ceedc25"},"parents":[{"objectFormat":"sha256","hex":"edcabb8492c05de81861380178a5fb8e0f9f256d25eda2c9be554f84a3a47b31"}]}
+# Subtest: Git candidates: real sha256 complete trees preserve unchanged arbitrary bytes and isolate the user index
+ok 108 - Git candidates: real sha256 complete trees preserve unchanged arbitrary bytes and isolate the user index
+  ---
+  duration_ms: 994.3406
+  type: 'test'
+  ...
+# Subtest: Git revert Provider: real sha1 inverse applies to current code and preserves unrelated later files
+ok 109 - Git revert Provider: real sha1 inverse applies to current code and preserves unrelated later files
+  ---
+  duration_ms: 6858.7727
+  type: 'test'
+  ...
+# Subtest: Git revert Provider: real sha256 inverse applies to current code and preserves unrelated later files
+ok 110 - Git revert Provider: real sha256 inverse applies to current code and preserves unrelated later files
+  ---
+  duration_ms: 6953.5147
+  type: 'test'
+  ...
+# {"old":null,"published":{"objectFormat":"sha1","hex":"90904c689df83ba2badb559b5b50486ce6c9010b"},"results":[{"status":"conflict","journalId":".ans/trunk/operations/7aebf56e035aecd38ee2c6264322d3356c90a40b5a93b1eefc2a5cdf15110ef7/git.json"},{"status":"published","journalId":".ans/trunk/operations/e6537ffc30aa789aaa2ff3671b9eb2bea7604e0bc8df187e10973d5a36efac4f/git.json"}]}
+# Subtest: Git ref CAS: real independent Node processes have one winner; recovery uses actual ref and immutable commit
+ok 111 - Git ref CAS: real independent Node processes have one winner; recovery uses actual ref and immutable commit
+  ---
+  duration_ms: 1154.3053
+  type: 'test'
+  ...
+# Subtest: Git query: output and real process time are bounded; forced cancellation never claims whole-tree termination
+ok 112 - Git query: output and real process time are bounded; forced cancellation never claims whole-tree termination
+  ---
+  duration_ms: 293.8534
+  type: 'test'
+  ...
+# Subtest: Git operation media: restart enumeration discovers both formats and refuses same-id rebinding
+ok 113 - Git operation media: restart enumeration discovers both formats and refuses same-id rebinding
+  ---
+  duration_ms: 489.7901
+  type: 'test'
+  ...
+# Subtest: Git mutation process fence: an unresolved prior instance survives restart and never expires from clock or missing pid
+ok 114 - Git mutation process fence: an unresolved prior instance survives restart and never expires from clock or missing pid
+  ---
+  duration_ms: 117.1568
+  type: 'test'
+  ...
+# Subtest: Git TrunkStore: full five-argument CAS, same-version workflow fence, media-bound business recovery and read-only production selection
+ok 115 - Git TrunkStore: full five-argument CAS, same-version workflow fence, media-bound business recovery and read-only production selection
+  ---
+  duration_ms: 5539.5219
+  type: 'test'
+  ...
+# Subtest: Git migration: actual legacy committed and pending operations keep their original media proof
+ok 116 - Git migration: actual legacy committed and pending operations keep their original media proof
+  ---
+  duration_ms: 2109.5521
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: 固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行
+ok 117 - 固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行
+  ---
+  duration_ms: 281.6821
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: B30 桌面默认身份：repo-local [user] name=ANS/email=ans@local 不阻断 executeReadonlyGit('status')（真实仓库夹具）
+ok 118 - B30 桌面默认身份：repo-local [user] name=ANS/email=ans@local 不阻断 executeReadonlyGit('status')（真实仓库夹具）
+  ---
+  duration_ms: 302.9293
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: 不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）
+ok 119 - 不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）
+  ---
+  duration_ms: 211.4982
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源
+ok 120 - alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源
+  ---
+  duration_ms: 222.225
+  type: 'test'
+  ...
+# Subtest: 预算有界：outputLimit 生效并如实标记 stdoutTruncated
+ok 121 - 预算有界：outputLimit 生效并如实标记 stdoutTruncated
+  ---
+  duration_ms: 216.6286
+  type: 'test'
+  ...
+# Subtest: 执行面静态断言：executeReadonlyGit 经 buildReadonlyGitBody + executeGit（固定传输），不自行 spawn/拼 argv
+ok 122 - 执行面静态断言：executeReadonlyGit 经 buildReadonlyGitBody + executeGit（固定传输），不自行 spawn/拼 argv
+  ---
+  duration_ms: 0.567
+  type: 'test'
+  ...
+# Subtest: direct governance bridge: only the trusted trio action owner receives each capability
+ok 123 - direct governance bridge: only the trusted trio action owner receives each capability
+  ---
+  duration_ms: 75.424
+  type: 'test'
+  ...
+# Subtest: chief bridge: trusted bounded context forwards only decision capability and denies production writes
+ok 124 - chief bridge: trusted bounded context forwards only decision capability and denies production writes
+  ---
+  duration_ms: 9.8582
+  type: 'test'
+  ...
+# Subtest: chief bridge: wrong role, single model and unbound settlement capability fail before adapter construction
+ok 125 - chief bridge: wrong role, single model and unbound settlement capability fail before adapter construction
+  ---
+  duration_ms: 0.9915
+  type: 'test'
+  ...
+# Subtest: chief bridge: real runtime Service sees only decide tool, separate host context, and no session persistence
+ok 126 - chief bridge: real runtime Service sees only decide tool, separate host context, and no session persistence
+  ---
+  duration_ms: 21.8717
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：product → 仅 submitVersionChange；rapporteur 同；convener → refactor+stable；chief 全无
+ok 127 - run-role 能力注入：product → 仅 submitVersionChange；rapporteur 同；convener → refactor+stable；chief 全无
+  ---
+  duration_ms: 40.0151
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：项目角色即便调用方误给也不注入三能力（模型自报角色不可信）
+ok 128 - run-role 能力注入：项目角色即便调用方误给也不注入三能力（模型自报角色不可信）
+  ---
+  duration_ms: 20.9972
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：未注入 ⇒ 能力位缺席（工具不注册；无副作用）
+ok 129 - run-role 能力注入：未注入 ⇒ 能力位缺席（工具不注册；无副作用）
+  ---
+  duration_ms: 7.8171
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：假实现的结构化回执形状（submitted/requested）由工具层透传（形状自检）
+ok 130 - run-role 能力注入：假实现的结构化回执形状（submitted/requested）由工具层透传（形状自检）
+  ---
+  duration_ms: 0.2756
+  type: 'test'
+  ...
+# Subtest: Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions
+ok 131 - Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions
+  ---
+  duration_ms: 2225.718
+  type: 'test'
+  ...
+# Subtest: Pipeline handback turn intent: real task identity survives optional info reports; work still requires a report and chat clears old task
+ok 132 - Pipeline handback turn intent: real task identity survives optional info reports; work still requires a report and chat clears old task
+  ---
+  duration_ms: 107.8169
+  type: 'test'
+  ...
+# Subtest: Pipeline initial workflow source: actual approved Core request binds task before the real guarded write
+ok 133 - Pipeline initial workflow source: actual approved Core request binds task before the real guarded write
+  ---
+  duration_ms: 2713.6218
+  type: 'test'
+  ...
+# Subtest: Pipeline failed open: actual Core preparation is revoked and error reference binds one host handle
+ok 134 - Pipeline failed open: actual Core preparation is revoked and error reference binds one host handle
+  ---
+  duration_ms: 19.4177
+  type: 'test'
+  ...
+# Subtest: Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology
+ok 135 - Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology
+  ---
+  duration_ms: 994.2307
+  type: 'test'
+  ...
+# Subtest: Hub NoGit stage facts: actual default Chat writes a legal product draft and rejects a late Git association
+ok 136 - Hub NoGit stage facts: actual default Chat writes a legal product draft and rejects a late Git association
+  ---
+  duration_ms: 128.5428
+  type: 'test'
+  ...
+# Subtest: G15 pure lexical/canonical/final stages authorize only the same accepted frozen scope
+ok 137 - G15 pure lexical/canonical/final stages authorize only the same accepted frozen scope
+  ---
+  duration_ms: 2.1226
+  type: 'test'
+  ...
+# Subtest: G15 managed read stages reject absent role/scope, secrets, traversal and malformed host bindings
+ok 138 - G15 managed read stages reject absent role/scope, secrets, traversal and malformed host bindings
+  ---
+  duration_ms: 0.5709
+  type: 'test'
+  ...
+# Subtest: G15 canonical/currentFile unknown, root escape, protected aliases and final hash absence fail closed
+ok 139 - G15 canonical/currentFile unknown, root escape, protected aliases and final hash absence fail closed
+  ---
+  duration_ms: 0.4909
+  type: 'test'
+  ...
+# Subtest: G15 pure read/final predicates never call fs or the legacy live-boundary diagnostics
+ok 140 - G15 pure read/final predicates never call fs or the legacy live-boundary diagnostics
+  ---
+  duration_ms: 0.6897
+  type: 'test'
+  ...
+# Subtest: G5 Git-selected missing effective ref never falls back to valid FS projection/live role
+ok 141 - G5 Git-selected missing effective ref never falls back to valid FS projection/live role
+  ---
+  duration_ms: 202.4381
+  type: 'test'
+  ...
+# Subtest: G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed
+ok 142 - G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed
+  ---
+  duration_ms: 8583.762
+  type: 'test'
+  ...
+# Subtest: G2 pure activation check binds complete bytes and rejects half-set/mismatch/widened/shared ownership
+ok 143 - G2 pure activation check binds complete bytes and rejects half-set/mismatch/widened/shared ownership
+  ---
+  duration_ms: 3.1529
+  type: 'test'
+  ...
+# Subtest: G2 real Provider-backed new old-run session re-resolves frozen bytes after live change and deletion
+ok 144 - G2 real Provider-backed new old-run session re-resolves frozen bytes after live change and deletion
+  ---
+  duration_ms: 32.0048
+  type: 'test'
+  ...
+# Subtest: G2 run requires matching full evidence; corrupt or missing snapshot cannot fall back to live
+ok 145 - G2 run requires matching full evidence; corrupt or missing snapshot cannot fall back to live
+  ---
+  duration_ms: 24.2463
+  type: 'test'
+  ...
+# Subtest: G3 no-run uses independent active pointer after doc-only update; old-run pin remains unchanged
+ok 146 - G3 no-run uses independent active pointer after doc-only update; old-run pin remains unchanged
+  ---
+  duration_ms: 111.1288
+  type: 'test'
+  ...
+# Subtest: G3 awaited Service refresh installs real Provider confirmation freeze and fails closed on damaged evidence
+ok 147 - G3 awaited Service refresh installs real Provider confirmation freeze and fails closed on damaged evidence
+  ---
+  duration_ms: 28.2565
+  type: 'test'
+  ...
+# Subtest: G3 judge-delegated intent freeze is accepted by the gate's own versions.jsonl consumer (single Model validator)
+ok 148 - G3 judge-delegated intent freeze is accepted by the gate's own versions.jsonl consumer (single Model validator)
+  ---
+  duration_ms: 17.7004
+  type: 'test'
+  ...
+# Subtest: G2 freeze source validates real direct/delegated kinds and rejects fabricated customer approvals
+ok 149 - G2 freeze source validates real direct/delegated kinds and rejects fabricated customer approvals
+  ---
+  duration_ms: 0.5972
+  type: 'test'
+  ...
+# Subtest: 六角色明确未注入能力不得虚构或恢复取消卡
+ok 150 - 六角色明确未注入能力不得虚构或恢复取消卡
+  ---
+  duration_ms: 0.3652
+  type: 'test'
+  ...
+# Subtest: 产品/策划整单直接提交，来源和旧run冻结约束可见
+ok 151 - 产品/策划整单直接提交，来源和旧run冻结约束可见
+  ---
+  duration_ms: 0.3492
+  type: 'test'
+  ...
+# Subtest: 策划独占三模式，旧pin与停稳失败不能绕过
+ok 152 - 策划独占三模式，旧pin与停稳失败不能绕过
+  ---
+  duration_ms: 0.1118
+  type: 'test'
+  ...
+# Subtest: 人事保留真实D3，三文档整体激活，不再逐次写卡审批
+ok 153 - 人事保留真实D3，三文档整体激活，不再逐次写卡审批
+  ---
+  duration_ms: 0.1005
+  type: 'test'
+  ...
+# Subtest: 运营直接完成计划与主动环境卡，真实恢复条件先行
+ok 154 - 运营直接完成计划与主动环境卡，真实恢复条件先行
+  ---
+  duration_ms: 0.088
+  type: 'test'
+  ...
+# Subtest: chief/convener收口必须为原创建者，报告不等于关闭
+ok 155 - chief/convener收口必须为原创建者，报告不等于关闭
+  ---
+  duration_ms: 0.1027
+  type: 'test'
+  ...
+# Subtest: 真实chief委托能选非推荐项/拒绝/退修，且受revision单次结算约束
+ok 156 - 真实chief委托能选非推荐项/拒绝/退修，且受revision单次结算约束
+  ---
+  duration_ms: 0.086
+  type: 'test'
+  ...
+# Subtest: 提示变化不扩充工具布尔位、写区或派发权
+ok 157 - 提示变化不扩充工具布尔位、写区或派发权
+  ---
+  duration_ms: 0.1106
+  type: 'test'
+  ...
+# Subtest: Chief枢纽在六卡区分普通准备和动作授权，历史创建者保持真实
+ok 158 - Chief枢纽在六卡区分普通准备和动作授权，历史创建者保持真实
+  ---
+  duration_ms: 0.295
+  type: 'test'
+  ...
+# Subtest: Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+not ok 159 - Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+  ---
+  duration_ms: 2.5655
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\fix-test-debt-b2\\test\\门禁引擎\\direct-role-capabilities.test.ts:483:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The expression evaluated to a falsy value:
+    
+      assert.ok(chiefWorkflow.startsWith("# Chief 工作流\n\n资源版本：chief-workflow/v1\n"))
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b2/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/direct-role-capabilities.test.ts:484:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+ok 160 - W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+  ---
+  duration_ms: 68.0354
+  type: 'test'
+  ...
+# Subtest: W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+ok 161 - W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+  ---
+  duration_ms: 57.5591
+  type: 'test'
+  ...
+# Subtest: W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）
+ok 162 - W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）
+  ---
+  duration_ms: 63.3824
+  type: 'test'
+  ...
+# Subtest: W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）
+ok 163 - W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）
+  ---
+  duration_ms: 92.1409
+  type: 'test'
+  ...
+# Subtest: W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）
+ok 164 - W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）
+  ---
+  duration_ms: 71.1457
+  type: 'test'
+  ...
+# Subtest: W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）
+ok 165 - W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）
+  ---
+  duration_ms: 61.4977
+  type: 'test'
+  ...
+# Subtest: W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）
+ok 166 - W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）
+  ---
+  duration_ms: 53.3582
+  type: 'test'
+  ...
+# Subtest: G18 actual sha1 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence
+ok 167 - G18 actual sha1 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence
+  ---
+  duration_ms: 5069.0784
+  type: 'test'
+  ...
+# Subtest: G18 actual sha256 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence
+ok 168 - G18 actual sha256 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence
+  ---
+  duration_ms: 4064.5163
+  type: 'test'
+  ...
+# Subtest: G17 actual sha1 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL
+ok 169 - G17 actual sha1 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL
+  ---
+  duration_ms: 4486.649
+  type: 'test'
+  ...
+# Subtest: G17 actual sha256 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL
+ok 170 - G17 actual sha256 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL
+  ---
+  duration_ms: 4497.0218
+  type: 'test'
+  ...
+# Subtest: G17 ref-only denies wrong actor/ref/CAS/source/parents/commit bytes/tree/grants and extra commands
+ok 171 - G17 ref-only denies wrong actor/ref/CAS/source/parents/commit bytes/tree/grants and extra commands
+  ---
+  duration_ms: 3747.2606
+  type: 'test'
+  ...
+# Subtest: G17 recomputed real candidate plans still cannot alter inherited metadata/other owners/modes
+ok 172 - G17 recomputed real candidate plans still cannot alter inherited metadata/other owners/modes
+  ---
+  duration_ms: 8917.3792
+  type: 'test'
+  ...
+# Subtest: G16 actual sha1 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands
+ok 173 - G16 actual sha1 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands
+  ---
+  duration_ms: 2143.963
+  type: 'test'
+  ...
+# Subtest: G16 actual sha256 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands
+ok 174 - G16 actual sha256 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands
+  ---
+  duration_ms: 2240.1885
+  type: 'test'
+  ...
+# Subtest: G16 integrate refuses wrong actor/run/grants/parents/ref/commands and cannot pretend to be commit
+ok 175 - G16 integrate refuses wrong actor/run/grants/parents/ref/commands and cannot pretend to be commit
+  ---
+  duration_ms: 1952.5331
+  type: 'test'
+  ...
+# Subtest: G16 complete Provider replans cannot integrate metadata, controller-owned paths, ungranted deletes or mode changes
+ok 176 - G16 complete Provider replans cannot integrate metadata, controller-owned paths, ungranted deletes or mode changes
+  ---
+  duration_ms: 2337.7436
+  type: 'test'
+  ...
+# Subtest: G23 shared raw observations retain special modes and R/C without enabling unsupported revert
+ok 177 - G23 shared raw observations retain special modes and R/C without enabling unsupported revert
+  ---
+  duration_ms: 1438.8006
+  type: 'test'
+  ...
+# Subtest: revert actual sha1 inverse preserves unrelated current entries and rejects false observations
+ok 178 - revert actual sha1 inverse preserves unrelated current entries and rejects false observations
+  ---
+  duration_ms: 4085.7671
+  type: 'test'
+  ...
+# Subtest: revert actual sha256 inverse preserves unrelated current entries and rejects false observations
+ok 179 - revert actual sha256 inverse preserves unrelated current entries and rejects false observations
+  ---
+  duration_ms: 4128.8106
+  type: 'test'
+  ...
+# Subtest: G11 actual sha1 approved-source/written-consumed initial workflow preserves active and document authority
+ok 180 - G11 actual sha1 approved-source/written-consumed initial workflow preserves active and document authority
+  ---
+  duration_ms: 3127.233
+  type: 'test'
+  ...
+# Subtest: G11 actual sha256 approved-source/written-consumed initial workflow preserves active and document authority
+ok 181 - G11 actual sha256 approved-source/written-consumed initial workflow preserves active and document authority
+  ---
+  duration_ms: 3126.4921
+  type: 'test'
+  ...
+# Subtest: G11 full replans reject false source, unconsumed permission, changed mainline/active/history/workflow and transport
+ok 182 - G11 full replans reject false source, unconsumed permission, changed mainline/active/history/workflow and transport
+  ---
+  duration_ms: 8105.5843
+  type: 'test'
+  ...
+# Subtest: G10 actual sha1 independent eight-ref activation preserves document mainline and accepts historical D3 source
+ok 183 - G10 actual sha1 independent eight-ref activation preserves document mainline and accepts historical D3 source
+  ---
+  duration_ms: 1683.7656
+  type: 'test'
+  ...
+# Subtest: G10 actual sha256 independent eight-ref activation preserves document mainline and accepts historical D3 source
+ok 184 - G10 actual sha256 independent eight-ref activation preserves document mainline and accepts historical D3 source
+  ---
+  duration_ms: 1700.289
+  type: 'test'
+  ...
+# Subtest: G10 actual sha1 judge-delegated D3 accepts honest judge audit with the real application decisionId
+ok 185 - G10 actual sha1 judge-delegated D3 accepts honest judge audit with the real application decisionId
+  ---
+  duration_ms: 1903.6327
+  type: 'test'
+  ...
+# Subtest: G10 actual sha256 judge-delegated D3 accepts honest judge audit with the real application decisionId
+ok 186 - G10 actual sha256 judge-delegated D3 accepts honest judge audit with the real application decisionId
+  ---
+  duration_ms: 1578.2188
+  type: 'test'
+  ...
+# Subtest: G10 judge-delegated D3 variants reject malformed audit, mismatched operatorId/decisionId and mixed sources
+ok 187 - G10 judge-delegated D3 variants reject malformed audit, mismatched operatorId/decisionId and mixed sources
+  ---
+  duration_ms: 3110.5169
+  type: 'test'
+  ...
+# Subtest: G10 complete replans reject activation changes to authority, document bytes, role evidence, history and transport
+ok 188 - G10 complete replans reject activation changes to authority, document bytes, role evidence, history and transport
+  ---
+  duration_ms: 2955.3124
+  type: 'test'
+  ...
+# Subtest: G9 actual sha1 existing-base team-plan completion preserves other authority and supports exact no-op
+ok 189 - G9 actual sha1 existing-base team-plan completion preserves other authority and supports exact no-op
+  ---
+  duration_ms: 1384.4633
+  type: 'test'
+  ...
+# Subtest: G9 actual sha256 existing-base team-plan completion preserves other authority and supports exact no-op
+ok 190 - G9 actual sha256 existing-base team-plan completion preserves other authority and supports exact no-op
+  ---
+  duration_ms: 1388.4725
+  type: 'test'
+  ...
+# Subtest: G9 fully re-planned team-plan tampering cannot change refs, authorization, marker, versions or unrelated bytes
+ok 191 - G9 fully re-planned team-plan tampering cannot change refs, authorization, marker, versions or unrelated bytes
+  ---
+  duration_ms: 2324.0509
+  type: 'test'
+  ...
+# Subtest: G8 actual Provider sha1 full first-document tree/no-index plan and exact publication CAS
+ok 192 - G8 actual Provider sha1 full first-document tree/no-index plan and exact publication CAS
+  ---
+  duration_ms: 42.4515
+  type: 'test'
+  ...
+# Subtest: G8 actual Provider sha256 full first-document tree/no-index plan and exact publication CAS
+ok 193 - G8 actual Provider sha256 full first-document tree/no-index plan and exact publication CAS
+  ---
+  duration_ms: 42.8892
+  type: 'test'
+  ...
+# Subtest: G8 recomputed malicious metadata/content/modes remain rejected beyond object-hash binding
+ok 194 - G8 recomputed malicious metadata/content/modes remain rejected beyond object-hash binding
+  ---
+  duration_ms: 48.5075
+  type: 'test'
+  ...
+# Subtest: G6 actual Provider sha1 first-init/empty-candidate plans have honest no-repo/no-index policy
+ok 195 - G6 actual Provider sha1 first-init/empty-candidate plans have honest no-repo/no-index policy
+  ---
+  duration_ms: 1.9737
+  type: 'test'
+  ...
+# Subtest: G6 actual Provider sha256 first-init/empty-candidate plans have honest no-repo/no-index policy
+ok 196 - G6 actual Provider sha256 first-init/empty-candidate plans have honest no-repo/no-index policy
+  ---
+  duration_ms: 1.5077
+  type: 'test'
+  ...
+# Subtest: G6 narrow first-init facts cannot exempt an existing repo, actor, worksite, nonempty diff, root or command
+ok 197 - G6 narrow first-init facts cannot exempt an existing repo, actor, worksite, nonempty diff, root or command
+  ---
+  duration_ms: 2.4992
+  type: 'test'
+  ...
+# Subtest: pure ACL all six roles/worker may use an exactly planned readable query; digest binds every field
+ok 198 - pure ACL all six roles/worker may use an exactly planned readable query; digest binds every field
+  ---
+  duration_ms: 0.5078
+  type: 'test'
+  ...
+# Subtest: query refuses malicious config/argv, hidden paths, ungranted history, pathspec and stale revision
+ok 199 - query refuses malicious config/argv, hidden paths, ungranted history, pathspec and stale revision
+  ---
+  duration_ms: 0.2823
+  type: 'test'
+  ...
+# Subtest: candidate ACL gives each role a valid own-path case and rejects other-role content
+ok 200 - candidate ACL gives each role a valid own-path case and rejects other-role content
+  ---
+  duration_ms: 1.1931
+  type: 'test'
+  ...
+# Subtest: complete base→candidate diff checks deletion/rename both sides, mixed staged data, modes and revocation
+ok 201 - complete base→candidate diff checks deletion/rename both sides, mixed staged data, modes and revocation
+  ---
+  duration_ms: 0.4337
+  type: 'test'
+  ...
+# Subtest: publish roles and convener integration use full owner-bound diffs without granting chief decisions Git power
+ok 202 - publish roles and convener integration use full owner-bound diffs without granting chief decisions Git power
+  ---
+  duration_ms: 0.2707
+  type: 'test'
+  ...
+# Subtest: raw Git：只读精确形态 allow/pass（固定传输）；别名/写形态/全局选项仍硬拒
+ok 203 - raw Git：只读精确形态 allow/pass（固定传输）；别名/写形态/全局选项仍硬拒
+  ---
+  duration_ms: 1.556
+  type: 'test'
+  ...
+# Subtest: actual write_file/edit_file handlers protect .git, canonical host roots and directory-link aliases
+ok 204 - actual write_file/edit_file handlers protect .git, canonical host roots and directory-link aliases
+  ---
+  duration_ms: 6.2471
+  type: 'test'
+  ...
+# Subtest: real core handle inventory in an isolated unprotected fixture is per-session, never whole-team proof
+ok 205 - real core handle inventory in an isolated unprotected fixture is per-session, never whole-team proof
+  ---
+  duration_ms: 7.5005
+  type: 'test'
+  ...
+1..205
+# tests 205
+# suites 0
+# pass 194
+# fail 9
+# cancelled 0
+# skipped 2
+# todo 0
+# duration_ms 82171.2607
