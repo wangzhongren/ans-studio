@@ -1,0 +1,5 @@
+run	exit	tests	pass	fail	duration_ms	note
+before-run1	1	2	1	1	4733.6747	baseline: 重启恢复 waitUntil 等待超时 (2040ms)
+1	0	2	2	0	46308.338	natural exit; target 45777.768ms
+2	0	2	2	0	45796.76	natural exit; target 45245.668ms
+3	0	2	2	0	46315.1894	natural exit; target 45742.947ms

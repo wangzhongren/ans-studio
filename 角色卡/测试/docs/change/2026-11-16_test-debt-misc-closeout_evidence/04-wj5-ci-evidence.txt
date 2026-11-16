@@ -1,0 +1,25 @@
+W-J5/J15 平台时序定性（CI 工件 run 43829367008，workflow_dispatch on main @ a0baea2，Node 24.14.0）
+数据集：/tmp/r8-art/test-logs-{mac-arm64,mac-x64,win-x64}/test-ci-output.log（原始工件不入库）
+
+1) macOS x64（唯一红/超时平台）
+L3174 / L7930: ✖ W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例 (180001.963841ms)
+失败体：'test timed out after 180000ms'
+→ 无任何断言失败文本；恰在测试自带 180s timeout 到点被取消（test/测试/2026-11-09_judge-delegated-effectiveness.test.ts:55 { timeout: 180000 }）。
+→ R5 §1：x64 测试步骤 duration_ms 2,501,114.80（41m41s），arm64 1,283,872.76（21m24s），x64 为 arm64 的 1.95×。
+
+2) macOS arm64（同测试绿）
+L3168: ✔ W-J5/J15：… (71132.148208ms)
+
+3) Windows x64（同测试绿）
+L3113: ✔ W-J5/J15：… (69523.6045ms)
+
+4) 历史
+- R3：同一 180s x64-only（R4 记录 §2 消失名单 #3）。
+- R4：三平台均未复现（R4 记录 §2/§3.3；R4 x64 34m27s）。
+- R5：复现（本工件；R5 记录 §3.3/§2.2）。
+→ 单轮不判稳定；两轮 x64 超时均无断言、均恰在 180s。
+
+5) 本机（Windows 11 / Node v24.22.1）3×
+- 63,872.928ms / 65,024.212ms / 65,060.0389ms，全部 pass，自然退出（见 01-wj5-local-3x.tsv 与 runs/wj5-run*.txt）。
+
+定性：平台/runner 性能时序候选（x64 macOS runner 负载/性能），非产品缺陷、无断言失败；180s 自带上限相对 arm64/Windows 的 69–71s 有 ~2.5× 余量，但 x64 job 整体 1.95× 慢于 arm64，超时与负载解释一致。R5 owner 裁决项 #8 为「观测为主，暂不排修；R6 后复核」，本批不改测试文件、不改 180s 上限；留作平台候选。

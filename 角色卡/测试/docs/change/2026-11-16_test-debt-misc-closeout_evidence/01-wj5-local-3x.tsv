@@ -1,0 +1,4 @@
+run	file	pass	fail	cancelled	skipped	duration_ms	note
+1	test/测试/2026-11-09_judge-delegated-effectiveness.test.ts	1	0	0	0	64202.8468	natural exit; W-J5 63872.928ms
+2	test/测试/2026-11-09_judge-delegated-effectiveness.test.ts	1	0	0	0	65356.0435	natural exit; W-J5 65024.212ms
+3	test/测试/2026-11-09_judge-delegated-effectiveness.test.ts	1	0	0	0	65395.815	natural exit; W-J5 65060.0389ms
