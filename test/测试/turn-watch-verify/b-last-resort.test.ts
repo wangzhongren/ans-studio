@@ -59,9 +59,22 @@ test("B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案
     assert.equal(events.filter((e) => e.kind === "settled").length, 0, "检查时限到点不得中止整轮");
     assert.equal(provider.starts[0].aborted, false);
 
-    t.mock.timers.tick(200);
-    await nextIO();
-    await rejected;
+    // B5（2026-11-16）去抖：兜底计时器在 send 的异步装配（持久化/黑板边界等 mock timer 步骤）
+    // 完成后才武装，有效运行时间从武装点起算。旧的固定 `tick(200)` 假设武装点在 t0，装配偏移
+    // 会让计时器尚未到点，本用例随后无界等待 send 拒绝并挂到 10s 测试超时（本机 3/3、CI 同名
+    // 10s 复现）。改为按 20ms 步进推进 mock 时钟、直到 send 拒绝；总推进有界（2s 有效时间），
+    // turnLastResortMs=300 的语义与断言逐字不变。
+    let rejectedSeen = false;
+    const rejectedDone = rejected.then(
+      () => { rejectedSeen = true; },
+      () => { rejectedSeen = true; },
+    );
+    for (let advanced = 0; advanced < 2_000 && !rejectedSeen; advanced += 20) {
+      t.mock.timers.tick(20);
+      await nextIO();
+    }
+    assert.equal(rejectedSeen, true, "最后兜底应在有界 mock 时间内中止整轮（300ms 有效运行时间）");
+    await rejectedDone;
     await untilIO(() => events.some((e) => e.kind === "settled"));
     const terminals = events.filter((e): e is SessionEvent => e.kind === "settled");
     assert.equal(terminals.length, 1);

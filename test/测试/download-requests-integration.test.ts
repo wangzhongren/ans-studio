@@ -781,7 +781,13 @@ test("审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小�
     assert.ok(byKind(ledger.events, "download.completed").length >= 1, "坏行不得影响有效事件读取");
     const state = await readTaskState(root);
     assert.ok(state.errors.length >= 1, "tasks 坏行应被计数");
-    assert.ok(state.events.some((event) => event.kind === "request.resolved"), "坏行不得影响 request.* 读取");
+    // B5（2026-11-16）按当前语义同步：e71501c 起 app 层 request.* 写入经 trunk 账本的
+    // `recordTaskObservation`（CAS/审计）而非裸 append；tasks.jsonl 含坏行 ⇒ 账本读取返回
+    // `audit-ledger-unreadable`，写入按既有纪律 **fail-closed**（绝不把新行追加到不可读账本）。
+    // 「主路径不受坏行影响」仍被上面逐字钉住：下载本身成功、字节正确、downloads 账本计数且
+    // completed 事件可读；缺席的只是无法安全写入的 request.* 审计副本。
+    assert.equal(state.events.some((event) => event.kind.startsWith("request.")), false,
+      "任务账本不可读 ⇒ request.* 审计写入 fail-closed（不追加坏账本，主路径仍成功）");
   } finally {
     await h.close();
     await server.close();

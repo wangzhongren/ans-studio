@@ -1,0 +1,17 @@
++6 open B 1
++10 open A 2
++12 dispose A 2
++13 gate arrived (old A dispose blocked)
++13 after microtask
++13 gate released
++13 disposed A 2
++13 refresh ["A"]
++13 stop resolved {"ok":false,"note":"角色 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-stop-a-SDj4nM\u0000A\u0000demo 没有打开的会话。","deliveryQueuePersistence":{"managerId":"e69aff31-43cf-4b76-9404-9e4733040c5a","completedSeq":0,"committedSeq":0,"failureCount":0,"targetSeq":0,"armed":false,"pending":0}}
++14 state {
+  opened: [ 'B', 'A' ],
+  disposed: [ 'A' ],
+  live: [ 'B' ],
+  openFor: null
+}
++14 dispose B 1
++14 disposed B 1

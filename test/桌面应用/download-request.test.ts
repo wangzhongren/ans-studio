@@ -240,7 +240,16 @@ function makeHarness(root: string, options: HarnessOptions = {}): Harness {
           if (options.runtimeDownload !== undefined) {
             return options.runtimeDownload(runInput, input);
           }
-          const outcome = await input.present.present(approvalRequest({ roleId: input.roleId, ...(input.runtime !== undefined ? { runtime: input.runtime } : {}) }), {
+          // B5（2026-11-16）：按冻结契约转发**每次调用**的 `runInput.toolCallId/turnId`（与真实 B1
+          // 运行时一致；B7-3 download-decision 同款修复）。旧夹具固定 toolCallId="call-1"，两张下载卡的
+          // requestIdFor 相同 ⇒ 命中桌面通道的同请求重放去重（返回第一张的 promise），第二张既不
+          // 呈现也不排队。转发后两张卡 requestId 各不相同，一项目一卡队列语义方可被真实测到。
+          const outcome = await input.present.present(approvalRequest({
+            roleId: input.roleId,
+            ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
+            ...(runInput.toolCallId !== undefined ? { toolCallId: runInput.toolCallId } : {}),
+            ...(runInput.turnId !== undefined ? { turnId: runInput.turnId } : {}),
+          }), {
             onPresented: (info) => presentedIds.push(info.requestId),
           });
           if (outcome.decision !== "approved") {

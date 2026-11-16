@@ -1,0 +1,57 @@
+# 任务书点名的 Q2 P2 文件（git-action-delivery-claude-e2e.test.ts）3× 交叉核对
+
+- 该文件内**没有 Q2 P2**（唯一用例为 AC-4：Claude convener git_publish delivery 完整链）；R4 证据中 Q2 P2 位于 git-role-workflows-e2e.test.ts。
+
+## run 1
+ℹ pass 1
+ℹ fail 0
+ℹ duration_ms 75181.5137
+✔ AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提） (74845.7953ms)
+## run 2
+ℹ pass 1
+ℹ fail 0
+ℹ duration_ms 75380.0064
+✔ AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提） (75056.104ms)
+## run 3
+ℹ pass 0
+ℹ fail 1
+ℹ duration_ms 55504.6956
+✖ test\测试\git-action-delivery-claude-e2e.test.ts (55500.2881ms)
+✖ failing tests:
+✖ test\测试\git-action-delivery-claude-e2e.test.ts (55500.2881ms)
+
+## run 3 失败体（Node native flake）
+----- Native stack trace -----
+
+ 1: 00007FF640186536 node::SetAbortHandler+54
+ 2: 00007FF6401860E7 node::MultiIsolatePlatform::DisposeIsolate+781383
+ 3: 00007FF64029D5C3 node::SetCppgcReference+356435
+ 4: 000002951FDCF77E 
+
+----- JavaScript stack trace -----
+
+1: destroyTracking (node:internal/async_hooks:344:3)
+2: promiseInitHookWithDestroyTracking (node:internal/async_hooks:338:3)
+3: lstat (node:internal/fs/promises:1742:13)
+4: noLinks (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b5new/src/provider/trunk/impl/git-command.ts:553:61)
+
+
+✖ test\测试\git-action-delivery-claude-e2e.test.ts (55500.2881ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 55504.6956
+
+✖ failing tests:
+
+test at test\测试\git-action-delivery-claude-e2e.test.ts:1:1
+✖ test\测试\git-action-delivery-claude-e2e.test.ts (55500.2881ms)
+  'test failed'
+
+## 定性
+- run1/run2 绿（74.8s / 75.1s）；run3 在 55.5s 触发 Node 24.22.1 原生 CleanupQueue::Add 断言（async_hooks destroyTracking × fs.promises.lstat，src/provider/trunk/impl/git-command.ts:553 noLinks）。
+- 属 Node 原生清理队列 flake（R2/R3 已登记该错误族；本轮此前计数为 0），不是 Q2 P2、也不是 macOS host-facts 产品错误；B5 不改该文件（不在 12 文件范围），如实单列。

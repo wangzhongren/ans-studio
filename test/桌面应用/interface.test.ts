@@ -243,7 +243,7 @@ function fakeHandle(): FakeHandle {
   return handle;
 }
 
-function twoRoleListing(): ProjectListing {
+function twoRoleListing(projectRoot: string): ProjectListing {
   const role = (roleId: string): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: `角色卡/${roleId}/role-card.md`,
@@ -256,7 +256,7 @@ function twoRoleListing(): ProjectListing {
     },
   });
   return {
-    projectRoot: "/proj",
+    projectRoot,
     roles: [role("A"), role("B")],
     warnings: [],
     hasRoles: true,
@@ -267,9 +267,19 @@ function twoRoleListing(): ProjectListing {
 
 test("requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用", async () => {
   const t = tempDir("ans-interface-replay-");
+  // B5（2026-11-16）：真实 mkdtemp 项目根（B7-3 口径）。v2.0.0 的 Git host action 租约按项目根
+  // 全局登记；旧夹具固定 "/proj"（CI 三平台均不存在；本机仅因残留 C:\proj 才绿）会与其它用例的
+  // 租约/会话互相污染，CI 稳定报「项目正在处理派发或权限变更」。改用本用例独占临时根。
+  const projectRoot = path.join(t.dir, "proj");
+  fs.mkdirSync(path.join(projectRoot, "角色卡", "chief"), { recursive: true });
+  fs.mkdirSync(path.join(projectRoot, "角色卡", "B"), { recursive: true });
+  for (const roleId of ["chief", "B"]) {
+    fs.writeFileSync(path.join(projectRoot, "角色卡", roleId, "role-card.md"), `# ${roleId}\n`);
+    fs.writeFileSync(path.join(projectRoot, "角色卡", roleId, "boundary.yaml"), `role: ${roleId}\nentries: []\n`);
+  }
   const states: Parameters<NonNullable<Parameters<typeof createDesktopInterface>[0]["emitRoleState"]>>[0][] = [];
   const handles: Record<string, FakeHandle> = { chief: fakeHandle(), B: fakeHandle() };
-  const listing = twoRoleListing();
+  const listing = twoRoleListing(projectRoot);
   listing.roles[0] = { ...listing.roles[0]!, roleId: "chief", builtIn: true, governanceFunction: "chief" };
   listing.primaryRoleId = "chief";
   listing.governanceModel = "trio";
@@ -285,14 +295,14 @@ test("requestRoleStates：客户仅chief可发；其他角色伪内部来源拒�
     runtimeStatePath: path.join(t.dir, "runtime-selection.json"),
   });
   try {
-    await desktop.listProject({ projectRoot: "/proj" });
-    assert.equal((await desktop.openSession({ projectRoot: "/proj", roleId: "chief", runtime: "demo" })).ok, true);
-    assert.equal((await desktop.openSession({ projectRoot: "/proj", roleId: "B", runtime: "demo" })).ok, true);
+    await desktop.listProject({ projectRoot });
+    assert.equal((await desktop.openSession({ projectRoot, roleId: "chief", runtime: "demo" })).ok, true);
+    assert.equal((await desktop.openSession({ projectRoot, roleId: "B", runtime: "demo" })).ok, true);
     await tick(30);
 
     // 两个角色都进入「工作中」（send 挂起未返回）。
-    const sendA = desktop.sendSession({ text: "A 的活", target: { roleId: "chief", projectRoot: "/proj", runtime: "demo" } });
-    const sendB = await desktop.sendSession({ text: "B 的活", target: { roleId: "B", projectRoot: "/proj", runtime: "demo" }, metadata: { background: true, kind: "system" } });
+    const sendA = desktop.sendSession({ text: "A 的活", target: { roleId: "chief", projectRoot, runtime: "demo" } });
+    const sendB = await desktop.sendSession({ text: "B 的活", target: { roleId: "B", projectRoot, runtime: "demo" }, metadata: { background: true, kind: "system" } });
     assert.equal(sendB.ok, false);
     assert.equal(handles.B.sendCalls.length, 0, "Renderer cannot impersonate an internal dispatch/report origin");
     await tick(40);
@@ -306,7 +316,7 @@ test("requestRoleStates：客户仅chief可发；其他角色伪内部来源拒�
     assert.deepEqual(states.map((s) => s.roleId).sort(), ["B", "chief"]);
     assert.equal(states.find(s => s.roleId === "chief")?.busy, true);
     assert.equal(states.find(s => s.roleId === "B")?.busy, false);
-    assert.ok(states.every((s) => s.runtime === "demo" && s.projectRoot === "/proj"));
+    assert.ok(states.every((s) => s.runtime === "demo" && s.projectRoot === projectRoot));
 
     // 两轮结束 → 重放为闲。
     handles.chief.release();

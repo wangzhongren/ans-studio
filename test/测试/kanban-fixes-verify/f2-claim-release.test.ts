@@ -5,6 +5,8 @@
 //  - 场景 2「同目标仍排队」：同一目标在投递进行中再派 ⇒ 排在其后，绝不并发 send；settled 后按序放行。
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { SessionManager } from "../../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../../app/desktop/project.ts";
@@ -16,7 +18,7 @@ import type { ProjectListing } from "../../../src/service/role/resolve-role.ts";
 
 const tick = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
-function listing(): ProjectListing {
+function listing(root: string): ProjectListing {
   const mk = (roleId: string, builtIn = false): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: builtIn ? "" : `角色卡/${roleId}/role-card.md`,
@@ -27,7 +29,7 @@ function listing(): ProjectListing {
       : { entries: [{ root: "project", path: `src/${roleId}.ts`, kind: "file", purpose: "p" }], boundarySource: `角色卡/${roleId}/boundary.yaml`, acceptance: { accepted: false, source: "" } },
     builtIn: builtIn ? true : undefined,
   });
-  return { projectRoot: "/proj", roles: [mk("su", true), mk("A"), mk("B")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+  return { projectRoot: root, roles: [mk("su", true), mk("A"), mk("B")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
 // G-1 格式收口后可跟进的金文本（批准范围内的格式变更，非行为变更）：投递文本的单一来源 =
@@ -37,7 +39,17 @@ function listing(): ProjectListing {
 const dispatchTemplate = (task: string) => renderDispatchPrompt({ roleId: "A", task });
 
 function makeHarness() {
-  const l = listing();
+  // B5（2026-11-16）：真实 mkdtemp 项目根（B7-3 口径）。v2.0.0 B3-2b host-inventory publication
+  // 对不可解析根 fail-closed；旧夹具用 "/proj"（CI 三平台均不存在，本机仅因残留 C:\proj 才绿）
+  // ⇒ su 会话开不出来、dispatchTask 未注入（CI 红：`su 会话应注入派发能力` / `dispatch is not a function`）。
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-f2-claim-"));
+  for (const roleId of ["A", "B"]) {
+    const dir = path.join(root, "角色卡", roleId);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "role-card.md"), `# ${roleId}\n`);
+    fs.writeFileSync(path.join(dir, "boundary.yaml"), "role: " + roleId + "\nentries: []\n");
+  }
+  const l = listing(root);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
   const invoked: Record<string, string[]> = { su: [], A: [], B: [] };
   const done: Record<string, string[]> = { su: [], A: [], B: [] };
@@ -92,77 +104,92 @@ function makeHarness() {
     createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
     createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
     buildProjectConfig,
-    getListing: (root) => (root === "/proj" ? l : undefined),
+    getListing: (candidate) => (candidate === root ? l : undefined),
     emitEvent: () => {},
   });
-  return { mgr, streams, invoked, done, openInputs, hangNext, maxConcurrent, dispatchOf: (roleId: string) => openInputs[roleId]?.dispatchTask };
+  return {
+    mgr, root, streams, invoked, done, openInputs, hangNext, maxConcurrent,
+    dispatchOf: (roleId: string) => openInputs[roleId]?.dispatchTask,
+    async cleanup() {
+      try { await mgr.stop(null); } finally { fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
+    },
+  };
 }
 
 test("F-2 场景 1（跨目标不阻塞）：A 的 send 挂起期间派发 B ⇒ B 立即收到（不待 A 轮结束）", async () => {
   const h = makeHarness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
-  await tick();
-  const dispatch = h.dispatchOf("su");
-  assert.ok(dispatch, "su 会话应注入派发能力");
+  try {
+    const opened = await h.mgr.open({ projectRoot: h.root, roleId: "su", runtime: "demo" });
+    assert.equal(opened.ok, true, opened.error ?? "open failed");
+    await tick();
+    const dispatch = h.dispatchOf("su");
+    assert.ok(dispatch, "su 会话应注入派发能力");
 
-  const releaseA = h.hangNext("A"); // A 的下一次 send 挂起（模拟整轮在跑）
-  const ra = (await dispatch!({ roleId: "A", task: "A 的长活动" })) as DispatchReceipt;
-  assert.equal(ra.ok, true);
-  // 等 A 投递真正开跑（send 被调用且挂起）。
-  const began = Date.now();
-  while (h.invoked.A.length === 0 && Date.now() - began < 2000) await tick(10);
-  assert.equal(h.invoked.A.length, 1, "A 的投递应已开始（且挂起中）");
-  assert.equal(h.done.A.length, 0, "A 尚未完成（对照点：此刻仍是挂起态）");
+    const releaseA = h.hangNext("A"); // A 的下一次 send 挂起（模拟整轮在跑）
+    const ra = (await dispatch!({ roleId: "A", task: "A 的长活动" })) as DispatchReceipt;
+    assert.equal(ra.ok, true);
+    // 等 A 投递真正开跑（send 被调用且挂起）。
+    const began = Date.now();
+    while (h.invoked.A.length === 0 && Date.now() - began < 2000) await tick(10);
+    assert.equal(h.invoked.A.length, 1, "A 的投递应已开始（且挂起中）");
+    assert.equal(h.done.A.length, 0, "A 尚未完成（对照点：此刻仍是挂起态）");
 
-  // 关键时序断言：A 挂起期间派发 B —— 立即送达。
-  const t0 = Date.now();
-  const rb = (await dispatch!({ roleId: "B", task: "B 的独立活" })) as DispatchReceipt;
-  assert.equal(rb.ok, true);
-  let delivered = false;
-  while (Date.now() - t0 < 1500) {
-    if (h.done.B.length === 1) { delivered = true; break; }
-    await tick(10);
+    // 关键时序断言：A 挂起期间派发 B —— 立即送达。
+    const t0 = Date.now();
+    const rb = (await dispatch!({ roleId: "B", task: "B 的独立活" })) as DispatchReceipt;
+    assert.equal(rb.ok, true);
+    let delivered = false;
+    while (Date.now() - t0 < 1500) {
+      if (h.done.B.length === 1) { delivered = true; break; }
+      await tick(10);
+    }
+    const elapsed = Date.now() - t0;
+    assert.equal(h.done.A.length, 0, "断言前提：A 的 send 此刻仍未 resolve（修复前链会被它持有）");
+    assert.equal(delivered, true, "B 必须在 A 轮未结束时收到投递（认领段后链已释放）");
+    assert.ok(elapsed < 1000, `B 的送达须为秒级以下（实际 ${elapsed}ms）`);
+    assert.deepEqual(h.done.B, [dispatchTemplate("B 的独立活")]);
+
+    // 放行 A：其投递照常收尾，两边各恰一次、同会话无并发。
+    releaseA();
+    await tick(150);
+    assert.deepEqual(h.done.A, [dispatchTemplate("A 的长活动")]);
+    assert.equal(h.maxConcurrent.A ?? 0, 1, "同会话并发 send 峰值须 ≤1");
+    assert.equal(h.maxConcurrent.B ?? 0, 1);
+  } finally {
+    await h.cleanup();
   }
-  const elapsed = Date.now() - t0;
-  assert.equal(h.done.A.length, 0, "断言前提：A 的 send 此刻仍未 resolve（修复前链会被它持有）");
-  assert.equal(delivered, true, "B 必须在 A 轮未结束时收到投递（认领段后链已释放）");
-  assert.ok(elapsed < 1000, `B 的送达须为秒级以下（实际 ${elapsed}ms）`);
-  assert.deepEqual(h.done.B, [dispatchTemplate("B 的独立活")]);
-
-  // 放行 A：其投递照常收尾，两边各恰一次、同会话无并发。
-  releaseA();
-  await tick(150);
-  assert.deepEqual(h.done.A, [dispatchTemplate("A 的长活动")]);
-  assert.equal(h.maxConcurrent.A ?? 0, 1, "同会话并发 send 峰值须 ≤1");
-  assert.equal(h.maxConcurrent.B ?? 0, 1);
-  await h.mgr.stop(null);
 });
 
 test("F-2 场景 2（同目标仍排队）：投递进行中再派同目标 ⇒ 排队不并发；settled 后按序放行", async () => {
   const h = makeHarness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
-  await tick();
-  const dispatch = h.dispatchOf("su")!;
+  try {
+    const opened = await h.mgr.open({ projectRoot: h.root, roleId: "su", runtime: "demo" });
+    assert.equal(opened.ok, true, opened.error ?? "open failed");
+    await tick();
+    const dispatch = h.dispatchOf("su")!;
+    assert.ok(dispatch, "su 会话应注入派发能力");
 
-  const releaseFirst = h.hangNext("A");
-  await dispatch({ roleId: "A", task: "先到的活" });
-  const began = Date.now();
-  while (h.invoked.A.length === 0 && Date.now() - began < 2000) await tick(10);
-  assert.equal(h.invoked.A.length, 1);
+    const releaseFirst = h.hangNext("A");
+    await dispatch({ roleId: "A", task: "先到的活" });
+    const began = Date.now();
+    while (h.invoked.A.length === 0 && Date.now() - began < 2000) await tick(10);
+    assert.equal(h.invoked.A.length, 1);
 
-  // 同目标第二条（不同文本，避开队列期去重窗口语义——此处只测投递串行）。
-  await dispatch({ roleId: "A", task: "后续的活" });
-  await tick(400);
-  assert.equal(h.invoked.A.length, 1, "同目标投递进行中：第二条**不得**并发 send（仍排队）");
-  assert.equal(h.done.A.length, 0);
+    // 同目标第二条（不同文本，避开队列期去重窗口语义——此处只测投递串行）。
+    await dispatch({ roleId: "A", task: "后续的活" });
+    await tick(400);
+    assert.equal(h.invoked.A.length, 1, "同目标投递进行中：第二条**不得**并发 send（仍排队）");
+    assert.equal(h.done.A.length, 0);
 
-  // 第一轮结束 → 第二条按序放行。
-  releaseFirst();
-  await tick(120);
-  h.streams.A.push({ kind: "settled", summary: "A 第一轮结束" });
-  const t1 = Date.now();
-  while (h.done.A.length < 2 && Date.now() - t1 < 2000) await tick(10);
-  assert.deepEqual(h.done.A, [dispatchTemplate("先到的活"), dispatchTemplate("后续的活")], "同目标按序投递、不丢不换序");
-  assert.equal(h.maxConcurrent.A ?? 0, 1, "同会话并发 send 峰值须 ≤1（排队防护未失真）");
-  await h.mgr.stop(null);
+    // 第一轮结束 → 第二条按序放行。
+    releaseFirst();
+    await tick(120);
+    h.streams.A.push({ kind: "settled", summary: "A 第一轮结束" });
+    const t1 = Date.now();
+    while (h.done.A.length < 2 && Date.now() - t1 < 2000) await tick(10);
+    assert.deepEqual(h.done.A, [dispatchTemplate("先到的活"), dispatchTemplate("后续的活")], "同目标按序投递、不丢不换序");
+    assert.equal(h.maxConcurrent.A ?? 0, 1, "同会话并发 send 峰值须 ≤1（排队防护未失真）");
+  } finally {
+    await h.cleanup();
+  }
 });

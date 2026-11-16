@@ -1,0 +1,20 @@
+# /proj 夹具根：CI 三平台失败的本机不可复现根因（B7-3 同类）
+
+- B7-3（e3b6fc9）记录：「v2.0.0 B3-2b host-inventory publication fail-closes on an unresolvable root,
+  so /proj (absent on every CI runner; present only as a local leftover C:\proj) made sessions never
+  open and turns never start.」
+- 本机确证：C:\proj 存在（残留），CI runner 不存在 /proj。
+- B5 涉及的四个文件沿用 /proj：
+  · test/测试/network-state-e2e.test.ts（队列 harness）→ CI：离线回交未入队 / 回合未开跑
+  · test/测试/kanban-fixes-verify/f2-claim-release.test.ts → CI：su 会话应注入派发能力 / dispatch is not a function
+  · test/测试/queue-recovery-e2e.test.ts → CI：回交未持久化（2s 上限叠加）
+  · test/桌面应用/interface.test.ts（requestRoleStates 用例）→ CI：项目正在处理派发或权限变更（全局 Git host 租约按 /proj 互污）
+- 修法：每个 harness 用 fs.mkdtempSync(path.join(os.tmpdir(), ...)) 独占根，写入最小角色卡/边界文件；
+  listing、open、send/watchdogSnapshot 使用同一根；finally 有界 stop + rm(maxRetries)。断言不变。
+
+## 本机对照探针（SessionManager.open，demo/su）
+$ node root-probe.mjs
+missing-root open: {"ok":false,"error":"会话库存登记失败，会话尚未创建。请检查诊断后重试。"}
+mkdtemp-root open: {"ok":true,"resumed":false}
+
+结论：不可解析根 ⇒ open.ok=false（「会话库存登记失败」）；mkdtemp 根 ⇒ open.ok=true。

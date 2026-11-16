@@ -1,0 +1,4 @@
+name	file	status	classification
+重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过	test/桌面应用/task-restart.test.ts	RED（未修改）	产品/夹具候选：v2.0.0 来源门拒绝裸 legacy 恢复投递；需 owner 裁定（见 04）
+C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口	test/桌面应用/stuck-redispatch.test.ts	RETIRED（旧名退役）	测试同步：e71501c 删除 tryAutoSelectDecision；新名 3× 绿
+F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行	test/测试/g4v2-mcp-verify/f-handler.test.ts	UNTOUCHED	不在 B5 范围（归 B6b）

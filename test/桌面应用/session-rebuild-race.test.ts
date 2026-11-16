@@ -332,7 +332,18 @@ for (const phase of ["dispose", "open"] as const) {
           assert.equal(stopped, false, "关闭必须等已在途重建收口");
           gate.release();
           await refresh;
-          assert.equal((await stop).ok, true);
+          const stopResult = await stop;
+          // v2.0.0/e71501c 停止栅栏（deliveryStopVersion/stoppedDeliveryKeys）：关闭入口先冻结该角色
+          // 的投递代际；在途重建的「重开续段」在 `openInternalUnsafe` 的 stopped 预检处**作废并
+          // dispose 新句柄**（不装入会话表）。因此 stop 返回时没有活会话可释放——`ok:false` 为如实
+          // 回执（「没有打开的会话」），关闭契约由栅栏本身保证（A 不复活、零投递）。旧期望
+          // `ok:true` 来自栅栏引入前的「重建先装入、stop 再 dispose」时序，已随当前语义同步。
+          if (action === "stop all") {
+            assert.equal(stopResult.ok, true, stopResult.note);
+          } else {
+            assert.equal(stopResult.ok, false, "在途重建已被 stop 栅栏作废：没有活会话可释放（不是关闭失败）");
+            assert.match(stopResult.note, /没有打开的会话/, "回执如实说明无活会话可释放");
+          }
           assert.equal(harness.mgr.openForRoleId(), null);
           assert.ok(!harness.mgr.liveRoleIds().includes("A"));
           assert.deepEqual(harness.sent, []);
@@ -345,7 +356,10 @@ for (const phase of ["dispose", "open"] as const) {
               assert.equal((await harness.mgr.open({ projectRoot: next.root, roleId: "A", runtime: "demo" })).ok, true);
               assert.equal(harness.mgr.openForRoleId(), "A");
               assert.equal((await harness.mgr.send("新项目消息")).ok, true);
-              assert.deepEqual(harness.sentGenerations, [4], "新项目的新句柄接收，旧重建句柄已释放");
+              // 句柄代次＝openRoleSession 进入次数（1 基）。被栅栏作废的重建**不**创建句柄
+              //（dispose 阶段：open 预检早退不调 openRoleSession；open 阶段：句柄已建但随即 disposed），
+              // 因而新项目的代次由实际 opened 长度决定；不再硬编码旧时序下的 4。
+              assert.deepEqual(harness.sentGenerations, [harness.opened.length], "新项目的新句柄接收，旧重建句柄已释放");
             } finally {
               fs.rmSync(next.root, { recursive: true, force: true });
             }
@@ -458,9 +472,13 @@ test("关闭全部与双角色刷新扫描交接：停止返回后没有后续�
     const stop = harness.mgr.stop(null).finally(() => { stopSettled = true; });
     firstOpen.release();
     await settledWithin(firstStopDispose.arrived, "stop 未到达 A 重建句柄 dispose 等待窗口", facts);
-    // 缺陷版会继续扫描 B 并在 stop 释放 A 的窗口临时移出 B；修复版扫描直接完成。
-    await settledWithin(Promise.race([refresh, laterOpen.arrived]), "刷新扫描/后续重开未在有界窗口内结算", facts);
+    // 交接收口顺序修正（2026-11-16 B5）：v2.0.0 停止栅栏下，`firstStopDispose` 阻塞的是**重建自身**
+    // 的 fail-closed 清理（`openInternalUnsafe` 见 stopped ⇒ disposeObservedHandle），不是 stop 的
+    // dispose 阶段。重建链完成前 refresh 与 stop 都在等它；若在释放该窗口前等待 refresh 结算，
+    // 夹具自身成环（测试等 refresh、refresh 等 dispose、dispose 等测试）。先放行 dispose，再观察
+    // 扫描**不再启动 B 的重建**（缺陷版会在版本检查前继续扫 B，卡在 laterOpen；refresh 的有界等待即失败）。
     firstStopDispose.release();
+    await settledWithin(refresh, "刷新扫描未在有界窗口内结算（疑似继续扫描/启动了后续重建）", facts);
     assert.equal((await settledWithin(stop, "stop 未在有界窗口内返回", facts)).ok, true);
     assert.deepEqual(harness.mgr.liveRoleIds(), [], "stop 返回时没有旧句柄");
     laterOpen.release();

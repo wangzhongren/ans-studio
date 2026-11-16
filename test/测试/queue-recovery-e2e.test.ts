@@ -21,12 +21,14 @@ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../../src/common/shared/diagnostics.ts";
 
 const tick = (ms = 40) => new Promise((r) => setTimeout(r, ms));
-async function until(predicate: () => boolean, label = "等待实际事件超时"): Promise<void> {
-  for (let i = 0; i < 400; i += 1) {
-    if (predicate()) return;
+async function until(predicate: () => boolean, label = "等待实际事件超时", timeoutMs = 8_000): Promise<void> {
+  // B5（2026-11-16）：有界等待统一 8s（原 2s）。CI（尤其中载 Windows runner）上持久化链/投递
+  // 排空可超过 2s，产生「回交未持久化」假红；只放宽等待上界，不放宽任何断言。
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) assert.fail(label);
     await tick(5);
   }
-  assert.fail(label);
 }
 
 const HANDBACK_A: TaskHandback = {
@@ -38,7 +40,7 @@ const HANDBACK_A: TaskHandback = {
   at: "2026-10-30T13:00:00.000Z",
 };
 
-function listing(): ProjectListing {
+function listing(projectRoot: string): ProjectListing {
   const mk = (roleId: string, builtIn = false): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: builtIn ? "" : `角色卡/${roleId}/role-card.md`,
@@ -53,7 +55,7 @@ function listing(): ProjectListing {
         },
     builtIn: builtIn ? true : undefined,
   });
-  return { projectRoot: "/proj", roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+  return { projectRoot, roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
 interface Instance {
@@ -64,8 +66,11 @@ interface Instance {
   disposeHandles: () => void;
 }
 
-function makeInstance(options: { storePath: string; gateFirstSend?: boolean; extraDeps?: Record<string, unknown> }): Instance {
-  const l = listing();
+function makeInstance(options: { storePath: string; projectRoot: string; gateFirstSend?: boolean; extraDeps?: Record<string, unknown> }): Instance {
+  // B5（2026-11-16）：真实 mkdtemp 项目根（B7-3 口径）。v2.0.0 B3-2b host-inventory publication
+  // 对不可解析根 fail-closed；旧夹具用 "/proj"（CI 三平台均不存在，本机仅因残留 C:\proj 才绿）
+  // ⇒ CI 上会话开不出来、回交不入队（`回交未持久化`）。根由调用方传入并在测试 finally 清理。
+  const l = listing(options.projectRoot);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
   const openCalls: Array<{ roleId: string; runtime: string }> = [];
@@ -154,17 +159,23 @@ test("P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 re
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-queue-recovery-"));
   const storePath = path.join(root, "delivery-queue.json");
   const diagDir = path.join(root, "diagnostics");
+  const projectRoot = path.join(root, "proj");
+  await fs.mkdir(path.join(projectRoot, "角色卡", "A"), { recursive: true });
+  await fs.writeFile(path.join(projectRoot, "角色卡", "A", "role-card.md"), "# A\n", "utf8");
+  await fs.writeFile(path.join(projectRoot, "角色卡", "A", "boundary.yaml"), "role: A\nentries: []\n", "utf8");
   configureDiagnostics({ directory: diagDir });
-  const first = makeInstance({ storePath, gateFirstSend: true });
-  const second = makeInstance({ storePath });
+  const first = makeInstance({ storePath, projectRoot, gateFirstSend: true });
+  const second = makeInstance({ storePath, projectRoot });
   try {
     // —— 实例 1：su 正忙（send 挂起），回交入队并持久化（现场崩溃前形状）。
     // 生产启动会先调用 restore（无历史文件 ⇒ 武装持久化）；测试同路径，不自造第二套开关。
     await first.mgr.restorePersistedDeliveries();
-    await first.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
-    await first.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    const openSu = await first.mgr.open({ projectRoot, roleId: "su", runtime: "demo" });
+    assert.equal(openSu.ok, true, openSu.error ?? "open failed");
+    const openA = await first.mgr.open({ projectRoot, roleId: "A", runtime: "demo" });
+    assert.equal(openA.ok, true, openA.error ?? "open failed");
     await tick(30);
-    const pending = first.mgr.send("占住 su 的长回合", undefined, { projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    const pending = first.mgr.send("占住 su 的长回合", undefined, { projectRoot, roleId: "su", runtime: "demo" });
     void pending.catch(() => undefined);
     await tick(120);
     first.streams.A.push({ kind: "handback", summary: "回交 su", handback: HANDBACK_A });
@@ -191,7 +202,7 @@ test("P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 re
     assert.equal(second.sent.su[0], queued[0].item.text, "续投文本与持久条目逐字一致（不重渲染）");
     second.streams.su.push({ kind: "settled", summary: "续投轮完成", turnId: "turn-su-1", roleId: "su", runtime: "demo" });
     await tick(80);
-    await until(() => second.mgr.watchdogSnapshot("/proj")?.activeDeliveries === 0, "续投轮未收尾");
+    await until(() => second.mgr.watchdogSnapshot(projectRoot)?.activeDeliveries === 0, "续投轮未收尾");
 
     // 投递完成 ⇒ 持久队列清空；恢复诊断可对账。
     await until(() => {
@@ -226,6 +237,10 @@ test("2026-11-05 修复：生产宿主 demoRuntimeAutoDeliver:false ⇒ 持久�
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-queue-demo-guard-"));
   const storePath = path.join(root, "delivery-queue.json");
   const diagDir = path.join(root, "diagnostics");
+  const projectRoot = path.join(root, "proj");
+  await fs.mkdir(path.join(projectRoot, "角色卡", "A"), { recursive: true });
+  await fs.writeFile(path.join(projectRoot, "角色卡", "A", "role-card.md"), "# A\n", "utf8");
+  await fs.writeFile(path.join(projectRoot, "角色卡", "A", "boundary.yaml"), "role: A\nentries: []\n", "utf8");
   configureDiagnostics({ directory: diagDir });
   await fs.writeFile(
     storePath,
@@ -234,7 +249,7 @@ test("2026-11-05 修复：生产宿主 demoRuntimeAutoDeliver:false ⇒ 持久�
       items: [
         {
           state: "queued",
-          key: { projectRoot: "/proj", roleId: "A", runtime: "demo" },
+          key: { projectRoot, roleId: "A", runtime: "demo" },
           item: {
             kind: "dispatch",
             targetRoleId: "A",
@@ -249,7 +264,7 @@ test("2026-11-05 修复：生产宿主 demoRuntimeAutoDeliver:false ⇒ 持久�
     }),
     "utf8",
   );
-  const inst = makeInstance({ storePath, extraDeps: { demoRuntimeAutoDeliver: false } });
+  const inst = makeInstance({ storePath, projectRoot, extraDeps: { demoRuntimeAutoDeliver: false } });
   try {
     const report = await inst.mgr.restorePersistedDeliveries();
     assert.equal(report.restored, 1, "demo 项被恢复入队（不丢消息）");

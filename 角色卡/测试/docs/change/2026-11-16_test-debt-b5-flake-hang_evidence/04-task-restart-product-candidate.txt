@@ -1,0 +1,77 @@
+# task-restart：v2.0.0 来源门拒绝裸 legacy 恢复投递（产品/夹具候选，未修改测试）
+
+## 复现（本机 Windows，3× 一致：1 pass / 1 fail，失败＝等待超时）
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+
+失败体（R4 三平台同款 errorFirst）：
+✖ failing tests:
+
+test at test\桌面应用\task-restart.test.ts:57:1
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2039.6356ms)
+  Error: 等待超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b5new/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:21:47)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b5new/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:88:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+## 根因探针（独立脚本，真实 SessionManager + 裸大账本）
+$ node task-restart-probe.mjs
+report {"restored":1,"skipped":1,"taskIds":["t-pending"],"orphanedRequests":0,"expiredApprovals":0,"versionDecisionsReconciled":0,"versionDecisionsUncertain":0}
+sent {}
+list {
+ "projectRoot": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-task-restart-probe-9cQc2Y",
+ "tasks": [
+  {
+   "taskId": "t-pending",
+   "targetRoleId": "worker",
+   "text": "实现恢复功能",
+   "sideEffect": "code",
+   "status": "created",
+   "createdAt": "2026-11-16T09:03:13.737Z",
+   "reports": []
+  },
+  {
+   "taskId": "t-delivered",
+   "targetRoleId": "worker",
+   "text": "已投递任务",
+   "sideEffect": "docs",
+   "status": "reported",
+   "createdAt": "2026-11-16T09:03:13.737Z",
+   "deliveredAt": "2026-11-16T09:03:13.739Z",
+   "lastReport": {
+    "v": 1,
+    "at": "2026-11-16T09:03:13.739Z",
+    "kind": "task.reported",
+    "taskId": "t-delivered",
+    "from": "worker",
+    "status": "done",
+    "summary": "做完了"
+   },
+   "reports": [
+    {
+     "v": 1,
+     "at": "2026-11-16T09:03:13.739Z",
+     "kind": "task.reported",
+     "taskId": "t-delivered",
+     "from": "worker",
+     "status": "done",
+     "summary": "做完了"
+    }
+   ]
+  }
+ ],
+ "errors": 1,
+ "unclosed": 2
+}
+queues []
+second {"restored":1,"skipped":1,"taskIds":["t-pending"],"orphanedRequests":0,"expiredApprovals":0,"versionDecisionsReconciled":0,"versionDecisionsUncertain":0}
+sent2 {}
+list2 pending status created
+
+## 结论
+- restoreTasks 报告 restored:1（t-pending 入队），但 drainQueue 的 inspectQueuedChild → inspectAssignedTask 要求 task.created 同时带 runId+flowId 且对应 run record 可读（draft/pinned）；裸 legacy 任务两项皆无 ⇒ 条目被 delivery.skip.task-unavailable 从队列移除、零投递，任务保持 created/未收口。
+- 第二次 restoreTasks 因账本仍无 task.delivered，再次 restored:1（重新入队后又移除）——「重复调用不重复投」在当前语义下只成立为零投递，原测试的 restored:0/status=delivered 期望无法满足。
+- 因此本文件未改期望（避免把产品/夹具语义问题伪装成 flake）；需 owner 裁定：restore 对不可投递条目应保留队列/提前拒绝，或测试改用 v2.0.0 真实 run-bound 任务夹具。
