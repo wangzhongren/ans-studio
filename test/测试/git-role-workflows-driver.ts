@@ -69,6 +69,9 @@ export function fixtureWaitBudgetMs(timeoutMs: number, caseDeadlineAt: number | 
 }
 export type HttpTrace = { sequence: number; at: string; role: string; roleStep: number; request: ChatRequest; reply?: ModelReply; error?: string; creationFacts: ReturnType<typeof readCreationFacts> };
 export type DiagnosticWait = { waiter: string; resolver: string | null; event: string; external: boolean };
+/** Owned test-stage progress only (stage name + already-produced reply); read at Q2_TIMEOUT, never mutated here. */
+export type StageProgressFact = { stage: string; reply: string };
+type StageTimelineFact = { label: string; startedAt: string; startedMs: number; endedAt?: string; endedMs?: number; budgetMs: number; remainingCase: boolean; outcome: "pending" | "resolved" | "rejected" | "timeout" };
 export type QueueDiagnosticFact = {
   at: string; root: string; event: unknown;
   inventoryBeforeLedgerRead: ReturnType<typeof desktopProjectExecutionInventory>;
@@ -421,6 +424,10 @@ export async function createRealHttpDriver(scripts: HttpScripts, options: {
   timerDiagnostics?: ReturnType<typeof observeDiagnosticTimers>;
   finiteRoles?: Record<string, { initial?: number; tasks: Record<string, number> }>;
   reusableNoticeKeys?: readonly string[];
+  /** Read-only stage progress supplied by the owned case; used only in Q2_TIMEOUT diagnostics. */
+  progress?: readonly StageProgressFact[];
+  /** Optional one-shot JSON projection written at Q2_TIMEOUT / Q_CASE_ABSOLUTE_BUDGET (diagnostics must never replace the failure). */
+  timeoutDiagnosticFile?: string;
   prepareFixture?: (root: string) => Promise<void>;
   existingOwnedProject?: { proofFile: string; proofSha256: string };
   applicationDataRoot?: string;
@@ -731,16 +738,77 @@ export async function createRealHttpDriver(scripts: HttpScripts, options: {
     observeOwnedLifecycle(stage);
     process.stdout.write(`Q_DRIVER_TEARDOWN ${JSON.stringify({ at: fact.at, stage, resources: fact.resources })}\n`);
   };
+  // R9 批次 E：单阶段 bounded 时间线 + 超时时刻诊断。只记录测试自己的等待预算与自有事实，不新增产品状态。
+  const driverStartedAt = Date.now(), stageTimeline: StageTimelineFact[] = [];
+  const factText = (value: unknown): string => typeof value === "string" ? value : value === undefined ? "" : JSON.stringify(value) ?? String(value);
+  const clipFact = (value: unknown, limit: number) => { const text = factText(value); return text.length <= limit ? text : `${text.slice(0, limit)}…[${text.length} chars]`; };
+  const summarizeHttpRow = (row: HttpTrace | undefined, at: number, withUser: boolean) => row === undefined ? null : {
+    sequence: row.sequence, at: row.at, ageMs: at - Date.parse(row.at), role: row.role, roleStep: row.roleStep,
+    ...(withUser ? { lastUserPreview: clipFact(row.request.messages.findLast(message => message.role === "user")?.content, 1500) } : {}),
+    emittedToolCalls: row.reply?.tool_calls?.map(call => ({ id: call.id, name: call.function.name })) ?? [],
+    replyContentPreview: clipFact(row.reply?.content, 400), replyError: row.error };
+  const summarizeOwnedInventory = () => {
+    try {
+      const facts = desktopProjectExecutionInventory(root);
+      return { sessions: facts.sessions.map(row => ({ ...tailScalars(row, ["roleId", "runtime", "phase", "status", "busy", "activeTurnId"]),
+          lifecycle: tailScalars(tailField(row, "lifecycle"), ["status", "stopRequested", "providerFinished", "processCoverage"]) })),
+        pendingOpens: facts.pendingOpens.map(row => tailScalars(row, ["roleId", "taskId", "runtime", "phase"])),
+        queuedDispatches: facts.queuedDispatches.map(row => tailScalars(row, ["queueEntryId", "roleId", "runtime", "systemAssignmentState"])),
+        activeDeliveries: facts.activeDeliveries.map(row => tailScalars(row, ["roleId", "kind", "taskId", "runtime"])) };
+    } catch (error) { return { error: String(error) }; }
+  };
+  const stageTimeoutDiagnostic = (label: string, entry: StageTimelineFact, remainingMs: number) => {
+    const at = Date.now();
+    try {
+      const httpByRole: Record<string, { requests: number; lastAt: string; lastRoleStep: number }> = {};
+      for (const row of trace) { const item = httpByRole[row.role] ?? { requests: 0, lastAt: row.at, lastRoleStep: row.roleStep }; item.requests++; item.lastAt = row.at; item.lastRoleStep = row.roleStep; httpByRole[row.role] = item; }
+      return { schema: "q2-timeout-diagnostic/v1", at: new Date(at).toISOString(), root, stage: label,
+        stageBudgetMs: remainingMs, stageDefaultMs: timeoutMs, caseDeadlineAt: options.caseDeadlineAt ?? null,
+        caseRemainingMs: options.caseDeadlineAt === undefined ? null : options.caseDeadlineAt - at,
+        driverElapsedMs: at - driverStartedAt, stageElapsedMs: at - entry.startedMs,
+        requests: trace.length, errors: [...errors], waits: analyzeWaits([...waitEdges.values()]),
+        roleProgress: options.progress?.map(item => ({ stage: item.stage, replyPreview: clipFact(item.reply, 240), replyChars: factText(item.reply).length })) ?? null,
+        lastHttp: summarizeHttpRow(trace.at(-1), at, true),
+        recentHttp: trace.slice(-5).map(row => summarizeHttpRow(row, at, false)),
+        httpByRole, pendingCards: [...pending.values()].map(card => ({ id: card.id, roleId: card.roleId,
+          kind: tailField(card.request, "kind"), cardKind: tailField(card.request, "cardKind"), title: clipFact(tailField(card.request, "title"), 160) })),
+        inventory: summarizeOwnedInventory(),
+        recentEvents: events.slice(-8).map(envelope => { const raw = tailField(envelope, "event");
+          return { roleId: tailField(envelope, "roleId"), kind: tailField(raw, "kind"), summary: clipFact(tailField(raw, "summary"), 160),
+            detail: tailScalars(tailField(raw, "detail"), ["toolName", "phase", "status", "code", "errorCode", "source", "taskId", "outcome"]) }; }),
+        stageTimeline: stageTimeline.map(row => ({ label: row.label, startedAt: row.startedAt, endedAt: row.endedAt ?? null,
+          durationMs: row.endedMs === undefined ? null : row.endedMs - row.startedMs, budgetMs: row.budgetMs, remainingCase: row.remainingCase, outcome: row.outcome })) };
+    } catch (error) { return { schema: "q2-timeout-diagnostic/v1", at: new Date(at).toISOString(), root, stage: label, diagnosticBuildError: String(error), requests: trace.length, errors: [...errors] }; }
+  };
+  const persistTimeoutDiagnostic = (diagnostic: unknown) => {
+    const file = options.timeoutDiagnosticFile; if (!file) return;
+    try { writeFileSync(file, JSON.stringify(diagnostic, null, 2), { flag: "w" }); }
+    catch { /* Owned diagnostics must never replace the primary budget failure. */ }
+  };
   const bounded = async <T>(label: string, run: (signal: AbortSignal) => Promise<T>, budget: { remainingCase?: true } = {}): Promise<T> => {
     const abort = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined;
     const now = Date.now(), remaining = fixtureWaitBudgetMs(timeoutMs, options.caseDeadlineAt, now, budget.remainingCase === true);
-    if (remaining <= 0) throw new Error(`Q_CASE_ABSOLUTE_BUDGET ${label}`);
+    const entry: StageTimelineFact = { label, startedAt: new Date(now).toISOString(), startedMs: now, budgetMs: remaining, remainingCase: budget.remainingCase === true, outcome: "pending" };
+    stageTimeline.push(entry);
+    if (remaining <= 0) {
+      entry.outcome = "timeout"; entry.endedMs = now; entry.endedAt = new Date(now).toISOString();
+      const diagnostic = stageTimeoutDiagnostic(label, entry, remaining); persistTimeoutDiagnostic(diagnostic);
+      throw new Error(`Q_CASE_ABSOLUTE_BUDGET ${label}; ${JSON.stringify(diagnostic)}`);
+    }
     if (budget.remainingCase) process.stdout.write(`Q_BOUNDED_CASE_REMAINDER ${JSON.stringify({ at: new Date(now).toISOString(), label, caseDeadlineAt: options.caseDeadlineAt, remainingMs: remaining, originalDefaultWaitMs: timeoutMs, scope: "One already-declared phase; all HR/card/mode/admission work stays under this same absolute deadline" })}\n`);
     try { return await Promise.race([run(abort.signal), new Promise<never>((_, reject) => {
-      timer = setTimeout(() => { abort.abort(); reject(new Error(`Q2_TIMEOUT ${label}; ${JSON.stringify({ errors, requests: trace.length, waits: analyzeWaits([...waitEdges.values()]) })}`)); }, remaining);
-    })]); } finally { if (timer) clearTimeout(timer); }
+      timer = setTimeout(() => { abort.abort(); entry.outcome = "timeout"; entry.endedMs = Date.now(); entry.endedAt = new Date(entry.endedMs).toISOString();
+        const diagnostic = stageTimeoutDiagnostic(label, entry, remaining); persistTimeoutDiagnostic(diagnostic);
+        reject(new Error(`Q2_TIMEOUT ${label}; ${JSON.stringify(diagnostic)}`)); }, remaining);
+    })]); } catch (error) {
+      if (entry.outcome === "pending") { entry.outcome = "rejected"; entry.endedMs = Date.now(); entry.endedAt = new Date(entry.endedMs).toISOString(); }
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (entry.endedMs === undefined) { entry.endedMs = Date.now(); entry.endedAt = new Date(entry.endedMs).toISOString(); entry.outcome = "resolved"; }
+    }
   };
-  return { root, initialRootFacts, desktop, trace, errors, events, customerTrace, customerInputs, inferenceOrigin: `http://127.0.0.1:${address.port}`, pending, delegation, bounded, teardownFacts, publicationDiagnostics, queueDiagnostics, queueDiagnosticErrors, workerRuntimeObservations, pinnedChildObservations, pinObservationErrors, httpCounts, lifecycleObservations,
+  return { root, initialRootFacts, desktop, trace, errors, events, customerTrace, customerInputs, inferenceOrigin: `http://127.0.0.1:${address.port}`, pending, delegation, bounded, teardownFacts, stageTimeline, publicationDiagnostics, queueDiagnostics, queueDiagnosticErrors, workerRuntimeObservations, pinnedChildObservations, pinObservationErrors, httpCounts, lifecycleObservations,
     inspectInventory: () => desktopProjectExecutionInventory(root),
     async openChief() {
       assert.equal(await desktop.pickProject(), root, "Actual native-selection callback must precede successful registration/listing");
@@ -772,7 +840,7 @@ export async function createRealHttpDriver(scripts: HttpScripts, options: {
       const at = new Date().toISOString(), observation = await this.observe();
       await fs.writeFile(file, JSON.stringify({ at, root, transport: "default-production Core/default CodexChat -> loopback HTTP",
         realModel: false, credential: "fixture-only; headers not captured", initialRootFacts, existingOwnedInput, customerInputs, trace, errors, events, customerTrace, effectActorSamples, publicationDiagnostics, queueDiagnostics, queueDiagnosticErrors, workerRuntimeObservations, pinnedChildObservations, pinObservationErrors, httpCounts, lifecycleObservations,
-        receiverTransitions, observation, extra }, null, 2));
+        receiverTransitions, observation, extra, stageTimeline }, null, 2));
       if (file.endsWith("-full-final-proof.json")) {
         await fs.writeFile(file.replace(/-full-final-proof\.json$/, "-final-light-projection.json"), JSON.stringify({ at, root,
           fullProof: path.basename(file), errors, httpCounts, lastHttp: trace.slice(-3).map(row => ({ sequence: row.sequence, at: row.at, role: row.role,

@@ -1307,15 +1307,26 @@ test("Q2 real default CodexChat HTTP: chief Git query preserves real metadata an
 });
 
 const firstNewBusinessName = "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards";
-const firstNewBusinessTimeoutMs = () => process.env.ANS_Q39_BUSINESS === "1" || (!standaloneBusiness && process.env.ANS_DIRECT_NODETEST !== "1") ? 300000 : (process.env.ANS_Q38_BUSINESS === "1" || process.env.ANS_Q36_BUSINESS === "1" ? 300000 : (process.env.ANS_Q35_BUSINESS === "1" ? 300000 : process.env.ANS_Q34_QUEUE_DIAGNOSTIC === "1" || process.env.ANS_Q33_QUEUE_DIAGNOSTIC === "1" ? 90000 : process.env.ANS_Q32_BUSINESS === "1" || process.env.ANS_Q31_BUSINESS === "1" || process.env.ANS_Q30_BUSINESS === "1" || process.env.ANS_Q29_BUSINESS === "1" || process.env.ANS_Q28_BUSINESS === "1" || process.env.ANS_Q27_BUSINESS === "1" || process.env.ANS_Q26_BUSINESS === "1" ? 300000 : process.env.ANS_Q25_BUSINESS === "1" ? 240000 : process.env.ANS_Q24_BUSINESS === "1" ? 180000 : process.env.ANS_Q23_BUSINESS === "1" ? 180000 : process.env.ANS_Q21_BUSINESS === "1" ? 180000 : process.env.ANS_Q20_PROFILE === "1" ? 90000 : process.env.ANS_Q19_DIAGNOSTIC === "1" ? 120000 : 240000) );
+// R9 批次 E（2026-11-16）：Q2 P2 三层预算统一到同一 600s 目标口径（数值/依据见 2026-11-16_r9-batch-e-q2p2-budgets-diagnostics.md）。
+// 依据：R9 arm64/Windows 已在 90s 阶段预算内自然失败（258.1s/278.4s，Q2_TIMEOUT @ driver:740），
+// x64 300s 时仅到 persisted-child（251.7s）；R8 同链 arm64/Windows 214.0s/195.6s 通过。
+// #137 的 CLI 600s 被父测试显式 per-test timeout 与子进程 300s 看门狗覆盖，故三层必须一起改（不得只依赖 CLI）。
+const q2P2WholeTestBudgetMs = 600000;     // 父测试显式 timeout（node:test 选项）
+const q2P2ChildAbsoluteBudgetMs = 540000; // 子进程硬预算；父测试保留 60s 做结果核验/拆解
+const q2P2StageBudgetMs = 240000;         // first-bootstrap 单阶段 bounded 预算（CI 子进程经 q26 闭锁实占 150s，默认分支 90s；两者均对齐到此值）；driver 同时把 timeoutMs 用作单回合 lastResort/首字节预算
+const firstNewBusinessTimeoutMs = () => process.env.ANS_Q39_CHILD === "1" ? q2P2WholeTestBudgetMs
+  : continuousChangeChild ? 300000 // 连续阶段运行器受其共享绝对 deadline 约束，保留原 300s 单阶段口径
+  : process.env.ANS_Q39_BUSINESS === "1" ? 300000
+  : !standaloneBusiness && process.env.ANS_DIRECT_NODETEST !== "1" ? q2P2WholeTestBudgetMs
+  : (process.env.ANS_Q38_BUSINESS === "1" || process.env.ANS_Q36_BUSINESS === "1" ? 300000 : (process.env.ANS_Q35_BUSINESS === "1" ? 300000 : process.env.ANS_Q34_QUEUE_DIAGNOSTIC === "1" || process.env.ANS_Q33_QUEUE_DIAGNOSTIC === "1" ? 90000 : process.env.ANS_Q32_BUSINESS === "1" || process.env.ANS_Q31_BUSINESS === "1" || process.env.ANS_Q30_BUSINESS === "1" || process.env.ANS_Q29_BUSINESS === "1" || process.env.ANS_Q28_BUSINESS === "1" || process.env.ANS_Q27_BUSINESS === "1" || process.env.ANS_Q26_BUSINESS === "1" ? 300000 : process.env.ANS_Q25_BUSINESS === "1" ? 240000 : process.env.ANS_Q24_BUSINESS === "1" ? 180000 : process.env.ANS_Q23_BUSINESS === "1" ? 180000 : process.env.ANS_Q21_BUSINESS === "1" ? 180000 : process.env.ANS_Q20_PROFILE === "1" ? 90000 : process.env.ANS_Q19_DIAGNOSTIC === "1" ? 120000 : 240000) );
 async function runOwnedCompleteBusinessChild() {
   const runNonce = process.env.ANS_HARNESS_RUN_ID ?? randomUUID();
   const caseTag = process.env.ANS_Q39_CASE_TAG ?? `default-new-${runNonce}`;
   assert.match(caseTag, /^[a-z0-9][a-z0-9-]{0,99}$/);
   const started = new Date().toISOString();
   const suppliedOuter = Number(process.env.ANS_HARNESS_WRAPPER_DEADLINE_AT);
-  const outerDeadlineAt = Number.isSafeInteger(suppliedOuter) && suppliedOuter > Date.now() ? suppliedOuter : Date.now() + 330000;
-  const deadlineAt = Math.min(Date.now() + 300000, outerDeadlineAt - 30000);
+  const outerDeadlineAt = Number.isSafeInteger(suppliedOuter) && suppliedOuter > Date.now() ? suppliedOuter : Date.now() + q2P2ChildAbsoluteBudgetMs + 30000;
+  const deadlineAt = Math.min(Date.now() + q2P2ChildAbsoluteBudgetMs, outerDeadlineAt - 30000);
   assert.ok(deadlineAt > Date.now(), "No fresh child may extend an exhausted shared budget");
   const source = [fileURLToPath(import.meta.url), path.resolve("test/测试/git-role-workflows-driver.ts")].map(file => ({ file,
     sha256: createHash("sha256").update(readFileSync(file)).digest("hex") }));
@@ -1409,8 +1420,8 @@ export async function runFirstNewBusinessCase() {
   const q21Business = process.env.ANS_Q21_BUSINESS === "1" || q23Business;
   const caseTag = process.env.ANS_Q39_CASE_TAG ?? (q39Business ? "q39" : q38Business ? "q38" : q36Business ? "q36" : q35Business ? "q35" : q34QueueDiagnostic ? "q34" : q33QueueDiagnostic ? "q33" : q32Business ? "q32" : q31Business ? "q31" : q30Business ? "q30" : q29Business ? "q29" : q28Business ? "q28" : q27Business ? "q27" : q26Business ? "q26" : q25Business ? "q25" : q24Business ? "q24" : q23Business ? "q23" : q21Business ? "q21" : q20Profile ? "q20" : q19Diagnostic ? "q19" : "q17");
   const timerDiagnostics = q19Diagnostic ? observeDiagnosticTimers() : undefined;
-  // Q17 none-isolation runner after exact current-parent blocked-report wait handling; one attempt: 192 HTTP/240s whole test/90s wait,
-  // no retry, expected <=144 through actual first pin/persisted child/worker open.
+  // Q17 none-isolation runner after exact current-parent blocked-report wait handling; one attempt: 192 HTTP/600s whole test/240s stage wait,
+  // no retry, expected <=144 through actual first pin/persisted child/worker open. R9 批次 E：阶段 90s→240s、子进程 300s→540s、父测试 300s→600s。
   const diagnosticOnly = false;
   let handoffReply: string | undefined, initReply: string | undefined;
   let actualSource: unknown;
@@ -1919,7 +1930,8 @@ export async function runFirstNewBusinessCase() {
     output: { path: "src/impl/result.txt", content: "Actual isolated workflow worker output.\n" },
     ids: { write: "q17-worker-write", basis: "q21-worker-basis-query", candidate: "q21-worker-candidate", gapReport: "q21-worker-gap-report", report: "q21-worker-candidate-report" },
     caseTag, progress: roleProgress, onCandidateReceipt: result => { workerCandidateReceipt = result; }
-  }) }, { caseDeadlineAt, tag: "first-bootstrap", requestLimit: q33QueueDiagnostic ? 96 : q23Business ? 256 : 192, timeoutMs: q33QueueDiagnostic ? 30000 : q26Business ? 150000 : q25Business ? 120000 : 90000,
+  }) }, { caseDeadlineAt, tag: "first-bootstrap", requestLimit: q33QueueDiagnostic ? 96 : q23Business ? 256 : 192, timeoutMs: q33QueueDiagnostic ? 30000 : q26Business ? q2P2StageBudgetMs : q25Business ? 120000 : q2P2StageBudgetMs,
+    progress: roleProgress, timeoutDiagnosticFile: path.join(evidence, `${caseTag}-q2-timeout-diagnostic.json`),
     reusableNoticeKeys: ["chief:feedback", ...["chief", "convener", "product", "nominator"].map(role => `${role}:application-notice`)],
     finiteRoles: q21Business ? {
       chief: { initial: 0, tasks: { "q2-empty-bootstrap-convener": 2, "q6-product-draft": 5, "q6-rapporteur-draft": 9, "q6-product-publish": 12, "q7-dispatch-plan": 15, "q8-dispatch-nominator": 18, "q9-dispatch-workflow": 21, "q11-dispatch-execution": 24, "q23-dispatch-verifier": 26 } },
@@ -2285,7 +2297,7 @@ export async function runFirstNewBusinessCase() {
     firstDocumentReadback,
     planReply: planReply ?? null,
     planReadback, activationReadback, activationCloseReadback, workflowReadback, workflowCloseReadback, roleProgress,
-    budget: { diagnosticQueueOnly: q33QueueDiagnostic, httpRequests: q33QueueDiagnostic ? 96 : q23Business ? 256 : 192, wholeTestMs: q33QueueDiagnostic ? 90000 : q26Business ? 300000 : q25Business ? 240000 : q23Business ? 180000 : 240000, perObservationMs: q33QueueDiagnostic ? 30000 : q26Business ? 150000 : q25Business ? 120000 : 90000, retries: 0, expectedRequestsAtMost: q33QueueDiagnostic ? 48 : q27Business ? 180 : 144, runnerIsolation: "none", diagnosticOnly },
+    budget: { diagnosticQueueOnly: q33QueueDiagnostic, httpRequests: q33QueueDiagnostic ? 96 : q23Business ? 256 : 192, wholeTestMs: q33QueueDiagnostic ? 90000 : q26Business ? q2P2WholeTestBudgetMs : q25Business ? 240000 : q23Business ? 180000 : q2P2WholeTestBudgetMs, perObservationMs: q33QueueDiagnostic ? 30000 : q26Business ? q2P2StageBudgetMs : q25Business ? 120000 : q2P2StageBudgetMs, retries: 0, expectedRequestsAtMost: q33QueueDiagnostic ? 48 : q27Business ? 180 : 144, runnerIsolation: "none", diagnosticOnly },
     repoPrefilled: false, futurePlanningD3CardsPrefilled: false }); } catch (error) { finalSaveFailure = { error }; }
     await driver.dispose(); disposeCompleted = true;
     await fs.writeFile(path.join(evidence, `${caseTag}-owned-teardown-facts.json`), JSON.stringify(driver.teardownFacts, null, 2));
@@ -3417,7 +3429,7 @@ if (process.env.ANS_Q39_CHILD === "1") {
   const caseTag = process.env.ANS_Q39_CASE_TAG, runNonce = process.env.ANS_HARNESS_RUN_ID;
   assert.ok(caseTag && runNonce); assert.match(caseTag, /^[a-z0-9][a-z0-9-]{0,99}$/);
   const deadlineAt = Number(process.env.ANS_HARNESS_ABSOLUTE_DEADLINE_AT);
-  assert.ok(Number.isSafeInteger(deadlineAt) && deadlineAt > Date.now() && deadlineAt <= Date.now() + 300000);
+  assert.ok(Number.isSafeInteger(deadlineAt) && deadlineAt > Date.now() && deadlineAt <= Date.now() + q2P2ChildAbsoluteBudgetMs);
   const source = [fileURLToPath(import.meta.url), path.resolve("test/测试/git-role-workflows-driver.ts")].map(file => ({ file,
     sha256: createHash("sha256").update(readFileSync(file)).digest("hex") }));
   const start = { at: new Date().toISOString(), runNonce, caseTag, pid: process.pid, parentPid: process.ppid, deadlineAt, source,
