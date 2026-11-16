@@ -10,6 +10,7 @@ import {
   DOC_FREEZE_APPLICATION_REASONS,
   DOC_FREEZE_BASELINE_EVENT_KINDS,
   DOC_FREEZE_CUSTOMER_REASONS,
+  DOC_FREEZE_DIRECT_REASONS,
   DOC_FREEZE_ERROR_CODES,
   DOC_FREEZE_JUDGE_DELEGATED_REASONS,
   DOC_FREEZE_LOOKUP_STATES,
@@ -174,14 +175,22 @@ test("版本变更事件归属分区（AC-31/Q3）：approved/rejected=customer�
 });
 
 test("doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）", () => {
-  assert.equal(DOC_FREEZE_REASONS.length, 9);
-  assert.equal(new Set(DOC_FREEZE_REASONS).size, 9, "reason 不得重复");
+  // 2026-11-16 KR-33 K3：测试名保留冻结基线历史名（“九类”）；现行契约 10 类，新增
+  // role-direct-applied（src/model/version-change.ts:196-235；api-spec.md:187/209）——
+  // customer 5 + application 4 + direct 1 三分区互斥且并集恰等于全集。
+  assert.equal(DOC_FREEZE_REASONS.length, 10);
+  assert.equal(new Set(DOC_FREEZE_REASONS).size, 10, "reason 不得重复");
   const all = new Set<string>(DOC_FREEZE_REASONS);
   const customer = new Set<string>(DOC_FREEZE_CUSTOMER_REASONS);
   const application = new Set<string>(DOC_FREEZE_APPLICATION_REASONS);
-  const union = new Set<string>([...customer, ...application]);
-  assert.deepEqual([...union].sort(), [...all].sort(), "customer/application 分区穷尽全集");
-  assert.equal(customer.size + application.size, all.size, "两分区互斥");
+  const direct = new Set<string>(DOC_FREEZE_DIRECT_REASONS);
+  const union = new Set<string>([...customer, ...application, ...direct]);
+  assert.deepEqual([...union].sort(), [...all].sort(), "customer/application/direct 分区穷尽全集");
+  assert.equal(customer.size + application.size + direct.size, all.size, "三分区互斥");
+  assert.equal(customer.size, 5); assert.equal(application.size, 4); assert.equal(direct.size, 1);
+  assert.deepEqual([...direct], ["role-direct-applied"]);
+  // judge-delegated 仍是 customer 子集，不构成第四分区。
+  for (const reason of DOC_FREEZE_JUDGE_DELEGATED_REASONS) assert.equal(customer.has(reason), true);
   assert.equal((DOC_FREEZE_REASONS as readonly string[]).includes("migrated-draft"), false);
   assert.deepEqual([...DOC_MIGRATION_MARKS], ["migrated-legacy", "migrated-draft"]);
   assert.deepEqual([...DOC_FREEZE_BASELINE_EVENT_KINDS], ["frozen", "draft-updated", "draft-marker"]);

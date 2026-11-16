@@ -7,7 +7,7 @@ import path from "node:path";
 import { createRuntimeAdapter, readRuntimeSessionHistory } from "../../src/service/runtime/session.ts";
 import { createEventQueue } from "../../src/common/runtime-core/event-queue.ts";
 import type { PromptOptions, PromptTurnStartedMetadata, ReportHandbackMetadata, RoleSession, RuntimeProviderFactory, SessionEvent } from "../../src/model/runtime.ts";
-import { allow, role, until } from "./fixtures.ts";
+import { allow, neutralProjectRoot, role, until } from "./fixtures.ts";
 
 function collect(session: RoleSession) {
   const events: SessionEvent[] = [];
@@ -66,14 +66,16 @@ test("actual turn has one synchronous acknowledgement before persisted input/nat
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("active and disposed prompt rejections have no turn acknowledgement", async () => {
+test("active and disposed prompt rejections have no turn acknowledgement", async (t) => {
+  // K1：中性临时根（无 .git），避免 linked worktree 的 .git 文件触发保护范围 unknown。
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let entered = false;
   let complete!: () => void;
   const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return { async prompt() { entered = true; await new Promise<void>((resolve) => { complete = resolve; }); queue.push({ kind: "settled", summary: "done" }); }, events: () => queue.stream, async dispose() { queue.close(); } };
   } });
-  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), providerFactories: { pi: factory } }).bindRole(role());
+  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root, providerFactories: { pi: factory } }).bindRole(role());
   const acknowledgements: PromptTurnStartedMetadata[] = [];
   const options: PromptOptions = { onTurnStarted(metadata) { acknowledgements.push(metadata); } };
   const run = session.prompt("first", options); await until(() => entered);
@@ -82,7 +84,8 @@ test("active and disposed prompt rejections have no turn acknowledgement", async
   await assert.rejects(session.prompt("disposed", options), /已关闭/); assert.equal(acknowledgements.length, 1);
 });
 
-test("quarantined prompt rejection has no acknowledgement after one stopped actual turn", async () => {
+test("quarantined prompt rejection has no acknowledgement after one stopped actual turn", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let entered = false;
   const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
@@ -92,7 +95,7 @@ test("quarantined prompt rejection has no acknowledgement after one stopped actu
       async abort() { throw new Error("native cleanup rejected"); }, async dispose() { queue.close(); },
     };
   } });
-  const session = await createRuntimeAdapter({ runtime: "claude", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), providerFactories: { claude: factory } }).bindRole(role());
+  const session = await createRuntimeAdapter({ runtime: "claude", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root, providerFactories: { claude: factory } }).bindRole(role());
   let acknowledgements = 0;
   const options: PromptOptions = { onTurnStarted() { acknowledgements++; } };
   const run = session.prompt("first", options); const rejected = assert.rejects(run, /中止/); await until(() => entered);
@@ -101,14 +104,15 @@ test("quarantined prompt rejection has no acknowledgement after one stopped actu
   await session.dispose();
 });
 
-test("synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn", async () => {
+test("synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let nativePrompts = 0;
   let nativeAborts = 0;
   const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return { async prompt() { nativePrompts++; queue.push({ kind: "settled", summary: "done" }); }, events: () => queue.stream, async abort() { nativeAborts++; }, async dispose() { queue.close(); } };
   } });
-  const session = await createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), providerFactories: { codex: factory } }).bindRole(role());
+  const session = await createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root, providerFactories: { codex: factory } }).bindRole(role());
   const { events, done } = collect(session);
   const metadata: PromptTurnStartedMetadata[] = [];
   await assert.rejects(session.prompt("callback fails", { onTurnStarted(value) { metadata.push(value); throw new Error("observer failed"); } }), /observer failed/);
@@ -120,7 +124,8 @@ test("synchronous acknowledgement throw yields one failed terminal, zero native 
   assert.deepEqual(terminal.map((event) => event.turnId), metadata.map((value) => value.turnId));
 });
 
-test("acknowledged turns keep aborted/timed_out outcomes and single matching terminal", async () => {
+test("acknowledged turns keep aborted/timed_out outcomes and single matching terminal", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   for (const expected of ["aborted", "timed_out"] as const) {
     let entered = false;
     let complete!: () => void;
@@ -128,7 +133,7 @@ test("acknowledged turns keep aborted/timed_out outcomes and single matching ter
       const queue = createEventQueue<SessionEvent>();
       return { async prompt() { entered = true; await new Promise<void>((resolve) => { complete = resolve; }); }, events: () => queue.stream, async abort() { queue.push({ kind: "settled", summary: "inner cleanup", detail: { outcome: "aborted" } }); complete(); await Promise.resolve(); }, async dispose() { queue.close(); } };
     } });
-    const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), turnLastResortMs: expected === "timed_out" ? 15 : 60000, providerFactories: { pi: factory } }).bindRole(role());
+    const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root, turnLastResortMs: expected === "timed_out" ? 15 : 60000, providerFactories: { pi: factory } }).bindRole(role());
     const { events, done } = collect(session);
     const metadata: PromptTurnStartedMetadata[] = [];
     const run = session.prompt("outcome", { onTurnStarted(value) { metadata.push(value); } });

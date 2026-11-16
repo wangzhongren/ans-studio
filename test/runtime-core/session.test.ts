@@ -9,7 +9,7 @@ import { createRuntimeSessionStore } from "../../src/provider/runtime/session-st
 import { createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
 import { createEventQueue } from "../../src/common/runtime-core/event-queue.ts";
 import type { RoleSession, RuntimeKind, RuntimeProviderFactory, RuntimeProviderOptions, SessionEvent } from "../../src/model/runtime.ts";
-import { allow, deny, role, until } from "./fixtures.ts";
+import { allow, deny, neutralProjectRoot, role, until } from "./fixtures.ts";
 
 const temp = () => mkdtemp(path.join(os.tmpdir(), "ans-service-"));
 
@@ -374,7 +374,9 @@ test("Service configured custom API key is stripped from the actual governed she
   } finally { if (old === undefined) delete process.env[name]; else process.env[name] = old; await rm(root, { recursive: true, force: true }); }
 });
 
-test("outer timeout remains timed_out when abort cleanup emits inner aborted terminals", async () => {
+test("outer timeout remains timed_out when abort cleanup emits inner aborted terminals", async (t) => {
+  // K1：中性临时根（无 .git），避免 linked worktree 的 .git 文件触发保护范围 unknown。
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let completePrompt!: () => void;
   let abortCalls = 0;
   const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
@@ -392,7 +394,7 @@ test("outer timeout remains timed_out when abort cleanup emits inner aborted ter
       async dispose() { queue.close(); },
     };
   } });
-  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), turnLastResortMs: 15, providerFactories: { pi: factory } }).bindRole(role());
+  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root, turnLastResortMs: 15, providerFactories: { pi: factory } }).bindRole(role());
   const { events, done } = await collect(session);
   await assert.rejects(session.prompt("race"), /最后兜底/); await session.dispose(); await done;
   assert.equal(abortCalls, 1);
@@ -401,7 +403,8 @@ test("outer timeout remains timed_out when abort cleanup emits inner aborted ter
   assert.equal((terminal[0].detail as { turnId: string }).turnId, terminal[0].turnId);
 });
 
-test("outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup", async () => {
+test("outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let entered = false;
   let calls = 0;
   let completePrompt!: () => void;
@@ -421,7 +424,7 @@ test("outer aborted result stays aborted and a settled underlying lifts quaranti
       async dispose() { queue.close(); },
     };
   } });
-  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), providerFactories: { pi: factory } }).bindRole(role());
+  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root, providerFactories: { pi: factory } }).bindRole(role());
   const { events, done } = await collect(session);
   const run = session.prompt("abort"); const rejected = assert.rejects(run, /中止/); await until(() => entered);
   await assert.rejects(Promise.resolve(session.abort!()), /cleanup fixture failed/); await rejected;
@@ -436,13 +439,16 @@ test("outer aborted result stays aborted and a settled underlying lifts quaranti
 });
 
 
-test("Core-managed binding rejects a provider that did not register its display profile before first prompt",async()=>{
+test("Core-managed binding rejects a provider that did not register its display profile before first prompt",async(t)=>{
+  // K1：中性临时根（无 .git），避免 linked worktree 的 .git 文件触发保护范围 unknown。
+  // K2：产品侧 assertReady 失败路径只由外层 catch dispose 一次；本断言保持 disposed==1、native==0。
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let disposed=0,native=0;
   const factory:RuntimeProviderFactory=options=>{
     assert.equal(options.toolDisplayMode,"required-v1");assert.equal(typeof options.projectToolEvent,"function");assert.equal(typeof options.registerToolDisplayProfile,"function");
     return {async composeContext(){return {systemPrompt:"fixture"};},async bindRole(){return {async prompt(){native++;},events:()=>({async *[Symbol.asyncIterator](){}}),async dispose(){disposed++;}};}};
   };
-  await assert.rejects(createRuntimeAdapter({runtime:"codex",gate:allow,projectRoot:process.cwd(),skillRoot:process.cwd(),providerFactories:{codex:factory}}).bindRole(role()),/profile was not registered/);
+  await assert.rejects(createRuntimeAdapter({runtime:"codex",gate:allow,projectRoot:neutral.root,skillRoot:neutral.root,providerFactories:{codex:factory}}).bindRole(role()),/profile was not registered/);
   assert.equal(native,0);assert.equal(disposed,1);
 });
 

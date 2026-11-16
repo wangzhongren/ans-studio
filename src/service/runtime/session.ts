@@ -749,7 +749,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         previous = await storage?.readLatest();
         inner = await withTimeout(provider.adapter.bindRole(role), provider.options.constructTimeoutMs ?? 120000, `${options.runtime} 建立角色会话`);
         constructed = inner;
-        try { provider.display.assertReady(); } catch (error) { await inner.dispose(); throw error; }
+        // assertReady 失败由外层 catch 统一释放 constructed（dispose 恰一次；此处不得重复释放）。
+        provider.display.assertReady();
         // P1.4 F5/A6：仅核对**主动采用**的可选 native 强证明（plan.native 只在 observed+adapter 时投影）。
         // `absent` ⇒ 不拒绝；present-but-changed ⇒ runtime-native-factory-plan-binding-unverified。
         if (creationPlan?.native && !matchesRuntimeNativeFactoryPlanBinding(creationPlan.native, inner.inspectNativeToolSurface?.(), {

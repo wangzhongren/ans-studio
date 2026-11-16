@@ -8,6 +8,17 @@ import type { RuntimeKind, RuntimeSessionRecord } from "../../src/model/runtime.
 const record = (roleId: string, runtime: RuntimeKind, contextSource: RuntimeSessionRecord["contextSource"] = "fresh"): RuntimeSessionRecord => ({ version: 1, id: "ans-id", roleId, runtime, contextSource, nativeSessionId: "native-id", createdAt: "2026-10-14T00:00:00.000Z", updatedAt: "2026-10-14T00:00:00.000Z" });
 const temp = () => mkdtemp(path.join(os.tmpdir(), "ans-store-"));
 
+/** K4（2026-11-16，KR-33）：目录链接能力适配——优先真实符号链接；Windows 无
+ *  SeCreateSymbolicLinkPrivilege 时 EPERM，改用 junction（lstat().isSymbolicLink() 同样为 true，
+ *  store 的「非普通目录」拒绝语义不变）。返回实际链接种类供诊断；非 Windows/非 EPERM 如实抛出。 */
+async function directoryLink(target: string, link: string): Promise<"symlink" | "junction"> {
+  try { await symlink(target, link, "dir"); return "symlink"; }
+  catch (error) {
+    if (process.platform !== "win32" || (error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+    await symlink(target, link, "junction"); return "junction";
+  }
+}
+
 test("store: creation/read stay lazy; roles/runtimes never share index or replay", async () => {
   const root = await temp();
   try {
@@ -43,24 +54,25 @@ test("store: concurrent writes serialize; corrupt history fails honestly", async
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("store: traversal, mismatched scope and symlinked runtime directories rejected", async () => {
+test("store: traversal, mismatched scope and symlinked runtime directories rejected", async (t) => {
   const root = await temp(); const outside = await temp();
   try {
     assert.throws(() => createRuntimeSessionStore({ projectRoot: root, roleId: "../other", runtime: "codex" }), /roleId/);
     const parent = path.join(root, ".ans", "sessions", "role"); await mkdir(parent, { recursive: true });
-    await symlink(outside, path.join(parent, "codex"), "dir");
+    t.diagnostic(JSON.stringify({ linkKind: await directoryLink(outside, path.join(parent, "codex")), platform: process.platform }));
     const store = createRuntimeSessionStore({ projectRoot: root, roleId: "role", runtime: "codex" });
     await assert.rejects(store.saveSession(record("role", "codex")), /不是普通目录/);
     assert.deepEqual(await readdir(outside), []);
   } finally { await rm(root, { recursive: true, force: true }); await rm(outside, { recursive: true, force: true }); }
 });
 
-test("store: native validation stays lazy and native symlink is rejected before effects", async () => {
+test("store: native validation stays lazy and native symlink is rejected before effects", async (t) => {
   const root = await temp(); const outside = await temp();
   try {
     const store = createRuntimeSessionStore({ projectRoot: root, roleId: "core", runtime: "codex" });
     await store.validateNativeDirectory?.(); assert.deepEqual(await readdir(root), []);
-    await mkdir(store.directory, { recursive: true }); await symlink(outside, store.nativeDirectory, "dir");
+    await mkdir(store.directory, { recursive: true });
+    t.diagnostic(JSON.stringify({ linkKind: await directoryLink(outside, store.nativeDirectory), platform: process.platform }));
     await assert.rejects(store.prepareNativeDirectory!(), /不是普通目录/);
     await assert.rejects(store.readLatest(), /不是普通目录/);
     assert.deepEqual(await readdir(outside), []);

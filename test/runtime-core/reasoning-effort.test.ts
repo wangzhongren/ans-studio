@@ -10,7 +10,7 @@ import {
   isReasoningEffortV1, normalizeReasoningEffortValue, resolveReasoningEffort,
 } from "../../src/common/runtime-core/reasoning.ts";
 import type { GovernedToolsOptions, RuntimeProviderFactory, RuntimeProviderOptions } from "../../src/model/runtime.ts";
-import { deny, role } from "./fixtures.ts";
+import { deny, neutralProjectRoot, role } from "./fixtures.ts";
 
 const ENV_KEYS = ["ANS_CLAUDE_REASONING_EFFORT", "ANS_CODEX_REASONING_EFFORT", "ANS_PI_REASONING_EFFORT"] as const;
 
@@ -40,15 +40,19 @@ function spyDiagnostics(): { log: NonNullable<GovernedToolsOptions["diagnostics"
   return { log: { record(event, fields) { events.push({ event, fields }); }, error(event, _error, fields) { events.push({ event, fields }); } }, events };
 }
 
-/** 经真实 Service 入口构造一次 providerOptions 捕获（composeContext 即触发 providerFor）。 */
+/** 经真实 Service 入口构造一次 providerOptions 捕获（composeContext 即触发 providerFor）。
+ *  K1：中性临时根（无 .git），避免 linked worktree 的 .git 文件触发保护范围 unknown。 */
 async function captureFor(runtime: "claude" | "codex" | "pi" | "demo", diagnostics?: GovernedToolsOptions["diagnostics"]): Promise<RuntimeProviderOptions> {
-  const sink: RuntimeProviderOptions[] = [];
-  await createRuntimeAdapter({
-    runtime, gate: deny, projectRoot: process.cwd(), skillRoot: process.cwd(),
-    ...(diagnostics ? { diagnostics } : {}),
-    providerFactories: { [runtime]: captureFactory(sink) },
-  }).composeContext(role());
-  return sink[0]!;
+  const neutral = await neutralProjectRoot();
+  try {
+    const sink: RuntimeProviderOptions[] = [];
+    await createRuntimeAdapter({
+      runtime, gate: deny, projectRoot: neutral.root, skillRoot: neutral.root,
+      ...(diagnostics ? { diagnostics } : {}),
+      providerFactories: { [runtime]: captureFactory(sink) },
+    }).composeContext(role());
+    return sink[0]!;
+  } finally { await neutral.cleanup(); }
 }
 
 test("冻结值集与环境键：五值恰序（关/低/中/高/极高）；三键逐字；demo 无键面", () => {

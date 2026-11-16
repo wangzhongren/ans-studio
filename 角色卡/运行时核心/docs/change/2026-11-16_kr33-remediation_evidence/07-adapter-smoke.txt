@@ -1,0 +1,19 @@
+KR-33 运行时核心：调用方冒烟（session.ts 依赖变更后的重测）
+
+命令：
+  node --test --test-concurrency=1 test/claude-adapter/application-tool-surface.test.ts test/claude-adapter/session.test.ts test/codex-adapter/application-surface.test.ts test/codex-adapter/chat-transport.test.ts test/pi-adapter/injected-runtime.test.ts test/pi-adapter/tool-display-projection.test.ts
+
+修改后（kr33fix）：
+  EXIT=1；tests 124 / pass 122 / fail 2 / skipped 0
+  失败名：
+   - store validate callback rejects directory symlink before Pi parse or new native write（test/pi-adapter/injected-runtime.test.ts:188）
+   - Pi storage refuses file symlink and role/runtime mismatch without touching other storage（test/pi-adapter/injected-runtime.test.ts:195）
+  错误体：EPERM: operation not permitted, symlink …（本机 Windows 无 SeCreateSymbolicLinkPrivilege；构造阶段即失败）
+
+基线对照（kr33ana @ d1f256f，同一文件）：
+  node --test --test-concurrency=1 test/pi-adapter/injected-runtime.test.ts
+  EXIT=1；tests 14 / pass 12 / fail 2 / skipped 0
+  失败名与错误体与修改后完全一致。
+
+结论：这 2 个失败是既有环境限制（文件符号链接 EPERM），不是本轮 K1–K4 引入；该文件属于 Pi适配器边界，
+不在运行时核心写区，本轮不修改。其余 122 个适配器用例通过。

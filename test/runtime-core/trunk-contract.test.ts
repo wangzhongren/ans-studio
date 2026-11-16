@@ -78,17 +78,21 @@ test("schema 常量与最小版本（trunk/v1、trunk-amendment/v1、trunk-apply
 });
 
 test("主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）", () => {
+  // 2026-11-16 KR-33 K3：现行 TRUNK_SOURCES 含第 7 个来源 team-plan（真实计划发布来源；
+  // api-spec.md:217），测试名保留冻结基线历史名。
   assert.deepEqual([...TRUNK_SOURCES].sort(), [
     "adopted",
     "amendment",
     "bootstrap",
     "post-run-change",
     "recovery",
+    "team-plan",
     "upgrade",
   ]);
   assert.equal((TRUNK_SOURCES as readonly string[]).includes("bootstrap"), true);
   assert.equal((TRUNK_SOURCES as readonly string[]).includes("recovery"), true);
   assert.equal((TRUNK_SOURCES as readonly string[]).includes("upgrade"), true);
+  assert.equal((TRUNK_SOURCES as readonly string[]).includes("team-plan"), true, "team-plan 是真实计划发布来源");
   // @ts-expect-error 消费方不得新造 "main-upgrade"；统一用 "upgrade"
   const badSource: TrunkSource = "main-upgrade";
   void badSource;
