@@ -1,0 +1,161 @@
+{
+  "generatedAt": "2026-11-16T01:20:30.397Z",
+  "runId": "43421603526",
+  "command": "node --test --test-concurrency=1 --test-timeout=300000 \"test/**/*.test.ts\"",
+  "platforms": {
+    "macos_arm64": {
+      "summary": {
+        "source": "largest top-level summary",
+        "lineIndex": 7600,
+        "ts": "2026-11-13T12:22:38.3158510Z",
+        "counts": {
+          "tests": 5823,
+          "suites": 0,
+          "pass": 5519,
+          "fail": 282,
+          "cancelled": 3,
+          "skipped": 19,
+          "todo": 0,
+          "duration_ms": 1237503.032833
+        }
+      },
+      "timeouts": [
+        {
+          "name": "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+          "maxDurationMs": 300008.997083,
+          "count": 2,
+          "files": [
+            "test/桌面应用/session-rebuild-race.test.ts"
+          ],
+          "fileLevel": false
+        },
+        {
+          "name": "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口",
+          "maxDurationMs": 300009.843375,
+          "count": 2,
+          "files": [
+            "test/桌面应用/stuck-redispatch.test.ts"
+          ],
+          "fileLevel": false
+        }
+      ],
+      "fileLevelNames": [],
+      "lastResultTs": "2026-11-13T12:22:38.4722040Z",
+      "cancelTs": null,
+      "resultTsGaps": [
+        {
+          "from": "2026-11-13T12:07:45.8212490Z",
+          "to": "2026-11-13T12:12:45.8466030Z",
+          "gapMs": 300025,
+          "nextLine": "✖ 关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递 (300008.997083ms)"
+        },
+        {
+          "from": "2026-11-13T12:12:53.7043950Z",
+          "to": "2026-11-13T12:17:53.7317570Z",
+          "gapMs": 300027,
+          "nextLine": "✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (300009.843375ms)"
+        }
+      ],
+      "notes": [
+        "unique xmark names=285 vs summary fail=282; difference is parent/subtest accounting (inline parent names such as W5/W10 are not repeated as leaf blocks) and embedded child-run output"
+      ]
+    },
+    "macos_x64": {
+      "summary": {
+        "source": "largest top-level summary",
+        "lineIndex": 7619,
+        "ts": "2026-11-13T12:29:50.5866170Z",
+        "counts": {
+          "tests": 5823,
+          "suites": 0,
+          "pass": 5517,
+          "fail": 284,
+          "cancelled": 3,
+          "skipped": 19,
+          "todo": 0,
+          "duration_ms": 1575824.163546
+        }
+      },
+      "timeouts": [
+        {
+          "name": "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+          "maxDurationMs": 300002.543483,
+          "count": 2,
+          "files": [
+            "test/桌面应用/session-rebuild-race.test.ts"
+          ],
+          "fileLevel": false
+        },
+        {
+          "name": "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口",
+          "maxDurationMs": 300000.978715,
+          "count": 2,
+          "files": [
+            "test/桌面应用/stuck-redispatch.test.ts"
+          ],
+          "fileLevel": false
+        }
+      ],
+      "fileLevelNames": [],
+      "lastResultTs": "2026-11-13T12:29:50.9288150Z",
+      "cancelTs": null,
+      "resultTsGaps": [
+        {
+          "from": "2026-11-13T12:13:09.7538050Z",
+          "to": "2026-11-13T12:18:09.7555510Z",
+          "gapMs": 300002,
+          "nextLine": "✖ 关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递 (300002.543483ms)"
+        },
+        {
+          "from": "2026-11-13T12:18:23.5357250Z",
+          "to": "2026-11-13T12:23:23.5377450Z",
+          "gapMs": 300002,
+          "nextLine": "✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (300000.978715ms)"
+        }
+      ],
+      "notes": [
+        "unique xmark names=287 vs summary fail=284; difference is parent/subtest accounting (inline parent names such as W5/W10 are not repeated as leaf blocks) and embedded child-run output"
+      ]
+    },
+    "windows_x64_cancelled": {
+      "summary": null,
+      "timeouts": [
+        {
+          "name": "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+          "maxDurationMs": 300011.3438,
+          "count": 1,
+          "files": [],
+          "fileLevel": false
+        },
+        {
+          "name": "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口",
+          "maxDurationMs": 300002.0474,
+          "count": 1,
+          "files": [],
+          "fileLevel": false
+        }
+      ],
+      "fileLevelNames": [],
+      "lastResultTs": "2026-11-13T12:31:59.3915875Z",
+      "cancelTs": "2026-11-13T14:00:57.8125464Z",
+      "stallBeforeCancelMs": 5338421,
+      "resultTsGaps": [
+        {
+          "from": "2026-11-13T12:09:09.3727623Z",
+          "to": "2026-11-13T12:14:09.3920011Z",
+          "gapMs": 300020,
+          "nextLine": "✖ 关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递 (300011.3438ms)"
+        },
+        {
+          "from": "2026-11-13T12:14:18.7003112Z",
+          "to": "2026-11-13T12:19:18.7063932Z",
+          "gapMs": 300006,
+          "nextLine": "✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (300002.0474ms)"
+        }
+      ],
+      "notes": [
+        "no top-level summary with tests>=100 (largest nested child summary tests=1); run was cancelled before the top-level summary; failure list is partial (whole-log xmark union)"
+      ]
+    }
+  }
+}

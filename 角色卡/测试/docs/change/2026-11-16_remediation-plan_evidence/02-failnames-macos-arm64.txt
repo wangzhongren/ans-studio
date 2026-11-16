@@ -1,0 +1,285 @@
+2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发	test/桌面应用/handback-delivery.test.ts
+不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）	test/编排/readonly-git-transport.test.ts
+冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准	test/测试/version-change-integration.test.ts
+范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su	test/测试/g4-skill-verify/h-scope-audit.test.ts
+范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册	test/测试/g4-skill-verify/h-scope-audit.test.ts
+范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用	test/测试/g4-skill-verify/h-scope-audit.test.ts
+固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行	test/编排/readonly-git-transport.test.ts
+关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递	test/桌面应用/session-rebuild-race.test.ts
+护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行	test/测试/g4-skill-verify/e-handler.test.ts
+卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report	test/编排/trio-worker-report.test.ts
+卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡	test/编排/trio-worker-report.test.ts
+卡文本：运营负责落盘工作流，幕僚不再被暗示为写者	test/门禁引擎/convener-workflow-write.test.ts
+跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串）	test/测试/g3-search-verify/pi-loopback-verify.test.ts
+宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change	test/桌面应用/run-change-trigger.test.ts
+派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0	test/桌面应用/run-change-trigger.test.ts
+人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒	test/编排/section1-write-preauthorization.test.ts
+审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读	test/测试/download-requests-integration.test.ts
+提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发	test/桌面应用/run-change-trigger.test.ts
+显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变	test/桌面应用/run-change-trigger.test.ts
+显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变	test/桌面应用/run-change-trigger.test.ts
+显式入口（stop）：requestRunChangeDecision 三模式落账不变	test/桌面应用/run-change-trigger.test.ts
+显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）	test/桌面应用/run-change-trigger.test.ts
+星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝	test/桌面应用/star-routing.test.ts
+渲染过滤：section=roles/routing 与注册表展示字段出现在文本中	test/门禁引擎/governance-matrix-service.test.ts
+业务卡的旧@决策预设不能形成第三个自动执行者	test/桌面应用/decision-service.test.ts
+一项目一卡：前一张未决时下载卡排队，不呈现	test/桌面应用/download-request.test.ts
+有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒	test/编排/section1-write-preauthorization.test.ts
+预算有界：outputLimit 生效并如实标记 stdoutTruncated	test/编排/readonly-git-transport.test.ts
+重建 dispose 等待窗口：stop A 保持用户目标/关闭契约	test/桌面应用/session-rebuild-race.test.ts
+重建 dispose 等待窗口：stop all 保持用户目标/关闭契约	test/桌面应用/session-rebuild-race.test.ts
+重建 open 等待窗口：stop A 保持用户目标/关闭契约	test/桌面应用/session-rebuild-race.test.ts
+重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过	test/桌面应用/task-restart.test.ts
+主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）	test/runtime-core/trunk-contract.test.ts
+最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域	test/测试/governance-e2e-auto/i-full-chain.test.ts
+A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）	test/编排/governance-matrix-injection.test.ts
+AC-1：Claude product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中）	test/测试/git-action-commit-claude-e2e.test.ts
+AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录	test/测试/git-action-cross-runtime-init.test.ts
+AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）	test/测试/git-action-cross-runtime-audit-failure.test.ts
+AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留	test/桌面应用/run-change-trigger.test.ts
+AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确	test/测试/git-action-cross-runtime-pi-init.test.ts
+AC-2：Pi product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中）	test/测试/git-action-commit-pi-e2e.test.ts
+AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读	test/桌面应用/run-pin.test.ts
+AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点	test/桌面应用/run-pin.test.ts
+AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点	test/桌面应用/run-pin.test.ts
+AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提）	test/测试/git-action-delivery-claude-e2e.test.ts
+AC-4.3：洁净派发无 advisory、无诊断噪声	test/桌面应用/star-routing.test.ts
+AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）	test/编排/trunk-upgrade-validation.test.ts
+AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝	test/编排/trunk-upgrade-validation.test.ts
+AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）	test/编排/trunk-upgrade-validation.test.ts
+AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）	test/编排/trunk-upgrade-validation.test.ts
+AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）	test/编排/trunk-upgrade-validation.test.ts
+AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）	test/桌面应用/session.test.ts
+AC-8/P1.2-AC-25：deferred run-stop 宿主继续 finalize（Claude requester + Pi 成员；host-continuation + drain + run transition journal；无 sidecar）	test/测试/git-run-stop-host-continuation-e2e.test.ts
+actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt	test/桌面应用/multi-runtime.test.ts
+alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源	test/编排/readonly-git-transport.test.ts
+applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接	test/编排/trunk-service.test.ts
+appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本）	test/测试/trunk-stable-write-integration.test.ts
+B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported	test/桌面应用/handback-delivery.test.ts
+B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）	test/桌面应用/stuck-redispatch.test.ts
+B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务	test/桌面应用/stuck-redispatch.test.ts
+B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案明确「最后兜底」	test/测试/turn-watch-verify/b-last-resort.test.ts
+B30 桌面默认身份：repo-local [user] name=ANS/email=ans@local 不阻断 executeReadonlyGit('status')（真实仓库夹具）	test/编排/readonly-git-transport.test.ts
+B30 user section accepted: desktop identity defaults (name=ANS/email=ans@local) no longer block inspect or status	test/编排/git-command.test.ts
+B30 user section stays fail-closed: illegal keys/values and every other dangerous section still reject	test/编排/git-command.test.ts
+Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）	test/桌面应用/version-change.test.ts
+bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1	test/测试/version-change-integration.test.ts
+BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed	test/编排/appointment-roster.test.ts
+BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针	test/编排/appointment-roster.test.ts
+BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）	test/桌面应用/star-routing.test.ts
+BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队	test/桌面应用/star-routing.test.ts
+BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）	test/桌面应用/star-routing.test.ts
+BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）	test/桌面应用/star-routing.test.ts
+buildProjectConfig：由枚举结果构造角色表，acceptance 透传	test/桌面应用/project.test.ts
+C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口	test/桌面应用/stuck-redispatch.test.ts
+Chief final review and resume: exact host-shaped refs cannot invent integration, quality or reopen an ordinary preparation	test/编排/git-capabilities.test.ts
+commit-race	test/桌面应用/chief-workflow.test.ts
+convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务	test/桌面应用/star-routing.test.ts
+Core-managed binding rejects a provider that did not register its display profile before first prompt	test/runtime-core/session.test.ts
+D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）	test/测试/entry-role-minimal-d.test.ts
+D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）	test/编排/session-dir.test.ts
+D-1：projectRoot 为空 → 不传 sessionDir（旧行为）	test/编排/session-dir.test.ts
+D-10：质检卡保留可选质量核对与截图上限，不要求录屏	test/门禁引擎/view-image-cards.test.ts
+D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly	test/桌面应用/multi-runtime.test.ts
+D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly	test/桌面应用/multi-runtime.test.ts
+D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly	test/桌面应用/multi-runtime.test.ts
+D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly	test/桌面应用/multi-runtime.test.ts
+D1 background dispatch, queued customer input and handback pin the source engine after selection switches	test/桌面应用/multi-runtime.test.ts
+D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card	test/桌面应用/multi-runtime.test.ts
+D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn	test/桌面应用/multi-runtime.test.ts
+D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged	test/桌面应用/multi-runtime.test.ts
+D1 same role and project across engines and same role across projects keep distinct handles and exact input targets	test/桌面应用/multi-runtime.test.ts
+D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired	test/桌面应用/multi-runtime.test.ts
+D1R2 actual ack preserves a failed delayed terminal and the next aborted original client	test/桌面应用/multi-runtime.test.ts
+D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text	test/桌面应用/multi-runtime.test.ts
+D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client	test/桌面应用/multi-runtime.test.ts
+D1R2 direct and queued identical inputs retain original client ID through delayed old settled	test/桌面应用/multi-runtime.test.ts
+D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call	test/桌面应用/multi-runtime.test.ts
+D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集	test/桌面应用/run-pin.test.ts
+D3 linked workspace root remains usable; linked target itself is not replaced	test/runtime-core/file-write-safety.test.ts
+D3 lstat ENOTDIR is a status error, never a new-file fallback	test/runtime-core/file-write-safety.test.ts
+Delivery authority: expected object refs and a role name do not replace real accepted independent quality	test/编排/git-capabilities.test.ts
+dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行	test/runtime-core/dispatch-workflow-writer-copy.test.ts
+dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」	test/runtime-core/dispatch-workflow-writer-copy.test.ts
+doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）	test/runtime-core/version-change-contract.test.ts
+e2e 队列：离线保留并标 blockedReason=network；恢复后按既有 drain 继续且恰投递一次	test/测试/network-state-e2e.test.ts
+e2e 网络失败系统行：settled(failed, network-offline-timeout) ⇒ 恰一条人话 delivery-note，无技术 code	test/测试/network-state-e2e.test.ts
+e2e F1 队列：已知离线 + 探针异常 ⇒ 不解除 network 阻塞、不 drain；真正恢复后恰投递一次	test/测试/network-state-e2e.test.ts
+F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发	test/测试/governance-e2e-auto/i-full-chain.test.ts
+F-2 场景 1（跨目标不阻塞）：A 的 send 挂起期间派发 B ⇒ B 立即收到（不待 A 轮结束）	test/测试/kanban-fixes-verify/f2-claim-release.test.ts
+F-2 场景 2（同目标仍排队）：投递进行中再派同目标 ⇒ 排队不并发；settled 后按序放行	test/测试/kanban-fixes-verify/f2-claim-release.test.ts
+F2：版本化文档基线违规受理 + advisory；基线/文档未被改写	test/桌面应用/run-pin.test.ts
+F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行	test/测试/g4v2-mcp-verify/f-handler.test.ts
+F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖	test/测试/g4v2-mcp-verify/f-handler.test.ts
+foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn	test/桌面应用/multi-runtime.test.ts
+Formal new-project route: filesystem emptiness cannot replace native selection and an actual chief parent turn	test/编排/git-capabilities.test.ts
+G10 actual sha1 independent eight-ref activation preserves document mainline and accepts historical D3 source	test/门禁引擎/git-shell-acl.test.ts
+G10 actual sha1 judge-delegated D3 accepts honest judge audit with the real application decisionId	test/门禁引擎/git-shell-acl.test.ts
+G10 actual sha256 independent eight-ref activation preserves document mainline and accepts historical D3 source	test/门禁引擎/git-shell-acl.test.ts
+G10 actual sha256 judge-delegated D3 accepts honest judge audit with the real application decisionId	test/门禁引擎/git-shell-acl.test.ts
+G10 complete replans reject activation changes to authority, document bytes, role evidence, history and transport	test/门禁引擎/git-shell-acl.test.ts
+G10 judge-delegated D3 variants reject malformed audit, mismatched operatorId/decisionId and mixed sources	test/门禁引擎/git-shell-acl.test.ts
+G11 actual sha1 approved-source/written-consumed initial workflow preserves active and document authority	test/门禁引擎/git-shell-acl.test.ts
+G11 actual sha256 approved-source/written-consumed initial workflow preserves active and document authority	test/门禁引擎/git-shell-acl.test.ts
+G11 full replans reject false source, unconsumed permission, changed mainline/active/history/workflow and transport	test/门禁引擎/git-shell-acl.test.ts
+G16 actual sha1 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands	test/门禁引擎/git-shell-acl.test.ts
+G16 actual sha256 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands	test/门禁引擎/git-shell-acl.test.ts
+G16 complete Provider replans cannot integrate metadata, controller-owned paths, ungranted deletes or mode changes	test/门禁引擎/git-shell-acl.test.ts
+G16 integrate refuses wrong actor/run/grants/parents/ref/commands and cannot pretend to be commit	test/门禁引擎/git-shell-acl.test.ts
+G17 actual sha1 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL	test/门禁引擎/git-shell-acl.test.ts
+G17 actual sha256 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL	test/门禁引擎/git-shell-acl.test.ts
+G17 recomputed real candidate plans still cannot alter inherited metadata/other owners/modes	test/门禁引擎/git-shell-acl.test.ts
+G17 ref-only denies wrong actor/ref/CAS/source/parents/commit bytes/tree/grants and extra commands	test/门禁引擎/git-shell-acl.test.ts
+G18 actual sha1 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence	test/门禁引擎/git-shell-acl.test.ts
+G18 actual sha256 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence	test/门禁引擎/git-shell-acl.test.ts
+G23 shared raw observations retain special modes and R/C without enabling unsupported revert	test/门禁引擎/git-shell-acl.test.ts
+G5 Git-selected missing effective ref never falls back to valid FS projection/live role	test/门禁引擎/direct-role-capabilities.test.ts
+G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed	test/门禁引擎/direct-role-capabilities.test.ts
+G8 actual Provider sha1 full first-document tree/no-index plan and exact publication CAS	test/门禁引擎/git-shell-acl.test.ts
+G8 actual Provider sha256 full first-document tree/no-index plan and exact publication CAS	test/门禁引擎/git-shell-acl.test.ts
+G8 recomputed malicious metadata/content/modes remain rejected beyond object-hash binding	test/门禁引擎/git-shell-acl.test.ts
+G9 actual sha1 existing-base team-plan completion preserves other authority and supports exact no-op	test/门禁引擎/git-shell-acl.test.ts
+G9 actual sha256 existing-base team-plan completion preserves other authority and supports exact no-op	test/门禁引擎/git-shell-acl.test.ts
+G9 fully re-planned team-plan tampering cannot change refs, authorization, marker, versions or unrelated bytes	test/门禁引擎/git-shell-acl.test.ts
+gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录	test/编排/git-action-authorization-gate.test.ts
+gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）	test/编排/git-action-authorization-gate.test.ts
+gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven	test/编排/git-action-authorization-gate.test.ts
+Git candidates: real sha1 complete trees preserve unchanged arbitrary bytes and isolate the user index	test/编排/git-trunk-store.test.ts
+Git candidates: real sha256 complete trees preserve unchanged arbitrary bytes and isolate the user index	test/编排/git-trunk-store.test.ts
+Git delivery bytes: real sha1 raw commits and null/existing ref CAS preserve the code basis	test/编排/git-trunk-store.test.ts
+Git delivery bytes: real sha256 raw commits and null/existing ref CAS preserve the code basis	test/编排/git-trunk-store.test.ts
+Git empty plan: computed sha1 object bytes match actual fixed-date Git readback	test/编排/git-command.test.ts
+Git empty plan: computed sha256 object bytes match actual fixed-date Git readback	test/编排/git-command.test.ts
+Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time	test/编排/git-trunk-store.test.ts
+Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry	test/编排/git-command.test.ts
+Git host coordination: ordinary unknown inventory serializes real host actions without minting a mutation permit	test/编排/git-capabilities.test.ts
+Git init journal: restart discovery binds the original operation and excludes FS/ref media	test/编排/git-command.test.ts
+Git init Provider: final real root/file hashes fence initialization and persist original operation process identity	test/编排/git-command.test.ts
+Git initialization Service effect: storage fixture rechecks bytes, rejects copied preparation and replays actual empty candidate	test/编排/git-capabilities.test.ts
+Git migration: actual legacy committed and pending operations keep their original media proof	test/编排/git-trunk-store.test.ts
+Git modification Service: no self-reported proof or script identity can open mutations; Git metadata stays unchanged	test/编排/git-capabilities.test.ts
+Git mutation process fence: an unresolved prior instance survives restart and never expires from clock or missing pid	test/编排/git-trunk-store.test.ts
+Git normal read tool: host-bound query reaches real Git; a global query does not fabricate a task	test/编排/git-capabilities.test.ts
+Git operation media: restart enumeration discovers both formats and refuses same-id rebinding	test/编排/git-trunk-store.test.ts
+Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit	test/编排/git-command.test.ts
+Git protection freshness: only the issued observation survives unchanged config/topology	test/编排/git-command.test.ts
+Git query: output and real process time are bounded; forced cancellation never claims whole-tree termination	test/编排/git-trunk-store.test.ts
+Git ref CAS: real independent Node processes have one winner; recovery uses actual ref and immutable commit	test/编排/git-trunk-store.test.ts
+Git revert Provider: real sha1 inverse applies to current code and preserves unrelated later files	test/编排/git-trunk-store.test.ts
+Git revert Provider: real sha256 inverse applies to current code and preserves unrelated later files	test/编排/git-trunk-store.test.ts
+Git Service: policy result binds current repo/task/run/revision and cannot be reused after actual ledger change	test/编排/git-capabilities.test.ts
+Git Service/Pipeline: actual task/run plus G exact argv/read policy permits a bounded query	test/编排/git-capabilities.test.ts
+Git team plan prepare→commit (P-9): omitted values derive at prepare, prepared input stays exact, replay and post-prepare drift stay fail-closed	test/编排/git-capabilities.test.ts
+Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority	test/编排/git-capabilities.test.ts
+Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported	test/编排/git-command.test.ts
+Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query	test/编排/git-command.test.ts
+Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config	test/编排/git-command.test.ts
+Git TrunkStore: full five-argument CAS, same-version workflow fence, media-bound business recovery and read-only production selection	test/编排/git-trunk-store.test.ts
+host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven	test/测试/run-stop-host-continuation-integration.test.ts
+I0-11: a normal journal with a sidecar is unaffected (journal remains authoritative)	test/编排/git-operation-sidecar-tolerance.test.ts
+I0-11: a safe sidecar-only operation directory is tolerated by the journal scanner and effective-manifest reads	test/编排/git-operation-sidecar-tolerance.test.ts
+I0-11: sidecar plus an unknown extra file stays fail-closed	test/编排/git-operation-sidecar-tolerance.test.ts
+I0-11: unsafe sidecars (hardlink nlink≠1, oversized file, non-regular file) stay fail-closed	test/编排/git-operation-sidecar-tolerance.test.ts
+I0-12: a corrupted stable-source stays fail-closed even with a sidecar present	test/编排/git-operation-sidecar-tolerance.test.ts
+I0-12: stable-source plus only a safe authorization.jsonl is tolerated; unknown extra files and unsafe sidecars stay fail-closed	test/编排/git-operation-sidecar-tolerance.test.ts
+listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告	test/门禁引擎/list-project.test.ts
+listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留	test/门禁引擎/role-group-metadata.test.ts
+listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执	test/桌面应用/log-actions.test.ts
+no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome	test/桌面应用/multi-runtime.test.ts
+openRoleSession：普通角色 settle → 发出 handback（形状正确）	test/编排/handback.test.ts
+P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 restore 后自动续投一次（重启不排空不复现）	test/测试/queue-recovery-e2e.test.ts
+P0 根规范化：初始化事实/真实 Git 初始化在符号链接祖先根下成立，最终根链接仍拒绝	test/runtime-core/project-root-canonicalization.test.ts
+P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定	test/桌面应用/run-pin.test.ts
+P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId	test/桌面应用/run-pin.test.ts
+P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在	test/测试/git-action-cross-runtime-codex-init.test.ts
+P1.2-AC-31：activation 发布 E2E（真实 plan→D3→nominator 回合；sidecar {candidate,publication} 两键 + ref/journal + 发布回执；无 native）	test/测试/git-action-activation-e2e.test.ts
+P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界	test/编排/shell-operator-only.test.ts
+Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions	test/编排/run-role-submit-capabilities.test.ts
+Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology	test/编排/run-role-submit-capabilities.test.ts
+Pipeline initial workflow source: actual approved Core request binds task before the real guarded write	test/编排/run-role-submit-capabilities.test.ts
+Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze	test/测试/direct-role-capabilities-e2e.test.ts
+Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed	test/测试/session-admission-approval-q9-integration.test.ts
+Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards	test/测试/git-role-workflows-e2e.test.ts
+Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface	test/测试/git-role-workflows-e2e.test.ts
+Q30 fixture HTTP preserves split UTF8 and byte budget	test/测试/git-role-workflows-e2e.test.ts
+Q74 owned Git metadata observer atomic rename race remains bounded and strict	test/测试/git-role-workflows-e2e.test.ts
+R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable	test/桌面应用/run-pin.test.ts
+R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable	test/桌面应用/run-pin.test.ts
+R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages	test/runtime-core/git-capability-tools.test.ts
+real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId	test/编排/chat-handback-scope.test.ts
+requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用	test/桌面应用/interface.test.ts
+required	test/桌面应用/chief-workflow.test.ts
+Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation	test/编排/direct-role-capabilities.test.ts
+revert actual sha1 inverse preserves unrelated current entries and rejects false observations	test/门禁引擎/git-shell-acl.test.ts
+revert actual sha256 inverse preserves unrelated current entries and rejects false observations	test/门禁引擎/git-shell-acl.test.ts
+Revert Service/Pipeline: real objects and a controller title cannot invent a pin or Chief quality	test/编排/git-capabilities.test.ts
+Review assignment: an expected OID or built-in name cannot replace a real integrated run and host criterion	test/编排/git-capabilities.test.ts
+run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned	test/桌面应用/run-pin.test.ts
+run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned	test/桌面应用/run-pin.test.ts
+safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递	test/桌面应用/stuck-redispatch.test.ts
+same client IDs across sequential actual turns retain separate first public outcomes	test/桌面应用/multi-runtime.test.ts
+selected	test/桌面应用/chief-workflow.test.ts
+send rejection before public events remains unknown; later same-client different turns do not borrow outcomes	test/桌面应用/multi-runtime.test.ts
+send result reports the original handle is no longer current after replacement while its turn rejects	test/桌面应用/multi-runtime.test.ts
+sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道	test/桌面应用/directive-input.test.ts
+sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）	test/桌面应用/directive-input.test.ts
+sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）	test/桌面应用/directive-input.test.ts
+sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账	test/桌面应用/directive-input.test.ts
+sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂	test/桌面应用/directive-input.test.ts
+SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常	test/桌面应用/version-change.test.ts
+stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift）	test/测试/trunk-stable-write-integration.test.ts
+stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session	test/桌面应用/multi-runtime.test.ts
+stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色	test/桌面应用/run-change-trigger.test.ts
+T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report	test/测试/t1-pipeline-integration.test.ts
+T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report	test/测试/t1-pipeline-integration.test.ts
+T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report	test/测试/t1-pipeline-integration.test.ts
+TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）	test/编排/doc-format-specs.test.ts
+v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力	test/编排/trio-worker-report.test.ts
+VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）	test/桌面应用/version-change.test.ts
+VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）	test/桌面应用/version-change.test.ts
+VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变）	test/测试/version-change-integration.test.ts
+VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试）	test/测试/version-change-integration.test.ts
+VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码）	test/测试/version-change-integration.test.ts
+VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用）	test/测试/version-change-integration.test.ts
+VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin）	test/测试/version-change-integration.test.ts
+VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied	test/测试/version-change-integration.test.ts
+VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖	test/测试/version-change-integration.test.ts
+W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例	test/测试/2026-11-09_judge-delegated-effectiveness.test.ts
+W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind	
+W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界	test/桌面应用/chief-workflow.test.ts
+W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）	test/门禁引擎/freeze-closure.test.ts
+W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）	test/门禁引擎/freeze-closure.test.ts
+W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）	test/门禁引擎/freeze-closure.test.ts
+W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）	test/门禁引擎/freeze-closure.test.ts
+W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）	test/门禁引擎/freeze-closure.test.ts
+W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）	test/门禁引擎/freeze-closure.test.ts
+W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）	test/门禁引擎/freeze-closure.test.ts
+W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin	test/桌面应用/chief-workflow.test.ts
+W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin	test/桌面应用/chief-workflow.test.ts
+W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin	test/桌面应用/chief-workflow.test.ts
+W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin	test/桌面应用/chief-workflow.test.ts
+W3 默认Core→默认CodexChat本地HTTP：真实git_query与同实例surface库存；native旁路拒绝而FS仍unknown	test/桌面应用/chief-workflow.test.ts
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后	test/桌面应用/chief-workflow.test.ts
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后	test/桌面应用/chief-workflow.test.ts
+W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续	test/桌面应用/chief-workflow.test.ts
+W34 真实首文档发布与原创建者关闭后派团队规划保独立scope	test/桌面应用/chief-workflow.test.ts
+W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝	test/桌面应用/chief-workflow.test.ts
+W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝	
+W5-回归 t1 之后：非 bootstrap direct 快照仅含新 target；team-plan 快照仅 directRefs（不含 versions/历史）	test/测试/bootstrap-frozen-closure-integration.test.ts
+W5-T1 bootstrap 4-target 全链：9 文件快照 → vca.prepareDirect 接受 → candidate/publication allowed → 真实 t1 提交	test/测试/bootstrap-frozen-closure-integration.test.ts
+W5-T17 异 flow 冻结行逐行 fail-closed（不静默过滤，消息含 flowId）	test/测试/bootstrap-frozen-closure-integration.test.ts
+W5-T18 record.path 已是 -vN.md 且后缀 ≠ record.version：真实注册表拒绝；注入注册表下服务侧防御性拒绝	test/测试/bootstrap-frozen-closure-integration.test.ts
+W5-T19 未证明 snapshot-content（docs/proposals 非槽位非 frozen）：candidate/publication 仍 git-policy-raw-write-scope；证明后放行	test/测试/bootstrap-frozen-closure-integration.test.ts
+W5-T2 7-target 同 kind 多版本单请求：service trunk-item-invalid / 全链 vca-target-invalid，无副作用（M1）	test/测试/bootstrap-frozen-closure-integration.test.ts
+W5-T3 bootstrap 闭合 fail-closed：历史 frozen 文件缺失、漂移、不可读均拒绝且无 manifest/ref/snapshot	test/测试/bootstrap-frozen-closure-integration.test.ts
+W5-T6 账本坏行、未知 event、非法 freeze 形状：真实注册表整体 fail-closed（不跳过、无副作用）	test/测试/bootstrap-frozen-closure-integration.test.ts
+W5-T7 同 path 两种 sha（意图证据 vs frozen 记录）：fail-closed，消息含冲突路径	test/测试/bootstrap-frozen-closure-integration.test.ts
+wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects	test/编排/git-action-authorization-wiring-document-audit-failure.test.ts
+wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit	test/编排/git-action-authorization-wiring-document.test.ts
+wiring failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no repository, journal or ref effects	test/编排/git-action-authorization-wiring-audit-failure.test.ts
+wiring init: sidecar carries actor/task/turn/lease + init,candidate digests before effects	test/编排/git-action-authorization-wiring.test.ts
+wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects	test/编排/git-action-authorization-wiring-initial-workflow-audit-failure.test.ts
+wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit	test/编排/git-action-authorization-wiring-initial-workflow.test.ts
+wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects	test/编排/git-action-authorization-wiring-publication-audit-failure.test.ts
+wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit	test/编排/git-action-authorization-wiring-publication.test.ts
+wiring retry: same operationId on a new lease/turn appends a sidecar row without replay/init conflicts	test/编排/git-action-authorization-wiring-retry.test.ts
