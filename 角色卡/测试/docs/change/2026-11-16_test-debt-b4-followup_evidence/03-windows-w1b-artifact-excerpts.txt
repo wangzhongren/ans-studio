@@ -1,0 +1,67 @@
+# Windows x64 W1b excerpts (R5 run 43829367008)
+
+## inline child run around failing W1b (embedded sub-run) [log lines 2330-2356]
+  ℹ todo 0
+  ℹ duration_ms 785.1744
+  
+  ✔ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (828.1879ms)
+  W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["revise","select"],"missingEvidence":false,"originRoleId":"rapporteur","entries":[{"sessionId":"2fdf89c3-f45d-42ca-a5f3-c04a5189fbbd","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"4564418e-0652-4923-a01d-3ff294b9684a","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"26abb161-ee7b-4385-8d8e-79be11bf44ce","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+  ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (5248.7339ms)
+  ℹ tests 1
+  ℹ suites 0
+  ℹ pass 0
+  ℹ fail 1
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  ℹ duration_ms 5835.8832
+  
+  ✖ failing tests:
+  
+  test at test\桌面应用\chief-workflow.test.ts:511:1
+  ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (5248.7339ms)
+    Error: Real chief loop did not settle: shown=[] requests=1 worker=[{"ok":false,"message":"request_choice：幕僚要求修订（chief-delegated；原因：请补齐恢复证据再重新提交 幕僚要求修订，原请求已退回，未获批准。请原发起角色补齐材料后重新提交；请求退回不代表任务取消。）。本次退修未获批准；原发起角色应按理由修订并重新提交。\n原始回执：{\"outcome\":\"declined\",\"operatorId\":\"chief\",\"actionSource\":{\"kind\":\"chief-delegated\",\"actorRoleId\":\"chief\",\"originRoleId\":\"rapporteur\",\"requestId\":\"req-de33c4e446995b7f\",\"baseDigest\":\"cc427482b59c2fc79e82cd3df2111ae10047529c0fa13cbe42c2337958897dcd\",\"delegationRevision\":0,\"disposition\":\"revise\",\"reason\":\"请补齐恢复证据再重新提交\",\"at\":\"2026-11-16T08:16:28.633Z\"},\"reason\":\"请补齐恢复证据再重新提交 幕僚要求修订，原请求已退回，未获批准。请原发起角色补齐材料后重新提交；请求退回不代表任务取消。\"}"}] writes=[{"ok":true,"message":"write_file 已获准并落盘：docs/proposals/focus-proposal-v2.md（116 字节写入 C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-w1b-chief-4nfSWc\\docs\\proposals\\focus-proposal-v2.md）
+        at Timeout.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:463:39)
+        at listOnTimeout (node:internal/timers:605:17)
+        at process.processTimers (node:internal/timers:541:7)
+  
+  ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (5874.3866ms)
+  W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":true,"originRoleId":"convener","entries":[{"sessionId":"05a9601f-6f3a-4915-91c4-27bec6407197","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"798a8bae-82de-4d31-a704-7bf5534adf20","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+  W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托
+
+## final failing section: parent W1b block + child nested section [log lines 7262-7296]
+      operator: 'strictEqual',
+      diff: 'simple'
+    }
+  
+  test at test\桌面应用\chief-workflow.test.ts:511:1
+  ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (5874.3866ms)
+    AssertionError [ERR_ASSERTION]: W52 legacy custom case actual Core binding {"dispositions":["revise","select"],"missingEvidence":false,"originRoleId":"rapporteur","entries":[{"sessionId":"2fdf89c3-f45d-42ca-a5f3-c04a5189fbbd","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"4564418e-0652-4923-a01d-3ff294b9684a","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"26abb161-ee7b-4385-8d8e-79be11bf44ce","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+    ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (5248.7339ms)
+    ℹ tests 1
+    ℹ suites 0
+    ℹ pass 0
+    ℹ fail 1
+    ℹ cancelled 0
+    ℹ skipped 0
+    ℹ todo 0
+    ℹ duration_ms 5835.8832
+    
+    ✖ failing tests:
+    
+    test at test\桌面应用\chief-workflow.test.ts:511:1
+    ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (5248.7339ms)
+      Error: Real chief loop did not settle: shown=[] requests=1 worker=[{"ok":false,"message":"request_choice：幕僚要求修订（chief-delegated；原因：请补齐恢复证据再重新提交 幕僚要求修订，原请求已退回，未获批准。请原发起角色补齐材料后重新提交；请求退回不代表任务取消。）。本次退修未获批准；原发起角色应按理由修订并重新提交。\n原始回执：{\"outcome\":\"declined\",\"operatorId\":\"chief\",\"actionSource\":{\"kind\":\"chief-delegated\",\"actorRoleId\":\"chief\",\"originRoleId\":\"rapporteur\",\"requestId\":\"req-de33c4e446995b7f\",\"baseDigest\":\"cc427482b59c2fc79e82cd3df2111ae10047529c0fa13cbe42c2337958897dcd\",\"delegationRevision\":0,\"disposition\":\"revise\",\"reason\":\"请补齐恢复证据再重新提交\",\"at\":\"2026-11-16T08:16:28.633Z\"},\"reason\":\"请补齐恢复证据再重新提交 幕僚要求修订，原请求已退回，未获批准。请原发起角色补齐材料后重新提交；请求退回不代表任务取消。\"}"}] writes=[{"ok":true,"message":"write_file 已获准并落盘：docs/proposals/focus-proposal-v2.md（116 字节写入 C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-w1b-chief-4nfSWc\\docs\\proposals\\focus-proposal-v2.m
+          at Timeout.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:463:39)
+          at listOnTimeout (node:internal/timers:605:17)
+          at process.processTimers (node:internal/timers:541:7)
+    
+    
+    1 !== 0
+    
+        at isolateUnknownCoreCase (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:125:60)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:512:7)
+        at async Test.run (node:internal/test_runner/test:1125:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+      generatedMessage: false,

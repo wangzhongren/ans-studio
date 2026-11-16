@@ -1,0 +1,47 @@
+W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":false,"originRoleId":"convener","entries":[{"sessionId":"a99b3ac7-2d28-4b17-80bb-3dd91e53c4f7","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"2757d37c-9cf0-4ded-9ee3-a98e1074b0a6","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"7fbd359e-4b4c-42f9-bb93-cc74645effc6","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流
+✔ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (231.339ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 698.6063
+
+✔ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (737.1402ms)
+W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["revise","select"],"missingEvidence":false,"originRoleId":"rapporteur","entries":[{"sessionId":"1d1332bb-fd6c-427a-b35d-91ca4c7e9885","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"31ad8e1a-c4d7-44f5-a950-d93dd11b53c6","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"88ae31de-bc84-4060-b804-b2d473676070","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"6e436561-00ad-40ea-8bc4-6d84b87d48af","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场
+✔ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (377.9674ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 850.679
+
+✔ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (886.0542ms)
+W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":true,"originRoleId":"convener","entries":[{"sessionId":"81ee3d11-4667-4e89-84ca-d115f347ec11","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"f8624ec7-5c8f-4362-9848-48c5885e6b47","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托
+✔ W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托 (150.0134ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 614.3513
+
+✔ W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托 (649.7524ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2734.5686
