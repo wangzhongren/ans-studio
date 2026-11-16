@@ -1,0 +1,7 @@
+command: npm run typecheck
+scope: workspaces=kr29a (fix/test-debt-kr29-gates @ 5661a73), node v24.22.1
+EXIT=0
+
+output:
+> ans-cli@2.0.0 typecheck
+> tsc --noEmit

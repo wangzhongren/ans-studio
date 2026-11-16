@@ -40,15 +40,15 @@ test("listProject：枚举真实项目（本仓库）全部角色，边界均解
   assert.equal(listing.primaryRoleId, "su");
   // 归档约定（客户 2026-10-14，PM 转达）：`角色卡/桌面应用/`（已拆分为 桌面UI/桌面窗口）原位冻结归档，
   // 其 boundary.yaml **恢复原名**并带顶层 `archived: true`——枚举**静默跳过**：不枚举该角色、不产生任何
-  // 警告（见 test/门禁引擎/archived-role.test.ts 的夹具用例钉死该约定）。故本仓库 warnings 为空；
-  // 除该归档目录外出现任何警告即回归。
-  // 收尾（2026-10-14）：治理侧恢复 boundary.yaml 后本用例已复跑转绿——此前（恢复前，目录仅剩
-  // boundary.yaml.frozen）走「缺少 boundary.yaml」告警路径的暂时红属预期等待态，已闭。
+  // 警告（见 test/门禁引擎/archived-role.test.ts 的夹具用例钉死该约定）。
+  // 7281792 起 `角色卡/招募/memo.md` 是备忘录目录，缺 role-card.md 的告警是该目录按技能默认路径产生的
+  // 预期提示（memo 明示“非角色卡缺陷”）；冻结名中的「无警告」保留为历史标题，除此一条既定告警外
+  // 出现任何新告警即回归。
   assert.ok(
     !ids.includes("桌面应用"),
     `冻结归档角色不得复活为活角色（应静默跳过，实际：${ids.join(",")}）`,
   );
-  assert.deepEqual(listing.warnings, []);
+  assert.deepEqual(listing.warnings, ["角色卡/招募：缺少 role-card.md，已跳过"]);
 });
 
 test("listProject：内置治理角色 su 永远排在第一位，无角色目录，边界为内置（未接受）", async () => {
