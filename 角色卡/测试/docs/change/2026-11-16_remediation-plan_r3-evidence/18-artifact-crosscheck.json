@@ -1,0 +1,63 @@
+{
+  "generatedAt": "2026-11-16T04:51:22.348Z",
+  "arm64": {
+    "label": "macos-arm64",
+    "ghLog": {
+      "path": "C:/Users/51054/AppData/Local/Temp/ci-logs2/arm64.log",
+      "bytes": 2612486,
+      "xmarkLines": 383,
+      "headers": 3,
+      "uniqueNames": 189
+    },
+    "artifact": {
+      "path": "C:/Users/51054/AppData/Local/Temp/ci-logs2/artifact-mac-arm64/test-ci-output.log",
+      "bytes": 1814748,
+      "xmarkLines": 383,
+      "headers": 3,
+      "uniqueNames": 189
+    },
+    "sameNameSet": true,
+    "onlyInGhLog": [],
+    "onlyInArtifact": []
+  },
+  "x64": {
+    "label": "macos-x64",
+    "ghLog": {
+      "path": "C:/Users/51054/AppData/Local/Temp/ci-logs2/x64.log",
+      "bytes": 2666101,
+      "xmarkLines": 389,
+      "headers": 3,
+      "uniqueNames": 192
+    },
+    "artifact": {
+      "path": "C:/Users/51054/AppData/Local/Temp/ci-logs2/artifact-mac-x64/test-ci-output.log",
+      "bytes": 1818309,
+      "xmarkLines": 389,
+      "headers": 3,
+      "uniqueNames": 192
+    },
+    "sameNameSet": true,
+    "onlyInGhLog": [],
+    "onlyInArtifact": []
+  },
+  "win": {
+    "label": "windows-x64",
+    "ghLog": {
+      "path": "C:/Users/51054/AppData/Local/Temp/ci-logs2/windows.log",
+      "bytes": 891537,
+      "xmarkLines": 25,
+      "headers": 1,
+      "uniqueNames": 22
+    },
+    "artifact": {
+      "path": "C:/Users/51054/AppData/Local/Temp/ci-logs2/artifact-win/test-ci-output.log",
+      "bytes": 538352,
+      "xmarkLines": 25,
+      "headers": 1,
+      "uniqueNames": 22
+    },
+    "sameNameSet": true,
+    "onlyInGhLog": [],
+    "onlyInArtifact": []
+  }
+}

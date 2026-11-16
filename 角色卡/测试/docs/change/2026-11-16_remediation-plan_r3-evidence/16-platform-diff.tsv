@@ -1,0 +1,6 @@
+name	platforms	arm64Ms	x64Ms	win	r2Platforms	r2Family	r3Family	sets	notes	file
+AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提）	x64		300001.858113		arm64+x64	macos-git-config	hang-timeout	-	R3 x64-only; 超时>=100s(x64); R2 平台=arm64+x64; 与 R2 平台分布不同; R2 mac 曾出现，本轮该平台转绿→漂移线索	test/测试/git-action-delivery-claude-e2e.test.ts
+W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例	x64		180004.77835		arm64+x64	macos-git-config	hang-timeout	-	R3 x64-only; 超时>=100s(x64); R2 平台=arm64+x64; 与 R2 平台分布不同; R2 mac 曾出现，本轮该平台转绿→漂移线索	test/测试/2026-11-09_judge-delegated-effectiveness.test.ts
+W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin	win			1	arm64+x64+win	e71501c-drift	unclassified-new	NEW	R3 Windows-only; R2 平台=arm64+x64+win; 与 R2 平台分布不同; R2 mac 曾出现，本轮该平台转绿→漂移线索	
+W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒	x64		8322.787636		win	e71501c-drift	e71501c-drift	NEW	R3 x64-only; R2 平台=win; 与 R2 平台分布不同	test/桌面应用/chief-workflow.test.ts
+W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease	win			1	win	ci-path-canonical	ci-path-canonical	MAC	R3 Windows-only; R2 平台=win; 与 R2 平台分布相同	

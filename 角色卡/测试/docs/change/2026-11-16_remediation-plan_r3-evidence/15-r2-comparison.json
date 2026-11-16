@@ -1,0 +1,3154 @@
+{
+  "generatedAt": "2026-11-16T04:49:17.812Z",
+  "r2Universe": 289,
+  "r3Universe": 194,
+  "intersection": 194,
+  "r3Only": 0,
+  "r2Only": 95,
+  "perPlatform": {
+    "arm64": {
+      "r2": 285,
+      "r3": 189,
+      "common": 188,
+      "onlyR2": 94,
+      "onlyR3": 0
+    },
+    "x64": {
+      "r2": 287,
+      "r3": 192,
+      "common": 191,
+      "onlyR2": 95,
+      "onlyR3": 0
+    },
+    "win": {
+      "r2": 117,
+      "r3": 22,
+      "common": 22,
+      "onlyR2": 1,
+      "onlyR3": 0
+    }
+  },
+  "familyDelta": {
+    "macos-git-config": {
+      "r2": 113,
+      "r3": 0,
+      "appeared": 0,
+      "disappeared": 113,
+      "still": 0,
+      "r3OnlyFromR2Absent": 0
+    },
+    "ci-path-canonical": {
+      "r2": 36,
+      "r3": 42,
+      "appeared": 6,
+      "disappeared": 0,
+      "still": 36,
+      "r3OnlyFromR2Absent": 0
+    },
+    "e71501c-drift": {
+      "r2": 33,
+      "r3": 32,
+      "appeared": 0,
+      "disappeared": 1,
+      "still": 32,
+      "r3OnlyFromR2Absent": 0
+    },
+    "known-red-62": {
+      "r2": 33,
+      "r3": 33,
+      "appeared": 0,
+      "disappeared": 0,
+      "still": 33,
+      "r3OnlyFromR2Absent": 0
+    },
+    "source-gate": {
+      "r2": 23,
+      "r3": 23,
+      "appeared": 0,
+      "disappeared": 0,
+      "still": 23,
+      "r3OnlyFromR2Absent": 0
+    },
+    "b0-existing-other": {
+      "r2": 17,
+      "r3": 18,
+      "appeared": 1,
+      "disappeared": 0,
+      "still": 17,
+      "r3OnlyFromR2Absent": 0
+    },
+    "flake-timing": {
+      "r2": 16,
+      "r3": 16,
+      "appeared": 0,
+      "disappeared": 0,
+      "still": 16,
+      "r3OnlyFromR2Absent": 0
+    },
+    "vca-flow": {
+      "r2": 13,
+      "r3": 13,
+      "appeared": 0,
+      "disappeared": 0,
+      "still": 13,
+      "r3OnlyFromR2Absent": 0
+    },
+    "unclassified-new": {
+      "r2": 3,
+      "r3": 13,
+      "appeared": 11,
+      "disappeared": 1,
+      "still": 2,
+      "r3OnlyFromR2Absent": 0
+    },
+    "hang-timeout": {
+      "r2": 2,
+      "r3": 4,
+      "appeared": 2,
+      "disappeared": 0,
+      "still": 2,
+      "r3OnlyFromR2Absent": 0
+    }
+  },
+  "r3OnlyNames": [],
+  "r2OnlyNames": [
+    {
+      "name": "不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 62.618375,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 119.908505,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 94.164542,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 163.643337,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+      "r2Platforms": {
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 2249.773765,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/b31-fixed-release-auto-desktop.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "unclassified-new"
+    },
+    {
+      "name": "预算有界：outputLimit 生效并如实标记 stdoutTruncated",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 76.693458,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 135.235985,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "AC-1：Claude product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 213.647875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-action-commit-claude-e2e.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 483.719702,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-action-commit-claude-e2e.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "AC-2：Pi product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 205.486917,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-action-commit-pi-e2e.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 487.600523,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-action-commit-pi-e2e.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "AC-8/P1.2-AC-25：deferred run-stop 宿主继续 finalize（Claude requester + Pi 成员；host-continuation + drain + run transition journal；无 sidecar）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 216.064584,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-run-stop-host-continuation-e2e.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 494.692293,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-run-stop-host-continuation-e2e.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 72.893791,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 148.519138,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "B30 桌面默认身份：repo-local [user] name=ANS/email=ans@local 不阻断 executeReadonlyGit('status')（真实仓库夹具）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 88.216667,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 169.479419,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/readonly-git-transport.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "B30 user section accepted: desktop identity defaults (name=ANS/email=ans@local) no longer block inspect or status",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 68.6595,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 143.721151,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "B30 user section stays fail-closed: illegal keys/values and every other dangerous section still reject",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.013375,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 126.087641,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Chief final review and resume: exact host-shaped refs cannot invent integration, quality or reopen an ordinary preparation",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 68.256959,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 121.38732,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Delivery authority: expected object refs and a role name do not replace real accepted independent quality",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 55.815959,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 121.382663,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Formal new-project route: filesystem emptiness cannot replace native selection and an actual chief parent turn",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 78.438334,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 134.797882,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G10 actual sha1 independent eight-ref activation preserves document mainline and accepts historical D3 source",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 55.911292,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 113.556711,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G10 actual sha1 judge-delegated D3 accepts honest judge audit with the real application decisionId",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 55.708916,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 119.373504,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G10 actual sha256 independent eight-ref activation preserves document mainline and accepts historical D3 source",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 56.842875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 117.361267,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G10 actual sha256 judge-delegated D3 accepts honest judge audit with the real application decisionId",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 55.740208,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 115.733295,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G10 complete replans reject activation changes to authority, document bytes, role evidence, history and transport",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 59.77875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 115.438388,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G10 judge-delegated D3 variants reject malformed audit, mismatched operatorId/decisionId and mixed sources",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 57.462292,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 115.334523,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G11 actual sha1 approved-source/written-consumed initial workflow preserves active and document authority",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 67.514625,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 125.847576,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G11 actual sha256 approved-source/written-consumed initial workflow preserves active and document authority",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.147875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 119.123623,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G11 full replans reject false source, unconsumed permission, changed mainline/active/history/workflow and transport",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.112625,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 120.36083,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G16 actual sha1 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.383625,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 116.829699,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G16 actual sha256 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.201834,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 122.208421,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G16 complete Provider replans cannot integrate metadata, controller-owned paths, ungranted deletes or mode changes",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 66.201416,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 118.842179,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G16 integrate refuses wrong actor/run/grants/parents/ref/commands and cannot pretend to be commit",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.373084,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 120.031274,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G17 actual sha1 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.601,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 120.99084,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G17 actual sha256 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.59325,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 119.797031,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G17 recomputed real candidate plans still cannot alter inherited metadata/other owners/modes",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.063125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 134.478327,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G17 ref-only denies wrong actor/ref/CAS/source/parents/commit bytes/tree/grants and extra commands",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 61.43075,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 119.669674,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G18 actual sha1 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 74.222291,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 140.687609,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G18 actual sha256 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 62.261125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 122.918778,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G23 shared raw observations retain special modes and R/C without enabling unsupported revert",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 73.117458,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 121.187736,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G5 Git-selected missing effective ref never falls back to valid FS projection/live role",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 195.5605,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/direct-role-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 191.042692,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/direct-role-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 65.833333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/direct-role-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 141.502605,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/direct-role-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G8 actual Provider sha1 full first-document tree/no-index plan and exact publication CAS",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 59.673,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 123.155017,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G8 actual Provider sha256 full first-document tree/no-index plan and exact publication CAS",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.459,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 128.540769,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G8 recomputed malicious metadata/content/modes remain rejected beyond object-hash binding",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.440292,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 211.490384,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G9 actual sha1 existing-base team-plan completion preserves other authority and supports exact no-op",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.069083,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 123.099119,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G9 actual sha256 existing-base team-plan completion preserves other authority and supports exact no-op",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.237833,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 114.582094,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "G9 fully re-planned team-plan tampering cannot change refs, authorization, marker, versions or unrelated bytes",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.47,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 124.914747,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git candidates: real sha1 complete trees preserve unchanged arbitrary bytes and isolate the user index",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 56.543583,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 118.068546,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git candidates: real sha256 complete trees preserve unchanged arbitrary bytes and isolate the user index",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 58.823333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 119.57509,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git delivery bytes: real sha1 raw commits and null/existing ref CAS preserve the code basis",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 65.96525,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 120.674979,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git delivery bytes: real sha256 raw commits and null/existing ref CAS preserve the code basis",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 67.984458,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 121.364378,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git empty plan: computed sha1 object bytes match actual fixed-date Git readback",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 64.075459,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 136.666242,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git empty plan: computed sha256 object bytes match actual fixed-date Git readback",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.288416,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 130.676225,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 75.469167,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 129.785827,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git host coordination: ordinary unknown inventory serializes real host actions without minting a mutation permit",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 66.112458,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 118.628657,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git init Provider: final real root/file hashes fence initialization and persist original operation process identity",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 65.983875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 271.493933,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git initialization Service effect: storage fixture rechecks bytes, rejects copied preparation and replays actual empty candidate",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 143.387583,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 273.303927,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git migration: actual legacy committed and pending operations keep their original media proof",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 71.879459,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 183.484797,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git modification Service: no self-reported proof or script identity can open mutations; Git metadata stays unchanged",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.593958,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 118.758122,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git mutation process fence: an unresolved prior instance survives restart and never expires from clock or missing pid",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 73.00275,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 129.094812,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git normal read tool: host-bound query reaches real Git; a global query does not fabricate a task",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 70.491125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 123.876254,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git protection freshness: only the issued observation survives unchanged config/topology",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 61.785125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 187.479947,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git query: output and real process time are bounded; forced cancellation never claims whole-tree termination",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 67.078333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 130.777369,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git ref CAS: real independent Node processes have one winner; recovery uses actual ref and immutable commit",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.99375,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 138.069951,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git revert Provider: real sha1 inverse applies to current code and preserves unrelated later files",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 76.219375,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 121.270371,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git revert Provider: real sha256 inverse applies to current code and preserves unrelated later files",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 57.505167,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 131.248422,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git Service: policy result binds current repo/task/run/revision and cannot be reused after actual ledger change",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.298834,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 120.06295,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git Service/Pipeline: actual task/run plus G exact argv/read policy permits a bounded query",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 65.54825,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 120.813043,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git team plan prepare→commit (P-9): omitted values derive at prepare, prepared input stays exact, replay and post-prepare drift stay fail-closed",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 84.712667,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 174.672978,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 58.323417,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 121.30983,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 58.827375,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 129.977924,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.481708,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 143.928424,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-command.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Git TrunkStore: full five-argument CAS, same-version workflow fence, media-bound business recovery and read-only production selection",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 70.060042,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 125.628516,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-trunk-store.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "P0 根规范化：初始化事实/真实 Git 初始化在符号链接祖先根下成立，最终根链接仍拒绝",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 114.729292,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/runtime-core/project-root-canonicalization.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 305.696492,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/runtime-core/project-root-canonicalization.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "P1.2-AC-31：activation 发布 E2E（真实 plan→D3→nominator 回合；sidecar {candidate,publication} 两键 + ref/journal + 发布回执；无 native）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 473.406042,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-action-activation-e2e.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 497.87098,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-action-activation-e2e.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 134.256166,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/run-role-submit-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 157.811612,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/run-role-submit-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 113.676791,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/run-role-submit-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 151.950366,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/run-role-submit-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 95.943083,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 132.048559,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ]
+        },
+        "windows_x64_cancelled": {
+          "count": 1,
+          "maxDurationMs": 67.9154,
+          "indents": [
+            0
+          ],
+          "files": []
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 2198.33725,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/runtime-core/git-capability-tools.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1714.938191,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/runtime-core/git-capability-tools.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "MAC"
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "revert actual sha1 inverse preserves unrelated current entries and rejects false observations",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 75.127417,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 124.023987,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "revert actual sha256 inverse preserves unrelated current entries and rejects false observations",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 70.772583,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 129.777627,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/git-shell-acl.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Revert Service/Pipeline: real objects and a controller title cannot invent a pin or Chief quality",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.1635,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 119.610547,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "Review assignment: an expected OID or built-in name cannot replace a real integrated run and host criterion",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 77.607958,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 136.212342,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.970333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 125.430556,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 60.24825,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 125.082263,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 59.197791,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 123.647056,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 62.673667,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 165.74919,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 79.166042,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 153.7589,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 63.102959,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 126.182271,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 61.688875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 125.615442,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/门禁引擎/freeze-closure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W3 默认Core→默认CodexChat本地HTTP：真实git_query与同实例surface库存；native旁路拒绝而FS仍unknown",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 139.63525,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 263.47234,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "MAC"
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-回归 t1 之后：非 bootstrap direct 快照仅含新 target；team-plan 快照仅 directRefs（不含 versions/历史）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 134.133625,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 280.69719,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-T1 bootstrap 4-target 全链：9 文件快照 → vca.prepareDirect 接受 → candidate/publication allowed → 真实 t1 提交",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 168.096333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 308.926464,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-T17 异 flow 冻结行逐行 fail-closed（不静默过滤，消息含 flowId）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 141.627,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 298.986747,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-T18 record.path 已是 -vN.md 且后缀 ≠ record.version：真实注册表拒绝；注入注册表下服务侧防御性拒绝",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 115.303541,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 290.598948,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-T19 未证明 snapshot-content（docs/proposals 非槽位非 frozen）：candidate/publication 仍 git-policy-raw-write-scope；证明后放行",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 69.745792,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 137.803077,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-T2 7-target 同 kind 多版本单请求：service trunk-item-invalid / 全链 vca-target-invalid，无副作用（M1）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 117.299167,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 282.032566,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-T3 bootstrap 闭合 fail-closed：历史 frozen 文件缺失、漂移、不可读均拒绝且无 manifest/ref/snapshot",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 151.685875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 286.300092,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-T6 账本坏行、未知 event、非法 freeze 形状：真实注册表整体 fail-closed（不跳过、无副作用）",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 122.024042,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 294.457966,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    },
+    {
+      "name": "W5-T7 同 path 两种 sha（意图证据 vs frozen 记录）：fail-closed，消息含冲突路径",
+      "r2Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 118.986167,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 280.331684,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/bootstrap-frozen-closure-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r2Family": "macos-git-config"
+    }
+  ]
+}
