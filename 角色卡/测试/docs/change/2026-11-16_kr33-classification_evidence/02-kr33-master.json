@@ -1,0 +1,666 @@
+{
+ "generatedAt": "2026-11-16T11:51:46.660Z",
+ "sourceTap": "角色卡/运行时核心/docs/change/2026-11-12_release-blocker-83-provider_evidence/14b-knownred-runtime-core.tap",
+ "rows": [
+  {
+   "idx": 1,
+   "name": "abort rejection no longer quarantines forever once the underlying turn settles later",
+   "file": "test/runtime-core/abort-quarantine.test.ts",
+   "testLine": "26",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 2,
+   "name": "abort rejection keeps quarantine when the underlying turn never settles",
+   "file": "test/runtime-core/abort-quarantine.test.ts",
+   "testLine": "59",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 3,
+   "name": "normal abort without cleanup failure keeps its existing quarantine lifecycle",
+   "file": "test/runtime-core/abort-quarantine.test.ts",
+   "testLine": "81",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 4,
+   "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+   "file": "test/runtime-core/dispatch-workflow-writer-copy.test.ts",
+   "testLine": "10",
+   "classification": "TEST-stale",
+   "frozenError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+   "worktreeError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+   "canonical": "  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+   "ci": {
+    "R5-arm64": "✖",
+    "R5-x64": "✖",
+    "R5-win": "✖",
+    "R6-x64": "✖",
+    "R6-win": "✖"
+   },
+   "owner": "运行时核心",
+   "batch": "K3",
+   "recommendation": "按现行产品语义更新断言（K3），测试名保持不变：对齐 schema.ts:752/774 现文案与 stable-write 契约"
+  },
+  {
+   "idx": 5,
+   "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+   "file": "test/runtime-core/dispatch-workflow-writer-copy.test.ts",
+   "testLine": "29",
+   "classification": "TEST-stale",
+   "frozenError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+   "worktreeError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+   "canonical": "  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+   "ci": {
+    "R5-arm64": "✖",
+    "R5-x64": "✖",
+    "R5-win": "✖",
+    "R6-x64": "✖",
+    "R6-win": "✖"
+   },
+   "owner": "运行时核心",
+   "batch": "K3",
+   "recommendation": "按现行产品语义更新断言（K3），测试名保持不变：对齐 schema.ts:752/774 现文案与 stable-write 契约"
+  },
+  {
+   "idx": 6,
+   "name": "Pi env 300s/310s reach the Provider inspection option while the Service turn timer uses the fixed 1h last resort",
+   "file": "test/runtime-core/effective-timeouts.test.ts",
+   "testLine": "36",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 7,
+   "name": "Service explicit Pi timing overrides env, including the legacy disabled-timer values",
+   "file": "test/runtime-core/effective-timeouts.test.ts",
+   "testLine": "55",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 8,
+   "name": "all runtimes read the same inspection env; Service still uses the fixed 1h last resort",
+   "file": "test/runtime-core/effective-timeouts.test.ts",
+   "testLine": "120",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 9,
+   "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+   "file": "test/runtime-core/file-write-safety.test.ts",
+   "testLine": "97",
+   "classification": "TEST-stale",
+   "frozenError": "Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-oHH2EO\\actual\\nested\\file.txt' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-oHH2EO\\actual\\link.txt'",
+   "worktreeError": "Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-g4xIwL\\actual\\nested\\file.txt' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-g4xIwL\\actual\\link.txt'",
+   "canonical": "  Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-05D4SM\\actual\\nested\\file.txt' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-05D4SM\\actual\\link.txt'",
+   "ci": {
+    "R5-arm64": "✖",
+    "R5-x64": "✖",
+    "R5-win": "✖",
+    "R6-x64": "✖",
+    "R6-win": "✖"
+   },
+   "owner": "运行时核心",
+   "batch": "K3",
+   "recommendation": "按现行产品语义更新断言（K3），测试名保持不变：断言 [file-write-protection] symbolic-link target"
+  },
+  {
+   "idx": 10,
+   "name": "R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible",
+   "file": "test/runtime-core/git-capability-tools.test.ts",
+   "testLine": "739",
+   "classification": "ENV-worktree",
+   "frozenError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /coordinator-busy/. Input:",
+   "worktreeError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /coordinator-busy/. Input:",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 11,
+   "name": "R12 interruption during async factory preparation prevents the subsequent native bind",
+   "file": "test/runtime-core/git-capability-tools.test.ts",
+   "testLine": "770",
+   "classification": "ENV-worktree",
+   "frozenError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /lease-interrupted/. Input:",
+   "worktreeError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /lease-interrupted/. Input:",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 12,
+   "name": "R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry",
+   "file": "test/runtime-core/git-capability-tools.test.ts",
+   "testLine": "783",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 13,
+   "name": "actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof",
+   "file": "test/runtime-core/git-capability-tools.test.ts",
+   "testLine": "985",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 14,
+   "name": "R8 a custom factory cannot self-report the default Codex Chat production provenance",
+   "file": "test/runtime-core/git-capability-tools.test.ts",
+   "testLine": "1022",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 15,
+   "name": "R8 native registry/instance/role/runtime/activity mismatches remain unknown",
+   "file": "test/runtime-core/git-capability-tools.test.ts",
+   "testLine": "1039",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 16,
+   "name": "R8 active HTTP inference alone is not treated as an uncontrolled execution program",
+   "file": "test/runtime-core/git-capability-tools.test.ts",
+   "testLine": "1068",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 17,
+   "name": "active and disposed prompt rejections have no turn acknowledgement",
+   "file": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+   "testLine": "69",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 18,
+   "name": "quarantined prompt rejection has no acknowledgement after one stopped actual turn",
+   "file": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+   "testLine": "85",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 19,
+   "name": "synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn",
+   "file": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+   "testLine": "104",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 20,
+   "name": "acknowledged turns keep aborted/timed_out outcomes and single matching terminal",
+   "file": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+   "testLine": "123",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 21,
+   "name": "Service 三键读取注入：set ⇒ 注入 RuntimeProviderOptions.reasoningEffort（规范形）",
+   "file": "test/runtime-core/reasoning-effort.test.ts",
+   "testLine": "87",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 22,
+   "name": "未设/空串 ⇒ 字段缺席（逐字现状的机读形态，而非 undefined 值）；demo 恒缺席",
+   "file": "test/runtime-core/reasoning-effort.test.ts",
+   "testLine": "99",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 23,
+   "name": "非法值 ⇒ 按未设处理（零参数）＋诊断如实；空串静默不诊断；绝不毁会话",
+   "file": "test/runtime-core/reasoning-effort.test.ts",
+   "testLine": "111",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 24,
+   "name": "诊断自身故障不改变执行（绝不毁会话）；跨键不串（设 claude 键对 codex 会话零影响）",
+   "file": "test/runtime-core/reasoning-effort.test.ts",
+   "testLine": "128",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 25,
+   "name": "store: traversal, mismatched scope and symlinked runtime directories rejected",
+   "file": "test/runtime-core/session-store.test.ts",
+   "testLine": "46",
+   "classification": "ENV-symlink",
+   "frozenError": "Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-9hpjUX' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-ViaTeT\\.ans\\sessions\\role\\codex'",
+   "worktreeError": "Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-NpH3aU' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-vtPvSp\\.ans\\sessions\\role\\codex'",
+   "canonical": "  Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-g5U6lS' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-HJagjj\\.ans\\sessions\\role\\codex'",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K4",
+   "recommendation": "加 symlink 能力探测：win32 用 junction 或按诊断跳过（K4），CI 已绿"
+  },
+  {
+   "idx": 26,
+   "name": "store: native validation stays lazy and native symlink is rejected before effects",
+   "file": "test/runtime-core/session-store.test.ts",
+   "testLine": "58",
+   "classification": "ENV-symlink",
+   "frozenError": "Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-JvzkQx' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-u0NzBl\\.ans\\sessions\\core\\codex\\native'",
+   "worktreeError": "Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-c71i5v' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-5w7c8J\\.ans\\sessions\\core\\codex\\native'",
+   "canonical": "  Error: EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-685qXm' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-JipAgL\\.ans\\sessions\\core\\codex\\native'",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K4",
+   "recommendation": "加 symlink 能力探测：win32 用 junction 或按诊断跳过（K4），CI 已绿"
+  },
+  {
+   "idx": 27,
+   "name": "outer timeout remains timed_out when abort cleanup emits inner aborted terminals",
+   "file": "test/runtime-core/session.test.ts",
+   "testLine": "377",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 28,
+   "name": "outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup",
+   "file": "test/runtime-core/session.test.ts",
+   "testLine": "404",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 29,
+   "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+   "file": "test/runtime-core/session.test.ts",
+   "testLine": "439",
+   "classification": "PRODUCT",
+   "frozenError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /profile was not registered/. Input:",
+   "worktreeError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /profile was not registered/. Input:",
+   "canonical": "  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "ci": {
+    "R5-arm64": "✖",
+    "R5-x64": "✖",
+    "R5-win": "✖",
+    "R6-x64": "✖",
+    "R6-win": "✖"
+   },
+   "owner": "运行时核心",
+   "batch": "K2",
+   "recommendation": "去掉 assertReady 失败路径的重复 inner.dispose（K2）"
+  },
+  {
+   "idx": 30,
+   "name": "R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget",
+   "file": "test/runtime-core/submit-capability-tools.test.ts",
+   "testLine": "503",
+   "classification": "ENV-worktree",
+   "frozenError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /trusted chief/. Input:",
+   "worktreeError": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /trusted chief/. Input:",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 31,
+   "name": "R2 chief timeout is finite and normal sessions still receive injected narrow capabilities",
+   "file": "test/runtime-core/submit-capability-tools.test.ts",
+   "testLine": "537",
+   "classification": "ENV-worktree",
+   "frozenError": "Error: runtime-protection-scope-unknown",
+   "worktreeError": "Error: runtime-protection-scope-unknown",
+   "canonical": "PASS",
+   "ci": {
+    "R5-arm64": "✔",
+    "R5-x64": "✔",
+    "R5-win": "✔",
+    "R6-x64": "✔",
+    "R6-win": "✔"
+   },
+   "owner": "运行时核心",
+   "batch": "K1",
+   "recommendation": "改用中性临时根作为 projectRoot/skillRoot（K1），canonical/CI 已绿"
+  },
+  {
+   "idx": 32,
+   "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+   "file": "test/runtime-core/trunk-contract.test.ts",
+   "testLine": "80",
+   "classification": "TEST-stale",
+   "frozenError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+   "worktreeError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+   "canonical": "  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+   "ci": {
+    "R5-arm64": "✖",
+    "R5-x64": "✖",
+    "R5-win": "✖",
+    "R6-x64": "✖",
+    "R6-win": "✖"
+   },
+   "owner": "运行时核心",
+   "batch": "K3",
+   "recommendation": "按现行产品语义更新断言（K3），测试名保持不变：TRUNK_SOURCES 期望加入 team-plan"
+  },
+  {
+   "idx": 33,
+   "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+   "file": "test/runtime-core/version-change-contract.test.ts",
+   "testLine": "176",
+   "classification": "TEST-stale",
+   "frozenError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "worktreeError": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "canonical": "  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "ci": {
+    "R5-arm64": "✖",
+    "R5-x64": "✖",
+    "R5-win": "✖",
+    "R6-x64": "✖",
+    "R6-win": "✖"
+   },
+   "owner": "运行时核心",
+   "batch": "K3",
+   "recommendation": "按现行产品语义更新断言（K3），测试名保持不变：DOC_FREEZE_REASONS 10 类、三分区"
+  }
+ ]
+}

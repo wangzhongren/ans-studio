@@ -1,0 +1,56 @@
+KR-33 分类专项 —— 运行元数据与复现命令
+日期：2026-11-16
+角色：测试（roleId: 测试）
+工作树：C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\kr33ana
+分支：analysis/test-debt-kr33；HEAD d1f256f（= origin/main，merge PR #126）
+Node：v24.22.1；OS：Windows 11 Pro 10.0.26300
+依赖：kr33ana 无 node_modules，创建目录联接 node_modules -> .claude/worktrees/refactor-session-ts-b7/node_modules；
+     两处 package.json SHA-256 c37e1e49…、package-lock.json SHA-256 a5e315ca… 完全相同（b7 为 d1f256f 祖先）。
+     该联接为未跟踪的环境准备，不是仓库改动，不入库。
+约束：未修改代码/测试/配置/workflow/角色卡/边界；未 commit/push；未触发 CI；未 tag；未碰 main；
+     未读 .env；未占用 9222/9223/9224。本目录只保存派生数据与小段错误体，原始大日志不入库。
+
+[1] 工作树本机复现（任务口径）
+命令：
+  cd .claude/worktrees/kr33ana
+  node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit "test/runtime-core/**/*.test.ts"
+说明：--test-force-exit 仅约束全部用例完成后的进程退出（R6 CI 亦使用），不改变用例执行/判定语义。
+结果（runtime-core-full.tap）：
+  ℹ tests 604 / pass 567 / fail 33 / cancelled 0 / skipped 4 / todo 0 / duration_ms 50515.1386
+  EXIT=1
+失败名：与 14b-knownred-runtime-core.tap 的 33 名逐名一致（33/33）。
+
+[2] 中性/规范根对照（同一 d1f256f 代码，cwd 无 .git）
+构造：
+  git archive d1f256f | tar -x -C %TEMP%\kr33-canon
+  mklink /J %TEMP%\kr33-canon\node_modules <b7>/node_modules
+命令：在 %TEMP%\kr33-canon 运行同一 node --test 命令。
+结果（runtime-core-canon.tap）：
+  ℹ tests 604 / pass 592 / fail 8 / cancelled 0 / skipped 4 / todo 0 / duration_ms 49591.9152
+8 个失败：
+  1) dispatch_task 文案（断言）
+  2) dispatch_task promptGuidelines（断言）
+  3) D3 linked workspace root（本机 EPERM；CI 为断言）
+  4) store: traversal…（本机 EPERM）
+  5) store: native validation…（本机 EPERM）
+  6) Core-managed binding rejects…（2 !== 1）
+  7) 主干来源（深比较）
+  8) doc-freeze reason 九类（10 !== 9）
+结论：25 个“仅工作树根”失败在规范根下全部通过；2 个 symlink 失败是本机 Windows 权限；6 个真实失败跨环境稳定。
+
+[3] 既有对照（B7.1，2026-11-11，Windows）
+文件：角色卡/桌面窗口/docs/change/2026-11-11_B7.1_two-fixed-workflow-paths-desktop_evidence/09-readonly-suites/NOTES.txt
+原文要点：纯净 HEAD 586/574/8/4；工作树 cwd（git worktree 的 .git 为文件）直跑 586/549/33/4，
+25 个额外失败均为测试以 process.cwd() 为 projectRoot 时 readGitHostProtectionRequirement 判 .git 文件
+⇒ runtime-protection-scope-unknown；改用无 .git 的中性 cwd 后 586/574/8/4，失败名与纯净基线逐名一致。
+（当时 8 个失败同样含 2 个本机 symlink EPERM。）
+
+[4] CI 对照（用于平台形态与错误体）
+R5：GitHub Actions run 43829367008（main @ a0baea22，2026-11-16T08:12Z；三平台完整）
+    arm64 5,825 / 5,702 / fail 103；x64 5,825 / 5,700 / fail 104；Windows 5,825 / 5,689 / fail 103。
+    本 33 名中 27 名三平台 ✔、6 名三平台 ✖（见 05-ci-status-matrix.tsv）。
+R6：GitHub Actions run 43848313583（main @ 82dc180，2026-11-16T10:22Z；arm64 job 级 cancelled 无工件）
+    x64 5,825 / 5,755 / fail 50 / cancelled 1 / skipped 19；
+    Windows 5,826 / 5,743 / fail 51 / cancelled 0 / skipped 32。
+    本 33 名中 27 名两平台 ✔、6 名两平台 ✖，与 R5 逐名一致。
+工件根：R5=/tmp/r8-art，R6=/tmp/r9-art（本机 Git Bash 映射到 C:\Users\51054\AppData\Local\Temp）。

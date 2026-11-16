@@ -1,0 +1,61 @@
+KR-33 根因探针：worktree `.git` 文件 ⇒ runtime-protection-scope-unknown
+日期：2026-11-16；Node v24.22.1；Windows 11
+
+## 1. 直接探针（只读调用产品导出，不写盘）
+
+命令（在 kr33ana 工作树内）：
+  node --input-type=module -e "import { readGitHostProtectionRequirement } from './src/provider/trunk/impl/git-command.ts'; ..."
+
+输出：
+  cwd C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\kr33ana
+  cwd .git lstat: file
+  scope cwd: {"state":"unknown","revision":1,"reasons":["Error: git-association-protection-requirement-unknown"]}
+  plain scope: {"state":"unmanaged","revision":1,"reasons":[]}            # 无 .git 的临时根
+  git-dir scope: {"state":"unmanaged","revision":1,"reasons":[]}          # .git 为普通目录
+  git-file scope: {"state":"unknown","revision":1,"reasons":["Error: git-association-protection-requirement-unknown"]}  # .git 为文件
+
+结论：linked git worktree 的 `.git` 是文件（`gitdir: …`），产品按安全口径判“Git 关联保护要求未知”，
+不是产品缺陷；规范 checkout（.git 为目录或无 .git）下为 unmanaged，测试继续执行。
+
+## 2. 源码链
+
+- `src/service/runtime/session.ts:232` `readCoreProtectionScope(projectRoot)` → 调用
+  `src/provider/trunk/public/trunk-store.ts` 重导出的 `readGitHostProtectionRequirement({projectRoot})`；
+  非 required/unmanaged 的合法事实 ⇒ 返回 `{state:"unknown"}`。
+- `src/service/runtime/session.ts:1277`（composeContext）与 `:1297-1298`（bindRole）：
+  `if (scope.state === "unknown") throw new Error("runtime-protection-scope-unknown");`
+- `src/provider/trunk/impl/git-command.ts:971` `readGitHostProtectionRequirement`：
+  `.git` 存在且不是“普通目录 / 非符号链接 / realpath 不变” ⇒ 抛 `git-association-protection-requirement-unknown` ⇒ state unknown。
+  （同一函数对 `.ans`/`trunk`/initialization-sources/refs 的检查仍是既有 fail-closed，未改。）
+- `src/common/装配/release-policy.mjs:16` 注释明确记录：`noncanonical-project-root` ⇒ 保护范围 unknown
+  ⇒ CI 120 名以 `runtime-protection-scope-unknown`；同一 fail-closed 口径不因测试环境放宽。
+
+## 3. 测试侧触发点（25 名）
+
+受影响的 7 个测试文件把 `projectRoot: process.cwd()` / `skillRoot: process.cwd()` 直接传给
+`createRuntimeAdapter(...).bindRole/composeContext`；在 linked worktree 中 cwd 即 `.git` 为文件的工作树根。
+- test/runtime-core/abort-quarantine.test.ts:18
+- test/runtime-core/effective-timeouts.test.ts:44,65,130
+- test/runtime-core/git-capability-tools.test.ts:671,742,772,784,987,1004
+- test/runtime-core/prompt-start-acknowledgement.test.ts:76,95,111,131
+- test/runtime-core/reasoning-effort.test.ts:47
+- test/runtime-core/session.test.ts:395,424,445
+- test/runtime-core/submit-capability-tools.test.ts:505,541,551
+
+注：同一 33 名中的 Core-managed binding（session.test.ts:445）在工作树里同样先被此环境错误掩盖；
+在规范根下才暴露真实失败（2 !== 1）。
+
+## 4. 对照结果
+
+- 规范根副本（%TEMP%\kr33-canon，git archive d1f256f，无 .git）：上述 25 名全部通过（604/592/8/4）。
+- R5（三平台）与 R6（macOS x64 + Windows x64）：上述 25 名全部 ✔；6 名真实失败在两轮均 ✖。
+- B7.1 NOTES（2026-11-11）：工作树 cwd 直跑 586/549/33/4，中性 cwd 586/574/8/4，逐名与纯净基线一致。
+
+## 5. 两个 symlink 环境项
+
+- test/runtime-core/session-store.test.ts:46（store: traversal…）与 :58（store: native validation…）
+  先 `fs.symlink(...)` 造目录链接，再断言拒绝；本机 Windows 无 SeCreateSymbolicLinkPrivilege ⇒
+  `EPERM: operation not permitted, symlink …`，测试在构造阶段即失败。
+- 规范根本机复跑仍 EPERM（604/592/8/4 中的 2 个）；R5/R6 的 GitHub Windows runner 与 macOS runner 均 ✔。
+- D3（file-write-safety.test.ts:97）同因在本机 EPERM；CI 上链接可建，暴露的是另一真实断言问题
+  （见 07-source-evidence.md §2）。
