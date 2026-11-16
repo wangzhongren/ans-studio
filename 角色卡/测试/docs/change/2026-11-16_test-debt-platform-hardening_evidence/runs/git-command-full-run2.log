@@ -1,0 +1,28 @@
+=== run 2 ===
+✔ NoGit protection absence: private issued facts protect potential metadata and reject a new ancestor association (11.344ms)
+✔ Git protection freshness: only the issued observation survives unchanged config/topology (54.0488ms)
+✔ Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry (776.8728ms)
+✔ Git init Provider: final real root/file hashes fence initialization and persist original operation process identity (66.6918ms)
+✔ Git init journal: restart discovery binds the original operation and excludes FS/ref media (27.4287ms)
+✔ Git init process fence: a previous unknown instance cannot be overwritten even while .git is absent (1.9496ms)
+✔ Git protection requirement: actual source binds scope; deleting evidence cannot clear it; an unknown association is not unmanaged (8.5429ms)
+✔ Git empty plan: computed sha1 object bytes match actual fixed-date Git readback (243.1995ms)
+✔ Git empty plan: computed sha256 object bytes match actual fixed-date Git readback (247.3789ms)
+{"repoId":"41e00102f238c2002af6dcbc689ac3f1131a17ff4b48863aff8471695b7a2d26","executable":"C:\\Program Files\\Git\\cmd\\git.exe","argv":["--no-pager","--no-optional-locks","--literal-pathspecs","-c","core.fsmonitor=false","-c","core.hooksPath=NUL","-c","core.untrackedCache=false","-c","core.excludesFile=NUL","-c","core.pager=cat","-c","pager.status=false","-c","pager.diff=false","-c","maintenance.auto=false","-c","gc.auto=0","-c","protocol.allow=never","-c","diff.external=","-c","core.attributesFile=NUL","status","--porcelain=v1","-z","--untracked-files=normal","--ignore-submodules=all","--","actual.txt"],"termination":"exited"}
+✔ Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config (68.8689ms)
+✔ Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query (158.1929ms)
+✔ B30 user section accepted: desktop identity defaults (name=ANS/email=ans@local) no longer block inspect or status (120.2019ms)
+✔ B30 user section stays fail-closed: illegal keys/values and every other dangerous section still reject (335.0819ms)
+✔ B2 macOS core.precomposeunicode accepted: real repo-local Boolean true/false no longer block inspect or status beside existing core keys and B30 user identity (381.7719ms)
+✔ B2 precomposeunicode stays fail-closed: non-Boolean values, wrong sections and other unlisted core keys keep the existing rejections (320.4244ms)
+✔ Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported (37.9529ms)
+✔ Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit (310.3929ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3363.7702
+EXIT=0

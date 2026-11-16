@@ -1,0 +1,11 @@
+WJ5_TIMING before-buildWriteChain 4
+WJ5_TIMING after-buildWriteChain 41123
+WJ5_TIMING after-phase1 41131
+WJ5_TIMING after-phase2 41301
+WJ5_TIMING after-phase3 43182
+WJ5_TIMING after-phase4 59269
+WJ5_TIMING after-phase5 60655
+✔ W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例 (60652.3216ms)
+ℹ duration_ms 60998.6004
+
+[exited with code 0]

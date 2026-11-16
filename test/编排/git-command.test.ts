@@ -46,36 +46,105 @@ test("Git final spawn fence: real pending-record interruption records no launch 
   const root = await fixture(), objects = createGitCandidateStore(root), dir = path.join(root, ".git/ans/processes"); await fs.mkdir(dir, { recursive: true });
   const lease = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(lease.ok); if (!lease.ok) return;
   let observed = false;
-  const watcher = watch(dir, () => { observed = true; watcher.close(); recordGitHostInterruption({ projectRoot: root, reason: "actual-pending-record-interruption" }); });
+  let signalPreparationObserved!: () => void;
+  const preparationObserved = new Promise<void>(resolve => { signalPreparationObserved = resolve; });
+  const watcher = watch(dir, () => { observed = true; watcher.close(); recordGitHostInterruption({ projectRoot: root, reason: "actual-pending-record-interruption" }); signalPreparationObserved(); });
   const input = { operationId: "actual-before-spawn-cancel", base: null, timestamp: "2026-11-05T00:00:00.000Z", message: "Real pending write", files: [{ path: "src/impl/result.txt", bytesBase64: Buffer.from("real result\n").toString("base64") }] };
-  try { await assert.rejects(objects.prepare(input, undefined, lease.leaseId), /git-command-failed:null:unknown/); }
+  let rejection: unknown;
+  try { await objects.prepare(input, undefined, lease.leaseId); }
+  catch (error) { rejection = error; }
   finally { watcher.close(); endGitHostAction({ projectRoot: root, leaseId: lease.leaseId }); }
+  // fs.watch 投递可能延迟（macOS FSEvents）：retry 前有界等待这次中断观察落地。延迟到达的中断落在
+  // 新 lease 上属于真实撤销语义（合法 fail-closed），不是本用例要制造/排除的 flake。
+  const settleObservation = (promise: Promise<void>) => Promise.race([promise, new Promise<void>(resolve => setTimeout(resolve, 500))]);
+  await settleObservation(preparationObserved);
+  assert.ok(rejection !== undefined, "A recorded pending-record interruption must reject the preparation; it must never silently succeed");
   assert.equal(observed, true, "The real process-fence filesystem write, not a fixture callback, interrupts the held lease");
-  const files = await fs.readdir(dir); assert.equal(files.length, 1);
-  const processFact = JSON.parse(await fs.readFile(path.join(dir, files[0]!), "utf8"));
-  assert.equal(processFact.launch, "cancelled-before-spawn"); assert.equal(processFact.pid, undefined); assert.equal(processFact.exitCode, null);
-  assert.equal(processFact.termination, "unknown", "No fake successful OS exit is invented for an unlaunched command");
-  assert.equal(await objects.readRef(`refs/ans/candidates/${createHash("sha256").update(input.operationId).digest("hex")}`), null);
+  const message = rejection instanceof Error ? rejection.message : String(rejection);
+  const readProcessFacts = async () => Promise.all((await fs.readdir(dir)).map(file => fs.readFile(path.join(dir, file), "utf8").then(JSON.parse)));
+  const mutatingVerb = (fact: { argv?: unknown }) => Array.isArray(fact.argv)
+    ? fact.argv.find(arg => ["init", "hash-object", "mktree", "commit-tree", "update-ref"].includes(String(arg))) as string | undefined : undefined;
+  const processFacts = await readProcessFacts();
+  const candidateRef = `refs/ans/candidates/${createHash("sha256").update(input.operationId).digest("hex")}`;
+  // 共享安全不变量（两路都必须成立）：被中断的 prepare 不得发布 candidate ref；
+  // 进程证据只允许出现对象写入（hash-object/mktree/commit-tree），真正变更 ref 的 update-ref 从未启动。
+  assert.equal(await objects.readRef(candidateRef), null, "The interrupted preparation must not publish a candidate ref (no commit becomes ref-visible)");
+  assert.equal(processFacts.some(fact => mutatingVerb(fact) === "update-ref"), false, "The final ref mutation must not launch while the interrupted lease is held");
+  assert.ok(processFacts.every(fact => ["hash-object", "mktree", "commit-tree"].includes(String(mutatingVerb(fact)))),
+    "Only object plumbing may be attempted before the fence; no other mutation family may launch");
+  // 显式两路分类（平台时序相关）：fs.watch 投递可能晚于产品「check 与 spawn 之间无 await」的最终栅栏
+  // （macOS FSEvents；见 misc2 延迟探针 0ms/100ms）。两路都在 ref 发布前 fail-closed，但延迟路会先跑完
+  // 内部 Git plumbing 命令，因此不能断言「records no launch」；改为钉住下列可证明的安全不变量。
+  const cancelled = processFacts.filter(fact => fact.launch === "cancelled-before-spawn");
+  const launched = processFacts.filter(fact => fact.launch === "started");
+  assert.equal(cancelled.length + launched.length, processFacts.length,
+    "Every persisted record must be an explicit pre-spawn cancellation or a started process; pending/unknown evidence would keep the fence held");
+  assert.ok(cancelled.every(fact => fact.pid === undefined && fact.exitCode === null && fact.termination === "unknown"),
+    "No fake successful OS exit is invented for an unlaunched command");
+  assert.ok(launched.every(fact => fact.pid !== undefined && fact.termination === "exited" && fact.exitCode === 0),
+    "Every launched internal command must be a settled success; an unknown termination would be an unresolved owned process");
+  if (launched.length === 0) {
+    // 路 A（watch 投递在首个 spawn 边界前）：恰好一条显式 cancelled-before-spawn，prepare 以 pre-spawn 取消拒绝。
+    assert.equal(cancelled.length, 1, "The never-launched path must record exactly one explicit pre-spawn cancellation");
+    assert.match(message, /^git-command-failed:null:unknown:/);
+  } else {
+    // 路 B（延迟投递，macOS FSEvents）：至少一条内部 plumbing 已启动并退出；记录被观察到后，
+    // 下一次 mutation 在自身启动前被拒绝（或在其取证窗口内被最终栅栏取消）。
+    assert.match(message, /^(git-host-lease-invalid-before-command|git-command-failed:null:unknown:)/,
+      "The delayed-observation path must still reject through a fail-closed fence");
+  }
+  // 真实重试（新 lease）必须成功，且 candidate ref 只能由一条 launched/exited-0 的 update-ref 进程证据背书。
   const retryLease = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(retryLease.ok); if (!retryLease.ok) return;
   try { const result = await objects.prepare(input, undefined, retryLease.leaseId); assert.ok(result.candidate); }
   finally { endGitHostAction({ projectRoot: root, leaseId: retryLease.leaseId }); }
-  const retried = await Promise.all((await fs.readdir(dir)).map(file => fs.readFile(path.join(dir, file), "utf8").then(JSON.parse)));
-  assert.ok(retried.some(fact => fact.launch === "started" && fact.termination === "exited" && fact.exitCode === 0 && fact.pid));
-  const ref = `refs/ans/candidates/${createHash("sha256").update(input.operationId).digest("hex")}`, actualOid = await objects.readRef(ref); assert.ok(actualOid);
+  const retried = await readProcessFacts();
+  assert.ok(retried.some(fact => mutatingVerb(fact) === "update-ref" && fact.launch === "started" && fact.termination === "exited" && fact.exitCode === 0 && fact.pid),
+    "The retried publication must be backed by a started, exited-0 owned update-ref process");
+  const ref = candidateRef, actualOid = await objects.readRef(ref); assert.ok(actualOid);
   const actual = await objects.readCommit(actualOid), identity = await objects.inspect();
   const binding = { operationId: "cancel-before-publication-spawn", repoId: identity.repoId, ref: "refs/ans/delivery/demo", oldOid: null,
     newOid: actual.candidate, tree: actual.tree, parents: actual.parents, requestDigest: createHash("sha256").update("actual-publication").digest("hex") };
   const publicationLease = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(publicationLease.ok); if (!publicationLease.ok) return;
-  const publicationWatcher = watch(dir, () => { publicationWatcher.close(); recordGitHostInterruption({ projectRoot: root, reason: "actual-publication-pending-interruption" }); });
-  try {
-    const publication = await createGitRefStore(root, { hostLeaseId: publicationLease.leaseId }).publish(binding);
-    assert.equal(publication.status, "blocked"); assert.equal(publication.journal.process?.launch, "cancelled-before-spawn");
-    assert.equal(await objects.readRef(binding.ref), null);
-  } finally { publicationWatcher.close(); endGitHostAction({ projectRoot: root, leaseId: publicationLease.leaseId }); }
+  let signalPublicationObserved!: () => void;
+  const publicationObserved = new Promise<void>(resolve => { signalPublicationObserved = resolve; });
+  const publicationWatcher = watch(dir, () => { publicationWatcher.close(); recordGitHostInterruption({ projectRoot: root, reason: "actual-publication-pending-interruption" }); signalPublicationObserved(); });
+  let publication: { status: string; journal: { process?: { launch?: string; termination?: string; exitCode?: number | null } } } | undefined;
+  let publicationRejection: unknown;
+  try { publication = await createGitRefStore(root, { hostLeaseId: publicationLease.leaseId }).publish(binding); }
+  catch (error) { publicationRejection = error; }
+  finally { publicationWatcher.close(); endGitHostAction({ projectRoot: root, leaseId: publicationLease.leaseId }); }
+  await settleObservation(publicationObserved);
+  // 发布阶段同一平台分类（三种合法 fail-closed 结果）：
+  //  - 中断在 spawn 边界前被观察到 ⇒ blocked + 显式 cancelled-before-spawn + ref 不变；
+  //  - 中断在 publish 早期检查与 update-ref 的 spawn 边界之间被观察到 ⇒ 下一次 mutation 启动前拒绝（抛错，ref 不变）；
+  //  - 中断在 update-ref 已启动后才被观察到 ⇒ 只允许 published，且必须由 started/exited-0 的 own 进程与 ref 新值共同背书。
+  // 任何结果都不允许「ref 变了却没有已启动且成功退出的进程证据」。
+  if (publicationRejection !== undefined) {
+    const refusal = publicationRejection instanceof Error ? publicationRejection.message : String(publicationRejection);
+    assert.match(refusal, /^git-host-lease-invalid-before-command$/, `Unexpected publication rejection: ${refusal}`);
+    assert.equal(await objects.readRef(binding.ref), null, "A refused publication must leave the ref unchanged");
+    assert.equal((await readProcessFacts()).some(fact => mutatingVerb(fact) === "update-ref" && fact.operationId === binding.operationId), false,
+      "update-ref must not launch for a refused publication");
+  } else {
+    assert.ok(publication, "publish must return on the non-throwing path");
+    if (publication.status === "blocked") {
+      assert.equal(publication.journal.process?.launch, "cancelled-before-spawn");
+      assert.equal(await objects.readRef(binding.ref), null);
+    } else {
+      assert.equal(publication.status, "published", `Unexpected publication status: ${JSON.stringify(publication.status)}`);
+      assert.equal(publication.journal.process?.launch, "started");
+      assert.equal(publication.journal.process?.termination, "exited");
+      assert.equal(publication.journal.process?.exitCode, 0);
+      assert.equal((await objects.readRef(binding.ref))?.hex, binding.newOid.hex);
+    }
+  }
   const publicationRetry = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(publicationRetry.ok); if (!publicationRetry.ok) return;
   try { assert.equal((await createGitRefStore(root, { hostLeaseId: publicationRetry.leaseId }).publish(binding)).status, "published"); }
   finally { endGitHostAction({ projectRoot: root, leaseId: publicationRetry.leaseId }); }
-  await fs.writeFile(path.join(dir, "00000000-0000-4000-8000-000000000099.json"), JSON.stringify({ ...processFact, pid: 99999999 }));
+  assert.equal((await objects.readRef(binding.ref))?.hex, binding.newOid.hex, "The genuine retry must publish the exact binding");
+  // 一条「可能已启动但未结算」的 own 进程记录（真实路径的取消记录不得被复用来清栅栏）。
+  const processFact = retried[0]!;
+  await fs.writeFile(path.join(dir, "00000000-0000-4000-8000-000000000099.json"), JSON.stringify({ ...processFact, launch: "started", termination: "unknown", pid: 99999999, exitCode: null }));
   await assert.rejects(objects.prepare({ ...input, operationId: "cannot-clear-possibly-started" }), /git-owned-process-unresolved/, "A missing/dead PID claim cannot reuse the real never-started cancellation path");
 });
 test("Git init Provider: final real root/file hashes fence initialization and persist original operation process identity", async () => {

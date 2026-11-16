@@ -1,0 +1,50 @@
+✖ 独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次 (2478.785ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2562.031
+
+✖ failing tests:
+
+test at test\测试\g5-reasoning-verify\.tmp-loopback-probe-crash.test.ts:261:37
+✖ 独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次 (2478.785ms)
+  AssertionError [ERR_ASSERTION]: Isolated pi reproducibly hit the native teardown crash in 3 bounded attempts; keeping the gate red:
+  TAP version 13
+  # Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\\win\\async.c, line 76
+  # Subtest: C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\plat\\test\\测试\\g5-reasoning-verify\\.tmp-loopback-probe-crash.test.ts
+  not ok 1 - C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\plat\\test\\测试\\g5-reasoning-verify\\.tmp-loopback-probe-crash.test.ts
+    ---
+    duration_ms: 779.0769
+    type: 'test'
+    location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\plat\\test\\测试\\g5-reasoning-verify\\.tmp-loopback-probe-crash.test.ts:1:1'
+    failureType: 'testCodeFailure'
+    exitCode: 134
+    signal: ~
+    error: 'test failed'
+    code: 'ERR_TEST_FAILURE'
+    ...
+  1..1
+  # tests 1
+  # suites 0
+  # pass 0
+  # fail 1
+  # cancelled 0
+  # skipped 0
+  # todo 0
+  # duration_ms 784.6946
+      at runIsolated (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/plat/test/%E6%B5%8B%E8%AF%95/g5-reasoning-verify/.tmp-loopback-probe-crash.test.ts:297:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/plat/test/%E6%B5%8B%E8%AF%95/g5-reasoning-verify/.tmp-loopback-probe-crash.test.ts:261:112)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+EXIT=1

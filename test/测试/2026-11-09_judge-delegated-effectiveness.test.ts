@@ -52,7 +52,14 @@ async function exportWj5(name: string, value: unknown): Promise<void> {
   await fsp.writeFile(path.join(dir, name), `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例", { timeout: 180000 }, async () => {
+test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例", { timeout: 180000 }, async context => {
+  // 预算观测（2026-11-16 平台加固，不改语义/断言）：x64 runner 在 R3/R5/R6 三度于本用例自带 180s 上限
+  // 超时且无任何断言失败；同轮 arm64/Windows ✔ ~69–71s，本机 Windows ✔ ~61s。本文件不含固定 sleep，
+  // 成本几乎全在真实跨层链（本机分段：buildWriteChain ≈41s、verifyReviewIntent 端到端 ≈15s、其余 ≈3s）。
+  // 分段耗时写入 diagnostic（File: 行内可见），供 x64 复现时区分「真实链路成本」与「runner 负载/泄漏」。
+  // 不调整 180s 上限：无测试缺陷证据时抬高上限只会掩盖潜在 x64 性能/泄漏问题（misc3 §4 结论）。
+  const budgetStart = Date.now(), budgetMarks: Record<string, number> = {};
+  const budgetMark = (label: string) => { budgetMarks[label] = Date.now() - budgetStart; };
   // G1：超长 reason/model 原值跨层逐字复制（不截断、不设上界）。
   const longReason = "judge-approve:" + "R".repeat(4096);
   const longModel = "claude-judge-model:" + "M".repeat(512);
@@ -63,6 +70,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 
     d3By: "judge",
     judgeAudit: { engine: "claude", model: longModel, reason: longReason, reasonCode: "sufficient", selected: ["confirm"] },
   });
+  budgetMark("buildWriteChain");
 
   // 1) R9 baseline：judge-delegated 冻结记录（源与账本逐字段一致；无客户字段；G1 不截断）。
   const integration = createVersionChangeIntegration({ projectRoot: chain.root, migrationCompleted: () => true });
@@ -115,6 +123,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 
   const confirmed = await readConfirmedIntentEvidence(chain.root, PATHS.intent);
   assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
 
+  budgetMark("r9BaselineAndFallbackNegatives");
   // 2) 回落负例：declined/unavailable/judge 来源不符 ⇒ 不写冻结、不抛错（既有回落语义不变）。
   const intentFreezeCount = async () => (await createGuardFreezeRegistry(chain.root, { migrationCompleted: () => true }).listFreezes())
     .filter(item => item.path === PATHS.intent && item.freeze.reason === "intent-confirmed").length;
@@ -134,6 +143,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 
   if (!mismatched.ok) assert.equal(mismatched.code, "trunk-item-invalid");
   assert.equal(await intentFreezeCount(), 1, "回落/负例不得新增冻结");
 
+  budgetMark("fallbackNegatives");
   // 3) judge D3（真实应用 decisionId）+ Runtime 包装层激活正例（fixture activationMode:"wrapper"）。
   assert.equal((chain.activationReceipt as { status?: string }).status, "applied");
   const store = createProjectTrunkStore(chain.root);
@@ -173,6 +183,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 
   assert.equal(runContext.ok, true, JSON.stringify(runContext));
   if (runContext.ok) assert.equal(runContext.documentContext.pinDigest, chain.pin.pinDigest);
 
+  budgetMark("judgeD3AndPin");
   // 4) verifyReviewIntent 端到端：真实 worker commit → accepted 收口 → convener integrate →
   //    prepareReviewTask/readReviewMaterial 从冻结的 trunk Git 历史账本重放 judge 来源。
   const assignment = await createExecutionAssignment(chain, { controllerTaskId: "wj5-controller-task", workerTaskId: "wj5-worker-task" });
@@ -233,6 +244,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 
     target: { operationId: "wj5-integration", candidate: integrationCandidate } });
   assert.equal(review.ok, true, JSON.stringify(review));
 
+  budgetMark("verifyReviewIntentEndToEnd");
   // 5) W-J2b amendment（B1 v1.1 附录 A / AC-J7b）：judge D3 经 Runtime 包装层
   //    `createDirectRoleRuntime.activateRoleDocuments` 成功。本链激活本身经包装层执行
   //    （fixture activationMode:"wrapper"）：prepareRoleActivation → 三文档 G 校验 → nominator
@@ -296,4 +308,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 
     activationNotifications: chain.activationNotifications ?? [],
     nominatorFacts: { stage: facts.stage, d3By: facts.d3By, d3DecisionId: facts.d3DecisionId, decisionIdMatches: facts.d3DecisionId === chain.d3DecisionId },
     d3ByNegatives: negativeResults, d3ByPositive: { allow: positiveDecision.allow } });
+  budgetMark("activationReplayAndIdempotency");
+  budgetMark("complete");
+  context.diagnostic(JSON.stringify({ wj5BudgetMs: budgetMarks }));
 });

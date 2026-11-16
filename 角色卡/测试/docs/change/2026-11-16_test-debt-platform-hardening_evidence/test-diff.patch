@@ -1,0 +1,348 @@
+diff --git a/test/测试/2026-11-09_judge-delegated-effectiveness.test.ts b/test/测试/2026-11-09_judge-delegated-effectiveness.test.ts
+index 1ca9fba..e98d612 100644
+--- a/test/测试/2026-11-09_judge-delegated-effectiveness.test.ts
++++ b/test/测试/2026-11-09_judge-delegated-effectiveness.test.ts
+@@ -52,7 +52,14 @@ async function exportWj5(name: string, value: unknown): Promise<void> {
+   await fsp.writeFile(path.join(dir, name), `${JSON.stringify(value, null, 2)}\n`, "utf8");
+ }
+ 
+-test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例", { timeout: 180000 }, async () => {
++test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例", { timeout: 180000 }, async context => {
++  // 预算观测（2026-11-16 平台加固，不改语义/断言）：x64 runner 在 R3/R5/R6 三度于本用例自带 180s 上限
++  // 超时且无任何断言失败；同轮 arm64/Windows ✔ ~69–71s，本机 Windows ✔ ~61s。本文件不含固定 sleep，
++  // 成本几乎全在真实跨层链（本机分段：buildWriteChain ≈41s、verifyReviewIntent 端到端 ≈15s、其余 ≈3s）。
++  // 分段耗时写入 diagnostic（File: 行内可见），供 x64 复现时区分「真实链路成本」与「runner 负载/泄漏」。
++  // 不调整 180s 上限：无测试缺陷证据时抬高上限只会掩盖潜在 x64 性能/泄漏问题（misc3 §4 结论）。
++  const budgetStart = Date.now(), budgetMarks: Record<string, number> = {};
++  const budgetMark = (label: string) => { budgetMarks[label] = Date.now() - budgetStart; };
+   // G1：超长 reason/model 原值跨层逐字复制（不截断、不设上界）。
+   const longReason = "judge-approve:" + "R".repeat(4096);
+   const longModel = "claude-judge-model:" + "M".repeat(512);
+@@ -63,6 +70,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3
+     d3By: "judge",
+     judgeAudit: { engine: "claude", model: longModel, reason: longReason, reasonCode: "sufficient", selected: ["confirm"] },
+   });
++  budgetMark("buildWriteChain");
+ 
+   // 1) R9 baseline：judge-delegated 冻结记录（源与账本逐字段一致；无客户字段；G1 不截断）。
+   const integration = createVersionChangeIntegration({ projectRoot: chain.root, migrationCompleted: () => true });
+@@ -115,6 +123,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3
+   const confirmed = await readConfirmedIntentEvidence(chain.root, PATHS.intent);
+   assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
+ 
++  budgetMark("r9BaselineAndFallbackNegatives");
+   // 2) 回落负例：declined/unavailable/judge 来源不符 ⇒ 不写冻结、不抛错（既有回落语义不变）。
+   const intentFreezeCount = async () => (await createGuardFreezeRegistry(chain.root, { migrationCompleted: () => true }).listFreezes())
+     .filter(item => item.path === PATHS.intent && item.freeze.reason === "intent-confirmed").length;
+@@ -134,6 +143,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3
+   if (!mismatched.ok) assert.equal(mismatched.code, "trunk-item-invalid");
+   assert.equal(await intentFreezeCount(), 1, "回落/负例不得新增冻结");
+ 
++  budgetMark("fallbackNegatives");
+   // 3) judge D3（真实应用 decisionId）+ Runtime 包装层激活正例（fixture activationMode:"wrapper"）。
+   assert.equal((chain.activationReceipt as { status?: string }).status, "applied");
+   const store = createProjectTrunkStore(chain.root);
+@@ -173,6 +183,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3
+   assert.equal(runContext.ok, true, JSON.stringify(runContext));
+   if (runContext.ok) assert.equal(runContext.documentContext.pinDigest, chain.pin.pinDigest);
+ 
++  budgetMark("judgeD3AndPin");
+   // 4) verifyReviewIntent 端到端：真实 worker commit → accepted 收口 → convener integrate →
+   //    prepareReviewTask/readReviewMaterial 从冻结的 trunk Git 历史账本重放 judge 来源。
+   const assignment = await createExecutionAssignment(chain, { controllerTaskId: "wj5-controller-task", workerTaskId: "wj5-worker-task" });
+@@ -233,6 +244,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3
+     target: { operationId: "wj5-integration", candidate: integrationCandidate } });
+   assert.equal(review.ok, true, JSON.stringify(review));
+ 
++  budgetMark("verifyReviewIntentEndToEnd");
+   // 5) W-J2b amendment（B1 v1.1 附录 A / AC-J7b）：judge D3 经 Runtime 包装层
+   //    `createDirectRoleRuntime.activateRoleDocuments` 成功。本链激活本身经包装层执行
+   //    （fixture activationMode:"wrapper"）：prepareRoleActivation → 三文档 G 校验 → nominator
+@@ -296,4 +308,7 @@ test("W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3
+     activationNotifications: chain.activationNotifications ?? [],
+     nominatorFacts: { stage: facts.stage, d3By: facts.d3By, d3DecisionId: facts.d3DecisionId, decisionIdMatches: facts.d3DecisionId === chain.d3DecisionId },
+     d3ByNegatives: negativeResults, d3ByPositive: { allow: positiveDecision.allow } });
++  budgetMark("activationReplayAndIdempotency");
++  budgetMark("complete");
++  context.diagnostic(JSON.stringify({ wj5BudgetMs: budgetMarks }));
+ });
+diff --git a/test/测试/g5-reasoning-verify/compatibility-loopback.test.ts b/test/测试/g5-reasoning-verify/compatibility-loopback.test.ts
+index 7de07a8..f8afc21 100644
+--- a/test/测试/g5-reasoning-verify/compatibility-loopback.test.ts
++++ b/test/测试/g5-reasoning-verify/compatibility-loopback.test.ts
+@@ -1,14 +1,20 @@
+ // 独立真实 SDK/CLI 验证：仅 localhost、临时目录和假 key，不注入兼容实现或修改模型目录。
++//
++// 2026-11-16 平台加固（Windows-only 原生 libuv `UV_HANDLE_CLOSING`，R6 首次观测）：
++// 三个真实子用例各自在**独立 Node 子进程**中串行运行，父进程只做编排与判定。仅当子进程在
++// **全部断言完成之后**、于进程收尾期发生原生崩溃（完成哨兵已写 + 原生断言签名）才做有界重试
++// （最多 3 次）；断言失败/测试中途崩溃/超时一律不重试、直接失败。隔离与重试不改变任何业务
++// 断言，也不把失败伪装成通过（重试耗尽仍失败，门禁口径不放松）。详见
++// 角色卡/测试/docs/change/2026-11-16_test-debt-platform-hardening.md。
+ import { test } from "node:test";
+ import assert from "node:assert/strict";
+ import { createServer, type ServerResponse } from "node:http";
+-import { mkdtemp } from "node:fs/promises";
++import { access, mkdtemp, writeFile } from "node:fs/promises";
++import { execFile } from "node:child_process";
++import { fileURLToPath } from "node:url";
+ import os from "node:os";
+ import path from "node:path";
+-import * as claudeSdk from "@anthropic-ai/claude-agent-sdk";
+-import { createClaudeRuntimeAdapter } from "../../../src/provider/claude/session.ts";
+-import { createCodexRuntimeAdapter } from "../../../src/provider/codex/session.ts";
+-import { createRealPiRuntimeAdapter } from "../../../src/common/pi-adapter/real-adapter.ts";
++import type * as ClaudeSdk from "@anthropic-ai/claude-agent-sdk";
+ import { createInteractionGate } from "../../../src/common/runtime-core/timeout.ts";
+ import type { RoleSession, SessionEvent } from "../../../src/model/runtime.ts";
+ import { makeRole, removeTempDirEventually } from "./helpers.ts";
+@@ -93,7 +99,14 @@ function states(events: SessionEvent[], state: string) {
+   });
+ }
+ 
+-test("独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config，同任务及下一轮 completed", { timeout: 60000 }, async context => {
++interface ScenarioContext { diagnostic: (message: string) => void }
++interface Scenario { name: "claude" | "codex" | "pi"; title: string; timeout: number; run: (context: ScenarioContext) => Promise<void> }
++
++async function runClaude(context: ScenarioContext): Promise<void> {
++  const [claudeSdk, { createClaudeRuntimeAdapter }] = await Promise.all([
++    import("@anthropic-ai/claude-agent-sdk"),
++    import("../../../src/provider/claude/session.ts"),
++  ]);
+   const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-claude-"));
+   const server = await gateway((body, response) => {
+     if (body.thinking !== undefined || body.output_config !== undefined) rejectField(response, body.output_config !== undefined ? "output_config.effort" : "thinking");
+@@ -101,7 +114,7 @@ test("独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config
+   });
+   const savedEnvironment = { PATH: process.env.PATH, HOME: root, TMPDIR: root, ANTHROPIC_API_KEY: FAKE_KEY };
+   const snapshot = JSON.stringify(savedEnvironment);
+-  const configurations: claudeSdk.Options[] = [];
++  const configurations: ClaudeSdk.Options[] = [];
+   const options = { runtime: "claude" as const, projectRoot: root, skillRoot: root, modelId: "claude-sonnet-4-6", baseUrl: server.baseUrl, reasoningEffort: "low" as const, tools: [], interactionGate: createInteractionGate(), currentTurnId: () => "independent-claude", turnLastResortMs: 45000 };
+   const session = await createClaudeRuntimeAdapter(options, {
+     env: savedEnvironment,
+@@ -140,9 +153,10 @@ test("独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config
+   assert.deepEqual(outcomes(observed.events), ["completed", "completed"]);
+   assert.equal(states(observed.events, "trying").length, 1);
+   assert.equal(states(observed.events, "compatible").length, 1);
+-});
++}
+ 
+-test("独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去参，同任务及下一轮完成", { timeout: 60000 }, async context => {
++async function runCodex(context: ScenarioContext): Promise<void> {
++  const { createCodexRuntimeAdapter } = await import("../../../src/provider/codex/session.ts");
+   const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-codex-"));
+   const server = await gateway((body, response) => {
+     if ((body.reasoning as { effort?: unknown })?.effort !== undefined) rejectField(response, "reasoning.effort");
+@@ -166,10 +180,13 @@ test("独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去
+   assert.deepEqual(outcomes(observed.events), ["completed", "completed"]);
+   assert.equal(states(observed.events, "trying").length, 1);
+   assert.equal(states(observed.events, "completed").length, 1);
+-});
++}
+ 
+-test("独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次", { timeout: 30000 }, async context => {
+-  const pi = await import("@earendil-works/pi-coding-agent");
++async function runPi(context: ScenarioContext): Promise<void> {
++  const [{ createRealPiRuntimeAdapter }, pi] = await Promise.all([
++    import("../../../src/common/pi-adapter/real-adapter.ts"),
++    import("@earendil-works/pi-coding-agent"),
++  ]);
+   const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-pi-"));
+   let toolCalls = 0;
+   let promptCalls = 0;
+@@ -211,4 +228,66 @@ test("独立真实 Pi：工具完成后下一请求兼容保留 tool_result，
+   assert.deepEqual(outcomes(observed.events), ["completed"]);
+   assert.equal(states(observed.events, "compatibility-attempt").length, 1);
+   assert.equal(states(observed.events, "compatibility-confirmed").length, 1);
+-});
++}
++
++const SCENARIOS: readonly Scenario[] = [
++  { name: "claude", title: "独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config，同任务及下一轮 completed", timeout: 60000, run: runClaude },
++  { name: "codex", title: "独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去参，同任务及下一轮完成", timeout: 60000, run: runCodex },
++  { name: "pi", title: "独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次", timeout: 30000, run: runPi },
++];
++const WORKER_ENV = "ANS_G5_LOOPBACK_WORKER";
++const SENTINEL_ENV = "ANS_G5_LOOPBACK_SENTINEL";
++// 仅限 Windows libuv 原生收尾断言（R6 工件：`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c`）。
++const nativeCrashSignature = /Assertion failed:.*(?:UV_HANDLE_CLOSING|src[\\/]win[\\/]async\.c)/;
++const maxIsolatedAttempts = 3;
++
++if (process.env[WORKER_ENV]) {
++  // 子进程模式：只注册被选中的真实子用例；全部断言完成后写完成哨兵，供父进程区分「收尾期原生崩溃」与「真实断言失败」。
++  const scenario = SCENARIOS.find(item => item.name === process.env[WORKER_ENV]);
++  if (!scenario) throw new Error(`unknown ${WORKER_ENV}: ${process.env[WORKER_ENV]}`);
++  test(scenario.title, { timeout: scenario.timeout }, async context => {
++    await scenario.run(context);
++    const sentinel = process.env[SENTINEL_ENV];
++    if (sentinel) await writeFile(sentinel, JSON.stringify({ completed: true, scenario: scenario.name }), "utf8");
++  });
++} else {
++  // 父进程模式：三个真实子用例串行隔离到独立子进程；判词见 runIsolated。
++  for (const scenario of SCENARIOS) test(scenario.title, { timeout: scenario.timeout + 120000 }, async () => { await runIsolated(scenario); });
++}
++
++async function exists(file: string): Promise<boolean> { return access(file).then(() => true, () => false); }
++function tailOf(text: string, limit = 4000): string { return text.length > limit ? text.slice(-limit) : text; }
++
++function runWorker(scenario: Scenario, sentinel: string): Promise<{ failed: boolean; stdout: string; stderr: string }> {
++  const env: NodeJS.ProcessEnv = { ...process.env, [WORKER_ENV]: scenario.name, [SENTINEL_ENV]: sentinel };
++  // 外层 runner 的 file-child 上下文标记不能泄漏进嵌套 runner（否则子进程会按 IPC 子模式运行）。
++  delete env.NODE_TEST_CONTEXT;
++  return new Promise(resolve => {
++    execFile(process.execPath, ["--test", "--test-reporter=tap", `--test-timeout=${scenario.timeout + 30000}`, fileURLToPath(import.meta.url)], {
++      env, timeout: scenario.timeout + 60000, windowsHide: true, maxBuffer: 16 * 1024 * 1024,
++    }, (error, stdout, stderr) => resolve({ failed: !!error, stdout: String(stdout), stderr: String(stderr) }));
++  });
++}
++
++async function runIsolated(scenario: Scenario): Promise<void> {
++  const controlRoot = await mkdtemp(path.join(os.tmpdir(), `ans-loopback-isolation-${scenario.name}-`));
++  try {
++    let lastOutput = "";
++    for (let attempt = 1; attempt <= maxIsolatedAttempts; attempt += 1) {
++      const sentinel = path.join(controlRoot, `attempt-${attempt}.json`);
++      const result = await runWorker(scenario, sentinel);
++      lastOutput = `${result.stdout}\n${result.stderr}`.trim();
++      if (!result.failed) {
++        assert.equal(await exists(sentinel), true, `isolated ${scenario.name} exited 0 without the completion sentinel`);
++        return;
++      }
++      const assertionsCompleted = await exists(sentinel);
++      const nativeCrash = nativeCrashSignature.test(lastOutput);
++      // 只有「全部断言完成后的进程级原生收尾崩溃」允许有界重试；断言失败/中途崩溃/超时立即失败，绝不重试。
++      if (!assertionsCompleted || !nativeCrash) {
++        assert.fail(`Isolated ${scenario.name} failed on attempt ${attempt}/${maxIsolatedAttempts} (assertionsCompleted=${assertionsCompleted}, nativeCrash=${nativeCrash}); non-native failures are never retried:\n${tailOf(lastOutput)}`);
++      }
++    }
++    assert.fail(`Isolated ${scenario.name} reproducibly hit the native teardown crash in ${maxIsolatedAttempts} bounded attempts; keeping the gate red:\n${tailOf(lastOutput)}`);
++  } finally { await removeTempDirEventually(controlRoot); }
++}
+diff --git a/test/编排/git-command.test.ts b/test/编排/git-command.test.ts
+index 104a651..941035c 100644
+--- a/test/编排/git-command.test.ts
++++ b/test/编排/git-command.test.ts
+@@ -46,36 +46,105 @@ test("Git final spawn fence: real pending-record interruption records no launch
+   const root = await fixture(), objects = createGitCandidateStore(root), dir = path.join(root, ".git/ans/processes"); await fs.mkdir(dir, { recursive: true });
+   const lease = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(lease.ok); if (!lease.ok) return;
+   let observed = false;
+-  const watcher = watch(dir, () => { observed = true; watcher.close(); recordGitHostInterruption({ projectRoot: root, reason: "actual-pending-record-interruption" }); });
++  let signalPreparationObserved!: () => void;
++  const preparationObserved = new Promise<void>(resolve => { signalPreparationObserved = resolve; });
++  const watcher = watch(dir, () => { observed = true; watcher.close(); recordGitHostInterruption({ projectRoot: root, reason: "actual-pending-record-interruption" }); signalPreparationObserved(); });
+   const input = { operationId: "actual-before-spawn-cancel", base: null, timestamp: "2026-11-05T00:00:00.000Z", message: "Real pending write", files: [{ path: "src/impl/result.txt", bytesBase64: Buffer.from("real result\n").toString("base64") }] };
+-  try { await assert.rejects(objects.prepare(input, undefined, lease.leaseId), /git-command-failed:null:unknown/); }
++  let rejection: unknown;
++  try { await objects.prepare(input, undefined, lease.leaseId); }
++  catch (error) { rejection = error; }
+   finally { watcher.close(); endGitHostAction({ projectRoot: root, leaseId: lease.leaseId }); }
++  // fs.watch 投递可能延迟（macOS FSEvents）：retry 前有界等待这次中断观察落地。延迟到达的中断落在
++  // 新 lease 上属于真实撤销语义（合法 fail-closed），不是本用例要制造/排除的 flake。
++  const settleObservation = (promise: Promise<void>) => Promise.race([promise, new Promise<void>(resolve => setTimeout(resolve, 500))]);
++  await settleObservation(preparationObserved);
++  assert.ok(rejection !== undefined, "A recorded pending-record interruption must reject the preparation; it must never silently succeed");
+   assert.equal(observed, true, "The real process-fence filesystem write, not a fixture callback, interrupts the held lease");
+-  const files = await fs.readdir(dir); assert.equal(files.length, 1);
+-  const processFact = JSON.parse(await fs.readFile(path.join(dir, files[0]!), "utf8"));
+-  assert.equal(processFact.launch, "cancelled-before-spawn"); assert.equal(processFact.pid, undefined); assert.equal(processFact.exitCode, null);
+-  assert.equal(processFact.termination, "unknown", "No fake successful OS exit is invented for an unlaunched command");
+-  assert.equal(await objects.readRef(`refs/ans/candidates/${createHash("sha256").update(input.operationId).digest("hex")}`), null);
++  const message = rejection instanceof Error ? rejection.message : String(rejection);
++  const readProcessFacts = async () => Promise.all((await fs.readdir(dir)).map(file => fs.readFile(path.join(dir, file), "utf8").then(JSON.parse)));
++  const mutatingVerb = (fact: { argv?: unknown }) => Array.isArray(fact.argv)
++    ? fact.argv.find(arg => ["init", "hash-object", "mktree", "commit-tree", "update-ref"].includes(String(arg))) as string | undefined : undefined;
++  const processFacts = await readProcessFacts();
++  const candidateRef = `refs/ans/candidates/${createHash("sha256").update(input.operationId).digest("hex")}`;
++  // 共享安全不变量（两路都必须成立）：被中断的 prepare 不得发布 candidate ref；
++  // 进程证据只允许出现对象写入（hash-object/mktree/commit-tree），真正变更 ref 的 update-ref 从未启动。
++  assert.equal(await objects.readRef(candidateRef), null, "The interrupted preparation must not publish a candidate ref (no commit becomes ref-visible)");
++  assert.equal(processFacts.some(fact => mutatingVerb(fact) === "update-ref"), false, "The final ref mutation must not launch while the interrupted lease is held");
++  assert.ok(processFacts.every(fact => ["hash-object", "mktree", "commit-tree"].includes(String(mutatingVerb(fact)))),
++    "Only object plumbing may be attempted before the fence; no other mutation family may launch");
++  // 显式两路分类（平台时序相关）：fs.watch 投递可能晚于产品「check 与 spawn 之间无 await」的最终栅栏
++  // （macOS FSEvents；见 misc2 延迟探针 0ms/100ms）。两路都在 ref 发布前 fail-closed，但延迟路会先跑完
++  // 内部 Git plumbing 命令，因此不能断言「records no launch」；改为钉住下列可证明的安全不变量。
++  const cancelled = processFacts.filter(fact => fact.launch === "cancelled-before-spawn");
++  const launched = processFacts.filter(fact => fact.launch === "started");
++  assert.equal(cancelled.length + launched.length, processFacts.length,
++    "Every persisted record must be an explicit pre-spawn cancellation or a started process; pending/unknown evidence would keep the fence held");
++  assert.ok(cancelled.every(fact => fact.pid === undefined && fact.exitCode === null && fact.termination === "unknown"),
++    "No fake successful OS exit is invented for an unlaunched command");
++  assert.ok(launched.every(fact => fact.pid !== undefined && fact.termination === "exited" && fact.exitCode === 0),
++    "Every launched internal command must be a settled success; an unknown termination would be an unresolved owned process");
++  if (launched.length === 0) {
++    // 路 A（watch 投递在首个 spawn 边界前）：恰好一条显式 cancelled-before-spawn，prepare 以 pre-spawn 取消拒绝。
++    assert.equal(cancelled.length, 1, "The never-launched path must record exactly one explicit pre-spawn cancellation");
++    assert.match(message, /^git-command-failed:null:unknown:/);
++  } else {
++    // 路 B（延迟投递，macOS FSEvents）：至少一条内部 plumbing 已启动并退出；记录被观察到后，
++    // 下一次 mutation 在自身启动前被拒绝（或在其取证窗口内被最终栅栏取消）。
++    assert.match(message, /^(git-host-lease-invalid-before-command|git-command-failed:null:unknown:)/,
++      "The delayed-observation path must still reject through a fail-closed fence");
++  }
++  // 真实重试（新 lease）必须成功，且 candidate ref 只能由一条 launched/exited-0 的 update-ref 进程证据背书。
+   const retryLease = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(retryLease.ok); if (!retryLease.ok) return;
+   try { const result = await objects.prepare(input, undefined, retryLease.leaseId); assert.ok(result.candidate); }
+   finally { endGitHostAction({ projectRoot: root, leaseId: retryLease.leaseId }); }
+-  const retried = await Promise.all((await fs.readdir(dir)).map(file => fs.readFile(path.join(dir, file), "utf8").then(JSON.parse)));
+-  assert.ok(retried.some(fact => fact.launch === "started" && fact.termination === "exited" && fact.exitCode === 0 && fact.pid));
+-  const ref = `refs/ans/candidates/${createHash("sha256").update(input.operationId).digest("hex")}`, actualOid = await objects.readRef(ref); assert.ok(actualOid);
++  const retried = await readProcessFacts();
++  assert.ok(retried.some(fact => mutatingVerb(fact) === "update-ref" && fact.launch === "started" && fact.termination === "exited" && fact.exitCode === 0 && fact.pid),
++    "The retried publication must be backed by a started, exited-0 owned update-ref process");
++  const ref = candidateRef, actualOid = await objects.readRef(ref); assert.ok(actualOid);
+   const actual = await objects.readCommit(actualOid), identity = await objects.inspect();
+   const binding = { operationId: "cancel-before-publication-spawn", repoId: identity.repoId, ref: "refs/ans/delivery/demo", oldOid: null,
+     newOid: actual.candidate, tree: actual.tree, parents: actual.parents, requestDigest: createHash("sha256").update("actual-publication").digest("hex") };
+   const publicationLease = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(publicationLease.ok); if (!publicationLease.ok) return;
+-  const publicationWatcher = watch(dir, () => { publicationWatcher.close(); recordGitHostInterruption({ projectRoot: root, reason: "actual-publication-pending-interruption" }); });
+-  try {
+-    const publication = await createGitRefStore(root, { hostLeaseId: publicationLease.leaseId }).publish(binding);
+-    assert.equal(publication.status, "blocked"); assert.equal(publication.journal.process?.launch, "cancelled-before-spawn");
+-    assert.equal(await objects.readRef(binding.ref), null);
+-  } finally { publicationWatcher.close(); endGitHostAction({ projectRoot: root, leaseId: publicationLease.leaseId }); }
++  let signalPublicationObserved!: () => void;
++  const publicationObserved = new Promise<void>(resolve => { signalPublicationObserved = resolve; });
++  const publicationWatcher = watch(dir, () => { publicationWatcher.close(); recordGitHostInterruption({ projectRoot: root, reason: "actual-publication-pending-interruption" }); signalPublicationObserved(); });
++  let publication: { status: string; journal: { process?: { launch?: string; termination?: string; exitCode?: number | null } } } | undefined;
++  let publicationRejection: unknown;
++  try { publication = await createGitRefStore(root, { hostLeaseId: publicationLease.leaseId }).publish(binding); }
++  catch (error) { publicationRejection = error; }
++  finally { publicationWatcher.close(); endGitHostAction({ projectRoot: root, leaseId: publicationLease.leaseId }); }
++  await settleObservation(publicationObserved);
++  // 发布阶段同一平台分类（三种合法 fail-closed 结果）：
++  //  - 中断在 spawn 边界前被观察到 ⇒ blocked + 显式 cancelled-before-spawn + ref 不变；
++  //  - 中断在 publish 早期检查与 update-ref 的 spawn 边界之间被观察到 ⇒ 下一次 mutation 启动前拒绝（抛错，ref 不变）；
++  //  - 中断在 update-ref 已启动后才被观察到 ⇒ 只允许 published，且必须由 started/exited-0 的 own 进程与 ref 新值共同背书。
++  // 任何结果都不允许「ref 变了却没有已启动且成功退出的进程证据」。
++  if (publicationRejection !== undefined) {
++    const refusal = publicationRejection instanceof Error ? publicationRejection.message : String(publicationRejection);
++    assert.match(refusal, /^git-host-lease-invalid-before-command$/, `Unexpected publication rejection: ${refusal}`);
++    assert.equal(await objects.readRef(binding.ref), null, "A refused publication must leave the ref unchanged");
++    assert.equal((await readProcessFacts()).some(fact => mutatingVerb(fact) === "update-ref" && fact.operationId === binding.operationId), false,
++      "update-ref must not launch for a refused publication");
++  } else {
++    assert.ok(publication, "publish must return on the non-throwing path");
++    if (publication.status === "blocked") {
++      assert.equal(publication.journal.process?.launch, "cancelled-before-spawn");
++      assert.equal(await objects.readRef(binding.ref), null);
++    } else {
++      assert.equal(publication.status, "published", `Unexpected publication status: ${JSON.stringify(publication.status)}`);
++      assert.equal(publication.journal.process?.launch, "started");
++      assert.equal(publication.journal.process?.termination, "exited");
++      assert.equal(publication.journal.process?.exitCode, 0);
++      assert.equal((await objects.readRef(binding.ref))?.hex, binding.newOid.hex);
++    }
++  }
+   const publicationRetry = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(publicationRetry.ok); if (!publicationRetry.ok) return;
+   try { assert.equal((await createGitRefStore(root, { hostLeaseId: publicationRetry.leaseId }).publish(binding)).status, "published"); }
+   finally { endGitHostAction({ projectRoot: root, leaseId: publicationRetry.leaseId }); }
+-  await fs.writeFile(path.join(dir, "00000000-0000-4000-8000-000000000099.json"), JSON.stringify({ ...processFact, pid: 99999999 }));
++  assert.equal((await objects.readRef(binding.ref))?.hex, binding.newOid.hex, "The genuine retry must publish the exact binding");
++  // 一条「可能已启动但未结算」的 own 进程记录（真实路径的取消记录不得被复用来清栅栏）。
++  const processFact = retried[0]!;
++  await fs.writeFile(path.join(dir, "00000000-0000-4000-8000-000000000099.json"), JSON.stringify({ ...processFact, launch: "started", termination: "unknown", pid: 99999999, exitCode: null }));
+   await assert.rejects(objects.prepare({ ...input, operationId: "cannot-clear-possibly-started" }), /git-owned-process-unresolved/, "A missing/dead PID claim cannot reuse the real never-started cancellation path");
+ });
+ test("Git init Provider: final real root/file hashes fence initialization and persist original operation process identity", async () => {

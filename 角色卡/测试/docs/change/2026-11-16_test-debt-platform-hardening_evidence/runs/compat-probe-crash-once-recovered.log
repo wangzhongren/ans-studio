@@ -1,0 +1,11 @@
+✔ 独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次 (1685.6657ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1776.823
+EXIT=0
+MARKER=crashed
