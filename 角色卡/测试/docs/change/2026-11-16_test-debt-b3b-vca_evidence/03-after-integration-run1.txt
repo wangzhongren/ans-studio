@@ -1,0 +1,20 @@
+✔ VCA：product version-upgrade 经真实直接提交（role-direct）→ 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖 (244.1004ms)
+✔ VCA：detail-amendment 整单直接提交（role-direct）→ 修正案与 applied 目标冻结 + trunk t2；逐项客户卡通道关闭 (222.3548ms)
+✔ VCA：历史客户拒绝/批准入口只读（vca-conflict）⇒ 不冻结/不 re-pin；显式 supersede 才可重提 (245.6189ms)
+✔ VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码） (566.5975ms)
+✔ VCA：直接提交 expectedFrom 重验（声明旧基线 hash 不符 ⇒ vca-target-invalid，不冻结/不 re-pin） (228.8044ms)
+✔ VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 直接提交 fail-closed（不冻结/不 re-pin/trunk 不变） (272.0809ms)
+✔ VCA AC-5：直接提交 apply 前重验（链损坏 ⇒ vca-apply-failed，不 re-pin；修复后新 operation 重试成功） (249.9464ms)
+✔ bootstrap：首次 handoff pin 写 handoff-pin-bootstrap 冻结（pin 只 pin 冻结文档） (66.9136ms)
+✔ bootstrap：无 trunk ⇒ 显式 baseTrunk:null + 真实 intent-confirmed 直接建立 trunk v1；缺证据 fail-closed (214.2197ms)
+✔ 冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准 (52.2777ms)
+✔ 重构：convener 发起/应用调度层管理/机械写集/无客户决定/不产生 trunk 版本；越界提示转 VCA (30.0239ms)
+✔ 客户主权与旧入口：VCA 卡不被 @决策/判断器代选；低层 run-change 保留；F15 roleCards；F17 无 refactor:request (48.9424ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2782.2691

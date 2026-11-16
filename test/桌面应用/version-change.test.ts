@@ -1140,16 +1140,24 @@ test("Batch 3.5 三能力注入：仅对应角色注入；身份强制为会话�
   }
 });
 
-test("Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）", async () => {
+test("Batch 3.5 能力实现：VCA submitDirect（applied）/ refactor（requested）/ stable write request（requested+许可）", async () => {
   await withProject(async (project, root) => {
     await bootstrapTrunk(project);
     const v2 = "docs/proposals/demo-proposal-v2.md";
     const events: TaskStateEvent[] = [];
+    let cards = 0;
     const stack = createVersionChangeStack({
       projectRoot: root,
       now: () => new Date(AT),
       emitEvent: async (event) => {
         events.push(event);
+      },
+      // direct 提交的真实会话角色 + 固定 key 通知 sink（缺 sink ⇒ committed-pending-recovery）。
+      notifyDirect: async () => {},
+      // 旧客户批准卡通道已关闭：任何呈现都是回归。
+      presentVersionChangeCard: async () => {
+        cards += 1;
+        throw new Error("retired customer approval card must not be presented");
       },
       presentStableWriteCard: async () => ({
         outcome: "answered",
@@ -1161,18 +1169,22 @@ test("Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested�
       // 先完成迁移/冻结快照，再写新版本草稿（否则 F29 迁移会把既有文件一律冻结）。
       await stack.ensureInitialized();
       await writeProjectFile(root, v2, "---\nschema: project-proposal/v2\nflowId: demo\nversion: 2\n---\n# v2\n");
+      const current = (await project.service.current())!;
       const vca = await stack.submitVersionChange({
         kind: "version-upgrade",
         initiatorRoleId: "product",
         flowId: FLOW_ID,
-        targets: [{ kind: "contract", path: v2, action: "add" }],
+        operationId: "op-cap-1",
+        baseTrunk: { version: current.trunkVersion, digest: current.digest },
+        targets: [{ kind: "contract", path: v2, action: "add", expectedFromSha256: project.hashes[PATHS.proposal] }],
         summary: "v2 契约",
       });
       assert.equal(vca.ok, true, vca.ok ? "" : `${vca.errorCode}: ${vca.message ?? ""}`);
       assert.match(vca.applicationId ?? "", /^vc-\d+$/);
-      assert.equal(vca.status, "submitted");
+      assert.equal(vca.status, "applied", "direct 提交即 applied（无 submitted 阶段）");
+      assert.equal(cards, 0, "旧客户批准卡不得被呈现");
       const list = await stack.listVersionChanges();
-      assert.equal(list.some((candidate) => candidate.applicationId === vca.applicationId), true);
+      assert.equal(list.find((candidate) => candidate.applicationId === vca.applicationId)?.status, "applied");
       const refactor = await stack.submitRefactor({
         roleId: "convener",
         flowId: FLOW_ID,
@@ -1192,7 +1204,15 @@ test("Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested�
       assert.match(stable.requestId ?? "", /^sw-\d+$/);
       assert.equal(stable.status, "requested");
       assert.ok(stack.stablePermitOf("docs/workflow.md") !== undefined, "客户确认后许可已签发（能力本身未签发）");
-      assert.ok(events.some((event) => event.kind === "version.change" && (event as { status?: string }).status === "submitted"));
+      // direct 路径按 source-bound 账本直写（不经桌面 emitEvent 回调）；从真实账本读取核验。
+      const state = await readTaskState(root);
+      assert.deepEqual(state.errors, []);
+      const versionEvent = state.events.find((event) => event.kind === "version.change") as
+        | (TaskStateEvent & { status?: string; origin?: string; operationId?: string })
+        | undefined;
+      assert.equal(versionEvent?.status, "applied");
+      assert.equal(versionEvent?.origin, "role-direct");
+      assert.equal(versionEvent?.operationId, "op-cap-1");
       assert.ok(events.some((event) => event.kind === "refactor.request"));
       assert.ok(events.some((event) => event.kind === "stable.write.approved"));
     } finally {
@@ -1201,9 +1221,31 @@ test("Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested�
   });
 });
 
-test("VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）", async () => {
-  await withProject(async (project, root) => {
-    // 不 bootstrap：项目只有唯一 pinned run + 迁移冻结文档（与存量项目一致）。
+test("VCA bootstrap：无已落盘 trunk ⇒ 显式 baseTrunk:null + 真实 intent-confirmed 才建立 t1；缺显式 base 一律拒绝", async () => {
+  // 真实直接提交要求显式 base（null 表示 bootstrap）；不允许应用/角色把缺失 base 擅自推导成 bootstrap。
+  const project = await createTrunkProject({ freezeKeys: [] });
+  try {
+    const root = project.root;
+    // 唯一合法的首建证据：真实 intent-confirmed 冻结记录（客户确认来源 + decisionId）。
+    assert.deepEqual(
+      await project.registry.appendDocFreezeRecords([
+        {
+          path: PATHS.intent,
+          version: 1,
+          sha256: project.hashes[PATHS.intent]!,
+          freeze: {
+            schema: "doc-freeze/v1",
+            applicationId: "intent-dec-intent",
+            reason: "intent-confirmed",
+            origin: "customer",
+            decidedBy: "customer",
+            decisionId: "dec-intent",
+            frozenAt: AT,
+          },
+        },
+      ]),
+      { ok: true },
+    );
     const events: TaskStateEvent[] = [];
     const stack = createVersionChangeStack({
       projectRoot: root,
@@ -1211,34 +1253,62 @@ test("VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bo
       emitEvent: async (event) => {
         events.push(event);
       },
+      notifyDirect: async () => {},
     });
     try {
       await stack.ensureInitialized();
       const v2 = "docs/proposals/demo-proposal-v2.md";
-      await writeProjectFile(root, v2, "---\nschema: project-proposal/v2\nflowId: demo\nversion: 2\n---\n# v2\n");
+      await writeProjectFile(root, v2, "---\nschema: project-proposal/v2\nintent: docs/product/demo-intent-v1.md\n---\n# v2\n");
+      // 缺显式 base（undefined）⇒ vca-role-not-allowed；不自动按 bootstrap 提交（不得自报伪装）。
+      const missingBase = await stack.submitVersionChange({
+        kind: "version-upgrade",
+        initiatorRoleId: "product",
+        flowId: FLOW_ID,
+        operationId: "op-boot-missing-base",
+        targets: [{ kind: "contract", path: v2, action: "add", expectedFromSha256: null }],
+        summary: "缺显式 base",
+      });
+      assert.equal(missingBase.ok, false);
+      assert.equal(missingBase.errorCode, "vca-role-not-allowed");
+      assert.equal(await project.service.current(), null, "缺 base 不建立 trunk");
+      // 显式 baseTrunk:null + 真实 intent-confirmed ⇒ 直接建立 t1。
       const vca = await stack.submitVersionChange({
         kind: "version-upgrade",
         initiatorRoleId: "product",
         flowId: FLOW_ID,
-        targets: [{ kind: "contract", path: v2, action: "add" }],
+        operationId: "op-boot-1",
+        baseTrunk: null,
+        targets: [{ kind: "contract", path: v2, action: "add", expectedFromSha256: null }],
         summary: "存量项目基线绑定",
       });
       assert.equal(vca.ok, true, vca.ok ? "" : `${vca.errorCode}: ${vca.message ?? ""}`);
+      assert.equal(vca.status, "applied");
       const list = await stack.listVersionChanges();
       const record = list.find((candidate) => candidate.applicationId === vca.applicationId);
       assert.ok(record !== undefined);
-      assert.equal(record?.bootstrap, true, "无 trunk ⇒ 应用自动按 bootstrap 提交");
+      assert.equal(record?.bootstrap, true, "显式 null base ⇒ bootstrap 记录");
       assert.equal(record?.baseTrunk, null);
-      assert.equal(record?.status, "submitted");
-      assert.equal(await project.service.current(), null, "提交不建立 trunk；批准时才落 t1");
-      assert.ok(events.some((event) => event.kind === "version.change" && (event as { status?: string }).status === "submitted"));
+      assert.equal(record?.status, "applied");
+      const current = await project.service.current();
+      assert.equal(current?.trunkVersion, 1, "direct bootstrap 提交即建立 t1");
+      // direct 路径按 source-bound 账本直写；从真实账本读取核验。
+      const state = await readTaskState(root);
+      assert.deepEqual(state.errors, []);
+      const versionEvent = state.events.find((event) => event.kind === "version.change") as
+        | (TaskStateEvent & { status?: string; bootstrap?: boolean; origin?: string })
+        | undefined;
+      assert.equal(versionEvent?.status, "applied");
+      assert.equal(versionEvent?.bootstrap, true);
+      assert.equal(versionEvent?.origin, "role-direct");
     } finally {
       stack.dispose();
     }
-  });
+  } finally {
+    await fs.rm(project.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
 });
 
-test("VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）", async () => {
+test("VCA 直接提交不复活客户批准卡：presenter 零调用；成功即 applied（无第二张卡）", async () => {
   await withProject(async (project, root) => {
     await bootstrapTrunk(project);
     const presented: string[] = [];
@@ -1246,6 +1316,7 @@ test("VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞�
       projectRoot: root,
       now: () => new Date(AT),
       emitEvent: async () => {},
+      notifyDirect: async () => {},
       presentVersionChangeCard: async (record) => {
         presented.push(record.applicationId);
         return { outcome: "declined" };
@@ -1255,22 +1326,23 @@ test("VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞�
       await stack.ensureInitialized();
       const v2 = "docs/proposals/demo-proposal-v2.md";
       await writeProjectFile(root, v2, "---\nschema: project-proposal/v2\nflowId: demo\nversion: 2\n---\n# v2\n");
+      const current = (await project.service.current())!;
       const vca = await stack.submitVersionChange({
         kind: "version-upgrade",
         initiatorRoleId: "product",
         flowId: FLOW_ID,
-        targets: [{ kind: "contract", path: v2, action: "add" }],
-        summary: "自动呈现",
+        operationId: "op-direct-1",
+        baseTrunk: { version: current.trunkVersion, digest: current.digest },
+        targets: [{ kind: "contract", path: v2, action: "add", expectedFromSha256: project.hashes[PATHS.proposal] }],
+        summary: "直接提交",
       });
       assert.equal(vca.ok, true, vca.ok ? "" : `${vca.errorCode}: ${vca.message ?? ""}`);
-      // 自动呈现是提交后的异步动作：等到 presenter 收到该申请。
-      for (let i = 0; i < 50 && presented.length === 0; i += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-      assert.deepEqual(presented, [vca.applicationId]);
-      // 客户卡无应答（declined）⇒ 保持 submitted，不伪造批准。
+      assert.equal(vca.status, "applied");
+      // 提交后没有任何异步客户批准卡（旧通道已关闭）；presenter 零调用。
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      assert.deepEqual(presented, [], "direct 提交不再自动呈现客户批准卡");
       const list = await stack.listVersionChanges();
-      assert.equal(list.find((record) => record.applicationId === vca.applicationId)?.status, "submitted");
+      assert.equal(list.find((record) => record.applicationId === vca.applicationId)?.status, "applied");
     } finally {
       stack.dispose();
     }
@@ -2021,8 +2093,29 @@ function eventFeedHarness(): {
   return { feedOf, handleFor, sent };
 }
 
-/** 登记星形任务 T-plan-1（flowId=demo，创建者 convener）供 handleHandback 的 starTask/flow 判据使用。 */
-async function seedPlanTask(root: string, mgr: SessionManager): Promise<void> {
+/**
+ * 登记真实星形任务链（flowId=demo）：chief→convener 的父分配 + convener→product 的子任务
+ * `T-plan-1`（带 parentTaskRef/runId）。handleHandback 的 starTask/flow 判据与回交投递
+ * （`resolveDeliveryAssignment` 的 child-report 校验）都要求这组真实账本/run 事实。
+ */
+async function seedPlanTask(root: string, mgr: SessionManager, runId = "run-test-1"): Promise<void> {
+  const parent = taskEvent(
+    "task.created",
+    {
+      taskId: "T-parent-1",
+      from: "chief",
+      to: "convener",
+      text: "派发规划任务",
+      sideEffect: "read-only",
+      idempotencyKey: "idem-plan-parent-1",
+      flowId: "demo",
+      runId,
+      runState: "pinned",
+    },
+    () => new Date(AT),
+  );
+  const parentAppended = await appendTaskEvent(root, parent);
+  assert.equal(parentAppended.ok, true, parentAppended.ok ? "" : parentAppended.message);
   const created = await appendTaskEvent(
     root,
     taskEvent(
@@ -2035,8 +2128,13 @@ async function seedPlanTask(root: string, mgr: SessionManager): Promise<void> {
         sideEffect: "read-only",
         idempotencyKey: "idem-plan-1",
         flowId: "demo",
-        runId: "run-test-1",
+        runId,
         runState: "pinned",
+        parentTaskRef: {
+          kind: "assigned-task" as const,
+          taskId: "T-parent-1",
+          ledgerSha256: createHash("sha256").update(JSON.stringify(parent)).digest("hex"),
+        },
       },
       () => new Date(AT),
     ),
@@ -2163,9 +2261,10 @@ test("SessionManager blocked 提示：首次 blocked 即提示运营自行选择
     assert.equal(promptNotes().every((envelope) => envelope.event.detail?.source === "delivery-note"), true);
     const state = await readTaskState(root);
     assert.equal(
-      state.events.some((event) => event.kind === "task.created" && (event as { taskId?: string }).taskId !== "T-plan-1"),
+      state.events.some((event) => event.kind === "task.created" && (event as { taskId?: string }).taskId !== "T-plan-1"
+        && (event as { taskId?: string }).taskId !== "T-parent-1"),
       false,
-      "提示不派发新任务",
+      "提示不派发新任务（T-plan-1/T-parent-1 为测试种子任务）",
     );
     const docsAfter = await fs.stat(path.join(root, "docs")).then(() => true, () => false);
     assert.equal(docsAfter, docsBefore, "提示不写文档");
@@ -2177,53 +2276,54 @@ test("SessionManager blocked 提示：首次 blocked 即提示运营自行选择
 });
 
 test("SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-plan-blocked-nochannel-"));
-  const harness = eventFeedHarness();
-  const envelopes: CapturedEnvelope[] = [];
-  const diagnosticsDir = path.join(root, "diagnostics");
-  configureDiagnostics({ directory: diagnosticsDir });
-  const mgr = await makeManager(root, undefined as unknown as DesktopCustomerInputFn, {
-    openRoleSession: async (input) => harness.handleFor(input.roleId),
-    emitEvent: (envelope) => {
-      envelopes.push(envelope as unknown as CapturedEnvelope);
-    },
+  // 真实项目根：带 pinned run，供回交投递的 child-report 分配校验使用。
+  await withProject(async (project, root) => {
+    const harness = eventFeedHarness();
+    const envelopes: CapturedEnvelope[] = [];
+    const diagnosticsDir = path.join(root, "diagnostics");
+    configureDiagnostics({ directory: diagnosticsDir });
+    const mgr = await makeManager(root, undefined as unknown as DesktopCustomerInputFn, {
+      openRoleSession: async (input) => harness.handleFor(input.roleId),
+      emitEvent: (envelope) => {
+        envelopes.push(envelope as unknown as CapturedEnvelope);
+      },
+    });
+    try {
+      assert.equal((await mgr.open({ projectRoot: root, roleId: "product", runtime: "demo" })).ok, true);
+      await seedPlanTask(root, mgr, project.runId);
+      harness.feedOf("product").push(planBlockedHandback("turn-1", "blocked", "缺隔离环境，无法继续"));
+      await waitPlanReported(root, "turn-1");
+      // 报告路由照常：星形回交仍投递给 convener（任务创建者；真实 parentTaskRef/run 事实齐备）。
+      for (let attempt = 0; attempt < 300 && (harness.sent["convener"]?.length ?? 0) === 0; attempt += 1) await tick(10);
+      const handbackText = harness.sent["convener"]?.[0] ?? "";
+      assert.match(handbackText, /\[工作结果\]/);
+      assert.match(handbackText, /缺隔离环境/);
+      // 不提示 convener（无客户卡通道时不冒充可用能力）。
+      await tick(60);
+      assert.equal(
+        envelopes.filter(
+          (envelope) =>
+            envelope.event.kind === "message" &&
+            typeof envelope.event.summary === "string" &&
+            envelope.event.summary.includes("report_plan_escalation"),
+        ).length,
+        0,
+        "无客户卡通道不提示",
+      );
+      // 只记诊断（共享 logger；白名单字段 requestId/reasonCode 承载 flow 与原因）。
+      await flushDiagnostics();
+      const diagFiles = await fs.readdir(diagnosticsDir);
+      const diagText = (
+        await Promise.all(diagFiles.map((file) => fs.readFile(path.join(diagnosticsDir, file), "utf8")))
+      ).join("\n");
+      assert.match(diagText, /plan-escalation\.prompt\.skipped/);
+      assert.match(diagText, /customer-card-channel-unavailable/);
+      assert.match(diagText, /plan-escalation-demo/);
+    } finally {
+      await mgr.stop(null);
+      await disposeDiagnostics();
+    }
   });
-  try {
-    assert.equal((await mgr.open({ projectRoot: root, roleId: "product", runtime: "demo" })).ok, true);
-    await seedPlanTask(root, mgr);
-    harness.feedOf("product").push(planBlockedHandback("turn-1", "blocked", "缺隔离环境，无法继续"));
-    await waitPlanReported(root, "turn-1");
-    // 报告路由照常：星形回交仍投递给 convener（任务创建者）。
-    for (let attempt = 0; attempt < 300 && (harness.sent["convener"]?.length ?? 0) === 0; attempt += 1) await tick(10);
-    const handbackText = harness.sent["convener"]?.[0] ?? "";
-    assert.match(handbackText, /\[工作结果\]/);
-    assert.match(handbackText, /缺隔离环境/);
-    // 不提示 convener（无客户卡通道时不冒充可用能力）。
-    await tick(60);
-    assert.equal(
-      envelopes.filter(
-        (envelope) =>
-          envelope.event.kind === "message" &&
-          typeof envelope.event.summary === "string" &&
-          envelope.event.summary.includes("report_plan_escalation"),
-      ).length,
-      0,
-      "无客户卡通道不提示",
-    );
-    // 只记诊断（共享 logger；白名单字段 requestId/reasonCode 承载 flow 与原因）。
-    await flushDiagnostics();
-    const diagFiles = await fs.readdir(diagnosticsDir);
-    const diagText = (
-      await Promise.all(diagFiles.map((file) => fs.readFile(path.join(diagnosticsDir, file), "utf8")))
-    ).join("\n");
-    assert.match(diagText, /plan-escalation\.prompt\.skipped/);
-    assert.match(diagText, /customer-card-channel-unavailable/);
-    assert.match(diagText, /plan-escalation-demo/);
-  } finally {
-    await mgr.stop(null);
-    await disposeDiagnostics();
-    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
-  }
 });
 
 
