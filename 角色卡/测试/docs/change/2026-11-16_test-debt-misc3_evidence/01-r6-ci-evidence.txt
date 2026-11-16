@@ -1,0 +1,69 @@
+R6 CI 工件摘录（run 43848313583，2026-11-16，Node 24.14.0）
+命令：node --test --test-concurrency=1 --test-timeout=300000 --test-force-exit "test/**/*.test.ts"
+原始工件：/tmp/r9-art/test-logs-{mac-x64,win-x64}/test-ci-output.log（原始工件不入库）
+说明：以下为 grep/sed 摘录；行号为工件内行号。
+
+== A. b31 路径 B（macOS x64 工件，x64-only）==
+
+test-logs-mac-x64 L7372: test at test/桌面应用/b31-fixed-release-auto-desktop.test.ts:769:1
+test-logs-mac-x64 L7373: ✖ 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档） (1471.218496ms)
+L7375-7380:
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + undefined
+  - 'delivered'
+
+      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b31-fixed-release-auto-desktop.test.ts:819:12)
+
+判定：x64-only 单次；Windows 同轮绿（16-platform-diff.tsv 平台=x64；17-windows-coverage 无此名）。
+断言对应 src/common/编排/workflow-state.ts:309 `workflow.closed` → view.closed.outcome。
+产品顺序（src/common/编排/workflow-service.ts executeReleaseMerge）：
+  1) appendReleaseEvent("release.merged")
+  2) await completeReleaseWorkflow() → 读账本 → appendWorkflowEvent("stage.completed B4")
+     → appendWorkflowEvent("workflow.closed delivered")
+测试只等 (1)，随后立即读 workflow 账本 → 慢 runner 上 (2) 尚未落盘即出现 undefined≠delivered。
+定性：测试侧单事件屏障假设（时序），非产品缺陷；x64 runner 慢触发。
+
+== B. multi-runtime actual Core request_choice abort（Windows 工件，Windows-only）==
+
+test-logs-win-x64 L7321: ✖ actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt (138.8177ms)
+test at test\桌面应用\multi-runtime.test.ts:1079:1
+L7323-7334:
+  Error: ENOTEMPTY, Directory not empty: \\?\C:\Users\RUNNER~1\AppData\Local\Temp\ans-d1-ect9pu '\\?\C:\Users\RUNNER~1\AppData\Local\Temp\ans-d1-ect9pu'
+      at Object.rmSync (node:fs:1221:18)
+      at Object.cleanup (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:58:71)
+      at TestContext.<anonymous> (file:///D:/a/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:1093:81)
+    errno: 41, code: 'ENOTEMPTY', syscall: 'rm'
+    path: '\\\\?\\C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-d1-ect9pu'
+
+判定：测试体本身通过；失败在 finally 的临时目录清理（fixture().cleanup，`ans-d1-` 前缀）。
+Windows 上防病毒/索引器可在 rm 遍历后短暂持有目录项 ⇒ 空目录再变非空；与 B0/B7 同类清理缺口。
+定性：Windows 清理竞态（flare），非产品/断言失败。
+
+== C. compatibility-loopback（Windows 工件，file-level，Windows-only）==
+
+test-logs-win-x64 L3451（内嵌子运行）与 L7372（最终 section）：
+  Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76
+  ✖ test\测试\g5-reasoning-verify\compatibility-loopback.test.ts (3628.4306ms)
+test at test\测试\g5-reasoning-verify\compatibility-loopback.test.ts:1:1
+崩溃前三子用例均绿：
+  ✔ 独立真实 Claude … (1405.32ms)
+  ✔ 独立真实 Codex … (1051.2132ms)
+  ✔ 独立真实 Pi … (646.8608ms)
+
+判定：Node/libuv Windows 原生断言（uv_async_send 落在正在关闭的 async handle 上），
+发生在全部子用例通过后的进程退出/清理期；不是用例断言、不是产品错误。
+R6 为首次启用 `--test-force-exit`（cife #121，9a97ac1）的一轮；R5 同文件无此事件。
+定性：Node/Windows native-infra crash + 平台候选；force-exit × 原生收尾时序为加重因素假设。
+
+== D. W-J5/J15（macOS x64 超时，x64-only）==
+
+14-timeouts-and-stall.json: macos_x64 maxDurationMs=180003.746956，count=2；Windows 0 条；arm64 无工件。
+工件：✖ W-J5/J15… (180003.746956ms)，失败体 `test timed out after 180000ms`；无断言失败。
+历史：R3 x64-only 180s；R4 未复现；R5 x64-only 180s；R6 x64-only 180s（三度）。
+同文件对照（R5）：arm64 ✔ 71132.148208ms；Windows ✔ 69523.6045ms。
+runner 性能（R6 顶层汇总）：x64 duration_ms=2,680,564.56（5,825 tests）；Windows=1,553,909.97（5,826 tests）
+  ⇒ x64/Windows = 1.73×（R5：x64/arm64=1.95×）。
+按 Windows ~69.5s × 1.73 ≈ 120s 预期 x64 正常耗时；180s 自带上限仅 ~1.5× 余量
+（arm64/Windows 为 ~2.5× 余量）。超时与 x64 runner 负载/性能一致，无测试缺陷证据。

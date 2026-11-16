@@ -1,0 +1,9 @@
+✔ actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt (65.8729ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 545.6447

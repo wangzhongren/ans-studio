@@ -1,0 +1,36 @@
+W-J5/J15 平台候选与预算说明（R6 后复核）
+数据源：R6 run 43848313583（Node 24.14.0）；R5 对照见 2026-11-16_test-debt-misc-closeout.md。
+
+== 历史（x64-only 三度超时，均无断言失败） ==
+R3  x64 180s 超时
+R4  三平台未复现
+R5  x64 180s 超时；同文件 arm64 ✔ 71132.148208ms；Windows ✔ 69523.6045ms
+R6  x64 180s 超时（14-timeouts-and-stall.json：maxDurationMs=180003.746956，count=2）；
+    失败体 `test timed out after 180000ms`；Windows 0 条超时；arm64 job cancelled 无工件。
+    无任何断言失败/产品错误文本；恰在测试自带 { timeout: 180000 } 到点。
+
+== runner 性能（R6 顶层汇总，同命令同用例集） ==
+macOS x64 : tests=5825 pass=5755 fail=50 cancelled=1 skipped=19 duration_ms=2,680,564.56（44m40.6s）
+Windows   : tests=5826 pass=5743 fail=51 cancelled=0 skipped=32 duration_ms=1,553,909.97（25m53.9s）
+x64 / Windows = 1.73×（R5：x64 / arm64 = 1.95×）
+
+== 预算推理 ==
+- 正常耗时（R5 同文件）：arm64 71.1s，Windows 69.5s；本机 Windows（R6 批）61.7–65.1s，
+  本批清负载 3× 61.4 / 64.0 / 64.9s。
+- 按 Windows 69.5s × 1.73 ≈ 120s 推 x64 正常耗时；180s 自带上限仅 ~1.5× 余量
+  （arm64/Windows 约 2.5×）。
+- x64 满载/IO 抖动时越过 180s，与 runner 负载/性能解释一致；无测试缺陷证据。
+- 提高上限只会掩盖潜在 x64 性能/泄漏问题；本批不改 180s、不改测试文件。
+
+== 处置 ==
+分类：平台/runner 性能时序候选（x64-only；非产品、非测试断言缺陷）。
+建议：R7 x64 若第四次复现，由 owner 启动 x64 性能专项（定位 ~120s 正常耗时 vs 180s 超时差异）
+或单列测试预算调整；本批不排修。
+
+== 附带观测（本机，非 W-J5 结论样本） ==
+首次并发负载批次中 run3 在 ~59.9s 触发 Node 原生断言：
+  node::CleanupQueue::Add ... Assertion failed: (insertion_info.second) == (true)
+  JS 栈：node:internal/async_hooks destroy 追踪 × src/provider/trunk/impl/git-command.ts:551/555
+  （noLinks 递归 readdir/lstat）；file-level 'test failed'，无用例断言失败。
+原始输出：runs/wj5-run3-loadcrash.txt。清除并发负载后 3× 全绿（runs/wj5-clean-run{1,2,3}.txt）。
+与 compatibility-loopback 的 UV_HANDLE_CLOSING 同属 Node 原生 infra 断言类事件（不同断言点）。

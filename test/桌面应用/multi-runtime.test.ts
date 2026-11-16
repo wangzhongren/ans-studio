@@ -55,7 +55,10 @@ function fixture(options: { trio?: boolean } = {}) {
     fs.mkdirSync(path.join(root, ".ans"), { recursive: true });
     fs.writeFileSync(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
   }
-  return { root, envPath: path.join(root, "fake.env"), cleanup() { fs.rmSync(root, { recursive: true, force: true }); } };
+  // R6 Windows CI：`fixture()` 临时根清理偶发 `ENOTEMPTY`（防病毒/索引器短暂持有目录项
+  // 句柄；路径为 8.3 短名 TEMP 下的 `ans-d1-*`）。与 B0/B7 同类夹具缺口一致，用 `rmSync`
+  // 有界重试（仅瞬时码，耗尽仍上抛）收口；不掩盖任何断言/产品失败。
+  return { root, envPath: path.join(root, "fake.env"), cleanup() { fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } };
 }
 function listing(root: string): ProjectListing {
   const roles: ProjectListing["roles"] = ["su", "A", "B"].map((roleId) => ({ roleId, builtIn: roleId === "su", cardPath: "", boundaryPath: "", cardText: roleId,
@@ -75,7 +78,7 @@ function projectRoots() {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "ans-d1-roots-"));
   const one = path.join(base, "one"), two = path.join(base, "two");
   fs.mkdirSync(one); fs.mkdirSync(two);
-  return { one, two, cleanup() { fs.rmSync(base, { recursive: true, force: true }); } };
+  return { one, two, cleanup() { fs.rmSync(base, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } };
 }
 function harness(extra: Partial<SessionManagerDeps> = {}) {
   const opened: { root: string; role: string; runtime: RuntimeKind; stream: ReturnType<typeof queue<OrchestrationEvent>>; sent: string[]; input: Parameters<SessionManagerDeps["openRoleSession"]>[0]; handle: RoleSessionHandle }[] = [];

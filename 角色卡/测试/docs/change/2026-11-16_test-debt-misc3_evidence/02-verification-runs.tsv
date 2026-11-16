@@ -1,0 +1,30 @@
+file	stage	run	exit	tests	pass	fail	duration_ms	notes
+b31-fixed-release-auto-desktop.test.ts	target-before	1	0	1	1	0	3699.8832	修改前基线（x64-only 时序未复现）
+b31-fixed-release-auto-desktop.test.ts	target-before	2	0	1	1	0	1661.2319
+b31-fixed-release-auto-desktop.test.ts	target-before	3	0	1	1	0	1629.7586
+b31-fixed-release-auto-desktop.test.ts	target-after	1	0	1	1	0	1842.9181	屏障改为等待最终投影
+b31-fixed-release-auto-desktop.test.ts	target-after	2	0	1	1	0	1742.3523
+b31-fixed-release-auto-desktop.test.ts	target-after	3	0	1	1	0	1732.6159
+b31-fixed-release-auto-desktop.test.ts	full-after	1	0	9	9	0	6393.8903	全文件 3×
+b31-fixed-release-auto-desktop.test.ts	full-after	2	0	9	9	0	6597.1286
+b31-fixed-release-auto-desktop.test.ts	full-after	3	0	9	9	0	6399.7545
+multi-runtime.test.ts	target-before	1	0	1	1	0	707.0241	ENOTEMPTY 未在本机复现
+multi-runtime.test.ts	target-before	2	0	1	1	0	557.7334
+multi-runtime.test.ts	target-before	3	0	1	1	0	545.6447
+multi-runtime.test.ts	full-after	1	0	39	39	0	1431.7717	全文件 3×（含清理重试）
+multi-runtime.test.ts	full-after	2	0	39	39	0	1435.06
+multi-runtime.test.ts	full-after	3	0	39	39	0	1394.8872
+compatibility-loopback.test.ts	full-ci-flags	1	0	3	3	0	3146.533	--test-concurrency=1 --test-timeout=300000 --test-force-exit
+compatibility-loopback.test.ts	full-ci-flags	2	0	3	3	0	2507.4858
+compatibility-loopback.test.ts	full-ci-flags	3	0	3	3	0	2493.8153
+compatibility-loopback.test.ts	full-ci-flags	4	0	3	3	0	2576.8311	压测（与 W-J5 后台并发）
+compatibility-loopback.test.ts	full-ci-flags	5	0	3	3	0	2537.6231
+compatibility-loopback.test.ts	full-ci-flags	6	0	3	3	0	2488.3501
+compatibility-loopback.test.ts	full-ci-flags	7	0	3	3	0	2561.2608
+compatibility-loopback.test.ts	full-ci-flags	8	0	3	3	0	2545.4936	原生断言 0/8
+2026-11-09_judge-delegated-effectiveness.test.ts	wj5-before-load	1	0	1	1	0	61740.9134	首次批次（后台，与兼容性压测部分重叠）
+2026-11-09_judge-delegated-effectiveness.test.ts	wj5-before-load	2	0	1	1	0	63689.2479	同上
+2026-11-09_judge-delegated-effectiveness.test.ts	wj5-before-load	3	1	1	0	1	59876.5973	原生 CleanupQueue 断言（非用例断言）；runs/wj5-run3-loadcrash.txt
+2026-11-09_judge-delegated-effectiveness.test.ts	wj5-clean	1	0	1	1	0	61419.1093	无人为并发负载
+2026-11-09_judge-delegated-effectiveness.test.ts	wj5-clean	2	0	1	1	0	63978.7116
+2026-11-09_judge-delegated-effectiveness.test.ts	wj5-clean	3	0	1	1	0	64858.0022
