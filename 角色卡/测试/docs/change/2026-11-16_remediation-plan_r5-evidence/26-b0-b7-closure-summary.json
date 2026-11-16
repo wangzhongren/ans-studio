@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-11-16T09:22:47.863Z",
+  "b0Total": 191,
+  "b7Total": 190,
+  "b0_b7_intersection": 189,
+  "b0_in_r5": 78,
+  "b7_in_r5": 78,
+  "b0_not_r5": 113,
+  "b7_not_r5": 112,
+  "b0_b7_intersection_in_r5": 78,
+  "b0_not_r4": 61,
+  "b7_not_r4": 60,
+  "newlyGreenSinceR4_b0": 52,
+  "newlyGreenSinceR4_b7": 52,
+  "b0_only": 2,
+  "b7_only": 1,
+  "note": "B0/B7 ∩ R5 = 78；R4→R5 新增转绿 52 名（两集合同一批名字）；B0 61 / B7 60 名在 R4 已不在宇宙，R5 仍未复现。B7 重冻结时按 REMOVED/未复现登记。"
+}

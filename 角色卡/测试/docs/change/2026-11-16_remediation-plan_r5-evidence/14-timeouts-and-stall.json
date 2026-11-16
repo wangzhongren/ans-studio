@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-11-16T09:23:10.350Z",
+  "runId": "43829367008",
+  "timeoutEntries": [
+    {
+      "platform": "macos_x64",
+      "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+      "maxDurationMs": 180001.963841,
+      "count": 2,
+      "files": [
+        "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+      ],
+      "fileLevel": false
+    }
+  ],
+  "fileLevelTimeoutEntries": [],
+  "windowsStall": {
+    "lastResultTs": null,
+    "cancelTs": null,
+    "stallBeforeCancelMs": null,
+    "stallMinutes": null,
+    "lastTopLevelSummaryFound": true,
+    "uniqueNames": 104,
+    "fileLevelCount": 0,
+    "note": "R5 Windows 完整跑完（有顶层汇总，无取消标记、无静默间隔）"
+  },
+  "note": "R5 口径与 R2/R3/R4 相同：timeouts = maxDurationMs>=100000 的失败名；三平台均有完整顶层汇总。R5 x64 有 1 条（W-J5/J15 judge 代批，maxDurationMs=180001.96，count=2，x64-only）；arm64 与 Windows 为 0。该名在 R4 未复现、R3 为 x64-only 180s 挂起，属复现而非新语义。"
+}

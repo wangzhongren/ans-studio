@@ -1,0 +1,97 @@
+{
+  "generatedAt": "2026-11-16T09:22:47.861Z",
+  "note": "权威唯一名=全日志 ✖ 去缩进/去耗时去重（排除 section 头）；lineLevel=保留缩进的去耗时唯一名 + section 头行出现次数（R2/R3/R4 定义）。协调者 Windows 110 与本地 111 差 1，见 perPlatform 明细与 disclosure。",
+  "perPlatform": {
+    "macos_arm64": {
+      "summary": {
+        "tests": 5825,
+        "suites": 0,
+        "pass": 5702,
+        "fail": 103,
+        "cancelled": 1,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 1283872.762667
+      },
+      "uniqueCanonical": 104,
+      "indentPreservingUnique": 105,
+      "sectionHeaders": 3,
+      "lineLevel": 108,
+      "fileLevel": 0,
+      "xmarkLines": 212,
+      "multiIndentNames": [
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "indents": [
+            0,
+            2
+          ]
+        }
+      ]
+    },
+    "macos_x64": {
+      "summary": {
+        "tests": 5825,
+        "suites": 0,
+        "pass": 5700,
+        "fail": 104,
+        "cancelled": 2,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 2501114.798554
+      },
+      "uniqueCanonical": 106,
+      "indentPreservingUnique": 107,
+      "sectionHeaders": 3,
+      "lineLevel": 110,
+      "fileLevel": 0,
+      "xmarkLines": 216,
+      "multiIndentNames": [
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "indents": [
+            0,
+            2
+          ]
+        }
+      ]
+    },
+    "windows_x64": {
+      "summary": {
+        "tests": 5825,
+        "suites": 0,
+        "pass": 5689,
+        "fail": 103,
+        "cancelled": 1,
+        "skipped": 32,
+        "todo": 0,
+        "duration_ms": 1521073.7034
+      },
+      "uniqueCanonical": 104,
+      "indentPreservingUnique": 106,
+      "sectionHeaders": 5,
+      "lineLevel": 111,
+      "fileLevel": 0,
+      "xmarkLines": 216,
+      "multiIndentNames": [
+        {
+          "name": "W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场",
+          "indents": [
+            0,
+            2
+          ]
+        },
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "indents": [
+            0,
+            2
+          ]
+        }
+      ]
+    }
+  },
+  "disclosure": {
+    "windowsDelta": "协调者口径 110 vs 本地 lineLevel 111：Windows 共 5 个 `✖ failing tests:` 头（2 个嵌入子运行的顶层 section：L2345 W1b / L2419 W19；1 个最终顶层 section L7129；2 个最终嵌套 section L7279/L7317），保留缩进唯一名 106（W1b/W19 各以 indent 0 与 2 出现）。若按 4 个头或把 W1b 的两种缩进合并，则为 110。R2/R3/R4 的既定定义（全部头出现次数计入）给出 111；R4 三平台按同一脚本与协调者 195/195/186 精确吻合。"
+  }
+}

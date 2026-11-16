@@ -1,0 +1,3636 @@
+{
+  "generatedAt": "2026-11-16T09:18:17.434Z",
+  "r4Universe": 188,
+  "r5Universe": 116,
+  "intersection": 113,
+  "r5Only": 3,
+  "r4Only": 75,
+  "perPlatform": {
+    "arm64": {
+      "r4": 188,
+      "r5": 104,
+      "common": 104,
+      "onlyR4": 75,
+      "onlyR5": 0
+    },
+    "x64": {
+      "r4": 188,
+      "r5": 106,
+      "common": 104,
+      "onlyR4": 75,
+      "onlyR5": 2
+    },
+    "win": {
+      "r4": 179,
+      "r5": 104,
+      "common": 103,
+      "onlyR4": 75,
+      "onlyR5": 1
+    }
+  },
+  "familyDelta": {
+    "ci-path-canonical": {
+      "r4": 41,
+      "r5": 1,
+      "r5NewNames": [],
+      "disappearedFromFamily": [
+        "AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录",
+        "AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）",
+        "AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确",
+        "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+        "D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly",
+        "D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly",
+        "D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly",
+        "D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly",
+        "D1 background dispatch, queued customer input and handback pin the source engine after selection switches",
+        "D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card",
+        "D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn",
+        "D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged",
+        "D1 same role and project across engines and same role across projects keep distinct handles and exact input targets",
+        "D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired",
+        "D1R2 actual ack preserves a failed delayed terminal and the next aborted original client",
+        "D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text",
+        "D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client",
+        "D1R2 direct and queued identical inputs retain original client ID through delayed old settled",
+        "D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call",
+        "foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn",
+        "gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录",
+        "gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）",
+        "gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+        "host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+        "no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome",
+        "P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在",
+        "Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed",
+        "same client IDs across sequential actual turns retain separate first public outcomes",
+        "send rejection before public events remains unknown; later same-client different turns do not borrow outcomes",
+        "send result reports the original handle is no longer current after replacement while its turn rejects",
+        "stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session",
+        "wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects",
+        "wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit",
+        "wiring failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no repository, journal or ref effects",
+        "wiring init: sidecar carries actor/task/turn/lease + init,candidate digests before effects",
+        "wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects",
+        "wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit",
+        "wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects",
+        "wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit",
+        "wiring retry: same operationId on a new lease/turn appends a sidecar row without replay/init conflicts"
+      ],
+      "stillInFamily": [
+        "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards"
+      ]
+    },
+    "known-red-62": {
+      "r4": 33,
+      "r5": 33,
+      "r5NewNames": [],
+      "disappearedFromFamily": [],
+      "stillInFamily": [
+        "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+        "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+        "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+        "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+        "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+        "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+        "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+        "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+        "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+        "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+        "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+        "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+        "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+        "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+        "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+        "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+        "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+        "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+        "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+        "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+        "D3 linked workspace root remains usable; linked target itself is not replaced",
+        "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+        "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+        "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+        "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+        "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+        "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+        "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+        "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+        "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+        "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+        "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+        "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力"
+      ]
+    },
+    "e71501c-drift": {
+      "r4": 30,
+      "r5": 10,
+      "r5NewNames": [
+        "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒"
+      ],
+      "disappearedFromFamily": [
+        "2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发",
+        "星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝",
+        "业务卡的旧@决策预设不能形成第三个自动执行者",
+        "AC-4.3：洁净派发无 advisory、无诊断噪声",
+        "B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported",
+        "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）",
+        "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+        "BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）",
+        "BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队",
+        "BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）",
+        "BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）",
+        "commit-race",
+        "convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务",
+        "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递",
+        "sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道",
+        "sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）",
+        "sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）",
+        "sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账",
+        "sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂",
+        "W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind",
+        "W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝"
+      ],
+      "stillInFamily": [
+        "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+        "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+        "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+        "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+        "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+        "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+        "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+        "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+        "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝"
+      ]
+    },
+    "source-gate": {
+      "r4": 23,
+      "r5": 14,
+      "r5NewNames": [],
+      "disappearedFromFamily": [
+        "宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change",
+        "提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发",
+        "显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变",
+        "显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变",
+        "显式入口（stop）：requestRunChangeDecision 三模式落账不变",
+        "显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）",
+        "AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留",
+        "F2：版本化文档基线违规受理 + advisory；基线/文档未被改写",
+        "selected"
+      ],
+      "stillInFamily": [
+        "派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0",
+        "最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域",
+        "AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读",
+        "AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点",
+        "AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点",
+        "D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集",
+        "F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发",
+        "P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定",
+        "P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId",
+        "R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable",
+        "R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable",
+        "run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned",
+        "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+        "stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色"
+      ]
+    },
+    "b0-existing-other": {
+      "r4": 18,
+      "r5": 17,
+      "r5NewNames": [],
+      "disappearedFromFamily": [
+        "required"
+      ],
+      "stillInFamily": [
+        "范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su",
+        "范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册",
+        "范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用",
+        "跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串）",
+        "AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）",
+        "appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本）",
+        "buildProjectConfig：由枚举结果构造角色表，acceptance 透传",
+        "D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）",
+        "F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖",
+        "listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执",
+        "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+        "Q30 fixture HTTP preserves split UTF8 and byte budget",
+        "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+        "stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift）",
+        "T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report",
+        "T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report",
+        "T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report"
+      ]
+    },
+    "flake-timing": {
+      "r4": 16,
+      "r5": 16,
+      "r5NewNames": [],
+      "disappearedFromFamily": [],
+      "stillInFamily": [
+        "护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行",
+        "审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读",
+        "一项目一卡：前一张未决时下载卡排队，不呈现",
+        "重建 dispose 等待窗口：stop A 保持用户目标/关闭契约",
+        "重建 dispose 等待窗口：stop all 保持用户目标/关闭契约",
+        "重建 open 等待窗口：stop A 保持用户目标/关闭契约",
+        "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+        "B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案明确「最后兜底」",
+        "e2e 队列：离线保留并标 blockedReason=network；恢复后按既有 drain 继续且恰投递一次",
+        "e2e 网络失败系统行：settled(failed, network-offline-timeout) ⇒ 恰一条人话 delivery-note，无技术 code",
+        "e2e F1 队列：已知离线 + 探针异常 ⇒ 不解除 network 阻塞、不 drain；真正恢复后恰投递一次",
+        "F-2 场景 1（跨目标不阻塞）：A 的 send 挂起期间派发 B ⇒ B 立即收到（不待 A 轮结束）",
+        "F-2 场景 2（同目标仍排队）：投递进行中再派同目标 ⇒ 排队不并发；settled 后按序放行",
+        "F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行",
+        "P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 restore 后自动续投一次（重启不排空不复现）",
+        "requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用"
+      ]
+    },
+    "vca-flow": {
+      "r4": 13,
+      "r5": 0,
+      "r5NewNames": [],
+      "disappearedFromFamily": [
+        "冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准",
+        "Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）",
+        "bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1",
+        "SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常",
+        "VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）",
+        "VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）",
+        "VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变）",
+        "VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试）",
+        "VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码）",
+        "VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用）",
+        "VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin）",
+        "VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied",
+        "VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖"
+      ],
+      "stillInFamily": []
+    },
+    "unclassified-new": {
+      "r4": 12,
+      "r5": 22,
+      "r5NewNames": [
+        "AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录",
+        "AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）",
+        "AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确",
+        "gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录",
+        "gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）",
+        "gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+        "host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+        "P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在",
+        "Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed",
+        "W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场"
+      ],
+      "disappearedFromFamily": [],
+      "stillInFamily": [
+        "D3 lstat ENOTDIR is a status error, never a new-file fallback",
+        "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+        "Git init journal: restart discovery binds the original operation and excludes FS/ref media",
+        "Git operation media: restart enumeration discovers both formats and refuses same-id rebinding",
+        "Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit",
+        "I0-11: a normal journal with a sidecar is unaffected (journal remains authoritative)",
+        "I0-11: a safe sidecar-only operation directory is tolerated by the journal scanner and effective-manifest reads",
+        "I0-11: sidecar plus an unknown extra file stays fail-closed",
+        "I0-11: unsafe sidecars (hardlink nlink≠1, oversized file, non-regular file) stay fail-closed",
+        "I0-12: a corrupted stable-source stays fail-closed even with a sidecar present",
+        "I0-12: stable-source plus only a safe authorization.jsonl is tolerated; unknown extra files and unsafe sidecars stay fail-closed",
+        "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write"
+      ]
+    },
+    "hang-timeout": {
+      "r4": 2,
+      "r5": 3,
+      "r5NewNames": [
+        "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例"
+      ],
+      "disappearedFromFamily": [],
+      "stillInFamily": [
+        "关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递",
+        "C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口"
+      ]
+    }
+  },
+  "intersectionSets": {
+    "r5_in_b0": 78,
+    "r5_in_b7": 78,
+    "r5_in_kr62": 33,
+    "r5_in_triage_any": 18,
+    "b0_not_r5": 113,
+    "b7_not_r5": 112,
+    "b0_not_r4": 61,
+    "b7_not_r4": 60
+  },
+  "r5OnlyNames": [
+    {
+      "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+      "platforms": {
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 180001.963841,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+          ]
+        }
+      },
+      "logFiles": [
+        "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+      ],
+      "repoFiles": [
+        "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+      ],
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r5Family": "hang-timeout",
+      "errorFirst": null
+    },
+    {
+      "name": "W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场",
+      "platforms": {
+        "windows_x64": {
+          "count": 6,
+          "maxDurationMs": 5874.3866,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ]
+        }
+      },
+      "logFiles": [
+        "test/桌面应用/chief-workflow.test.ts"
+      ],
+      "repoFiles": [
+        "test/桌面应用/chief-workflow.test.ts"
+      ],
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "MAC"
+      },
+      "r5Family": "unclassified-new",
+      "errorFirst": "Error: Real chief loop did not settle: shown=[] requests=1 worker=[{\"ok\":false,\"message\":\"request_choice：幕僚要求修订（chief-delegated；原因：请补齐恢复证据再重新提交 幕僚要求修订，原请求已退回，未获批准。请原发起角色补齐材料后重新提交；请求退回不代表任务取消。）。本次退修未获批准；原发起角色应按理由修订并重新提交。\\n原始回执：{\\\"outcome\\\":\\\"declined\\\",\\\"operatorId\\\":\\\"chief\\\",\\\"actionSource\\\":{\\\"kin"
+    },
+    {
+      "name": "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒",
+      "platforms": {
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 4288.368132,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        }
+      },
+      "logFiles": [
+        "test/桌面应用/chief-workflow.test.ts"
+      ],
+      "repoFiles": [
+        "test/桌面应用/chief-workflow.test.ts"
+      ],
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r5Family": "e71501c-drift",
+      "errorFirst": "code: 'ERR_ASSERTION',"
+    }
+  ],
+  "r4OnlyNames": [
+    {
+      "name": "2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1400.048167,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/handback-delivery.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1255.561525,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/handback-delivery.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 2939.5902,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\handback-delivery.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 17.781417,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 40.768185,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 38.207,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 67.245542,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 92.256913,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 137.7199,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\run-change-trigger.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 70.477333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 97.541073,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 80.1738,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\run-change-trigger.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 77.969708,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 113.095421,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 86.7721,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\run-change-trigger.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 73.031208,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 101.695562,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 108.4654,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\run-change-trigger.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "显式入口（stop）：requestRunChangeDecision 三模式落账不变",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 88.827875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 91.79327,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 93.4597,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\run-change-trigger.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 68.464042,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 89.270021,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 82.4553,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\run-change-trigger.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 40.387875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 47.209872,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 44.074,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\star-routing.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "业务卡的旧@决策预设不能形成第三个自动执行者",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 0.96825,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/decision-service.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1.530841,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/decision-service.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.0118,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\decision-service.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 71.6015,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 94.220569,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-change-trigger.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 91.6481,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\run-change-trigger.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "AC-4.3：洁净派发无 advisory、无诊断噪声",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 47.652833,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 48.569448,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 47.4397,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\star-routing.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1515.562708,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1532.447028,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1526.1226,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1413.191584,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/handback-delivery.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1205.352479,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/handback-delivery.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 2878.9902,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\handback-delivery.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 45.311333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/stuck-redispatch.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 72.995631,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/stuck-redispatch.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 49.3482,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\stuck-redispatch.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 208.661084,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/stuck-redispatch.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 232.39486,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/stuck-redispatch.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 227.3669,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\stuck-redispatch.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 34.516959,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/version-change.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 77.741852,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/version-change.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1216.2216,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\version-change.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 6.645041,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 26.794836,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 16.0974,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 51.136667,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 56.613795,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 63.4208,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\star-routing.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 39.107666,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 43.311015,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 43.4262,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\star-routing.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 37.858292,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 43.185264,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 36.1017,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\star-routing.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 41.253125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 42.887179,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 36.3045,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\star-routing.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "commit-race",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 53.289042,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 144.897932,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 65.9764,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 39.168333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 42.498709,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/star-routing.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 44.3922,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\star-routing.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 16.151125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 30.366196,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 15.6936,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 28.779292,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 31.052711,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 16.0184,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 58.571209,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 88.415779,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 51.8959,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 16.898458,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 37.844708,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 17.4018,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 background dispatch, queued customer input and handback pin the source engine after selection switches",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 7.174834,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 4.073388,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.9803,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 4.004208,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 2.853817,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.4285,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 8.845333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 4.960596,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 2.3499,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 12.522125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 16.204841,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 13.4466,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 same role and project across engines and same role across projects keep distinct handles and exact input targets",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 7.562916,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 13.255324,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 6.0708,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1.945083,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 3.814906,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.7571,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1R2 actual ack preserves a failed delayed terminal and the next aborted original client",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1520.231833,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1541.620406,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1528.6137,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1526.822292,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1534.885692,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1522.631,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1.65675,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 3.127403,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.6477,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1R2 direct and queued identical inputs retain original client ID through delayed old settled",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 2.4275,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 8.644614,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.3145,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 3.477125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 6.946174,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.7344,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "F2：版本化文档基线违规受理 + advisory；基线/文档未被改写",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 58.225459,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-pin.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 79.270018,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/run-pin.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 79.4394,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\run-pin.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 6.360834,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1.913333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.0223,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1.059375,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 2.494724,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.0397,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "required",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 46.420625,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 86.773102,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 50.1589,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r4Family": "b0-existing-other",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 100.784333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/stuck-redispatch.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 154.350605,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/stuck-redispatch.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 94.0518,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\stuck-redispatch.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "same client IDs across sequential actual turns retain separate first public outcomes",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1.436542,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 1.960477,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.6134,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "selected",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 6093.944958,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 6122.673907,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 6091.9774,
+          "indents": [
+            0,
+            2
+          ],
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r4Family": "source-gate",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "send rejection before public events remains unknown; later same-client different turns do not borrow outcomes",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1.696792,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 2.407285,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.241,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "send result reports the original handle is no longer current after replacement while its turn rejects",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 0.8895,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 7.898035,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 3.6641,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 44.268417,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 57.315879,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 44.52,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\directive-input.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 8.047125,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 11.929084,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 6.0254,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\directive-input.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 7.28725,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 19.425197,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 9.0211,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\directive-input.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 4010.958791,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 4019.21184,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 4012.6131,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\directive-input.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 4017.784708,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 4004.3107,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/directive-input.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 4014.3721,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\directive-input.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 3537.049667,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/version-change.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 3237.079537,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/version-change.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 4801.8709,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\version-change.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1.05,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 2.218767,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/multi-runtime.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1.0426,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 22.605708,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/version-change.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 47.910839,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/version-change.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 392.4014,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\version-change.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 37.850041,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/version-change.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 79.153393,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/version-change.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 503.2781,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\桌面应用\\version-change.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 25.651291,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 77.215818,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 79.2903,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 32.752459,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 74.78311,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 76.0396,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 34.843083,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 102.915281,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 96.1473,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 29.483459,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 85.676778,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 82.3087,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin）",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 29.161875,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 71.584398,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 72.5004,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 35.054416,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 91.005192,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 85.5035,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 67.399916,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 97.446222,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/version-change-integration.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 94.8333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\测试\\version-change-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "vca-flow",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 1,
+          "maxDurationMs": 482.600875,
+          "indents": [
+            0
+          ],
+          "files": []
+        },
+        "macos_x64": {
+          "count": 1,
+          "maxDurationMs": 836.146906,
+          "indents": [
+            0
+          ],
+          "files": []
+        },
+        "windows_x64": {
+          "count": 1,
+          "maxDurationMs": 403.99,
+          "indents": [
+            0
+          ],
+          "files": []
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 1,
+          "maxDurationMs": 6445.986375,
+          "indents": [
+            0
+          ],
+          "files": []
+        },
+        "macos_x64": {
+          "count": 1,
+          "maxDurationMs": 6687.644959,
+          "indents": [
+            0
+          ],
+          "files": []
+        },
+        "windows_x64": {
+          "count": 1,
+          "maxDurationMs": 6418.9947,
+          "indents": [
+            0
+          ],
+          "files": []
+        }
+      },
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r4Family": "e71501c-drift",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1171.132959,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-document-audit-failure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 2122.801979,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-document-audit-failure.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1426.8585,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring-document-audit-failure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 990.227667,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-document.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 2341.687546,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-document.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 1507.2054,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring-document.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no repository, journal or ref effects",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 40.543625,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-audit-failure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 104.231772,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-audit-failure.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 73.6013,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring-audit-failure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring init: sidecar carries actor/task/turn/lease + init,candidate digests before effects",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 39.842333,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 103.383954,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 97.5064,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 2107.320958,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-initial-workflow-audit-failure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 5131.317841,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-initial-workflow-audit-failure.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 3182.3635,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring-initial-workflow-audit-failure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 1870.758958,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-initial-workflow.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 4947.650434,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-initial-workflow.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 3153.8128,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring-initial-workflow.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 2072.880958,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-publication-audit-failure.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 5488.984162,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-publication-audit-failure.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 3365.7221,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring-publication-audit-failure.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 2189.183208,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-publication.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 5401.805133,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-publication.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 3263.6978,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring-publication.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    },
+    {
+      "name": "wiring retry: same operationId on a new lease/turn appends a sidecar row without replay/init conflicts",
+      "r4Platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 56.552958,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-retry.test.ts"
+          ]
+        },
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 119.64429,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/编排/git-action-authorization-wiring-retry.test.ts"
+          ]
+        },
+        "windows_x64": {
+          "count": 2,
+          "maxDurationMs": 92.6234,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test\\编排\\git-action-authorization-wiring-retry.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r4Family": "ci-path-canonical",
+      "note": "R4 消失 = R5 三平台均未复现（R5 三平台均完整跑完）"
+    }
+  ]
+}
