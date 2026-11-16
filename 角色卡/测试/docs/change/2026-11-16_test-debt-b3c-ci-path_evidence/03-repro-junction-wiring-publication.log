@@ -1,0 +1,28 @@
+✖ wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit (2736.4268ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3056.8875
+
+✖ failing tests:
+
+test at test\编排\git-action-authorization-wiring-publication.test.ts:23:1
+✖ wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit (2736.4268ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"status":"blocked","operationId":"w3b-plan-publication","baseDigest":"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392","targetDigest":null,"errorCode":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b3c/test/%E7%BC%96%E6%8E%92/git-action-authorization-wiring-publication.test.ts:27:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

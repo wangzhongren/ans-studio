@@ -1,0 +1,19 @@
+# Out-of-scope users of the two modified shared fixtures (regression spot-check)
+
+Modified helpers:
+- test/测试/git-action-cross-runtime-fixture.ts (fileGateOptions → realpath protectedGitRoots)
+- test/编排/fixtures/git-action-authorization-wiring.ts (w3bFileGateOptions + fixture roots realpath)
+
+Local argument: on this machine `fs.realpathSync(fs.mkdtempSync(...)) === <mkdtemp path>`, so the
+canonicalization output is byte-identical locally; behavior can only differ under a mismatched-spelling
+root (CI macOS /var, Windows 8.3), which is the intended fix.
+
+Spot-check runs (plain, node --test --test-concurrency=1 --test-timeout=120000, 180s wall):
+- test/测试/git-action-activation-e2e.test.ts: exit=0, 0 fails
+- test/测试/git-action-commit-pi-e2e.test.ts: exit=0, 0 fails
+- test/测试/git-run-stop-host-continuation-e2e.test.ts: exit=0, 0 fails
+- test/测试/git-action-commit-claude-e2e.test.ts: test body ✔ (49.6s); file-level process exit hit the
+  180s wall (pre-existing custom-provider session exit style; same class as the flake in 08), not a
+  test-name regression.
+- test/测试/2026-11-09_judge-delegated-effectiveness.test.ts and git-action-delivery-claude-e2e.test.ts
+  not run in this batch (heavy/x64 timeout candidates from R3); local output identical argument above.

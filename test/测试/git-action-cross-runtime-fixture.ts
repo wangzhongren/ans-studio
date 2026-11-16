@@ -8,6 +8,7 @@
 // （custom provider 会话按 I0-3 不能以 drained 收口）。不同运行时/AC-16 场景各用独立测试文件。
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -41,11 +42,15 @@ export function fixtureRole(id: string): ResolvedRole {
     boundarySource: "fixture", location: { card: "fixture", boundary: "fixture" } };
 }
 
-/** 受保护项目 host 文件守卫事实（`.git` 根；与 W3b/W2 gate 夹具同口径）。 */
+/** 受保护项目 host 文件守卫事实（`.git` 根；与 W3b/W2 gate 夹具同口径）。
+ *  B3c（2026-11-16）：guard 的期望根由调用方根经 `canonicalProjectRoot`（realpath）构造；
+ *  macOS CI 的 `/var` 符号链接与 Windows CI 的 8.3 短名会让 mkdtemp 原拼写与真实根不同，
+ *  因此夹具发布的 protectedGitRoots 必须是同一真实根的规范拼写（真实目录已由 mkdtemp 建立）。 */
 export function fileGateOptions(root: string): Partial<RuntimeSessionOptions> {
-  const protectedGitRoots = [path.join(root, ".git")];
+  const canonical = realpathSync(root);
+  const protectedGitRoots = [path.join(canonical, ".git")];
   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
-    fileGateProtection: { projectRoot: root, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
+    fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
 }
 
 /** 绑定真实 Core 会话（桩件 provider 覆盖所选运行时；真实包装层/真实工具回合）。必须在写入受保护范围证据之前调用。 */

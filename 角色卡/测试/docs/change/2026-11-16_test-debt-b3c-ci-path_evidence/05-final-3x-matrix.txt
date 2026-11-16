@@ -1,0 +1,50 @@
+# B3c final verification matrix (post-fix)
+# Command: node --test --test-concurrency=1 --test-timeout=120000 <file>; hard wall timeout 240s/run.
+# junction = TEMP/TMP -> C:\Users\51054\AppData\Local\Temp\ans-b3c-sim\junction (CI-like canonical mismatch).
+
+## junction (CI-like) — all 18 in-scope files ×3
+
+multi-runtime.test.ts: P P P
+git-action-authorization-gate.test.ts: P P P
+git-action-cross-runtime-init.test.ts: P P P
+git-action-cross-runtime-audit-failure.test.ts: P P P
+git-action-cross-runtime-pi-init.test.ts: P P P
+git-action-cross-runtime-codex-init.test.ts: P P P
+run-stop-host-continuation-integration.test.ts: P P P
+session-admission-approval-q9-integration.test.ts: P P P
+git-action-authorization-wiring-audit-failure.test.ts: P P P
+git-action-authorization-wiring-document-audit-failure.test.ts: P P P
+git-action-authorization-wiring-document.test.ts: P P P
+git-action-authorization-wiring-initial-workflow-audit-failure.test.ts: P P P (this batch); separate 6× loop P×6; one 240s wall timeout in an earlier 12× batch (test body pass; process exit flake—see 08)
+git-action-authorization-wiring-initial-workflow.test.ts: P P F124 in the 18-file batch (test body pass; process exit flake—see 08); separate natural-exit runs P×3 earlier; force-exit P P P
+git-action-authorization-wiring-publication-audit-failure.test.ts: P P P
+git-action-authorization-wiring-publication.test.ts: P P P
+git-action-authorization-wiring-retry.test.ts: P P P
+git-action-authorization-wiring.test.ts: P P P
+
+## plain (default TEMP) — same files ×3 (initial-workflow pair excepted, see flake note)
+
+multi-runtime.test.ts: P P P
+git-action-authorization-gate.test.ts: P P P
+git-action-cross-runtime-init.test.ts: P P P
+git-action-cross-runtime-audit-failure.test.ts: P P P
+git-action-cross-runtime-pi-init.test.ts: P P P
+git-action-cross-runtime-codex-init.test.ts: P P P
+run-stop-host-continuation-integration.test.ts: P P P
+session-admission-approval-q9-integration.test.ts: P P P
+git-action-authorization-wiring-audit-failure.test.ts: P P P
+git-action-authorization-wiring-document-audit-failure.test.ts: P P P
+git-action-authorization-wiring-document.test.ts: P P P
+git-action-authorization-wiring-initial-workflow-audit-failure.test.ts: skipped in batch; force-exit P P P (natural-exit loop had 1 hang/12 — see 08)
+git-action-authorization-wiring-initial-workflow.test.ts: skipped in batch; force-exit P P P (natural-exit loop had 1 hang/12 — see 08)
+git-action-authorization-wiring-publication-audit-failure.test.ts: P P P
+git-action-authorization-wiring-publication.test.ts: P P P
+git-action-authorization-wiring-retry.test.ts: P P P
+git-action-authorization-wiring.test.ts: P P P
+
+## Target-name deltas
+
+- All 41 locally exercisable target names: red→green (multi-runtime 22, gate 3, cross 4, run-stop 1, session-admission 1, wiring 9, plus wiring.test.ts init).
+- Q2 P2 (git-role-workflows-e2e): local 3× green before and after; CI macOS-only red — unchanged, product candidate (see 06).
+- W48 (unresolved → chief-workflow.test.ts): local Windows 3× green; no change (see 06).
+- Zero new failing names in any modified file; non-target local guards red in wiring.test.ts (CRLF) also turned green.

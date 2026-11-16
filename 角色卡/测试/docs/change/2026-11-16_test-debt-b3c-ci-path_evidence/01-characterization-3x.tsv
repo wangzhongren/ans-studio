@@ -1,0 +1,26 @@
+# B3c 3× characterization summary (Windows 11, Node v24.22.1; CI Node 24.14.0)
+# plain = default TEMP (%LOCALAPPDATA%\Temp); junction = TEMP/TMP overridden to
+# C:\Users\51054\AppData\Local\Temp\ans-b3c-sim\junction (junction -> real dir), simulating
+# macOS /var symlink / Windows 8.3 short-name CI roots (same real root, different spelling).
+# Each cell = failing-test-name count for run1/run2/run3 (node --test --test-concurrency=1 --test-timeout=120000).
+
+file	target_names	baseline_plain_3x	baseline_junction_3x	final_plain_3x	final_junction_3x	classification
+test/桌面应用/multi-runtime.test.ts	22	8/8/8 (local subset)	8/8/8 (local subset)	0/0/0	0/0/0	test-assumption: 8× e71501c chief-only customer entry (sendSession without explicit chief target); 14× hardcoded /one,/two roots masked locally by leftover C:\one/C:\two (manager.open inventory registration requires real dir). CI 22 names explained by these two groups.
+test/编排/git-action-authorization-gate.test.ts	3	0/0/0	3/3/3	0/0/0	0/0/0	test-assumption: fileGateOptions published raw mkdtemp root as protectedGitRoots; guard compares realpath canonical root.
+test/测试/git-action-cross-runtime-init.test.ts	1	0/0/0	1/1/1	0/0/0	0/0/0	same canonical metadata roots (shared fixture).
+test/测试/git-action-cross-runtime-audit-failure.test.ts	1	0/0/0	1/1/1	0/0/0	0/0/0	same.
+test/测试/git-action-cross-runtime-pi-init.test.ts	1	0/0/0	1/1/1	0/0/0	0/0/0	same.
+test/测试/git-action-cross-runtime-codex-init.test.ts	1	0/0/0	1/1/1	0/0/0	0/0/0	same.
+test/测试/run-stop-host-continuation-integration.test.ts	1	0/0/0	1/1/1	0/0/0	0/0/0	same (own fileGateOptions).
+test/测试/session-admission-approval-q9-integration.test.ts	1	0/0/0	1/1/1	0/0/0	0/0/0	same canonical metadata roots (shared fixture).
+test/测试/git-role-workflows-e2e.test.ts	1	3/3 pass (Q2 P2 ✔ 176.7s/178.5s/192.3s)	not run (heavy; plain green)	3/3 pass	not run	CI macOS-only: child business chain denied by file-gate-host-facts-unproven (host facts/protection currency). Local 3× green. Product candidate; no local fix verifiable.
+test/编排/git-action-authorization-wiring.test.ts	1 (+1 local-only)	init 0/0/0; guards 1/1/1 (CRLF)	init 1/1/1; guards 1/1/1 (CRLF)	0/0/0	0/0/0	canonical metadata roots (shared fixture) + local CRLF normalization in source-slice guard (non-target, local-only red).
+test/编排/git-action-authorization-wiring-audit-failure.test.ts	1	not run	1/1/1	0/0/0	0/0/0	canonical metadata roots (shared fixture).
+test/编排/git-action-authorization-wiring-document-audit-failure.test.ts	1	not run	1/1/1	0/0/0	0/0/0	same.
+test/编排/git-action-authorization-wiring-document.test.ts	1	not run	1/1/1	0/0/0	0/0/0	same.
+test/编排/git-action-authorization-wiring-initial-workflow-audit-failure.test.ts	1	not run	1/1/1	skipped (natural-exit flake; force-exit 3/3 P)	skipped (natural-exit flake; force-exit 3/3 P)	canonical metadata roots + second layer: trunk workflow-source requires realpath(dir)===dir (fixture root canonicalized at creation).
+test/编排/git-action-authorization-wiring-initial-workflow.test.ts	1	not run	1/1/1	skipped (natural-exit flake; force-exit 3/3 P)	skipped (natural-exit flake; force-exit 3/3 P)	same.
+test/编排/git-action-authorization-wiring-publication-audit-failure.test.ts	1	not run	1/1/1	0/0/0	0/0/0	canonical metadata roots.
+test/编排/git-action-authorization-wiring-publication.test.ts	1	not run	1/1/1	0/0/0	0/0/0	same.
+test/编排/git-action-authorization-wiring-retry.test.ts	1	not run	1/1/1	0/0/0	0/0/0	same.
+(unresolved) W48 default Core exact controller stop foreign-lease → test/桌面应用/chief-workflow.test.ts	1	3/3 pass (pattern run)	-	unchanged (out of 19-file list)	-	not path-canonical; Windows CI was cancelled, inline name had no error body. Local Windows 3× green on B1b base. Left to B1b/B4 context.

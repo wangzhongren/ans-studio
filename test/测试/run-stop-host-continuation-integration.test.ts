@@ -24,6 +24,7 @@
 // 在当前候选上的真实行为，不宣称完整链路已通过。
 import assert from "node:assert/strict";
 import fsp from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test, after } from "node:test";
@@ -54,9 +55,11 @@ function fixtureRole(id: string): ResolvedRole {
     boundarySource: "fixture", location: { card: "fixture", boundary: "fixture" } };
 }
 function fileGateOptions(root: string): Partial<RuntimeSessionOptions> {
-  const protectedGitRoots = [path.join(root, ".git")];
+  // B3c（2026-11-16）：guard 期望根为调用方根的 realpath 规范拼写（macOS `/var` 链接 / Windows 8.3 短名）。
+  const canonical = realpathSync(root);
+  const protectedGitRoots = [path.join(canonical, ".git")];
   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
-    fileGateProtection: { projectRoot: root, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
+    fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
 }
 async function bindSession(root: string, roleId: string): Promise<RoleSession & { sessionId: string }> {
   const adapter = createRuntimeAdapter({ runtime: "demo", gate: allowGate, projectRoot: root, skillRoot: root, ...fileGateOptions(root) });

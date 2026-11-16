@@ -5,6 +5,7 @@
 
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
@@ -30,9 +31,12 @@ export const w3bSidecarPath = (root: string, operationId: string) =>
   path.join(root, ".ans/trunk/operations", w3bSha256(operationId), "authorization.jsonl");
 
 export function w3bFileGateOptions(root: string): Partial<RuntimeSessionOptions> {
-  const protectedGitRoots = [path.join(root, ".git")];
+  // B3c（2026-11-16）：guard 的期望根是调用方根的 realpath 规范拼写；macOS CI 的 `/var`
+  // 符号链接与 Windows CI 的 8.3 短名会在 mkdtemp 原拼写下产生不同字符串，夹具必须发布真实根。
+  const canonical = realpathSync(root);
+  const protectedGitRoots = [path.join(canonical, ".git")];
   return { writeRoot: root, protectedGitRoots, fileGateProtocol: "host-facts-v1",
-    fileGateProtection: { projectRoot: root, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
+    fileGateProtection: { projectRoot: canonical, protectedGitRoots, coverage: "unknown", basisDigest: "a".repeat(64), reasons: [] } };
 }
 
 export type W3bBoundSession = RoleSession & { sessionId: string };
@@ -119,7 +123,9 @@ export function publishW3bInventory(root: string, revision: number, rows: Array<
  * 真实 convener Core 会话（active git_candidate）。存储层准备与 `git-capabilities.test.ts` 的 init 夹具同源。
  */
 export async function createInitFixture(input: { operationId: string; blockSidecarStore?: boolean; opened: RoleSession[] }) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w3b-wiring-")), canonical = await fs.realpath(root);
+  // B3c：夹具根创建即 realpath（macOS `/var` 符号链接 / Windows 8.3 短名下的真实根是规范拼写）；
+  // trunk store 的 workflow-source 目录校验要求 `realpath(dir) === dir`。
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "ans-w3b-wiring-"))), canonical = root;
   const chief = await bindDemoSession(root, "chief", input.opened);
   const held = holdableGitCandidate();
   const convener = await bindDemoSession(root, "convener", input.opened, { gitCandidate: held.gitCandidate,
@@ -156,7 +162,9 @@ export async function createInitFixture(input: { operationId: string; blockSidec
  * 迁移后的 Git trunk v1 → 真实 chief/convener Core 会话 + 真实 work source/task + 真实 host inventory。
  */
 export async function createPublicationFixture(input: { operationId: string; blockSidecarStore?: boolean; opened: RoleSession[]; withWriteFileSession?: boolean }) {
-  const project = await createTrunkProject({ withRun: false }), root = project.root, canonical = await fs.realpath(root);
+  const project = await createTrunkProject({ withRun: false });
+  // B3c：根创建即 realpath（真实根规范拼写；trunk store 的 workflow-source 目录校验要求 realpath(dir)===dir）。
+  const canonical = await fs.realpath(project.root), root = canonical;
   // 会话先于受保护范围证据（.git / initialization-sources）建立。
   const chief = await bindDemoSession(root, "chief", input.opened);
   const held = holdableCompleteTeamPlan();
@@ -167,7 +175,8 @@ export async function createPublicationFixture(input: { operationId: string; blo
   const workflowHeld = input.withWriteFileSession ? holdableVersionedDocWrite() : undefined;
   const workflowConvener = workflowHeld ? await bindDemoSession(root, "convener", input.opened, { versionedDocAfterWrite: workflowHeld.afterWrite, gate: allowStagedFileGate,
     // host-facts-v1 写路径要求 host 提供 complete coverage（真实 host 在受保护根上实测后发布）；这里用真实根/64-hex basis 的夹具事实。
-    fileGateProtection: { projectRoot: root, protectedGitRoots: [path.join(root, ".git")], coverage: "complete", basisDigest: w3bSha256("w3b-file-gate:" + root), reasons: [] },
+    // B3c：protectedGitRoots 用 realpath 规范根（与 guard 的 canonicalProjectRoot 同口径）。
+    fileGateProtection: { projectRoot: canonical, protectedGitRoots: [path.join(canonical, ".git")], coverage: "complete", basisDigest: w3bSha256("w3b-file-gate:" + canonical), reasons: [] },
     providerFactories: { demo: options => createDemoRuntimeAdapter(options, [{ name: "write_file", args: { path: "docs/workflow.md", content: W3B_WORKFLOW_TEXT } }]) } }) : undefined;
   const pumping = convener.prompt("Invoke complete_team_plan for the W3b publication fixture"); pumping.catch(() => undefined);
   await until(() => w3bEntryOf(convener.sessionId)?.lifecycle?.activeTools.some(tool => tool.name === "complete_team_plan") === true);
@@ -235,7 +244,8 @@ export async function createPublicationFixture(input: { operationId: string; blo
  * `prepareDirectSubmission`/`prepareDirectCommit`，运行时入口用同一 applyInput 重新准备并提交。
  */
 export async function createDocumentFixture(input: { operationId: string; blockSidecarStore?: boolean; opened: RoleSession[] }) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w3b-document-")), canonical = await fs.realpath(root);
+  // B3c：根创建即 realpath（真实根规范拼写）。
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "ans-w3b-document-"))), canonical = root;
   const chief = await bindDemoSession(root, "chief", input.opened);
   const held = holdableSubmitVersionChange();
   const intentPath = "docs/product/demo-intent-v1.md", proposalPath = "docs/proposals/demo-proposal-v1.md";
