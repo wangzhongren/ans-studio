@@ -19,7 +19,7 @@ import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { createCustomerInputChannel, type DesktopCustomerInputFn, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
 import { appendTaskEvent, readTaskState } from "../../src/common/编排/task-state.ts";
-import { findActiveRun, pinRun, readRunManifest } from "../../src/common/编排/run-manifest.ts";
+import { ensureDraftRun, findActiveRun, pinRun, readRunManifest } from "../../src/common/编排/run-manifest.ts";
 import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
@@ -228,20 +228,25 @@ async function appendD3(root: string): Promise<void> {
   });
 }
 
-/** 真实 pin：chief → convener 的 project-handoff 派发触发 pin，返回 pinned runId。 */
+/**
+ * 真实 pinned run 夹具（B3a，2026-11-16）：e71501c 起 chief→convener handoff 不再提前 pin
+ * （规划协调不前置未来 D3/卡/workflow；worker 执行由独立 execution preflight 冻结）——旧 helper
+ * 以 handoff 触发 pin 的假设已过时。本套件只验证 run-change 触发/三模式卡；pinned 前置事实改用
+ * 产品真实 pinRun API 直接建立（真实 manifest/真实 D3 事实），不伪造宿主输入、不放宽任何门禁。
+ */
 async function setupPinnedRun(root: string, h: ReturnType<typeof harness>): Promise<string> {
   await writeProjectV1(root);
   await appendD3(root);
-  assert.equal((await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" })).ok, true);
+  const draft = await ensureDraftRun(root, FLOW);
+  if (!draft.ok) throw new Error(draft.reason);
+  const pinned = await pinRun(root, draft.manifest.runId, { d3: { decisionId: "decision-req-d3", targetRoleIds: D3_TARGETS } });
+  if (!pinned.ok) throw new Error(pinned.reason);
+  assert.equal(pinned.manifest.state, "pinned");
+  assert.deepEqual(pinned.manifest.roles, ROLES_V1.map((role) => role.id));
+  // 夹具仍按真实会话入口打开 convener（run-change 卡通道/显式入口需要可呈现会话）。
+  assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
   await tick(30);
-  const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: FLOW })) as DispatchReceipt;
-  assert.equal(handoff.ok, true, handoff.message ?? "");
-  const active = await findActiveRun(root, FLOW);
-  assert.equal(active.ok, true);
-  if (!active.ok || active.manifest === null) throw new Error("handoff 未 pin run");
-  assert.equal(active.manifest.state, "pinned");
-  assert.deepEqual(active.manifest.roles, ROLES_V1.map((role) => role.id));
-  return active.manifest.runId;
+  return pinned.manifest.runId;
 }
 
 async function waitForManifest(root: string, runId: string, predicate: (manifest: import("../../src/common/编排/run-manifest.ts").RunManifest) => boolean): Promise<import("../../src/common/编排/run-manifest.ts").RunManifest> {

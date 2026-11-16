@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
+import { createRuntimeAdapterFactory, openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import { PROJECT_MODULES_SCHEMA, PROJECT_ROSTER_SCHEMA, PROJECT_TOPOLOGY_SCHEMA, parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
 import { appendTaskEvent, readTaskState } from "../../src/common/编排/task-state.ts";
 import { ensureDraftRun, findActiveRun, pinRun, prepareRunPin, readRunManifest, runManifestPath } from "../../src/common/编排/run-manifest.ts";
@@ -19,7 +20,8 @@ import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versi
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import type { ContractCheckFn, CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, DispatchReceipt, DispatchTaskFn } from "../../src/model/runtime.ts";
+import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
+import type { ContractCheckFn, CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, DispatchReceipt, DispatchTaskFn, DispatchTaskPayload, ToolCall } from "../../src/model/runtime.ts";
 import type { DesktopCustomerInputFn } from "../../app/desktop/customer-input.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -177,6 +179,101 @@ function harness(root: string, options: { customerInput?: DesktopCustomerInputFn
     customerInput: options.customerInput ?? (async () => ({ outcome: "declined", operatorId: "test" })),
   });
   return { mgr, streams, sent, caps, customerInputs, contractChecks };
+}
+
+/**
+ * B3a（2026-11-16）：v2.0.0 source 门（document-planning-source-unavailable）要求文档/团队准备派发
+ * 来自「已登记项目生命周期 + 当前 accepted 客户轮次 + 真实管理会话证据」。本 harness 用产品真实
+ * `openRoleSession` 构造**真实 managed chief 会话**：测试经 `mgr.send` 开一轮真实客户回合（core
+ * 发布 prompt-input + turn ack），并在该回合内由 demo runtime 脚本调用 `dispatch_task`——与生产
+ * 模型的工具调用路径一致；不伪造 host 事实、不放宽门禁。非 chief 角色仍用最小 fake 句柄（本套件
+ * 只验证 chief 来源门，投递目标行为与既有 harness 相同）。
+ */
+interface SourceGatedHarness {
+  mgr: SessionManager;
+  dispatchViaAcceptedTurn(payload: DispatchTaskPayload, text: string): Promise<DispatchReceipt>;
+}
+
+function sourceGatedHarness(root: string): SourceGatedHarness {
+  markLegacyProject(root);
+  const script: ToolCall[] = [];
+  const receipts: DispatchReceipt[] = [];
+  const streams: Record<string, OrchestrationEvent[]> = {};
+  const registration = {
+    selectionId: `native-selection-${path.basename(root)}`,
+    selectedRoot: root,
+    projectRoot: root,
+    source: "native-directory-selection" as const,
+    selectedAt: "2026-11-16T00:00:00.000Z",
+    listingGeneration: 1,
+  };
+  const fakeHandle = (roleId: string, runtime: RuntimeKind): RoleSessionHandle => {
+    let turns = 0;
+    let disposed = false;
+    return {
+      runtime,
+      async send(text, options) {
+        const turnId = `turn-${roleId}-${++turns}`;
+        options?.onTurnStarted?.({ turnId, roleId, runtime });
+        (streams[roleId] ??= []).push({
+          kind: "message", summary: "输入", roleId, runtime, turnId,
+          detail: { source: "prompt-input", text },
+        } as OrchestrationEvent);
+      },
+      events() {
+        let i = 0;
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                for (let tries = 0; tries < 2000; tries += 1) {
+                  if (disposed) return { value: undefined as unknown as OrchestrationEvent, done: true };
+                  const arr = streams[roleId] ?? [];
+                  if (i < arr.length) return { value: arr[i++]!, done: false };
+                  await tick(10);
+                }
+                return { value: undefined as unknown as OrchestrationEvent, done: true };
+              },
+            };
+          },
+        };
+      },
+      async dispose() { disposed = true; },
+    };
+  };
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      if (input.roleId !== "chief") return fakeHandle(input.roleId, input.runtime ?? "demo");
+      const factory = createRuntimeAdapterFactory(input.project, input.runtime ?? "demo", { writeRoot: root, script });
+      const dispatch = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
+      const wrapped: DispatchTaskFn | undefined = dispatch === undefined ? undefined : async (d, metadata) => {
+        const receipt = (await dispatch(d, metadata)) as DispatchReceipt | null | undefined;
+        if (receipt !== null && receipt !== undefined) receipts.push(receipt);
+        return receipt;
+      };
+      return openRoleSession({ ...input, autoRepin: false, ...(wrapped !== undefined ? { dispatchTask: wrapped } : {}) }, { createAdapter: factory });
+    },
+    createPiAdapterFactory: () => { throw new Error("no pi"); },
+    createDemoAdapter: () => { throw new Error("no demo"); },
+    buildProjectConfig,
+    getListing: (r) => (r === root ? listing(root) : undefined),
+    getRegisteredProjectLifecycle: (r) => (r === root ? registration : undefined),
+    emitEvent: () => {},
+    customerInput: async () => ({ outcome: "declined", operatorId: "test" }),
+  });
+  return {
+    mgr,
+    async dispatchViaAcceptedTurn(payload, text) {
+      script.length = 0;
+      script.push({ name: "dispatch_task", args: payload as unknown as Record<string, unknown> });
+      const before = receipts.length;
+      const send = await mgr.send(text, undefined, { projectRoot: root, roleId: "chief", runtime: "demo" });
+      assert.equal(send.ok, true, "真实 accepted 客户轮次应被受理");
+      for (let tries = 0; tries < 500 && receipts.length === before; tries += 1) await tick(10);
+      assert.ok(receipts.length > before, "脚本回合内 dispatch_task 应返回回执");
+      return receipts[receipts.length - 1]!;
+    },
+  };
 }
 
 async function d3(root: string): Promise<void> {
@@ -616,7 +713,8 @@ test("contract_check topic：session 层 topic + flowId + taskKind 并存时 top
 
 test("F2：版本化文档基线违规受理 + advisory；基线/文档未被改写", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-baseline-reject-"));
-  const h = harness(root);
+  // B3a：v2.0.0 source 门要求真实注册生命周期 + 当前 accepted 客户轮次 + managed 会话证据。
+  const h = sourceGatedHarness(root);
   try {
     await writeProject(root);
     const intentPath = path.join(root, "docs/product/focus-intent-v1.md");
@@ -627,7 +725,7 @@ test("F2：版本化文档基线违规受理 + advisory；基线/文档未被改
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
     const before = (await readTaskState(root)).records.size;
-    const receipt = (await h.caps.chief!({ roleId: "product", task: "写产品意图", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+    const receipt = await h.dispatchViaAcceptedTurn({ roleId: "product", task: "写产品意图", sideEffect: "docs", flowId: "focus" }, "请派产品写产品意图（基线违规场景）");
     assert.equal(receipt.ok, true, receipt.message ?? "");
     assert.match(receipt.message ?? "", /状态提示（未阻断）/);
     assert.match(receipt.message ?? "", /基线|只读|版本化/);

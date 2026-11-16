@@ -1,0 +1,41 @@
+# B3a 本机复现与 3× 自然退出（node --test --test-timeout=120000；worktree 8d6a35e；2026-11-16）
+
+## 每文件 3× 结果（exit=进程自然退出码；wall=含进程启动/清理）
+
+file                 run   exit   wall       counts
+run-pin              run1  exit=1 3756ms     ℹ tests 20 ℹ pass 10 ℹ fail 10 
+run-pin              run2  exit=1 3754ms     ℹ tests 20 ℹ pass 10 ℹ fail 10 
+run-pin              run3  exit=1 3715ms     ℹ tests 20 ℹ pass 10 ℹ fail 10 
+run-change-trigger   run1  exit=1 1915ms     ℹ tests 10 ℹ pass 8 ℹ fail 2 
+run-change-trigger   run2  exit=1 1934ms     ℹ tests 10 ℹ pass 8 ℹ fail 2 
+run-change-trigger   run3  exit=1 1952ms     ℹ tests 10 ℹ pass 8 ℹ fail 2 
+i-full-chain         run1  exit=1 2129ms     ℹ tests 2 ℹ pass 0 ℹ fail 2 
+i-full-chain         run2  exit=1 2121ms     ℹ tests 2 ℹ pass 0 ℹ fail 2 
+i-full-chain         run3  exit=1 2124ms     ℹ tests 2 ℹ pass 0 ℹ fail 2 
+schema               run1  exit=0 226ms      ℹ tests 10 ℹ pass 10 ℹ fail 0 
+schema               run2  exit=0 229ms      ℹ tests 10 ℹ pass 10 ℹ fail 0 
+schema               run3  exit=0 222ms      ℹ tests 10 ℹ pass 10 ℹ fail 0 
+
+## 逐文件失败名（run1）
+
+-- run-pin
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (119.1731ms)
+✖ D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集 (128.2731ms)
+✖ run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned (63.4942ms)
+✖ P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId (44.7011ms)
+✖ R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable (53.5572ms)
+✖ R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable (84.3233ms)
+✖ AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点 (72.6349ms)
+✖ AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点 (95.5563ms)
+✖ AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读 (58.7131ms)
+✖ P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定 (94.6754ms)
+
+-- run-change-trigger
+✖ 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0 (157.9152ms)
+✖ stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色 (156.3068ms)
+
+-- i-full-chain
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (60.3212ms)
+✖ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (45.1083ms)
+
+-- schema
