@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { createCustomerInputChannel, type DesktopCustomerInputFn, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
+import { createRuntimeAdapterFactory, openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
 import { appendTaskEvent, readTaskState } from "../../src/common/编排/task-state.ts";
 import { ensureDraftRun, findActiveRun, pinRun, readRunManifest } from "../../src/common/编排/run-manifest.ts";
@@ -24,7 +25,7 @@ import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versi
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import type { CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, DispatchReceipt, DispatchTaskFn } from "../../src/model/runtime.ts";
+import type { CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, DispatchReceipt, DispatchTaskFn, DispatchTaskPayload, ToolCall } from "../../src/model/runtime.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -163,6 +164,8 @@ interface HarnessOptions {
   withCustomerInput?: boolean;
   /** AC-17（D2）：版本变更栈（只读 `listVersionChanges` 判定在途 VCA）。 */
   stack?: import("../../app/desktop/version-change.ts").VersionChangeStack;
+  /** B3a 残差（2026-11-16）：convener 用真实 openRoleSession（demo script），用于 worker 执行 preflight 用例。 */
+  realConvener?: boolean;
 }
 
 /**
@@ -180,6 +183,8 @@ function harness(root: string, options: HarnessOptions = {}) {
   const customerInputs: Record<string, CustomerInputFn | undefined> = {};
   const customerRequests: CustomerInputRequest[] = [];
   const events: Array<{ roleId: string; projectRoot: string; runtime: string; event: { kind: string; summary?: string } }> = [];
+  const convenerScript: ToolCall[] = [];
+  const workerReceipts: DispatchReceipt[] = [];
   const customerInput: DesktopCustomerInputFn | undefined = options.withCustomerInput === false
     ? undefined
     : options.customerInput ?? (async (request) => {
@@ -188,8 +193,19 @@ function harness(root: string, options: HarnessOptions = {}) {
       });
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
-      caps[input.roleId] = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
+      const dispatch = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
+      caps[input.roleId] = dispatch;
       customerInputs[input.roleId] = (input as { customerInput?: CustomerInputFn }).customerInput;
+      if (options.realConvener === true && input.roleId === "convener") {
+        const factory = createRuntimeAdapterFactory(input.project, input.runtime ?? "demo", { writeRoot: root, script: convenerScript });
+        const wrapped: DispatchTaskFn | undefined = dispatch === undefined ? undefined : async (d, metadata) => {
+          const receipt = await dispatch(d, metadata);
+          if (receipt !== null && receipt !== undefined) workerReceipts.push(receipt);
+          return receipt;
+        };
+        caps[input.roleId] = wrapped;
+        return openRoleSession({ ...input, autoRepin: false, ...(wrapped !== undefined ? { dispatchTask: wrapped } : {}) }, { createAdapter: factory });
+      }
       const handle: RoleSessionHandle = {
         async send() {},
         events() {
@@ -209,7 +225,24 @@ function harness(root: string, options: HarnessOptions = {}) {
     ...(customerInput !== undefined ? { customerInput } : {}),
     ...(options.stack !== undefined ? { getVersionChangeStack: () => options.stack } : {}),
   });
-  return { mgr, caps, customerInputs, customerRequests, events };
+  /**
+   * B3a 残差（2026-11-16）：worker 派发的当前 source 门要求「当前运营真实受派任务」。本 helper 以
+   * open(taskId)+system 回合驱动真实 convener 派发，用于断言 trunk execution preflight 的冻结硬拒。
+   */
+  const dispatchWorkerViaAssignedTurn = async (taskId: string, payload: DispatchTaskPayload, text: string): Promise<DispatchReceipt> => {
+    const opened = await mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo", taskId });
+    assert.equal(opened.ok, true, opened.ok ? "" : opened.error ?? "运营会话应可打开");
+    assert.equal(await mgr.waitForRoleIdle(root, "convener", "demo", 5000), true, "运营应在空闲时开新回合");
+    convenerScript.length = 0;
+    convenerScript.push({ name: "dispatch_task", args: payload as unknown as Record<string, unknown> });
+    const before = workerReceipts.length;
+    const send = await mgr.sendBackground({ projectRoot: root, roleId: "convener", runtime: "demo", text, kind: "system" });
+    assert.equal(send.ok, true, send.ok ? "" : send.error ?? "");
+    for (let tries = 0; tries < 500 && workerReceipts.length === before; tries += 1) await tick(10);
+    assert.ok(workerReceipts.length > before, "运营回合内 dispatch_task 应返回回执");
+    return workerReceipts[workerReceipts.length - 1]!;
+  };
+  return { mgr, caps, customerInputs, customerRequests, events, dispatchWorkerViaAssignedTurn };
 }
 
 const D3_TARGETS = ["engine-dev", "render-dev", "ui-dev", "test-dev", "docs-dev"];
@@ -234,7 +267,7 @@ async function appendD3(root: string): Promise<void> {
  * 以 handoff 触发 pin 的假设已过时。本套件只验证 run-change 触发/三模式卡；pinned 前置事实改用
  * 产品真实 pinRun API 直接建立（真实 manifest/真实 D3 事实），不伪造宿主输入、不放宽任何门禁。
  */
-async function setupPinnedRun(root: string, h: ReturnType<typeof harness>): Promise<string> {
+async function setupPinnedRun(root: string, h: ReturnType<typeof harness>, options: { openConvener?: boolean } = {}): Promise<string> {
   await writeProjectV1(root);
   await appendD3(root);
   const draft = await ensureDraftRun(root, FLOW);
@@ -244,8 +277,10 @@ async function setupPinnedRun(root: string, h: ReturnType<typeof harness>): Prom
   assert.equal(pinned.manifest.state, "pinned");
   assert.deepEqual(pinned.manifest.roles, ROLES_V1.map((role) => role.id));
   // 夹具仍按真实会话入口打开 convener（run-change 卡通道/显式入口需要可呈现会话）。
-  assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
-  await tick(30);
+  if (options.openConvener !== false) {
+    assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+    await tick(30);
+  }
   return pinned.manifest.runId;
 }
 
@@ -265,31 +300,39 @@ function runChangeCards(requests: CustomerInputRequest[]): CustomerInputRequest[
 }
 
 test("派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：worker 执行改由 trunk execution preflight 冻结——legacy pinned run
+  // 无 trunk 历史证据 ⇒ `Old run lacks its historical evidence` 硬拒（不再「受理 + run-role-missing
+  // advisory」）。「派发不自动呈现 run-change 卡、旧 run 未被改写」判据保留。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-change-no-auto-"));
   const h = harness(root, {
+    realConvener: true,
     answer: () => {
       assert.fail("派发不应自动呈现客户卡");
     },
   });
   try {
-    const oldRunId = await setupPinnedRun(root, h);
+    const oldRunId = await setupPinnedRun(root, h, { openConvener: false });
     await writeProjectV2(root);
-    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
-    await tick(20);
+    const parentTaskId = "t-convener-run-change-no-auto";
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-11-16T00:00:20.000Z", kind: "task.created", taskId: parentTaskId, flowId: FLOW,
+      from: "chief", to: "convener", text: "把项目交付运营（run-change 场景）", sideEffect: "read-only",
+      idempotencyKey: "run-change-no-auto-handoff", runId: oldRunId, runState: "pinned",
+    });
     const before = (await readTaskState(root)).records.size;
-    const receipt = (await h.caps.convener!({
+    const receipt = await h.dispatchWorkerViaAssignedTurn(parentTaskId, {
       roleId: "audio-dev",
       task: "实现音频模块",
       sideEffect: "code",
       flowId: FLOW,
       moduleId: "audio-core",
-    })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
-    assert.match(receipt.message ?? "", /run-role-missing|角色集|pinned run/);
-    assert.equal((await readTaskState(root)).records.size, before + 1, "受理并建任务");
+    }, "请派实现音频模块（run-change 场景）");
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /worker-freeze stage=prepare code=trunk-verify-failed/);
+    assert.match(receipt.message ?? "", /Old run lacks its historical evidence/);
     assert.equal(runChangeCards(h.customerRequests).length, 0, "不再自动呈现 run-change 卡");
     assert.equal(h.customerRequests.length, 0, "客户卡请求数为 0");
+    assert.equal((await readTaskState(root)).records.size, before, "冻结拒绝不建新任务");
     const active = await findActiveRun(root, FLOW);
     assert.equal(active.ok, true);
     if (active.ok) {
@@ -364,14 +407,19 @@ for (const mode of ["continue-frozen", "stop-and-restart", "stop"] as const) {
 }
 
 test("stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：stop-and-restart 产生的新 draft 仍可按 v2 文档显式重新 pin
+  // （pinRun 产品 API，断言保留）；但「恢复派发新角色」不再受理/锚定——worker 执行由 trunk execution
+  // preflight 冻结，legacy pinned run 无 trunk 历史证据 ⇒ `Old run lacks its historical evidence` 硬拒。
+  // 卡片通道改由提案会话承载，避免提前打开 convener 占用其真实任务绑定。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-change-restart-pin-"));
   const h = harness(root, {
+    realConvener: true,
     answer: () => ({ outcome: "answered", value: { selected: ["stop-and-restart"] }, decisionId: "decision-run-change-restart", operatorId: "customer" }),
   });
   try {
-    const oldRunId = await setupPinnedRun(root, h);
+    const oldRunId = await setupPinnedRun(root, h, { openConvener: false });
     await writeProjectV2(root);
-    assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+    assert.equal((await h.mgr.open({ projectRoot: root, roleId: "rapporteur", runtime: "demo" })).ok, true);
     await tick(20);
     const started = await h.mgr.requestRunChangeDecision({ projectRoot: root, flowId: FLOW, requestedBy: "convener", reason: "客户要求变更" });
     assert.equal(started.ok, true, started.ok ? "" : started.error);
@@ -392,20 +440,27 @@ test("stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢�
     assert.match(pinned.manifest.documents.roster?.path ?? "", /focus-roster-v2\.md$/);
     assert.match(pinned.manifest.documents.proposal?.path ?? "", /focus-proposal-v2\.md$/);
 
-    // 新 pinned run 上，同一派发可通过（冻结基线已包含新角色/模块）。
-    const accepted = (await h.caps.convener!({
+    // 新 pinned run 上派发新角色：trunk execution preflight 冻结硬拒，不建任务、不伪装受理。
+    const parentTaskId = "t-convener-run-change-restart";
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-11-16T00:00:21.000Z", kind: "task.created", taskId: parentTaskId, flowId: FLOW,
+      from: "chief", to: "convener", text: "把项目交付运营（重启后场景）", sideEffect: "read-only",
+      idempotencyKey: "run-change-restart-handoff", runId: newRunId, runState: "pinned",
+    });
+    const accepted = await h.dispatchWorkerViaAssignedTurn(parentTaskId, {
       roleId: "audio-dev",
       task: "实现音频模块",
       sideEffect: "code",
       flowId: FLOW,
       moduleId: "audio-core",
-    })) as DispatchReceipt;
-    assert.equal(accepted.ok, true, accepted.message ?? "");
-    const state = await (await import("../../src/common/编排/task-state.ts")).readTaskState(root);
+    }, "请派实现音频模块（重启后场景）");
+    assert.equal(accepted.ok, false);
+    assert.match(accepted.message ?? "", /worker-freeze stage=prepare code=trunk-verify-failed/);
+    assert.match(accepted.message ?? "", /Old run lacks its historical evidence/);
+    const state = await readTaskState(root);
     const record = [...state.records.values()].find((item) => item.created?.to === AUDIO_ROLE.id);
-    assert.ok(record, "新角色任务已创建");
-    assert.equal(record!.created!.runId, newRunId);
-    assert.equal(record!.created!.runState, "pinned");
+    assert.equal(record, undefined, "冻结拒绝不建新角色任务");
+    assert.equal([...state.records.values()].some((item) => item.created?.to === AUDIO_ROLE.id && item.created?.runId === newRunId), false);
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });

@@ -11,6 +11,7 @@
 
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -24,27 +25,6 @@ import type { RoleSessionHandle, RoleSessionSendOptions } from "../../../src/pip
 import type { DispatchTaskFn, DispatchReceipt } from "../../../src/model/runtime.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
-async function waitUntil(check: () => boolean, timeoutMs = 2000): Promise<void> {
-  const start = Date.now();
-  while (!check()) {
-    if (Date.now() - start > timeoutMs) throw new Error("等待超时");
-    await tick(10);
-  }
-}
-/** 投递是异步队列：回执只承诺“受理/已创建”；断言 task.delivered 前须等它真实落盘（不猜时序）。 */
-async function waitUntilTaskState(
-  root: string,
-  check: (state: Awaited<ReturnType<typeof readTaskState>>) => boolean,
-  timeoutMs = 2000,
-): Promise<void> {
-  const start = Date.now();
-  for (;;) {
-    const state = await readTaskState(root);
-    if (check(state)) return;
-    if (Date.now() - start > timeoutMs) throw new Error("等待 tasks.jsonl 超时");
-    await tick(10);
-  }
-}
 
 function listing(root: string): ProjectListing {
   const builtIn = (roleId: string, governanceFunction: ProjectListing["roles"][number]["governanceFunction"]) => ({
@@ -85,7 +65,17 @@ function listing(root: string): ProjectListing {
   };
 }
 
+/**
+ * B3a 残差（2026-11-16）：本套件是 v4.1 legacy 星形链。B6.1/B7.1 起空 trio 聊天默认 fixed，
+ * 显式写 legacy/v1 固定被测项目模式（B7.1 既有模式；不预置文档/审批/pin）。
+ */
+function markLegacyProject(root: string): void {
+  mkdirSync(path.join(root, ".ans"), { recursive: true });
+  writeFileSync(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
+}
+
 function harness(root: string) {
+  markLegacyProject(root);
   const sent: Record<string, string[]> = {};
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const caps: Record<string, DispatchTaskFn | undefined> = {};
@@ -129,6 +119,12 @@ function harness(root: string) {
 }
 
 test("最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：v4.1 legacy 星形链在当前 source 门下已 fail-closed——
+  //  · hub 准备（chief→product/convener 等内置角色）必须带 flowId（否则 chief-hub-flow-unavailable）；
+  //  · 带 flowId 但无真实来源/managed 证据 ⇒ document-planning-source-unavailable；
+  //  · 幕僚直派项目 worker ⇒ chief-to-project-forbidden（M8）；运营无真实受派任务 ⇒
+  //    worker-dispatch-source-unavailable。
+  // 保留判据：六角色枚举、零任务行、零投递、无 flow/gate/ledger 文件、拒绝不建任务账本。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-d-full-chain-"));
   const h = harness(root);
   try {
@@ -138,46 +134,50 @@ test("最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tas
     await tick(30);
     const dispatch = h.caps.chief;
     assert.equal(typeof dispatch, "function", "幕僚有 dispatch_task");
-    // 2026-10-29（v4.1）：幕僚按序派发——链首派产品（无前置）；不得跳过链直接派项目 worker（M8）。
-    const receipt = (await dispatch!({
+    // 2026-10-29（v4.1）：幕僚按序派发——链首派产品（无前置）；当前 hub 准备必须带明确 flowId。
+    const noFlow = (await dispatch!({
       roleId: "product",
       task: "写产品意图文档",
       sideEffect: "docs",
       expectedOutput: "docs/product/focus-intent-v1.md",
       requestedEvidence: ["docs/product/focus-intent-v1.md"],
     })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    await waitUntil(() => (h.sent.product?.length ?? 0) > 0);
-    assert.match(h.sent.product[0] ?? "", /任务编号：#t-/);
-    // 回执仅为「受理」（受理 ≠ 完成）；task.delivered 在目标会话真实接收后异步落盘，等它可读再断言。
-    await waitUntilTaskState(root, (snapshot) =>
-      [...snapshot.records.values()].some((record) => record.created?.to === "product" && record.delivered?.to === "product"));
-    const state = await readTaskState(root);
-    assert.equal(state.errors.length, 0);
-    const task = [...state.records.values()][0];
-    assert.equal(task.created?.from, "chief");
-    assert.equal(task.created?.to, "product");
-    assert.equal(task.delivered?.to, "product");
-    assert.equal(h.sendOptions.product[0].handback?.taskId, task.taskId);
+    assert.equal(noFlow.ok, false);
+    assert.match(noFlow.message ?? "", /chief-hub-flow-unavailable/);
+    assert.equal((await readTaskState(root)).records.size, 0, "拒发零任务");
+    assert.equal(h.sent.product, undefined, "拒发零投递");
+    const withFlow = (await dispatch!({
+      roleId: "product",
+      task: "写产品意图文档",
+      sideEffect: "docs",
+      flowId: "focus",
+      expectedOutput: "docs/product/focus-intent-v1.md",
+      requestedEvidence: ["docs/product/focus-intent-v1.md"],
+    })) as DispatchReceipt;
+    assert.equal(withFlow.ok, false, "无真实来源/managed 证据的文档准备必须 fail-closed");
+    assert.match(withFlow.message ?? "", /document-planning-source-unavailable/);
+    assert.equal((await readTaskState(root)).records.size, 0, "source 门拒发零任务");
+    assert.equal(h.sent.product, undefined, "source 门拒发零投递");
+
     const toWorker = (await dispatch!({ roleId: "worker", task: "实现切片", sideEffect: "code" })) as DispatchReceipt;
     assert.equal(toWorker.ok, false, "幕僚不得直接派项目 worker（M8）");
-    assert.equal((await readTaskState(root)).records.size, 1, "拒绝不产生新任务行");
+    assert.match(toWorker.message ?? "", /chief-to-project-forbidden|幕僚不直接/);
+    assert.equal((await readTaskState(root)).records.size, 0, "拒绝不产生新任务行");
 
-    // D 撤除：不产生 flow/gate/ledger 文件；任务状态是唯一机器状态。
+    // D 撤除：不产生 flow/gate/ledger 文件；fail-closed 也不创建任务账本。
     assert.equal(await fs.stat(path.join(root, "docs", "flows")).then(() => true, () => false), false);
     assert.equal(await fs.stat(path.join(root, ".ans", "governance", "ledger.jsonl")).then(() => true, () => false), false);
-    assert.equal(await fs.stat(path.join(root, ".ans", "state", "tasks.jsonl")).then(() => true, () => false), true);
+    assert.equal(await fs.stat(path.join(root, ".ans", "state", "tasks.jsonl")).then(() => true, () => false), false, "fail-closed 不创建任务账本");
 
-    // 运营拥有 dispatch（v4.1）但未接交付（无 project-handoff）⇒ 受理 + handoff-missing advisory，任务行 +1（不阻断）。
+    // 运营拥有 dispatch 接口（v4.1 capability 仍在），但当前 source 门要求真实受派任务 ⇒ 如实拒绝。
     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
     await tick(30);
     assert.equal(typeof h.caps.convener, "function", "v4.1：convener 注入 dispatch_task");
     const convenerDispatch = (await h.caps.convener!({ roleId: "worker", task: "实现切片", sideEffect: "code" })) as DispatchReceipt;
-    assert.equal(convenerDispatch.ok, true, convenerDispatch.message ?? "");
-    assert.match(convenerDispatch.message ?? "", /尚未收到幕僚的交付任务/, "回执应含 handoff-missing advisory 文案");
-    assert.match(convenerDispatch.message ?? "", /状态提示（未阻断）/);
-    await waitUntilTaskState(root, (snapshot) => snapshot.records.size >= 2);
-    assert.equal((await readTaskState(root)).records.size, 2, "未接交付也受理并建任务（原 1 + 新 1）");
+    assert.equal(convenerDispatch.ok, false);
+    assert.match(convenerDispatch.message ?? "", /worker-dispatch-source-unavailable/);
+    assert.equal((await readTaskState(root)).records.size, 0, "未接交付不伪造任务行");
+    assert.equal(h.sent.worker, undefined, "零投递");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
@@ -185,8 +185,13 @@ test("最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tas
 });
 
 test("F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：chief→verifier 属 hub 准备，当前必须带 flowId + 真实来源；
+  // 裸 legacy 夹具下 fail-closed（缺 flowId ⇒ chief-hub-flow-unavailable；带 flowId ⇒
+  // document-planning-source-unavailable）。无任务可回交，故「settle/回交后无自动验收任务、无 flow/账本
+  // 文件、无自动验收派发」判据按零任务形态保留。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-f-full-chain-"));
   const h = harness(root);
+  const sentByRole = h.sent;
   try {
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
@@ -198,30 +203,28 @@ test("F 终态收口：幕僚调度验收（review 任务→质检回交→工�
       sideEffect: "read-only",
       expectedOutput: "复核结论",
     })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    await waitUntil(() => (h.sent.verifier?.length ?? 0) > 0);
-    const state = await readTaskState(root);
-    const task = [...state.records.values()][0]!;
-    assert.equal(task.created?.to, "verifier");
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /chief-hub-flow-unavailable/);
+    const withFlow = (await dispatch({
+      roleId: "verifier",
+      task: "复核交付：核对 worker.ts 与验收标准",
+      reason: "终态验收可选调度",
+      sideEffect: "read-only",
+      flowId: "focus",
+      expectedOutput: "复核结论",
+    })) as DispatchReceipt;
+    assert.equal(withFlow.ok, false);
+    assert.match(withFlow.message ?? "", /document-planning-source-unavailable/);
+    assert.equal(h.sent.verifier, undefined, "零投递");
 
-    // 质检回交（taskId 已知）→ 只投幕僚 [工作结果]；任务状态记 task.reported。
-    (h.streams.verifier ??= []).push({
-      kind: "handback",
-      summary: "复核完成",
-      handback: { roleId: "verifier", taskId: task.taskId, status: "completed", summary: "复核通过", evidence: ["src/worker.ts"], at: "2026-10-29T00:00:01.000Z", turnId: "turn-v" },
-    } as OrchestrationEvent);
-    await waitUntil(() => (h.sent.chief ?? []).some((text) => text.includes("复核通过")));
-    assert.match(h.sent.chief.find((text) => text.includes("复核通过"))!, /^\[工作结果\]/);
-
-    // F-03：验收由幕僚调度，不自动——回交/settle 后无新任务、无自动验收派发、无 flow/账本文件。
-    (h.streams.verifier ??= []).push({ kind: "settled", summary: "质检一轮结束" } as OrchestrationEvent);
+    // F-03：验收由幕僚调度，不自动——settle 后无新任务、无自动验收派发、无 flow/账本文件。
     (h.streams.chief ??= []).push({ kind: "settled", summary: "幕僚一轮结束" } as OrchestrationEvent);
     await tick(250);
     const after = await readTaskState(root);
-    assert.equal(after.records.size, 1, "回交/settle 不产生自动验收任务");
+    assert.equal(after.records.size, 0, "回交/settle 不产生自动验收任务");
     assert.equal(await fs.stat(path.join(root, "docs", "flows")).then(() => true, () => false), false);
     assert.equal(await fs.stat(path.join(root, ".ans", "governance", "ledger.jsonl")).then(() => true, () => false), false);
-    assert.equal((h.sent.verifier ?? []).filter((text) => !text.includes("任务编号")).length, 0, "无自动验收派发到质检");
+    assert.equal((sentByRole.verifier ?? []).filter((text: string) => !text.includes("任务编号")).length, 0, "无自动验收派发到质检");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });

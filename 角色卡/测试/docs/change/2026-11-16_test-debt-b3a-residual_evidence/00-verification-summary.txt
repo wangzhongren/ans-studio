@@ -1,0 +1,29 @@
+# B3a 残差 —— 最终验证汇总（2026-11-16，worktree b3ar，Node v24.22.1，Windows 11 x64）
+
+## 改前复现（B4 合并后）
+- repro-run-pin-before.log: tests 20 / pass 10 / fail 10 / cancelled 0（失败名 = B3a 残差 10 名）
+- repro-run-change-trigger-before.log: tests 10 / pass 8 / fail 2 / cancelled 0（失败名 = 派发不再自动弹 run-change；stop-and-restart 后…）
+- repro-i-full-chain-before.log: tests 2 / pass 0 / fail 2 / cancelled 0（失败名 = 最小系统全链（v4.1）；F 终态收口）
+
+## 改后 3×（自然退出；命令 node --test --test-timeout=120000 <file>）
+| 文件 | run1 | run2 | run3 | exit |
+| --- | --- | --- | --- | --- |
+| run-pin | tests 20 / pass 20 / fail 0（3.95s） | tests 20 / pass 20 / fail 0（3.84s） | tests 20 / pass 20 / fail 0（3.87s） | 0 / 0 / 0 |
+| run-change-trigger | tests 10 / pass 10 / fail 0（1.99s） | tests 10 / pass 10 / fail 0（2.05s） | tests 10 / pass 10 / fail 0（1.98s） | 0 / 0 / 0 |
+| i-full-chain | tests 2 / pass 2 / fail 0（2.21s） | tests 2 / pass 2 / fail 0（2.21s） | tests 2 / pass 2 / fail 0（2.22s） | 0 / 0 / 0 |
+
+- 目标名：14/14 转绿（run-pin 10、run-change 2、i-full-chain 2）。
+- 零新增失败；三文件均无残留失败名。
+- cancelled 0、skipped 0、无 120s 超时；全部自然退出。
+
+## typecheck
+- npm run typecheck（tsc --noEmit）：EXIT=0（typecheck.log）。
+
+## selected 伪影（只读）
+- node --test --test-timeout=120000 --test-force-exit --test-name-pattern="selected" "test/桌面应用/chief-workflow.test.ts"
+  → tests 1 / pass 1 / fail 0，EXIT=0（chief-workflow-selected-check.log）。未编辑 chief-workflow.test.ts / schema.test.ts。
+
+## 证据文件
+- repro-run-pin-before.log / repro-run-change-trigger-before.log / repro-i-full-chain-before.log
+- verify-run-pin-run{1,2,3}.log / verify-run-change-trigger-run{1,2,3}.log / verify-i-full-chain-run{1,2,3}.log
+- typecheck.log / chief-workflow-selected-check.log / dispositions.tsv / test-diff.patch
