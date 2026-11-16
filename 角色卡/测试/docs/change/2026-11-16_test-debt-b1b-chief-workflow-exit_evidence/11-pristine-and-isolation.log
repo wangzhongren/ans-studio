@@ -1,0 +1,13 @@
+# Pristine (pre-fix original file, copied as chief-workflow.b1b-pristine.test.ts, no after() hook)
+# Natural exits: PRISTINE1..3 EXIT=1; run4 interrupted by us (loop stopped), not counted.
+# Same 66 tests / 8 baseline failures in each completed run.
+PRISTINE1 EXIT=1
+PRISTINE2 EXIT=1
+PRISTINE3 EXIT=1
+PRISTINE4 EXIT=1
+
+# isolation=none comparison (fixed file):
+ISO1 EXIT=1
+ISO2 EXIT=1
+ISO3 EXIT=1
+DONE

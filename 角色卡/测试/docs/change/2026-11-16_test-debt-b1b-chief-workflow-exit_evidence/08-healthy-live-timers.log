@@ -1,0 +1,6 @@
+# Healthy tracked run (fixed file + temporary timer tracker), pid=21784 main file child
+# 3 live 50ms tick(50) timers at after() — one-shot iterator pumps from the last tests; they fire and the process exits.
+B1b post-suite active resources pid=21784: ["Timeout","Timeout","Timeout"]
+B1b live timers pid=21784: [{"kind":"timeout","ms":50,"stack":"    at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b1b/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:106:34 |     at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b1b/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:42:52"},{"kind":"timeout","ms":50,"stack":"    at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b1b/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:106:34 |     at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b1b/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:42:52"},{"kind":"timeout","ms":50,"stack":"    at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/fix-test-debt-b1b/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:106:34 |     at file:///C:/Users/51054/Desktop/work/ans-st
+B1b beforeExit marker pid=21784
+B1b exit marker pid=21784 code=1

@@ -1,0 +1,13 @@
+# CI run 43793243595 job 133056200177 (Windows x64) — last test output and silence
+# Source: gh run view 43793243595 --job 133056200177 --log > /tmp/ci-logs2/windows-r2.log (3,032 lines)
+# Last test output: 2026-11-16T02:44:58.6034176Z (test/桌面应用/chief-workflow.test.ts last W6/T5)
+# Job cancelled: 2026-11-16T04:37:06.0211141Z (##[error]The operation was canceled.)
+# Silence: 6,727,418ms ≈ 112.12 minutes (job timeout-minutes: 120)
+
+test (windows-2025, win, x64)	Full regression tests (bounded; development feedback)	2026-11-16T02:44:57.7481603Z ✔ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source (1523.4077ms)
+test (windows-2025, win, x64)	Full regression tests (bounded; development feedback)	2026-11-16T02:44:57.7482479Z ✔ W4 桌面run-stop：Claude/Pi drain 可推进；native absent 允许、present-but-changed 拒绝 (8.5589ms)
+test (windows-2025, win, x64)	Full regression tests (bounded; development feedback)	2026-11-16T02:44:58.3983545Z ✔ W6/T5 团队计划宿主绑定：省略 runId 注入受派任务 run；自报不一致/flow 不符拒绝；成功回执 source.runId=任务 run (651.8175ms)
+test (windows-2025, win, x64)	Full regression tests (bounded; development feedback)	2026-11-16T02:44:58.5875724Z ✔ W6/T5 团队计划宿主绑定拒绝分层：plan-task-unavailable/plan-task-changed 本地前置、inspect 失败直通 trunk-item-invalid (178.1769ms)
+test (windows-2025, win, x64)	Full regression tests (bounded; development feedback)	2026-11-16T02:44:58.6034176Z ✔ W6/T5 团队计划宿主绑定：普通消息回合无受派任务 ⇒ host-local plan-task-unavailable (20.7474ms)
+test (windows-2025, win, x64)	Full regression tests (bounded; development feedback)	2026-11-16T04:37:06.0211141Z ##[error]The operation was canceled.
+test (windows-2025, win, x64)	Run actions/upload-artifact@v4	﻿2026-11-16T04:37:06.2211498Z ##[group]Run actions/upload-artifact@v4

@@ -1,0 +1,8 @@
+B1B_FORCED_STATE {"mode":"fixed","root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1b-forced-x9Zq6I","coordinatorRoot":"c:\\users\\51054\\appdata\\local\\temp\\ans-b1b-forced-x9zq6i","lease":{"ok":true},"disposeThrew":"Error: 项目正在处理派发或权限变更，选择尚未更改。请稍后重试。","activeAction":"dispatch","serverListening":true}
+B1B_FORCED_DISPOSE_AFTER_LEASE ok
+B1B_FORCED_DONE resources=["FSReqCallback"]
+
+real	0m0.492s
+user	0m0.000s
+sys	0m0.000s
+EXIT=0
