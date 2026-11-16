@@ -1,0 +1,22 @@
+# Local residual native-spin observation (pre-fix and fixed runs) — Windows 11 x64, Node 24.22.1
+
+## Hang A: 8.3 short TEMP full-file run (2026-11-16 12:51), no inspector
+- 66 tests completed; main file child printed its after-hook probe (resources: PipeWrap only) and then produced no summary; external wall clock 400s -> EXIT=124.
+- netstat for the hung file child: no LISTENING/ESTABLISHED sockets; parent idle; fact check: no leaked HTTP server in this hang.
+
+## Hang B: inspector-enabled run (13:04), iloop2-run1
+- All tests completed, after-hook probe printed, no summary.
+- Debugger.pause produced B1B_PAUSED_TIMEOUT (5s). Runtime.evaluate returned "illegal access"; V8 CPU profile had only (root)/(idle) nodes -> no JS executing.
+  Raw: B1B_EVAL_OK "illegal access" | B1B_PROFILE_NODES 2 | B1B_FN 1 (root) @ :0 | B1B_FN 1 (idle) @ :0
+/tmp/b1b/stack-iloop2-run1.log.txt:B1B_PAUSED_TIMEOUT
+/tmp/b1b/stack-iloop2-run1.log.txt:B1B_PAUSED_TIMEOUT
+- Thread sample (hung file child): exactly one thread Running at ~1 core, all others Wait:
+  2060 cpu=00:01:51.1250000 state=Running; remaining 11 threads state=Wait
+
+## Hang C: fixed file, normal TEMP (13:14), fixed-run1
+- All tests completed; after-hook line: B1b post-suite active resources ["FSReqCallback","Timeout","Timeout","Timeout"]; no summary; file child CPU climbed ~1.1 core; killed at 600s.
+- Thread sample (pid 13916): 9756 cpu=00:02:05.6250000 state=Running; all other 12 threads Wait.
+
+## Comparison runs
+- --test-isolation=none (tests run in the runner process, no file child/IPC v8 serializer): 3/3 natural exits (ISO1/ISO2/ISO3 EXIT=1).
+- Pre-fix baseline (without any after() hook) share the same occasional spin — see 10-pristine-*.log (under collection).
