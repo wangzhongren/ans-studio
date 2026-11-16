@@ -1,0 +1,80 @@
+{
+  "generatedAt": "2026-11-16T01:26:27.932Z",
+  "runId": "43421603526",
+  "command": "node --test --test-concurrency=1 --test-timeout=300000 \"test/**/*.test.ts\"",
+  "typecheck": "success on all three jobs",
+  "platforms": {
+    "macos_arm64": {
+      "jobId": 131872698153,
+      "job": "test (macos-15, mac, arm64)",
+      "conclusion": "failure",
+      "startedAt": "2026-11-13T12:00:50Z",
+      "completedAt": "2026-11-13T12:22:46Z",
+      "summary": {
+        "tests": 5823,
+        "suites": 0,
+        "pass": 5519,
+        "fail": 282,
+        "cancelled": 3,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 1237503.032833
+      },
+      "xmarkLines": 572,
+      "uniqueNames": 285,
+      "topLevelNames": 285,
+      "subtestOnlyNames": 0,
+      "fileLevelNames": 0,
+      "timeouts100s": 2,
+      "stallBeforeCancelMs": null,
+      "notes": [
+        "unique xmark names=285 vs summary fail=282; difference is parent/subtest accounting (inline parent names such as W5/W10 are not repeated as leaf blocks) and embedded child-run output"
+      ]
+    },
+    "macos_x64": {
+      "jobId": 131872698562,
+      "job": "test (macos-15-intel, mac, x64)",
+      "conclusion": "failure",
+      "startedAt": "2026-11-13T12:00:51Z",
+      "completedAt": "2026-11-13T12:29:55Z",
+      "summary": {
+        "tests": 5823,
+        "suites": 0,
+        "pass": 5517,
+        "fail": 284,
+        "cancelled": 3,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 1575824.163546
+      },
+      "xmarkLines": 576,
+      "uniqueNames": 287,
+      "topLevelNames": 287,
+      "subtestOnlyNames": 0,
+      "fileLevelNames": 0,
+      "timeouts100s": 2,
+      "stallBeforeCancelMs": null,
+      "notes": [
+        "unique xmark names=287 vs summary fail=284; difference is parent/subtest accounting (inline parent names such as W5/W10 are not repeated as leaf blocks) and embedded child-run output"
+      ]
+    },
+    "windows_x64_cancelled": {
+      "jobId": 131872698592,
+      "job": "test (windows-2025, win, x64)",
+      "conclusion": "cancelled",
+      "startedAt": "2026-11-13T12:00:50Z",
+      "completedAt": "2026-11-13T14:01:03Z",
+      "summary": null,
+      "xmarkLines": 119,
+      "uniqueNames": 117,
+      "topLevelNames": 114,
+      "subtestOnlyNames": 3,
+      "fileLevelNames": 0,
+      "timeouts100s": 2,
+      "stallBeforeCancelMs": 5338421,
+      "notes": [
+        "no top-level summary with tests>=100 (largest nested child summary tests=1); run was cancelled before the top-level summary; failure list is partial (whole-log xmark union)"
+      ]
+    }
+  }
+}

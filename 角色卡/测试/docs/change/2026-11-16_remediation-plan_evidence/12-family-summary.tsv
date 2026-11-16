@@ -1,0 +1,10 @@
+macos-git-config	113	28:git-shell-acl.test.ts, 13:git-trunk-store.test.ts, 12:git-capabilities.test.ts, 11:git-command.test.ts, 9:bootstrap-frozen-closure-integration.test.ts, 7:freeze-closure.test.ts
+ci-path-canonical	36	22:multi-runtime.test.ts, 3:git-action-authorization-gate.test.ts, 1:git-action-cross-runtime-init.test.ts, 1:git-action-cross-runtime-audit-failure.test.ts, 1:git-action-cross-runtime-pi-init.test.ts, 1:run-stop-host-continuation-integration.test.ts
+e71501c-drift	33	14:chief-workflow.test.ts, 7:star-routing.test.ts, 5:directive-input.test.ts, 3:stuck-redispatch.test.ts, 2:handback-delivery.test.ts, 1:application-line.test.ts
+known-red-62	33	5:trunk-upgrade-validation.test.ts, 3:trio-worker-report.test.ts, 2:section1-write-preauthorization.test.ts, 2:appointment-roster.test.ts, 2:session-dir.test.ts, 2:dispatch-workflow-writer-copy.test.ts
+source-gate	23	11:run-pin.test.ts, 9:run-change-trigger.test.ts, 2:i-full-chain.test.ts, 1:schema.test.ts
+b0-existing-other	17	3:h-scope-audit.test.ts, 3:t1-pipeline-integration.test.ts, 2:trunk-stable-write-integration.test.ts, 1:pi-loopback-verify.test.ts, 1:session.test.ts, 1:project.test.ts
+flake-timing	16	3:session-rebuild-race.test.ts, 3:network-state-e2e.test.ts, 2:f2-claim-release.test.ts, 1:e-handler.test.ts, 1:download-requests-integration.test.ts, 1:download-request.test.ts
+vca-flow	13	9:version-change-integration.test.ts, 4:version-change.test.ts
+unclassified-new	3	1:b31-fixed-release-auto-desktop.test.ts, 1:file-write-safety.test.ts, 1:git-command.test.ts
+hang-timeout	2	1:session-rebuild-race.test.ts, 1:stuck-redispatch.test.ts

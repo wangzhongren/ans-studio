@@ -1,0 +1,20 @@
+root=C:\Users\51054\AppData\Local\Temp\ans-precompose-probe-usInsN
+--- .git/config after git init ---
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+--- .git/config after git config core.precomposeunicode true ---
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+	precomposeunicode = true
+WITH_KEY=REJECTED message=git-config-executable-or-unsupported
+WITHOUT_KEY=ACCEPTED objectFormat=sha1

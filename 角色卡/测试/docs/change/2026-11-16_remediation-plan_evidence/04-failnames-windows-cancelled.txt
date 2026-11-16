@@ -1,0 +1,117 @@
+2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发	
+范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su	
+范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册	
+范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用	
+关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递	
+护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行	
+跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串）	
+宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change	
+派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0	
+申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl	
+审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读	
+提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发	
+显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变	
+显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变	
+显式入口（stop）：requestRunChangeDecision 三模式落账不变	
+显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）	
+星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝	
+业务卡的旧@决策预设不能形成第三个自动执行者	
+一项目一卡：前一张未决时下载卡排队，不呈现	
+重建 dispose 等待窗口：stop A 保持用户目标/关闭契约	
+重建 dispose 等待窗口：stop all 保持用户目标/关闭契约	
+重建 open 等待窗口：stop A 保持用户目标/关闭契约	
+重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过	
+主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）	
+AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录	
+AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）	
+AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留	
+AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确	
+AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读	
+AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点	
+AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点	
+AC-4.3：洁净派发无 advisory、无诊断噪声	
+AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）	
+actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt	
+B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported	
+B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）	
+B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务	
+Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）	
+BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）	
+BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队	
+BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）	
+BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）	
+buildProjectConfig：由枚举结果构造角色表，acceptance 透传	
+C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口	
+commit-race	
+convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务	
+Core-managed binding rejects a provider that did not register its display profile before first prompt	
+D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）	
+D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly	
+D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly	
+D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly	
+D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly	
+D1 background dispatch, queued customer input and handback pin the source engine after selection switches	
+D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card	
+D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn	
+D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged	
+D1 same role and project across engines and same role across projects keep distinct handles and exact input targets	
+D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired	
+D1R2 actual ack preserves a failed delayed terminal and the next aborted original client	
+D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text	
+D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client	
+D1R2 direct and queued identical inputs retain original client ID through delayed old settled	
+D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call	
+D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集	
+D3 linked workspace root remains usable; linked target itself is not replaced	
+dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行	
+dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」	
+doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）	
+F2：版本化文档基线违规受理 + advisory；基线/文档未被改写	
+F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行	
+F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖	
+foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn	
+listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执	
+no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome	
+P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定	
+P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId	
+P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在	
+Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze	
+Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards	
+Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface	
+Q30 fixture HTTP preserves split UTF8 and byte budget	
+Q74 owned Git metadata observer atomic rename race remains bounded and strict	
+R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable	
+R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable	
+requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用	
+required	
+run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned	
+run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned	
+safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递	
+same client IDs across sequential actual turns retain separate first public outcomes	
+selected	
+send rejection before public events remains unknown; later same-client different turns do not borrow outcomes	
+send result reports the original handle is no longer current after replacement while its turn rejects	
+sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道	
+sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）	
+sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）	
+sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账	
+sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂	
+SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常	
+stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session	
+stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色	
+VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）	
+VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）	
+W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind	
+W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界	
+W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin	
+W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin	
+W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin	
+W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin	
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后	
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后	
+W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续	
+W34 真实首文档发布与原创建者关闭后派团队规划保独立scope	
+W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝	
+W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒	
+W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease	
+W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝	
