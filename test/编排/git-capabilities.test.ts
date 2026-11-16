@@ -512,7 +512,14 @@ test("Git initialization Service effect: storage fixture rechecks bytes, rejects
 });
 
 
-test("Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority", { timeout: 180000 }, async () => {
+// R9-A2（2026-11-17）：per-test 预算 180s→300s；仅慢 runner 预算适配，零断言/零语义改动。
+// 依据：第九轮 Windows CI（run 43911103883 / job 133452914919，main @ f3c8a8c）在 R9-A
+// 夹具根 realpath 修复后推进完整真实 Git 链路，本用例于 180,000.304ms 触顶
+// （test timed out after 180000ms），为该 job 唯一残差（fail 0 / cancelled 1）；
+// 本机快机实测 115–136s（KR-29 §5 记录约 117s），Windows runner 同链路慢化约 1.4–1.7×
+// （R9 Q2 P2 观测比例；W-J5 同轮 2.2–2.5×），180s 已无余量。
+// 若 300s 仍触顶：拆测试并报告 owner，不再抬预算。
+test("Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority", { timeout: 300000 }, async () => {
   const project = await createTrunkProject({ withRun: false }), fsStore = createFsTrunkStore(project.root), documents = project.snapshot().documents;
   const snapshot = await fsStore.captureSnapshot!({ snapshotId: "o7-real-planning-basis", createdAt: at, files: Object.values(documents) });
   assert.ok(snapshot.ok); if (!snapshot.ok) return;
