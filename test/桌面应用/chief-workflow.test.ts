@@ -95,6 +95,28 @@ async function disposeDocumentsBounded(desktop: { disposeProjectDocuments(): voi
   }
   console.error(`B1b disposeProjectDocuments retained for ${context}: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
+
+// —————— x64 follow-up（2026-11-16）：进入下一阶段前等待 Core registry 静止 ——————
+// R8 x64 工件（run 43867573699，test-logs-mac-x64）：W29 document-change 的通知等待失败后，
+// 一个 product Core 会话在 disposing 态滞留；后续 8 个变体在 chief-workflow.test.ts:1726 的
+// git_candidate init 上被产品守卫 `git-core-in-flight-unproven`（preparing/creating/disposing
+// 进程级注册表条目）快失败（0.4–0.6s）。夹具只在这里等待真实注册表进入静止态（有界），
+// 不放宽任何产品断言；清理路径只记录诊断（同 B1b 口径），pre-open 路径超时抛出带诊断的错误。
+const coreInFlightStates: ReadonlySet<string> = new Set(["preparing", "creating", "disposing"]);
+function inFlightCoreEntries() {
+  return inspectRuntimeCoreRegistry().entries.filter(entry => coreInFlightStates.has(entry.state));
+}
+async function waitForCoreRegistryQuiescent(context: string, options: { timeoutMs?: number; throwOnTimeout?: boolean } = {}): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  const end = Date.now() + timeoutMs;
+  while (inFlightCoreEntries().length > 0 && Date.now() < end) await tick(20);
+  const remaining = inFlightCoreEntries();
+  if (remaining.length === 0) return;
+  const detail = `Core registry not quiescent for ${context}: ${JSON.stringify(remaining.map(entry => ({
+    sessionId: entry.sessionId, roleId: entry.roleId, runtime: entry.runtime, state: entry.state, projectRoot: entry.projectRoot, reasons: entry.reasons })))}`;
+  if (options.throwOnTimeout) throw new Error(detail);
+  console.error(`B1b ${detail}`);
+}
 after(async () => {
   // 兜底：任何用例 finally 未触及的夹具 server 都必须在这里关闭，否则文件子进程无法自然退出。
   for (const server of [...fixtureServers]) await releaseAll("file-level server backstop", [["close-server", () => closeServer(server)]]);
@@ -1678,7 +1700,7 @@ const roleMissingPlan = scenario === "role-preparation-missing-plan";
 const teamPlanning = scenario === "team-planning";
 const crossDocumentNotice = scenario === "cross-document-close-notice";
 const documentChange = roleMissingPlan || teamPlanning || crossDocumentNotice || intentConfirmV2 || typeof scenario === "string" && scenario.startsWith("document-change");
-test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝" : teamPlanning ? "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope" : crossDocumentNotice ? "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续" : intentConfirmV2 ? `W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 ${intentConfirmRestart ? "真实重启迁移后" : "连续写入后"}` : documentChange ? `W29 默认Core/Chat真实既有文档基线后续 ${scenario} 保专业规划scope不授旧执行pin` : requestedRunMode ? `W28 默认Core/Chat真实受派策划缺不可变pin ${requestedRunMode} 拒绝且零停止` : `W21 默认Core/Chat应用生效通知 ${explicitNoticeReport ? "显式blocked保真任务" : "纯确认不覆盖真实完成报告"}`, { timeout: teamPlanning ? 18000 : 12000 }, async () => {
+test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝" : teamPlanning ? "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope" : crossDocumentNotice ? "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续" : intentConfirmV2 ? `W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 ${intentConfirmRestart ? "真实重启迁移后" : "连续写入后"}` : documentChange ? `W29 默认Core/Chat真实既有文档基线后续 ${scenario} 保专业规划scope不授旧执行pin` : requestedRunMode ? `W28 默认Core/Chat真实受派策划缺不可变pin ${requestedRunMode} 拒绝且零停止` : `W21 默认Core/Chat应用生效通知 ${explicitNoticeReport ? "显式blocked保真任务" : "纯确认不覆盖真实完成报告"}`, { timeout: teamPlanning ? 18000 : documentChange ? 30000 : 12000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w21-notice-"));
   if (intentConfirmV2 && process.env.ANS_W14_EVIDENCE_DIR) configureDiagnostics({ directory: process.env.ANS_W14_EVIDENCE_DIR });
   // B6.1：W21/W28/W29/W30/W33/W34/W35 验证 legacy 派发/run/意图链 ⇒ 显式 legacy 项目夹具（断言不变）。
@@ -1772,9 +1794,21 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3�
     const call = name ? { id, type: "function", function: { name, arguments: JSON.stringify(args) } } : undefined;
     response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ id: "w21-local", object: "chat.completion", choices: [{ index: 0, finish_reason: call || batch ? "tool_calls" : "stop", message: { role: "assistant", content: call || batch ? null : "已知悉应用已生效事实。", ...(batch ? { tool_calls: batch } : call ? { tool_calls: [call] } : {}) } }] }));
   });
-  const waitFor = async (predicate: () => boolean | Promise<boolean>, message: string) => { const end = Date.now() + (documentChange ? 6500 : 3500); while (!await predicate() && Date.now() < end) await tick(10); assert.ok(await predicate(), message + JSON.stringify(trace)); };
+  // x64 follow-up：documentChange 变体在发布应用 + 通知投递上需要慢 runner 余量（R8 x64 11.4s 超时）；
+  // 预算只放宽等待窗口，断言本身不变；diagnose 仅在失败时输出投递/队列/Core 在途诊断。
+  const waitFor = async (predicate: () => boolean | Promise<boolean>, message: string, timeoutMs = documentChange ? 6500 : 3500, diagnose?: () => unknown) => {
+    const end = Date.now() + timeoutMs; while (!await predicate() && Date.now() < end) await tick(10);
+    if (await predicate()) return;
+    let extra = "";
+    if (diagnose) { try { extra = " DIAG=" + JSON.stringify(diagnose()); } catch (error) { extra = " DIAG_ERROR=" + String(error); } }
+    assert.ok(false, message + JSON.stringify(trace) + extra);
+  };
   try {
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); const address = server.address(); assert.ok(address && typeof address !== "string");
+    // x64 follow-up：上一变体 stop/dispose 的 Core 收尾若仍处于 preparing/creating/disposing，
+    // 本次 W29/W30 的 git_candidate init 会被 `git-core-in-flight-unproven` 快失败（R8 x64 8 名同根）；
+    // 进入本阶段前等待真实注册表静止（有界；超时抛出带 entry 诊断的错误，不绕过产品守卫）。
+    await waitForCoreRegistryQuiescent(`W21 variant ${String(scenario)} pre-open`, { throwOnTimeout: true });
     const makeDesktop = () => createDesktopInterface({ pickDirectory: async () => nativePickAllowed ? root : null, emitEvent: event => events.push(event), customerInput: channel.customerInput,
       runtimeOptions: { baseUrl: `http://127.0.0.1:${address.port}/v1`, apiKeyEnvVar: "ANS_W21_LOCAL_KEY", modelId: "owned-local-only", requestAttemptMax: 1, requestFirstByteTimeoutMs: 1500, turnLastResortMs: 4500 },
       envFilePath: path.join(root, ".env"), piConfigEnv: {}, runtimeStatePath: path.join(root, ".runtime-selection.json") });
@@ -1894,7 +1928,20 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3�
       if (process.env.ANS_W14_EVIDENCE_DIR) await fs.writeFile(path.join(process.env.ANS_W14_EVIDENCE_DIR, `${process.env.W14_RUN_LABEL ?? "w34-manual"}-team-planning.json`), JSON.stringify({ root, plan, publication, source, trace, events, cards }, null, 2));
       return;
     }
-    await waitFor(() => trace.some(row => row.role === "product" && row.user.startsWith("[应用·文档更新]") && row.user.includes("version-upgrade")), "Actual publisher notification must reach its actor");
+    // x64 follow-up：R8 x64 工件显示发布应用/通知投递在慢 runner 上超过旧 6500ms 窗口（11.4s 失败）。
+    // 只放宽有界等待并附诊断；"通知必须到达 actor" 的断言不变。
+    await waitFor(() => trace.some(row => row.role === "product" && row.user.startsWith("[应用·文档更新]") && row.user.includes("version-upgrade")),
+      "Actual publisher notification must reach its actor", documentChange ? 20_000 : 3_500,
+      () => {
+        const inventory = desktopProjectExecutionInventory(root);
+        return {
+          productTrace: trace.filter(row => row.role === "product").slice(-3).map(row => ({ lastRole: row.lastRole, lastToolId: row.lastToolId,
+            user: String(row.user).slice(0, 160), tools: row.tools.slice(-2).map(text => String(text).slice(0, 160)) })),
+          productActiveDeliveries: inventory.activeDeliveries.filter(row => row.roleId === "product").map(row => ({ kind: row.kind, taskId: row.taskId, runtime: row.runtime })),
+          productQueuedDispatches: inventory.queuedDispatches.filter(row => row.roleId === "product").map(row => ({ kind: row.kind, operationId: row.operationId, queueEntryId: row.queueEntryId, lastAttempt: row.lastAttempt })),
+          coreInFlight: inFlightCoreEntries().map(entry => ({ sessionId: entry.sessionId, roleId: entry.roleId, runtime: entry.runtime, state: entry.state })),
+        };
+      });
     await waitFor(() => events.filter(event => event.roleId === "product" && event.event.kind === "settled").length >= 3 && !desktopProjectExecutionInventory(root).activeDeliveries.some(row => row.roleId === "product") && closeBasis !== undefined, "Actual publication/notice turns must settle and creator basis arrive");
     await tick(100); // Observe detached ledger consumers after the actual third settle; not a production retry.
     const state = await readTaskState(root), published = [...state.records.values()].find(record => record.created?.idempotencyKey === "w21-publish");
@@ -1950,6 +1997,8 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3�
         if (intentConfirmRestart) {
           await waitFor(() => trace.some(row => row.role === "chief" && row.user.startsWith("[工作结果]") && row.user.includes("W29 actual version two ready")) && !desktopProjectExecutionInventory(root).activeDeliveries.length, "Actual version two report must settle before a real restart");
           assert.ok((await desktop.stopSession()).ok); desktop.disposeProjectDocuments();
+          // x64 follow-up：真实重启也必须等上一次 Core 会话真正离开 preparing/creating/disposing 后再打开新实例。
+          await waitForCoreRegistryQuiescent("W30 real restart after desktop dispose", { throwOnTimeout: true });
           desktop = makeDesktop(); assert.equal(await desktop.pickProject(), root); await desktop.listProject({ projectRoot: root });
           assert.ok((await desktop.openSession(target)).ok);
           restartSend = desktop.sendSession({ text: "W30 confirm actual version two after restart", target });
@@ -2017,6 +2066,9 @@ test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3�
       }],
       ["stopSession", () => settleBounded("W21 desktop.stopSession", desktop?.stopSession() ?? Promise.resolve(), 15_000)],
       ["disposeDocuments", () => disposeDocumentsBounded(desktop, `W21 variant ${String(scenario)}`)],
+      // x64 follow-up：stop/dispose 是异步链；进入下一变体前等待真实 Core 注册表静止（有界）。
+      // server 仍保持打开，让收尾中的真实请求自然结束；清理超时只保留诊断，不改变用例结果。
+      ["core-registry-quiescent", () => waitForCoreRegistryQuiescent(`W21 variant ${String(scenario)} teardown`)],
       ["close-server", () => closeServer(server)],
       ["restore-env", () => {
         if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;

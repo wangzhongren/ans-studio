@@ -1,0 +1,11 @@
+7098:  Error: ENOTEMPTY, Directory not empty: /private/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-p1p7-window-report-c5l8el '/private/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-p1p7-window-report-c5l8el'
+7099-      at Object.rmSync (node:fs:1221:18)
+7100-      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%B5%8B%E8%AF%95/p1p7-window-provenance-integration.test.ts:170:8)
+7101-      at async Test.run (node:internal/test_runner/test:1125:7)
+7102-      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+--
+7104:    code: 'ENOTEMPTY',
+7105-    path: '/private/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-p1p7-window-report-c5l8el',
+7106-    syscall: 'rm'
+7107-  }
+7108-

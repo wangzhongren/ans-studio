@@ -167,7 +167,9 @@ test(`independent C Window: ${failFirstSave ? "failed source save and concurrent
   } finally {
     await manager.stop();
     if (previous === undefined) delete process.env[credentialName]; else process.env[credentialName] = previous;
-    fs.rmSync(root, { recursive: true, force: true });
+    // B0/B7 同法：真实 delivery-history 写入与递归删除在慢 runner 上会竞态出 ENOTEMPTY
+    // （R8 arm64 工件 ans-p1p7-window-report-*）；只给删除加有界重试，仍失败则如实抛错。
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 }

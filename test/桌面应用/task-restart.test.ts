@@ -107,7 +107,9 @@ test("重启恢复：未投递任务重新入队一次；已投递不前移；�
     const gate = await inspectAssignedTask({ projectRoot: root, taskId: "t-pending", actorRoleId: "impl" });
     assert.equal(gate.ok, true, JSON.stringify(gate));
     try {
-      await waitUntil(() => (h.sent.impl?.length ?? 0) === 1);
+      // R8 CI（arm64 55.6s / x64 158.1s）：真实 pinned run 的准备占满大部分用例时长；restoreTasks 的
+      // 异步 drain（真实来源门 + Git 读取）在慢 runner 上超过旧 5s 窗口。只放宽有界等待，断言不变。
+      await waitUntil(() => (h.sent.impl?.length ?? 0) === 1, 30_000);
     } catch (error) {
       const record = (await readTaskState(root)).records.get("t-pending");
       throw new Error(`恢复投递未发生：${String(error)} record=${JSON.stringify({ delivered: record?.delivered, reports: record?.reports })}
@@ -116,7 +118,7 @@ events=${JSON.stringify(h.events.slice(-12))}`);
     assert.match(h.sent.impl[0], /任务编号：#t-pending/);
     assert.doesNotMatch(h.sent.impl[0], /已投递任务/);
     // 投递成功先落盘 task.delivered（durability），再据此验证「重复恢复不重复投」。
-    await waitUntil(async () => (await readTaskState(root)).records.get("t-pending")?.delivered !== undefined);
+    await waitUntil(async () => (await readTaskState(root)).records.get("t-pending")?.delivered !== undefined, 15_000);
 
     const second = await h.mgr.restoreTasks(root);
     assert.equal(second.restored, 0);

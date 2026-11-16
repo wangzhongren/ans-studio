@@ -1,0 +1,11 @@
+/tmp/x64fu-r8-art/test-logs-mac-arm64/test-ci-output.log:7090:  Error: 恢复投递未发生：Error: 等待超时 record={"reports":[]}
+/tmp/x64fu-r8-art/test-logs-mac-arm64/test-ci-output.log-7091-  events=[]
+/tmp/x64fu-r8-art/test-logs-mac-arm64/test-ci-output.log-7092-      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:113:13)
+/tmp/x64fu-r8-art/test-logs-mac-arm64/test-ci-output.log-7093-      at async Test.run (node:internal/test_runner/test:1125:7)
+/tmp/x64fu-r8-art/test-logs-mac-arm64/test-ci-output.log-7094-      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+--
+/tmp/x64fu-r8-art/test-logs-mac-x64/test-ci-output.log:7288:  Error: 恢复投递未发生：Error: 等待超时 record={"reports":[]}
+/tmp/x64fu-r8-art/test-logs-mac-x64/test-ci-output.log-7289-  events=[]
+/tmp/x64fu-r8-art/test-logs-mac-x64/test-ci-output.log-7290-      at TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:113:13)
+/tmp/x64fu-r8-art/test-logs-mac-x64/test-ci-output.log-7291-      at async Test.run (node:internal/test_runner/test:1125:7)
+/tmp/x64fu-r8-art/test-logs-mac-x64/test-ci-output.log-7292-      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
