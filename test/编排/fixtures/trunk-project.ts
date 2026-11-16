@@ -56,7 +56,16 @@ export async function writeProjectFile(projectRoot: string, rel: string, content
 }
 
 export async function makeRoot(): Promise<string> {
-  return fs.mkdtemp(path.join(os.tmpdir(), "ans-trunk-service-"));
+  // R9-A（2026-11-17）：产品 journal 扫描要求操作目录满足 `realpath(dir) === dir`
+  //（git-command.ts:446，防符号链接/重定向的安全不变量）；调用方根必须是真实根拼写。
+  // CI 的 os.tmpdir() 可能是非规范拼写：macOS `/var/folders` → `/private/var/folders`，
+  // Windows runner 8.3 短名 `RUNNER~1` → `runneradmin`；mkdtemp 原拼写会让不变量误判
+  // （R9 三平台 `git-journal-directory-invalid`）。夹具统一持有规范根。
+  // 用 fs/promises.realpath（native 语义：展开 8.3 短名、解析符号链接祖先；普通
+  // fs.realpathSync 不展开短名——见 git-trunk-store.ts:1159-1165）；先例
+  // test/编排/git-command.test.ts:41-43 与 test/编排/fixtures/git-action-authorization-wiring.ts:128。
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-trunk-service-"));
+  return fs.realpath(root);
 }
 
 const ROSTER_TEXT = [
