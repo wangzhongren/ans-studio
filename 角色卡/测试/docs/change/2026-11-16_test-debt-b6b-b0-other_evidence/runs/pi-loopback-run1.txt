@@ -1,0 +1,33 @@
+✔ 隔离：ANS_PI_SERVER_TOOLS=off / 0（显式关）⇒ 请求体零声明、零 server_tool 诊断、零工具行（逐字旧行为） (16391.4275ms)
+✔ 构造期 fail-closed：未知 id（code_execution/伪造名）⇒ bindRole 抛错且抛错先于任何网络（loopback 零请求） (3.9366ms)
+✔ 开启成功往返：声明尾部上 wire、恰一对 start/result、查询/标题会话内可见、URL query 剥除、诱饵零泄漏 (37.3757ms)
+✔ 错误变体对抗（自选 error_code=unavailable）：denied 如实、非运行错误、轮次 completed、诊断类别归一 (52.9551ms)
+✖ 跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串） (14.0982ms)
+✔ 降级链：网关对含声明请求回 400 ⇒ 本轮如实失败＋降级恰一次＋后续（含第 2 轮）不再附声明且轮次正常完成 (46.0501ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16761.7667
+
+✖ failing tests:
+
+test at test\测试\g3-search-verify\pi-loopback-verify.test.ts:315:1
+✖ 跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串） (14.0982ms)
+  AssertionError [ERR_ASSERTION]: 轮次归属应恰为 g3-turn-1/2：,g3-turn-1,g3-turn-3
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6b/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:336:14
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async withEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6b/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:78:16)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6b/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:317:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

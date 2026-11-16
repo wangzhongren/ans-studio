@@ -1,0 +1,50 @@
+✔ F1 成功链（rebuilt）：校验→激活重建→冻形回执→[系统·安装] 真投递（含诚实面）→不可撤回→诊断 (189.8011ms)
+✔ F2 拒绝全分支 → reason 映射逐字＋零副作用（盘快照/零重建/无系统行）；文案与 schema 模板同代入后互核 (23.0672ms)
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (8.2844ms)
+✔ F4 激活三态：busy ⇒ next-session 不打断；无会话 ⇒ next-session＋note（绝不自动开）；重建失败 ⇒ rebuild-failed 如实 (166.9236ms)
+✔ F5 卸载链：先改声明→校验通过→重建→回执二分（效果已撤/声明保留/副作用不可撤）＋系统行；已发生副作用不可撤入文案 (14.9822ms)
+✔ F6 排队客户消息轮：su 忙时再发客户消息处于队列（active kind=message）⇒ 安装仍放行；护栏先判不消耗队列 (14.0924ms)
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (16.7672ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 867.3045
+
+✖ failing tests:
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:130:1
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (8.2844ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6b/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:140:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:266:1
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (16.7672ms)
+  AssertionError [ERR_ASSERTION]: 诊断含 mcp.refused
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6b/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:278:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

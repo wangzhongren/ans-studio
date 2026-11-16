@@ -1,0 +1,15 @@
+# h-scope-audit pre-fix 3x (observed; raw console output not retained)
+
+Command: node --test --test-timeout=120000 "test/测试/g4-skill-verify/h-scope-audit.test.ts"
+Runs: 3/3 identical. Summary: tests 7 / pass 4 / fail 3. EXIT=1.
+
+Failing names and first error (ERR_ASSERTION):
+1. 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su
+   - AssertionError [ERR_ASSERTION]: installMcp 透传判据＝能力矩阵（唯一）  (old regex vs blockedRoleCapabilities/input-presence line)
+2. 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册
+   - AssertionError [ERR_ASSERTION]: installSkill 透传判据＝能力矩阵（唯一）
+3. 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用
+   - AssertionError [ERR_ASSERTION]: test/claude-adapter/session.test.ts 不得引用任何 .probe 模块
+     (false positive from `{ ...probeTool(), ... }` spread containing the substring "..probe")
+
+Post-fix raw outputs: runs/h-scope-audit-after{1,2,3}.txt (7/7 each).

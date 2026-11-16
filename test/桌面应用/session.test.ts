@@ -571,9 +571,11 @@ test("AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有�
   }
 });
 
-test("AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）", () => {
+// 2026-11-16（B6b）：B23（6482387，fixed-path 哈希来源说明）更新了 doc-format 正文；
+// B1 初版 pin（5,223 / 4,089）已被有意内容增长取代。预算上限（≤8192）与 54 id 不变，仅重钉实测值。
+test("AC-8 预算：索引 5,244 B、最大详情 4,243 B（均 ≤8192 B，B23 后实测 pin）", () => {
   const index = docFormatIndexText();
-  assert.equal(Buffer.byteLength(index, "utf8"), 5223, "索引字节（B1 实测 pin）");
+  assert.equal(Buffer.byteLength(index, "utf8"), 5244, "索引字节（B23 后实测 pin）");
   assert.ok(Buffer.byteLength(index, "utf8") <= 8192);
   assert.equal(docFormatKnownIds().length, 54, "54 个格式 id 全量可发现");
 
@@ -587,6 +589,6 @@ test("AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 �
       maxId = id;
     }
   }
-  assert.equal(maxBytes, 4089, "最大详情字节（B1 实测 pin）");
+  assert.equal(maxBytes, 4243, "最大详情字节（B23 后实测 pin）");
   assert.equal(maxId, "project-roster/v3", "最大详情为 roster（render 型整段返回）");
 });

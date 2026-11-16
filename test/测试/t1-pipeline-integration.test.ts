@@ -65,9 +65,11 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
         receipts.push(await tool(options, "submit_report", { status: "completed", summary: "T1 current report", evidence: ["src/X/current.txt"] }, signal));
       }
     });
-    // 任务级 writeSet 收窄（空集）：2026-10-25 起无 scope 的聊天会话对 Section 1 边界内路径预授权，
-    // 会把本用例要验证的“确认发行”短路成无条件可写；scope 让确认成为唯一写权来源，保留原断言。
-    const handle = await openRoleSession({ roleId: "X", taskId: "T1", project, runtime, scope: { writeSet: [], conditions: [] },
+    // 确认制会话：空 writeSet 让「客户确认」成为唯一写权来源（Section 1 预授权不短路本用例）。
+    // 不用合成 taskId：v2.0.0/e71501c 起带 taskId 的项目角色会话按「真实受派任务」冻结
+    // module/current 交集求值；本用例的 T1 任务并不在账本中 ⇒ 交集为空、确认后写入仍会被拒。
+    // 聊天会话（无 taskId）＋空 scope 保留原断言语义（确认发行 vs 未确认拒绝）。
+    const handle = await openRoleSession({ roleId: "X", project, runtime, scope: { writeSet: [], conditions: [] },
       customerInput: (_request, context) => {
         if (phase) return { outcome: "answered", value: { confirmed: true } };
         metadata = context; return new Promise<CustomerInputOutcome>(r => { answer = r; });
@@ -75,7 +77,10 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
     }, { runtimeOptions: { providerFactories: { [runtime]: provider.factory }, turnLastResortMs: 100, promptTimeoutMs: 100, persistSession: true } });
     const pump = (async () => { for await (const event of handle.events()) events.push(event); })();
     try {
-      const first = handle.send("confirm"); const rejected = assert.rejects(first);
+      // 回交意图显式 required（不带 taskId）：本用例钉 settle→handback 语义（aborted/unreported/completed）；
+      // 无任务 id 仍保持聊天会话（不触任务级冻结交集），也不伪造账本任务。
+      const handback = { handback: { required: true } } as const;
+      const first = handle.send("confirm", handback); const rejected = assert.rejects(first);
       await untilIO(() => answer !== undefined); t.mock.timers.tick(180); await nextIO();
       assert.equal(events.filter(e => e.kind === "settled").length, 0, "actual waiting gate pauses the 100ms last-resort deadline during 180ms explicit logical customer wait");
       assert.equal(metadata?.runtime, runtime); assert.equal(metadata?.roleId, "X"); assert.ok(metadata?.turnId);
@@ -83,8 +88,8 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
       assert.deepEqual(await handle.abort?.(), { ok: true, supported: true }); await rejected;
       assert.equal(metadata?.signal?.aborted, true);
       answer!({ outcome: "answered", value: { confirmed: true } }); t.mock.timers.tick(5); await nextIO();
-      await handle.send("write"); assert.equal(receipts.at(-1)?.ok, false); assert.equal(fs.existsSync(path.join(project.projectRoot, "src/X/current.txt")), false);
-      phase = 1; await handle.send("current");
+      await handle.send("write", handback); assert.equal(receipts.at(-1)?.ok, false); assert.equal(fs.existsSync(path.join(project.projectRoot, "src/X/current.txt")), false);
+      phase = 1; await handle.send("current", handback);
       assert.deepEqual(receipts.slice(-4).map(r => r.ok), [true, true, false, true]);
       assert.equal(fs.readFileSync(path.join(project.projectRoot, "src/X/current.txt"), "utf8"), runtime + " valid current consent");
       assert.equal(fs.existsSync(path.join(project.projectRoot, "src/X/unlisted.txt")), false);

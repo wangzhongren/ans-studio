@@ -1,0 +1,32 @@
+✔ resolveSkillRoot：优先 ANS_SKILL_ROOT (0.8467ms)
+✔ posixDirname：取目录名 (0.1022ms)
+✔ buildProjectConfig：由枚举结果构造角色表，acceptance 透传 (44.5516ms)
+✔ readRoleDocsIndex：列出 docs 目录并读到设计稿；读到 changelog.md (1.7449ms)
+✔ su：枚举结果里排第一且标为内置，且不进 ProjectConfig 的 roles 映射 (23.0316ms)
+✔ su：resolveRole 下沉为 built-in-governance，走内置边界、不抛错 (20.6651ms)
+✔ deriveGovernanceRecord：missing——无 .ans（builtin-fallback），即使回退 acceptance 是运行期同意 (0.1881ms)
+✔ deriveGovernanceRecord：present——ans + accepted + 治理边界路径非空（不校验 pin 逐文件哈希） (0.0731ms)
+✔ deriveGovernanceRecord：invalid——ans-invalid 原样取载入器 downgradeReason (0.0777ms)
+✔ deriveGovernanceRecord：invalid——ans 但未接受（如 accepted:true 无 pin 被降级），reason 取 downgradeReason (0.3141ms)
+✔ deriveGovernanceRecord：invalid——治理边界路径为空或纯空白（含 accepted） (0.1123ms)
+✔ applyPinEvidence：ok 保持原 present（不新增字段）；mismatch → pin-mismatch + 明细；invalid → invalid + 原因 (0.1429ms)
+✔ applyPinEvidence：missing / invalid 原样返回（不因 pin 证据改写既有形状） (0.0387ms)
+✔ deriveGovernanceRecordWithPins：present 以外不做哈希、原样返回（检查器零调用） (0.1014ms)
+✔ deriveGovernanceRecordWithPins：pins 缺失或为空 → invalid（fail-closed，检查器零调用） (0.0588ms)
+✔ deriveGovernanceRecordWithPins：present 时透传 projectRoot/pins/治理边界路径，并映射证据 (0.0752ms)
+✔ deriveGovernanceRecordWithPins：mismatch 明细映射为 pin-mismatch；检查器抛错 → invalid 且永不 reject (0.1897ms)
+✔ readRoleDocsIndex：rootDocs 只含三个白名单文件（固定顺序），memo/任意根文件永不入索引；changelog 与 docs/ 不回归 (9.9208ms)
+✔ readRoleDocsIndex：部分根文档缺失只返回存在的，顺序保持相对；只有 memo 时 rootDocs 为空且不抛错 (3.8485ms)
+✔ readRoleDocsIndex：cardPath 为空/绝对/盘符/反斜杠/空段/`.`/`..` 一律返回空索引且不抛错 (2.6123ms)
+✔ readRoleDocsIndex：符号链接角色目录与根文档不列入（POSIX 实测；Windows 以非法路径/非目录用例覆盖） (0.1586ms)
+ℹ Windows 创建符号链接受权限限制；索引跳过逻辑由非法路径/非目录用例覆盖，POSIX 另行实测。
+✔ projectDocumentCandidates：透传 rootDocs 元数据；旧调用方（无 rootDocs）不产生字段 (0.1103ms)
+✔ readRoleDocsIndex：索引跳过记录元数据诊断（含 reasonCode，不写路径/正文） (12.266ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 315.0743

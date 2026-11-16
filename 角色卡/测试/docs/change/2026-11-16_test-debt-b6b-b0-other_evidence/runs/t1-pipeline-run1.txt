@@ -1,0 +1,90 @@
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (92.0595ms)
+✔ T1 pi: the same controlled Core clock triggers the 100ms last resort outside customer waiting (16.8595ms)
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (53.0911ms)
+✔ T1 codex: the same controlled Core clock triggers the 100ms last resort outside customer waiting (14.0039ms)
+✖ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (52.9017ms)
+✔ T1 claude: the same controlled Core clock triggers the 100ms last resort outside customer waiting (13.8994ms)
+✔ T1 real outer failed remains one terminal and truthful handback after external cleanup completion (20.6061ms)
+✔ T1 real outer timed_out remains one terminal and truthful handback after external cleanup completion (62.8962ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 5
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 637.3333
+
+✖ failing tests:
+
+test at test\测试\t1-pipeline-integration.test.ts:54:3
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (92.0595ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      true,
+  -   true,
+      false,
+  +   false,
+      true
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6b/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:88:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ true, false, false, true ],
+    expected: [ true, true, false, true ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\t1-pipeline-integration.test.ts:54:3
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (53.0911ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      true,
+  -   true,
+      false,
+  +   false,
+      true
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6b/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:88:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ true, false, false, true ],
+    expected: [ true, true, false, true ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\t1-pipeline-integration.test.ts:54:3
+✖ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (52.9017ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      true,
+  -   true,
+      false,
+  +   false,
+      true
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b6b/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:88:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ true, false, false, true ],
+    expected: [ true, true, false, true ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

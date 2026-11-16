@@ -134,8 +134,14 @@ test("D judge facts：只读任务/申请上下文；旧账本快照参数被忽
   assert.deepEqual(facts.appointmentTargetRoleIds, ["worker"]);
 });
 
+// 2026-11-16（B6b）：D 批撤除的是 **flow/team-plan 机器**（旧工具/模块/账本名）。v1.3 两条固定
+// 工作流路径（B1，2026-11-10：workflow-service/workflow-state 模块、complete-team-plan 动作、
+// team-plan/v3 文档格式、TrunkSource "team-plan"、purpose "team-planning"）把 `team-plan` 作为
+// **当前产品词汇**重新引入；`workflow-service`/`workflow-state` 中的 `flow-service`/`flow-state`
+// 是子串（负向 lookbehind 排除 work 前缀，旧机器名仍会被捕获）。因此 residue 集只保留
+// 旧机器专属标识符；`team-plan` 一词不再作为残留判据（allowlist 的按行豁免不再需要）。
 const D04_RESIDUE =
-  /governance-gate|governance-ledger|flow_get|flow_step_update|flow_step_supersede|flow-service|flow-state|team-plan|acceptance-triage|acceptance-rework|request_acceptance|request_gate_review|request_boundary_change|hand_off_intent|request_clarification|schedule-write|report_artifact_ready|docs\/flows\/|ledger\.jsonl/;
+  /governance-gate|governance-ledger|flow_get|flow_step_update|flow_step_supersede|(?<!work)flow-service|(?<!work)flow-state|acceptance-triage|acceptance-rework|request_acceptance|request_gate_review|request_boundary_change|hand_off_intent|request_clarification|schedule-write|report_artifact_ready|docs\/flows\/|ledger\.jsonl/;
 
 function* filesUnder(dir: string): Generator<string> {
   for (const name of readdirSync(dir)) {
@@ -154,6 +160,8 @@ function* filesUnder(dir: string): Generator<string> {
 // SHA-256 `43220baf…` 授权“按实际含义 allowlist 或修正测试，不得一刀切放宽”）：
 // D 批撤除的是 flow/team-plan **机器**（模块、工具、账本、schema）；trunk-amendment P1.6 把 `team-plan`/`flow`
 // 作为**工件类别**（VCA target kind、重构禁区、execution 路径映射）合法使用，属新 feature 语义，不是旧入口残留。
+// 2026-11-16（B6b）：`team-plan` 已在 v1.3 fixed 工作流中成为常规产品词汇（complete-team-plan /
+// team-plan/v3 / TrunkSource / purpose），不再是残留判据；其余 `docs/flows/` 豁免按当前真实引用逐行保留/补齐。
 // 豁免精度必须同时满足：文件全等 + 词面全等 + 整行锚点（^…$）匹配；allowlist 条目未命中任何真实词面亦失败（防腐烂）。
 interface D04AllowlistEntry {
   readonly file: string; // repo 相对 POSIX 路径
@@ -164,36 +172,11 @@ interface D04AllowlistEntry {
 
 const D04_ALLOWLIST: readonly D04AllowlistEntry[] = Object.freeze([
   {
-    file: "src/model/version-change.ts",
-    token: "team-plan",
-    line: /^export type RefactorForbiddenKind = "versioned-doc" \| "boundary" \| "stable" \| "team-plan" \| "flow";$/,
-    reason:
-      "P1.6 §4.8/AC-7（F40）：team-plan 是重构禁区枚举 RefactorForbiddenKind 的工件类别值（不新增角色/不恢复旧机器）",
-  },
-  {
-    file: "src/model/version-change.ts",
-    token: "team-plan",
-    line: /^"team-plan",$/,
-    reason: "P1.6 §4.8/AC-7（F40）：REFACTOR_FORBIDDEN_KINDS 冻结数组中的同一工件类别值",
-  },
-  {
     file: "src/pipeline/orchestration/version-change-runtime.ts",
     token: "docs/flows/",
     line: /^if \(pathRel\.startsWith\("docs\/flows\/"\)\) return "flow";$/,
     reason:
       "P1.6 §4.7/AC-29（F39）：execution 工件 docs/flows/<flowId>.yaml（若存在）→ kind flow 的 VCA target 映射",
-  },
-  {
-    file: "src/service/version-change/impl/refactor-validate.ts",
-    token: "team-plan",
-    line: /^kind: "team-plan",$/,
-    reason: "P1.6 §4.8/AC-7：重构 scope 含 docs/scheduling/ 时的拒绝分类 kind=team-plan（early warning，机械保证在 WriteGate）",
-  },
-  {
-    file: "src/service/version-change/impl/refactor-validate.ts",
-    token: "team-plan",
-    line: /^message: `重构不能改团队计划（kind=team-plan）：\$\{rel\}；请提交版本变更申请（detail-amendment execution）`,$/,
-    reason: "P1.6 §4.8/AC-7：上述拒绝分类的客户可见说明文案（kind=team-plan）",
   },
   {
     file: "src/service/version-change/impl/targets-items.ts",
@@ -203,25 +186,32 @@ const D04_ALLOWLIST: readonly D04AllowlistEntry[] = Object.freeze([
       "P1.6 §4.4/§4.7（F39/AC-29）：execution 工件作者写区注释（convener：docs/scheduling/、docs/flows/）",
   },
   {
-    file: "src/common/shared/i18n/messages/en-US.ts",
-    token: "team-plan",
-    line: /^\/\/ `ui\.trunk\.\*` \(22\) is a C3 in-directory key-family extension \(not listed in the team-plan increment §4\.1 C3 row\); disclosed in E1\.$/,
-    reason:
-      "Batch 3.5 注释引用本批次 increment 团队计划 docs/scheduling/2026-11-04_team-plan_trunk-amendment-model-P1.5-increment.md（C3 i18n 冻结行），非旧机器残留",
-  },
-  {
-    file: "src/provider/runtime/schema.ts",
-    token: "team-plan",
-    line: /^description: "Concrete file paths touched \(project-relative; versioned docs\/stable\/boundary\/team-plan\/flow are rejected\)",$/,
-    reason:
-      "P1.6 §4.8/AC-7（F40，C1d）：submit_refactor 的 scope.paths 参数描述列出重构被拒绝的工件类别（team-plan/flow 属 execution 工件，重构不得触碰；机械保证在 WriteGate）",
-  },
-  {
     file: "src/provider/runtime/schema.ts",
     token: "docs/flows/",
     line: /^"Target kind is an author-area class, NOT a document type\. contract = docs\/proposals\/<flowId>-\{proposal,modules,topology\}-vN\.md and docs\/contracts\/<flowId>-\{architecture,assets\}-vN\.md; roster = docs\/proposals\/<flowId>-roster-vN\.md; execution = docs\/scheduling\/<flowId>-team-vN\.md and docs\/flows\/<flowId>\.yaml\. version-upgrade allows contract\/roster only; detail-amendment also allows execution\.",$/,
     reason:
       "P1.6 §4.4/§4.7（F39/AC-29）：VCA target kind 工具说明按作者写区类别列出 execution 工件（docs/scheduling/、docs/flows/），与 targets-items.ts 作者写区注释同语义，属合法工件类别词面（非旧 flow 机器残留）",
+  },
+  {
+    file: "src/common/编排/doc-format-specs.ts",
+    token: "docs/flows/",
+    line: /^pathPattern: "docs\/flows\/<flowId>\.yaml",$/,
+    reason:
+      "v1.3 B1（2026-11-10）：execution 工件 docs/flows/<flowId>.yaml 的文档格式登记（pathPattern）；fixed 路径当前语义",
+  },
+  {
+    file: "src/common/门禁引擎/classify-shell.ts",
+    token: "docs/flows/",
+    line: /^policyRequire\(\(kind === "teamPlan" \? file\.startsWith\("docs\/scheduling\/"\) : file\.startsWith\("docs\/flows\/"\)\)$/,
+    reason:
+      "v1.3 B1：team-plan 完成时的 Git policy 写区判定——execution 工件按 docs/scheduling/ 或 docs/flows/ 归类（当前语义）",
+  },
+  {
+    file: "src/service/trunk/impl/apply-journal.ts",
+    token: "docs/flows/",
+    line: /^: key === "execution:flow" && new RegExp\(`\^docs\/flows\/\$\{input\.flowId\}[^`]*`\)\.test\(ref\.path\)\);$/,
+    reason:
+      "v1.3 B1：execution:flow 文档 key 的路径正则（docs/flows/<flowId>.y(a)ml）绑定 trunk 文档引用（当前语义）",
   },
 ]);
 

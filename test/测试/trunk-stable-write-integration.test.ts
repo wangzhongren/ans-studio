@@ -47,7 +47,8 @@ import type {
 } from "../../src/provider/pi/session.ts";
 import type { TaskStateEvent } from "../../src/model/runtime.ts";
 import type { StableWritePermit, StableWriteRecord } from "../../src/model/version-change.ts";
-import type { TrunkApplySnapshot, TrunkManifest } from "../../src/model/trunk.ts";
+import { FROZEN_ROLE_REF_KEYS, type CompleteSnapshot, type FrozenRoleEvidence, type TrunkApplySnapshot, type TrunkManifest } from "../../src/model/trunk.ts";
+import { completeSnapshotDigest } from "../../src/provider/version-change/public/version-change-store.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
 import type { VersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
 import { createRunRepinPort, createTrunkRuntime } from "../../src/pipeline/orchestration/trunk-runtime.ts";
@@ -215,40 +216,96 @@ async function bootstrapThrough(
 
 const WORKFLOW_OLD = "# workflow\n";
 
-function gateProject(root: string): ProjectConfig {
-  const files: Array<[string, string]> = [
-    ["角色卡/X/role-card.md", "# 角色 X\n"],
-    [
-      "角色卡/X/boundary.yaml",
-      [
-        "role: X",
-        "entries:",
-        "  - kind: file",
-        "    path: docs/workflow.md",
-        "    purpose: stable 文件",
-        "  - kind: file",
-        "    path: 角色卡/impl/role-card.md",
-        "    purpose: stable 文件",
-        "  - kind: file",
-        "    path: 角色卡/impl/boundary.yaml",
-        "    purpose: stable 文件",
-        "  - kind: directory",
-        "    path: docs/proposals/",
-        "    purpose: 版本化文档",
-        "",
-      ].join("\n"),
-    ],
+const GATE_ROLE_CARD = "# 角色 X\n" + ["组别", "工作立场", "能力描述", "职责与功能导航", "必读资料", "交接输入输出", "执行原则", "质量职责", "标准工作流", "交付物清单"]
+  .map((heading) => `## ${heading}\nX 角色（stable-write 集成夹具）。\n`).join("");
+const GATE_BOUNDARY_YAML = [
+  "role: X",
+  "entries:",
+  "  - kind: file",
+  "    path: docs/workflow.md",
+  "    purpose: stable 文件",
+  "  - kind: file",
+  "    path: 角色卡/impl/role-card.md",
+  "    purpose: stable 文件",
+  "  - kind: file",
+  "    path: 角色卡/impl/boundary.yaml",
+  "    purpose: stable 文件",
+  "  - kind: directory",
+  "    path: docs/proposals/",
+  "    purpose: 版本化文档",
+  "",
+].join("\n");
+const GATE_BOUNDARY_MD = [
+  "# 角色 X 边界",
+  "## Section 1: 可修改文件与目录",
+  "| 类型 | 可操作路径 | 用途 |",
+  "| --- | --- | --- |",
+  "| 单文件 | `docs/workflow.md` | stable 文件 |",
+  "| 单文件 | `角色卡/impl/role-card.md` | stable 文件 |",
+  "| 单文件 | `角色卡/impl/boundary.yaml` | stable 文件 |",
+  "| 目录 | `docs/proposals/` | 版本化文档 |",
+  "",
+].join("\n");
+const GATE_EVIDENCE_AUX: Array<[string, string]> = [
+  ["docs/gate-roster.md", "gate roster frozen bytes\n"],
+  ["docs/gate-plan.md", "gate plan frozen bytes\n"],
+  ["docs/gate-d3.json", "{\"decisionId\":\"gate-d3\"}\n"],
+  ["docs/gate-activation.json", "{\"activation\":\"gate-activation\"}\n"],
+  ["docs/gate-authorization.json", "{\"authorization\":\"gate-authorization\"}\n"],
+];
+
+/**
+ * 2026-11-16（B6b）：v2.0.0/e71501c 起，项目角色的边界解析要求**真实角色文档物证**
+ * （`documentContext.frozenRoleEvidence` 或 trunk `activeRoles`）；裸 card/boundary 文件不再足够
+ * （否则 `active-role-evidence-missing-or-mismatched`）。
+ * 本夹具按既有 `FROZEN_ROLE_REF_KEYS` 八类引用写一份真实 complete-snapshot 并绑定 documentContext；
+ * 角色边界内容（docs/workflow.md / 角色卡 impl 两文件 / docs/proposals/）逐字保留，stable 许可断言不变。
+ */
+async function gateProject(project: TrunkProject): Promise<ProjectConfig> {
+  const root = project.root;
+  const texts: Array<[string, string]> = [
+    ["角色卡/X/role-card.md", GATE_ROLE_CARD],
+    ["角色卡/X/boundary.md", GATE_BOUNDARY_MD],
+    ["角色卡/X/boundary.yaml", GATE_BOUNDARY_YAML],
+    ...GATE_EVIDENCE_AUX,
   ];
-  for (const [rel, text] of files) {
+  for (const [rel, text] of texts) {
     const abs = path.join(root, rel);
     mkdirSync(path.dirname(abs), { recursive: true });
     writeFileSync(abs, text, "utf8");
   }
+  const textOf = new Map(texts);
+  const files = texts.map(([rel, text]) => ({ path: rel, sha256: sha256(text), bytesBase64: Buffer.from(text, "utf8").toString("base64") }));
+  const digest = completeSnapshotDigest(files);
+  const snapshotId = `gate-role-x-${digest.slice(0, 16)}`;
+  const snapshot: CompleteSnapshot = { schema: "complete-snapshot/v1", snapshotId, digest, files, createdAt: AT2 };
+  const stored = await project.store.prepareSnapshot!(snapshot);
+  assert.equal(stored.ok, true, `gate 角色物证快照写入失败：${stored.ok ? "" : stored.message ?? stored.reason}`);
+  const ref = (rel: string) => ({ snapshotId, path: rel, sha256: sha256(textOf.get(rel)!) });
+  const refPaths: Record<(typeof FROZEN_ROLE_REF_KEYS)[number], string> = {
+    rosterRef: "docs/gate-roster.md",
+    planRef: "docs/gate-plan.md",
+    d3Ref: "docs/gate-d3.json",
+    activationRef: "docs/gate-activation.json",
+    cardRef: "角色卡/X/role-card.md",
+    boundaryMdRef: "角色卡/X/boundary.md",
+    boundaryYamlRef: "角色卡/X/boundary.yaml",
+    authorizationRef: "docs/gate-authorization.json",
+  };
+  const pinDigest = sha256("gate-x-pin");
+  const frozenRoleEvidence = {
+    roleId: "X",
+    snapshotRef: { snapshotId, digest },
+    ...Object.fromEntries(FROZEN_ROLE_REF_KEYS.map((key) => [key, ref(refPaths[key])])),
+    runId: project.runId,
+    pinDigest,
+  } as FrozenRoleEvidence;
   return {
     projectRoot: root,
     skillRoot: root,
     roles: { X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" } },
     governanceBoundary: { path: "角色卡/X/boundary.yaml", acceptance: { accepted: true, source: "test:t1" } },
+    documentContext: { runId: project.runId, pinDigest, frozenRoleEvidence },
   };
 }
 
@@ -288,7 +345,7 @@ async function openGate(
   const handle = await openRoleSession(
     {
       roleId: "X",
-      project: gateProject(project.root),
+      project: await gateProject(project),
       customerInput: () => ({ outcome: "declined" }),
       stablePermitOf,
     },

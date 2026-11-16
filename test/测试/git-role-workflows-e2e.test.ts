@@ -20,6 +20,9 @@ import { isDispatchTaskResumeController, isTaskParentRef, isTaskReviewBasisRef, 
 import { actualApplicationNotice, actualUserInput, actualToolReply, createFixtureTailRecorder, fixtureTailToolFact, createRealHttpDriver as createBaseRealHttpDriver, fixtureWaitBudgetMs, gitTool, hashFixtureFiles, observeFixtureGitMetadata, modelCalls, modelDone, observeDiagnosticTimers, readFixtureHttpBody, runDesktopLifecycleProbe, type ChatRequest, type HttpScripts, type HttpTrace } from "./git-role-workflows-driver.ts";
 
 const evidence = path.resolve("角色卡/测试/docs/change/2026-11-05_git-role-permissions-evidence");
+// 2026-11-16（B6b）：该证据目录是测试自写产物（未随仓库跟踪）。历史本地树中恰好存在，掩盖了
+// 全新工作树/CI 首跑的缺口——Q30/Q74 等早期用例在 finally 写证据时会 ENOENT。这里显式自建。
+await fs.mkdir(evidence, { recursive: true });
 const continuousChangeChild = process.env.ANS_CONTINUOUS_CHANGE_CHILD === "1";
 const continuousDrivers: Awaited<ReturnType<typeof createBaseRealHttpDriver>>[] = [];
 const createRealHttpDriver = continuousChangeChild ? async (...args: Parameters<typeof createBaseRealHttpDriver>) => {

@@ -1,0 +1,16 @@
+✔ stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift） (166.9904ms)
+✔ stable 异常：无客户通道不发许可；拒绝不写；哈希不符 failed + 许可作废 + 快照不变；过期许可拒绝 (237.1467ms)
+✔ appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本） (132.3736ms)
+✔ trunk apply-journal：提交点/幂等重放/base 不一致/内容哈希不符不改指针；derive/verify/history 一致 (138.735ms)
+✔ trunk 对账：phase 滞后可识别分裂态（内容已过提交点），且补写事件必须通过 C2a 账本校验 (60.4815ms)
+✔ trunk 客户动作：refreeze 只续接 stable 快照（不升版本、客户归属）；abandon 不改指针；history 归档 (157.1371ms)
+✔ trunk 恢复：manifest 损坏 ⇒ 客户确认后 tN+1（recovered）；冻结注册表 corrupt ⇒ 恢复拒绝 (117.3992ms)
+✔ 栈初始化：missing 基线 ⇒ 迁移后 ready；corrupt 基线 ⇒ corrupt-failclosed 且入口禁用 (46.3527ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1392.4294

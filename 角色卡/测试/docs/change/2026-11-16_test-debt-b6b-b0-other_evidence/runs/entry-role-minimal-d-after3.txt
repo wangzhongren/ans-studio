@@ -1,0 +1,14 @@
+✔ D 写区切换：六角色 Section 1 与能力矩阵按目标态生效 (1.1174ms)
+✔ §5A 意图入口契约：四卡含模板/命名规则，其他内置角色不携带 (0.2424ms)
+✔ D 工具面：flow/gate/账本/分诊/交接/产物汇报工具不注册 (1.8471ms)
+✔ D judge facts：只读任务/申请上下文；旧账本快照参数被忽略 (0.1777ms)
+✔ D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules） (63.9109ms)
+✔ D-03/D-10：强制工程质量/证据基线常量与文本不得存在 (37.4517ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 320.2086

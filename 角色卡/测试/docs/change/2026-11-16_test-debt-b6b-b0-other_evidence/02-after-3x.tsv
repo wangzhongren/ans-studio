@@ -1,0 +1,13 @@
+file	tests	run1	run2	run3	exit	notes
+test/测试/g4-skill-verify/h-scope-audit.test.ts	7	7 pass	7 pass	7 pass	natural 0	3× green
+test/测试/t1-pipeline-integration.test.ts	8	8 pass	8 pass	8 pass	natural 0	3× green
+test/测试/trunk-stable-write-integration.test.ts	8	8 pass	8 pass	8 pass	natural 0	3× green
+test/测试/git-role-workflows-e2e.test.ts	19	7 pass / 12 skip	7 pass / 12 skip	7 pass / 12 skip	natural 0	run1 (after1) started from REMOVED evidence dir => proves fresh-checkout fix; runs 2-3 same (after2/after3)
+test/测试/g3-search-verify/pi-loopback-verify.test.ts	6	6 pass	6 pass	6 pass	natural 0	3× green
+test/桌面应用/session.test.ts	7	7 pass	7 pass	7 pass	natural 0	3× green
+test/桌面应用/project.test.ts	23	23 pass	23 pass	23 pass	natural 0	3× green
+test/测试/entry-role-minimal-d.test.ts	6	6 pass	6 pass	6 pass	natural 0	3× green
+test/测试/g4v2-mcp-verify/f-handler.test.ts	7	7 pass	7 pass	7 pass	natural 0	3× green
+test/桌面应用/log-actions.test.ts	1	1 pass	1 pass	1 pass	natural 0	3× green
+test/测试/direct-role-capabilities-e2e.test.ts	3	2 pass / 1 fail	2 pass / 1 fail	2 pass / 1 fail	natural 1	UNCHANGED (product/semantics candidate); same red name
+test/claude-adapter/schema.test.ts	10	10 pass	10 pass	10 pass	natural 0	UNCHANGED; green before and after
