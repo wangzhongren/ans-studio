@@ -1,0 +1,24 @@
+# W36 / W29-missing-confirmation 3× 复跑（B4，改期望前定性）
+# 环境：Windows 11 Pro 10.0.26300，Node v24.22.1，工作树 fix-test-debt-b4 @ 8d6a35e
+# 命令：node --test --test-timeout=120000 --test-force-exit --test-name-pattern="<pattern>" test/桌面应用/chief-workflow.test.ts
+# 说明：--test-force-exit 仅用于本文件（B1b 后仍有真实 server/Core 夹具；不改断言）。
+
+== W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒 ==
+pattern: "W36 "
+run1: ✔ (1876.8471ms)  tests 1 pass 1 fail 0
+run2: ✔ (1929.1263ms)  tests 1 pass 1 fail 0
+run3: ✔ (1915.7153ms)  tests 1 pass 1 fail 0
+结论：本机 Windows x64 3/3 绿；R3 CI 仅 macOS x64 红（8.3s 断言）。无法在本机复现 ⇒
+      平台/环境候选（macOS x64 runner 性能/时序面），不按失败改期望。
+
+== W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin ==
+pattern: "document-change-missing-confirmation"
+run1: ✔ (2521.1602ms)  tests 1 pass 1 fail 0
+run2: ✔ (2530.6267ms)  tests 1 pass 1 fail 0
+run3: ✔ (2553.9937ms)  tests 1 pass 1 fail 0
+结论：本机 Windows x64 3/3 绿；R3 CI 仅在 Windows「取消前 inline」出现（无错误体）。无法复现 ⇒
+      平台/环境候选；不改期望。
+
+附：其余 W29 两个变体（document-change / wrong-flow / source-loss 之外的同族名）与 W30×2、W35
+在 chief-workflow 整文件 3× 验证中均 3/3 绿（见 verify-chief-workflow-run{1,2,3}.txt）；同样按
+「本机不复现、平台/环境候选」处理，不改期望。

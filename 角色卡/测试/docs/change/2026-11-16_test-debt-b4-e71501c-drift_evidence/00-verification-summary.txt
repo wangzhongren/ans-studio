@@ -1,0 +1,40 @@
+# B4 3x verification summary (generated 2026-11-16, Windows 11 x64, Node v24.22.1)
+
+application-line     run1  ℹ tests 3 ℹ pass 3 ℹ fail 0 
+application-line     run2  ℹ tests 3 ℹ pass 3 ℹ fail 0 
+application-line     run3  ℹ tests 3 ℹ pass 3 ℹ fail 0 
+  failing:
+
+decision-service     run1  ℹ tests 22 ℹ pass 22 ℹ fail 0 
+decision-service     run2  ℹ tests 22 ℹ pass 22 ℹ fail 0 
+decision-service     run3  ℹ tests 22 ℹ pass 22 ℹ fail 0 
+  failing:
+
+directive-input      run1  ℹ tests 19 ℹ pass 19 ℹ fail 0 
+directive-input      run2  ℹ tests 19 ℹ pass 19 ℹ fail 0 
+directive-input      run3  ℹ tests 19 ℹ pass 19 ℹ fail 0 
+  failing:
+
+handback-delivery    run1  ℹ tests 18 ℹ pass 18 ℹ fail 0 
+handback-delivery    run2  ℹ tests 18 ℹ pass 18 ℹ fail 0 
+handback-delivery    run3  ℹ tests 18 ℹ pass 18 ℹ fail 0 
+  failing:
+
+star-routing         run1  ℹ tests 10 ℹ pass 10 ℹ fail 0 
+star-routing         run2  ℹ tests 10 ℹ pass 10 ℹ fail 0 
+star-routing         run3  ℹ tests 10 ℹ pass 10 ℹ fail 0 
+  failing:
+
+stuck-redispatch     run1  ℹ tests 10 ℹ pass 9 ℹ fail 1 
+stuck-redispatch     run2  ℹ tests 10 ℹ pass 9 ℹ fail 1 
+stuck-redispatch     run3  ℹ tests 10 ℹ pass 9 ℹ fail 1 
+  failing:
+    ✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口
+
+chief-workflow       run1  ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 0 ℹ fail 1 ℹ tests 66 ℹ pass 64 ℹ fail 2 
+chief-workflow       run2  ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 0 ℹ fail 1 ℹ tests 66 ℹ pass 64 ℹ fail 2 
+chief-workflow       run3  ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ tests 1 ℹ pass 0 ℹ fail 1 ℹ tests 66 ℹ pass 64 ℹ fail 2 
+  failing:
+    ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+    ✖ W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+

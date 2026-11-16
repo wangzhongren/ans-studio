@@ -447,10 +447,12 @@ function listing(root: string): ProjectListing {
   });
   return {
     projectRoot: root,
-    roles: [role("A"), role("B")],
+    // 2026-11-16（B4，e71501c 起当前语义）：Interface.sendSession 是**客户入口**，只接受幕僚（chief）
+    // 目标（`ui.composer.customerEntryChiefOnly`）；这里保留 A/B 供控制器层用例，客户入口一律用 chief。
+    roles: [role("chief"), role("A"), role("B")],
     warnings: [],
     hasRoles: true,
-    primaryRoleId: "A",
+    primaryRoleId: "chief",
     governanceModel: "single",
   };
 }
@@ -461,7 +463,7 @@ function interfaceHarness(
   decisionEnabled: boolean,
   extra: { createDirectiveInterpreterFn?: (opts: CreateDirectiveInterpreterOptions) => DirectiveInterpretFn } = {},
 ) {
-  const handles: Record<string, FakeHandle> = { A: fakeHandle(), B: fakeHandle() };
+  const handles: Record<string, FakeHandle> = { chief: fakeHandle(), A: fakeHandle(), B: fakeHandle() };
   const events: unknown[] = [];
   const decisionSwitch = createShellJudgeSwitch(decisionEnabled);
   const desktop: DesktopInterface = createDesktopInterface({
@@ -487,16 +489,16 @@ test("sendSession 命中：不调用 manager.send/handle.send、不产生角色�
     const h = makeController(t.dir);
     env = interfaceHarness(t.dir, h.controller, false);
     await env.desktop.listProject({ projectRoot: t.dir });
-    assert.equal((await env.desktop.openSession({ projectRoot: t.dir, roleId: "A", runtime: "demo" })).ok, true);
+    assert.equal((await env.desktop.openSession({ projectRoot: t.dir, roleId: "chief", runtime: "demo" })).ok, true);
 
     const pending = env.desktop.sendSession({
       text: `@审批 允许 shell "echo hi" until=once`,
-      target: { projectRoot: t.dir, roleId: "A", runtime: "demo" },
+      target: { projectRoot: t.dir, roleId: "chief", runtime: "demo" },
     });
     await tick();
     const eventsBefore = env.events.length;
     assert.equal(h.confirmRequests.length, 1, "命中即有确认面板");
-    assert.equal(env.handles.A.sendCalls.length, 0, "命中绝不 manager.send/handle.send");
+    assert.equal(env.handles.chief.sendCalls.length, 0, "命中绝不 manager.send/handle.send");
     assert.equal(env.events.length, eventsBefore, "命中不发 session:events");
     const request = h.confirmRequests[0]!;
     assert.equal(request.request.decisionGroupEnabled, false, "提交当刻读取 decisionJudgeSwitch 快照");
@@ -510,21 +512,22 @@ test("sendSession 命中：不调用 manager.send/handle.send、不产生角色�
     assert.equal(result.directive?.target, "approval");
     assert.match(result.directive?.id ?? "", /^d-[1-9][0-9]*$/);
 
-    // 卡内入口 / Composer 未开会话：B 从未 openSession，但卡载荷 target 仍命中指令通道（不回退普通聊天）。
+    // 卡内入口 / Composer 未开会话：客户入口同目标 chief（e71501c 起仅幕僚），claude 引擎从未 openSession，
+    // 但 target 仍命中指令通道（不回退普通聊天）。
     const unopened = env.desktop.sendSession({
       text: `@决策 拒绝 until=once`,
-      target: { projectRoot: t.dir, roleId: "B", runtime: "demo" },
+      target: { projectRoot: t.dir, roleId: "chief", runtime: "claude" },
     });
     await tick();
     assert.equal(h.confirmRequests.length, 2);
-    assert.equal(env.handles.B.sendCalls.length, 0, "未开会话也不得回退 manager.send");
+    assert.equal(env.handles.chief.sendCalls.length, 0, "未开会话也不得回退 manager.send");
     const request2 = h.confirmRequests[1]!;
-    assert.equal(request2.request.roleId, "B");
+    assert.equal(request2.request.roleId, "chief");
     await h.controller.respond({ id: request2.request.id, decision: "cancel" });
     const cancelled = await unopened;
     assert.equal(cancelled.ok, false);
     assert.equal(cancelled.directiveCancelled, true);
-    assert.equal(env.handles.B.sendCalls.length, 0);
+    assert.equal(env.handles.chief.sendCalls.length, 0);
   } finally {
     if (env !== undefined) await envCleanup(env);
     t.cleanup();
@@ -579,24 +582,24 @@ test("sendSession：命中带图直接拒绝（不解码/不投递）；未命�
     const h = makeController(t.dir);
     env = interfaceHarness(t.dir, h.controller, false);
     await env.desktop.listProject({ projectRoot: t.dir });
-    await env.desktop.openSession({ projectRoot: t.dir, roleId: "A", runtime: "demo" });
+    await env.desktop.openSession({ projectRoot: t.dir, roleId: "chief", runtime: "demo" });
 
     const withImage = await env.desktop.sendSession({
       text: `@审批 允许 shell "echo hi"`,
       images: [{ type: "image", data: "aGVsbG8gd29ybGQ=", mimeType: "image/png" }],
-      target: { projectRoot: t.dir, roleId: "A", runtime: "demo" },
+      target: { projectRoot: t.dir, roleId: "chief", runtime: "demo" },
     });
     assert.equal(withImage.ok, false);
     assert.match(withImage.error ?? "", /图片/);
     assert.equal(h.confirmRequests.length, 0);
-    assert.equal(env.handles.A.sendCalls.length, 0);
+    assert.equal(env.handles.chief.sendCalls.length, 0);
 
     const normal = await env.desktop.sendSession({
       text: "普通客户消息",
-      target: { projectRoot: t.dir, roleId: "A", runtime: "demo" },
+      target: { projectRoot: t.dir, roleId: "chief", runtime: "demo" },
     });
     assert.equal(normal.ok, true);
-    assert.deepEqual(env.handles.A.sendCalls, ["普通客户消息"]);
+    assert.deepEqual(env.handles.chief.sendCalls, ["普通客户消息"]);
     assert.equal(normal.directive, undefined);
   } finally {
     if (env !== undefined) await envCleanup(env);
@@ -641,10 +644,10 @@ test("sendSession：未注入指令控制器时命中标记 fail-closed（不回
   });
   try {
     await desktop.listProject({ projectRoot: t.dir });
-    await desktop.openSession({ projectRoot: t.dir, roleId: "A", runtime: "demo" });
+    await desktop.openSession({ projectRoot: t.dir, roleId: "chief", runtime: "demo" });
     const result = await desktop.sendSession({
       text: `@审批 允许 shell "echo hi"`,
-      target: { projectRoot: t.dir, roleId: "A", runtime: "demo" },
+      target: { projectRoot: t.dir, roleId: "chief", runtime: "demo" },
     });
     assert.equal(result.ok, false);
     assert.match(result.error ?? "", /能力不可用/);
@@ -789,7 +792,7 @@ test("sendSession：自然语言经 desktop.interpretDirective（SessionManager 
 
     const pending = env.desktop.sendSession({
       text: "@审批 让 npm install 跑一次",
-      target: { projectRoot: t.dir, roleId: "A", runtime: "claude" },
+      target: { projectRoot: t.dir, roleId: "chief", runtime: "claude" },
     });
     await waitFor(() => h.confirmRequests.length === 1);
     assert.equal(seen.length, 1, "解释器经 SessionManager 构造（同一套 runtimeOptions/adapter 工厂）");
@@ -805,7 +808,7 @@ test("sendSession：自然语言经 desktop.interpretDirective（SessionManager 
     const result = await pending;
     assert.equal(result.ok, true);
     assert.equal(ledgerEvents(t.dir).length, 1);
-    assert.equal(env.handles.A.sendCalls.length, 0, "命中标记绝不回退普通聊天");
+    assert.equal(env.handles.chief.sendCalls.length, 0, "命中标记绝不回退普通聊天");
   } finally {
     if (env !== undefined) await envCleanup(env);
     t.cleanup();
@@ -832,7 +835,7 @@ test("sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板�
     await env.desktop.listProject({ projectRoot: t.dir });
     const pending = env.desktop.sendSession({
       text: "@审批 让 npm install 跑一次",
-      target: { projectRoot: t.dir, roleId: "A", runtime: "demo" },
+      target: { projectRoot: t.dir, roleId: "chief", runtime: "demo" },
     });
     await waitFor(() => h.confirmRequests.length === 1);
     assert.equal(factoryCalls, 0, "demo 不支持解释 ⇒ 不构造解释器");

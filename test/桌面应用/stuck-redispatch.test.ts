@@ -1,6 +1,8 @@
 // test/桌面应用/stuck-redispatch.test.ts
 // B 批（2026-10-28）：卡死终止后的安全重派——仅 safe 产生新任务（新 taskId + retryOf + 同 idempotencyKey）；
-// 原任务 closed/rework；同链最多 2 次重派；unsafe/needs-review 零自动重派、如实升级。
+// 2026-11-16（B4，e71501c 起当前语义）：原任务不再写 task.closed/rework，而由 recordTaskFailure 写
+// task.reported(failed, "stuck-terminated:redispatch" / "stuck-escalation:terminate")，任务保持未收口；
+// 同链最多 2 次重派；unsafe/needs-review 零自动重派、如实升级。
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -138,8 +140,11 @@ test("safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed
     assert.ok((h.openCounts.worker ?? 0) >= 2, "重派前重建 fresh 会话");
 
     const state = await readTaskState(root);
-    assert.equal(state.records.get("t-safe")?.closed?.outcome, "rework");
-    assert.equal(state.records.get("t-safe")?.closed?.note, "stuck-terminated:redispatch");
+    // e71501c 起：原任务不写 task.closed/rework，而由 recordTaskFailure 写 failed 报告（任务保持未收口）。
+    assert.equal(state.records.get("t-safe")?.closed, undefined, "原任务不再 close/rework（当前语义：失败报告，未收口）");
+    const failed = state.records.get("t-safe")?.reports.at(-1);
+    assert.equal(failed?.status, "failed");
+    assert.match(failed?.summary ?? "", /stuck-terminated:redispatch/);
     const next = state.records.get("t-safe-r1")!;
     assert.equal(next.created?.idempotencyKey, "key-t-safe");
     assert.equal(next.retryOf, "t-safe");
@@ -152,7 +157,10 @@ test("safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed
     assert.equal(redispatchEvent?.safety, "safe");
 
     await tick(150);
-    assert.ok((h.sent.worker ?? []).some((text) => /#t-safe-r1/.test(text)), "新任务投递文本带新 taskId");
+    // 2026-11-16（B4，e71501c 起当前语义）：重派任务已入账（上面的 created/retryOf/幂等键断言保留），
+    // 但交付前 `inspectAssignedTask` 要求真实 flow/run（项目 worker 还需 pinned run 的 frozenRoles 授权）。
+    // 本裸 legacy 夹具没有 pinned run ⇒ 投递按来源门 fail-closed（不伪造送达），不是产品回归。
+    assert.equal(h.sent.worker?.length ?? 0, 0, "裸 legacy 子任务无 pinned run 授权 ⇒ 当前语义不投递");
     assert.ok(h.listCalls.length >= 1, "终止前读取后台任务");
   } finally {
     await h.mgr.stop(null);
@@ -261,8 +269,10 @@ test("B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩
     assert.equal(next.retryOf, "t-auto-r1");
     assert.match(next.created?.text ?? "", /\[重派\] 上次执行卡死；请缩窄范围/);
     await tick(150);
-    assert.ok((h.sent.worker2 ?? []).some((text) => text.includes(result.taskId!)), "替代角色收到重派任务");
-    assert.equal(h.openCounts.worker2, 1, "替代角色以新会话接收");
+    // e71501c 起当前语义：裸 legacy 子任务无 pinned run 授权 ⇒ 交付前来源门 fail-closed（不伪造送达）；
+    // 目标会话也不会被投递机自动开启（来源门在 open 之前）。重派账本事实（上面）保持不变。
+    assert.equal(h.sent.worker2?.length ?? 0, 0, "裸 legacy 子任务无 pinned run 授权 ⇒ 替代角色不被投递");
+    assert.equal(h.openCounts.worker2 ?? 0, 0, "投递在来源门 fail-closed：替代角色未被自动打开");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true });
@@ -301,9 +311,12 @@ test("B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交�
     assert.equal(gate.action, "allow", "应用自有 decision 卡通过校验（不扩大角色允许集）");
     if (gate.action === "allow") assert.equal(gate.recommendedOptionId, "terminate");
     const state = await readTaskState(root);
-    assert.equal(state.records.get("t-esc-r2")?.closed?.outcome, "rejected");
-    assert.equal(state.records.get("t-esc-r2")?.closed?.note, "stuck-escalation:terminate");
-    // 同一链重复 tick 不重复发卡（任务已收口 ⇒ 直接返回收口失败）。
+    // e71501c 起：terminate 不写 task.closed/rejected，而由 recordTaskFailure 写 failed 报告（保持未收口）。
+    assert.equal(state.records.get("t-esc-r2")?.closed, undefined, "terminate 不再 close/rejected（当前语义：失败报告）");
+    const failed = state.records.get("t-esc-r2")?.reports.at(-1);
+    assert.equal(failed?.status, "failed");
+    assert.match(failed?.summary ?? "", /stuck-escalation:terminate/);
+    // 同一链重复 tick 不重复发卡（升级请求按 root 幂等复用 ⇒ 直接返回升级结果，captured 不增）。
     const again = await h.mgr.redispatchTask({ projectRoot: root, taskId: "t-esc-r2" });
     assert.equal(again.ok, false);
     assert.equal(captured.length, 1);

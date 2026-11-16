@@ -1,0 +1,30 @@
+✔ decision 开关关闭：应用 decision 卡呈现客户，客户手选；无 judge 审计 (3.2176ms)
+✔ 开启委托但无真实chief上下文：保留原因，禁人工/旧judge/默认推荐；关闭后接管 (1.9531ms)
+✔ 无chief时不以旧结果行充当业务决定 (4.496ms)
+✔ 应用自有 decision 卡通过共享校验且不扩大角色允许集；非法推荐数/非应用 chief 仍拒 (0.3015ms)
+✔ 真实chief独立上下文可选非推荐项，结果可信来源且不伪装客户/judge (41.6404ms)
+✔ 真实chief拒绝/退修释放原工具Promise，原角色补材后新请求可独立决定 (58.2656ms)
+✔ 关闭再开启使在途真实chief旧revision无效；同请求不会无限自派 (23.7297ms)
+✔ 真实chief提交时基线变化拒绝，原请求等待关闭接管 (26.6608ms)
+✔ 业务卡的旧@决策预设不能形成第三个自动执行者 (0.5052ms)
+✔ 2026-11-04 直修 (a)：替我决策开启 ⇒ run-change 卡呈现客户、作答前不结算、无 judge 代批 (2.9935ms)
+✔ 2026-11-04 直修 (b)：run-change 三模式分别由客户选择后原样结算 (38.1562ms)
+✔ 2026-11-04 直修 (b)：版本决策两动作均呈现客户、不代选；客户选择后原样交回 (33.5406ms)
+✔ 普通角色decision与应用decision同样禁用旧推荐兜底 (4.2971ms)
+✔ 2026-11-04 直修 (d)：开关关闭时 run-change / 版本决策卡行为与现状一致（原卡呈现、客户手选、无 judge） (31.5122ms)
+✔ 2026-11-04 直修 (a)：替我审批开启 + appointment-write ⇒ 呈现客户、judge 0 调用、0 结果行、无 judge 审计 (10.7038ms)
+✔ 2026-11-04 直修 (b)：替审批关闭 + appointment-write ⇒ 呈现客户；客户拒绝语义不变 (4.8144ms)
+✔ 2026-11-04 直修 (c)：普通 confirm 卡在开关开启时行为不变（呈现客户、不调 judge） (16.2881ms)
+✔ 2026-11-04 直修 (d)：无 presenter ⇒ appointment-write 与治理卡均 unavailable（fail-closed 不变） (0.2065ms)
+✔ 2026-11-04 直修 (e)：判断器异常与 ledger-unavailable 分支对写卡不再可达——仍原卡呈现客户 (15.563ms)
+✔ 同真实requestId并发/重试复用一次结算，关闭不撤已提交来源，换origin/卡面拒绝 (24.3449ms)
+✔ J12：judge 代批 intent-confirm ⇒ outcome 字段回归钉（operatorId/judge 审计；非客户） (0.8057ms)
+✔ J12：开关关闭 ⇒ intent-confirm 原卡呈现客户、judge 0 调用、无 judge 结算 (7.9839ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 791.0624
