@@ -191,13 +191,20 @@ function harness(root: string, options: { customerInput?: DesktopCustomerInputFn
  */
 interface SourceGatedHarness {
   mgr: SessionManager;
+  customerInputs: Record<string, CustomerInputFn | undefined>;
+  contractChecks: Record<string, ContractCheckFn | undefined>;
   dispatchViaAcceptedTurn(payload: DispatchTaskPayload, text: string): Promise<DispatchReceipt>;
+  /** B3a 残差（2026-11-16）：真实运营受派任务回合内派发——open(taskId) 绑定真实任务，system 回合内执行脚本。 */
+  dispatchWorkerViaAssignedTurn(roleId: "convener", taskId: string, payload: DispatchTaskPayload, text: string): Promise<DispatchReceipt>;
 }
 
-function sourceGatedHarness(root: string): SourceGatedHarness {
+function sourceGatedHarness(root: string, options: { realRoles?: readonly string[] } = {}): SourceGatedHarness {
   markLegacyProject(root);
-  const script: ToolCall[] = [];
+  const realRoles = new Set<string>(options.realRoles ?? ["chief"]);
+  const scripts: Record<string, ToolCall[]> = {};
   const receipts: DispatchReceipt[] = [];
+  const customerInputs: Record<string, CustomerInputFn | undefined> = {};
+  const contractChecks: Record<string, ContractCheckFn | undefined> = {};
   const streams: Record<string, OrchestrationEvent[]> = {};
   const registration = {
     selectionId: `native-selection-${path.basename(root)}`,
@@ -219,6 +226,8 @@ function sourceGatedHarness(root: string): SourceGatedHarness {
           kind: "message", summary: "输入", roleId, runtime, turnId,
           detail: { source: "prompt-input", text },
         } as OrchestrationEvent);
+        // B3a 残差（2026-11-16）：假句柄也如实结束回合（否则投递目标长期 busy，LRU 会误淘汰其它活会话）。
+        (streams[roleId] ??= []).push({ kind: "settled", summary: "会话结束" } as OrchestrationEvent);
       },
       events() {
         let i = 0;
@@ -243,7 +252,10 @@ function sourceGatedHarness(root: string): SourceGatedHarness {
   };
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
-      if (input.roleId !== "chief") return fakeHandle(input.roleId, input.runtime ?? "demo");
+      customerInputs[input.roleId] = (input as { customerInput?: CustomerInputFn }).customerInput;
+      contractChecks[input.roleId] = (input as { contractCheck?: ContractCheckFn }).contractCheck;
+      if (!realRoles.has(input.roleId)) return fakeHandle(input.roleId, input.runtime ?? "demo");
+      const script = (scripts[input.roleId] ??= []);
       const factory = createRuntimeAdapterFactory(input.project, input.runtime ?? "demo", { writeRoot: root, script });
       const dispatch = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
       const wrapped: DispatchTaskFn | undefined = dispatch === undefined ? undefined : async (d, metadata) => {
@@ -261,17 +273,31 @@ function sourceGatedHarness(root: string): SourceGatedHarness {
     emitEvent: () => {},
     customerInput: async () => ({ outcome: "declined", operatorId: "test" }),
   });
+  const driveTurn = async (roleId: string, payload: DispatchTaskPayload, text: string, system: boolean): Promise<DispatchReceipt> => {
+    (scripts[roleId] ??= []).length = 0;
+    scripts[roleId]!.push({ name: "dispatch_task", args: payload as unknown as Record<string, unknown> });
+    const before = receipts.length;
+    const send = system
+      ? await mgr.sendBackground({ projectRoot: root, roleId, runtime: "demo", text, kind: "system" })
+      : await mgr.send(text, undefined, { projectRoot: root, roleId, runtime: "demo" });
+    assert.equal(send.ok, true, `真实 ${roleId} 回合应被受理`);
+    for (let tries = 0; tries < 500 && receipts.length === before; tries += 1) await tick(10);
+    assert.ok(receipts.length > before, `${roleId} 回合内 dispatch_task 应返回回执`);
+    return receipts[receipts.length - 1]!;
+  };
   return {
     mgr,
+    customerInputs,
+    contractChecks,
     async dispatchViaAcceptedTurn(payload, text) {
-      script.length = 0;
-      script.push({ name: "dispatch_task", args: payload as unknown as Record<string, unknown> });
-      const before = receipts.length;
-      const send = await mgr.send(text, undefined, { projectRoot: root, roleId: "chief", runtime: "demo" });
-      assert.equal(send.ok, true, "真实 accepted 客户轮次应被受理");
-      for (let tries = 0; tries < 500 && receipts.length === before; tries += 1) await tick(10);
-      assert.ok(receipts.length > before, "脚本回合内 dispatch_task 应返回回执");
-      return receipts[receipts.length - 1]!;
+      assert.equal(await mgr.waitForRoleIdle(root, "chief", "demo", 5000), true, "幕僚应在空闲时开新回合");
+      return driveTurn("chief", payload, text, false);
+    },
+    async dispatchWorkerViaAssignedTurn(roleId, taskId, payload, text) {
+      const opened = await mgr.open({ projectRoot: root, roleId, runtime: "demo", taskId });
+      assert.equal(opened.ok, true, opened.ok ? "" : opened.error ?? "运营会话应可打开");
+      assert.equal(await mgr.waitForRoleIdle(root, roleId, "demo", 5000), true, "运营应在空闲时开新回合");
+      return driveTurn(roleId, payload, text, true);
     },
   };
 }
@@ -290,83 +316,95 @@ async function d3(root: string): Promise<void> {
 }
 
 test("run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：当前有意语义为——每次文档/团队准备生成独立 trunk planning run
+  // （run-hub-*，draft；不再共享 draft），handoff 不再提前 pin，worker 执行由 trunk execution preflight
+  // 冻结（planning run 无执行工作流证据 ⇒ effective-manifest-missing 硬拒）。原断言（共享 runId、
+  // handoff pin、worker 锚定 pinned）描述 e71501c 前的旧语义，已按当前契约更新；「受理、独立锚点身份、
+  // 不伪造 pinned、零 worker 任务」判据保留。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-"));
-  const h = harness(root);
+  const h = sourceGatedHarness(root, { realRoles: ["chief", "convener"] });
   try {
     await writeProject(root);
     await d3(root);
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    // 真实 convener 会话必须在任何 trunk planning run 之前打开：trunk 出现后项目保护范围变为 required，
+    // demo 工厂不再获准新开会话（runtime-creation-admission-unproven）。交付投递会复用该活会话。
+    assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+    // MAX_LIVE_SESSIONS=3 的 LRU 会淘汰最久未用的空闲会话——每次派发前触碰 convener 保持其存活
+    // （reuse 路径只刷新 lastUsed，不重新走工厂准入）。
+    const keepConvener = async (): Promise<void> => {
+      assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+    };
     await tick(30);
-    const dispatch = h.caps.chief!;
-    const m1 = (await dispatch({ roleId: "product", task: "写产品意图", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+    const m1 = await h.dispatchViaAcceptedTurn({ roleId: "product", task: "写产品意图", sideEffect: "docs", flowId: "focus" }, "请派产品写产品意图");
     assert.equal(m1.ok, true, m1.message ?? "");
     const state1 = await readTaskState(root);
     const m1Record = [...state1.records.values()].find((record) => record.created?.to === "product")!;
-    assert.match(m1Record.created!.runId ?? "", /^run-/);
+    const m1RunId = m1Record.created!.runId!;
+    assert.match(m1RunId, /^run-hub-/, "M1 锚定独立 trunk planning run");
     assert.equal(m1Record.created!.runState, "draft");
-    const runId = m1Record.created!.runId!;
-    const draft = await readRunManifest(root, runId);
-    assert.equal(draft.ok, true);
-    if (draft.ok) assert.equal(draft.manifest.state, "draft");
+    const m1Manifest = await readRunManifest(root, m1RunId);
+    assert.equal(m1Manifest.ok, true);
+    if (m1Manifest.ok) assert.equal(m1Manifest.manifest.state, "draft");
+    assert.equal(await h.mgr.waitForRoleIdle(root, "product", "demo", 5000), true, "M1 投递收口后再开下一轮");
 
-    const m2 = (await dispatch({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+    await keepConvener();
+    const m2 = await h.dispatchViaAcceptedTurn({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" }, "请派提案出方案");
     assert.equal(m2.ok, true, m2.message ?? "");
-    const m3 = (await dispatch({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-    assert.equal(m3.ok, true, m3.message ?? "");
     const state2 = await readTaskState(root);
-    assert.equal([...state2.records.values()].find((record) => record.created?.to === "rapporteur")!.created!.runId, runId);
-    assert.equal([...state2.records.values()].find((record) => record.created?.to === "nominator")!.created!.runId, runId);
-
-    const handoff = (await dispatch({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-    assert.equal(handoff.ok, true, handoff.message ?? "");
-    const pinned = await readRunManifest(root, runId);
-    assert.equal(pinned.ok, true);
-    if (pinned.ok) {
-      assert.equal(pinned.manifest.state, "pinned");
-      assert.equal(pinned.manifest.runId, runId, "pin 不生成新 runId");
-      assert.equal(pinned.manifest.d3?.decisionId, "decision-req-d3");
-      assert.deepEqual(pinned.manifest.roles, ["implementer", "qa"]);
-      assert.equal(pinned.manifest.execution.teamPlan, null);
-      assert.equal(pinned.manifest.execution.flow, null);
-      assert.equal(pinned.manifest.documents.assets, null);
-      assert.equal(pinned.manifest.documents.roster?.sha256, pinned.manifest.documents.topology?.sha256);
-    }
+    const m2Record = [...state2.records.values()].find((record) => record.created?.to === "rapporteur")!;
+    assert.match(m2Record.created!.runId ?? "", /^run-hub-/);
+    assert.notEqual(m2Record.created!.runId, m1RunId, "各准备独立 planning scope（不再共享 draft runId）");
+    assert.equal(await h.mgr.waitForRoleIdle(root, "rapporteur", "demo", 5000), true, "M2 投递收口后再开下一轮");
+    await keepConvener();
+    const m3 = await h.dispatchViaAcceptedTurn({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" }, "请派招人");
+    assert.equal(m3.ok, true, m3.message ?? "");
     const state3 = await readTaskState(root);
-    const handoffRecord = [...state3.records.values()].find((record) => record.created?.to === "convener")!;
-    assert.equal(handoffRecord.created!.runId, runId);
-    assert.equal(handoffRecord.created!.runState, "pinned");
-    assert.equal(handoffRecord.created!.stepId, "project-handoff");
+    const m3Record = [...state3.records.values()].find((record) => record.created?.to === "nominator")!;
+    assert.match(m3Record.created!.runId ?? "", /^run-hub-/);
+    assert.notEqual(m3Record.created!.runId, m2Record.created!.runId);
+    assert.equal(await h.mgr.waitForRoleIdle(root, "nominator", "demo", 5000), true, "M3 投递收口");
 
-    // mid-run：pin 后写出 roster/modules v2，active run 仍只读 pinned v1。
-    const rosterV2 = ROSTER_TEXT.replace("version: 1", "version: 2").replaceAll("src/", "src-v2/");
-    const parsedV2 = parseProjectRoster(rosterV2);
-    assert.equal(parsedV2.ok, true);
-    await fs.writeFile(path.join(root, "docs/proposals/focus-roster-v2.md"), rosterV2, "utf8");
-    if (parsedV2.ok) {
-      await fs.writeFile(
-        path.join(root, "docs/proposals/focus-modules-v2.md"),
-        ["---", "schema: project-modules/v2", "flowId: focus", "version: 2", `modules: ${JSON.stringify(parsedV2.roster.modules)}`, "---", "# 模块清单 v2"].join("\n"),
-        "utf8",
-      );
-    }
-    await recordVersionedDocBaselines({ projectRoot: root, recordedBy: "app:test" });
-
-    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
-    await tick(20);
-    const worker = (await h.caps.convener!({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-    assert.equal(worker.ok, true, worker.message ?? "");
+    await keepConvener();
+    const handoff = await h.dispatchViaAcceptedTurn({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" }, "请派运营");
+    assert.equal(handoff.ok, true, handoff.message ?? "");
     const state4 = await readTaskState(root);
-    const workerRecord = [...state4.records.values()].find((record) => record.created?.to === "implementer")!;
-    assert.equal(workerRecord.created!.runId, runId);
-    assert.equal(workerRecord.created!.runState, "pinned");
-    assert.equal(workerRecord.created!.moduleDirectory, "src/");
+    const handoffRecord = [...state4.records.values()].find((record) => record.created?.to === "convener")!;
+    assert.equal(handoffRecord.created!.stepId, "project-handoff");
+    const handoffRunId = handoffRecord.created!.runId!;
+    assert.match(handoffRunId, /^run-hub-/);
+    assert.equal(handoffRecord.created!.runState, "draft");
+    const handoffManifest = await readRunManifest(root, handoffRunId);
+    assert.equal(handoffManifest.ok, true);
+    if (handoffManifest.ok) {
+      assert.equal(handoffManifest.manifest.state, "draft", "handoff 不再提前 pin");
+      assert.equal(handoffManifest.manifest.d3, undefined, "handoff 不写 D3 冻结事实");
+    }
+
+    // 真实投递到运营后再由运营回合派 worker：trunk execution preflight 冻结该 planning run 并硬拒。
+    for (let tries = 0; tries < 500; tries += 1) {
+      const current = await readTaskState(root);
+      if (current.records.get(handoffRecord.taskId)?.delivered?.to === "convener") break;
+      await tick(10);
+    }
+    assert.equal((await readTaskState(root)).records.get(handoffRecord.taskId)?.delivered?.to, "convener", "交付任务应投递到运营");
+    const worker = await h.dispatchWorkerViaAssignedTurn("convener", handoffRecord.taskId, { roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus", moduleId: "impl-core" }, "请派实现番茄钟");
+    assert.equal(worker.ok, false, worker.message ?? "");
+    assert.match(worker.message ?? "", /worker-freeze stage=prepare code=trunk-verify-failed/);
+    assert.match(worker.message ?? "", /effective-manifest-missing/);
+    const state5 = await readTaskState(root);
+    assert.equal([...state5.records.values()].some((record) => record.created?.to === "implementer"), false, "freeze 拒绝零 worker 任务");
+    assert.equal([...state5.records.values()].filter((record) => record.created?.runState === "pinned").length, 0, "全程不伪造 pinned");
+
     await h.mgr.open({ projectRoot: root, roleId: "implementer", runtime: "demo" });
     await tick(20);
-    const pinnedCheck = await h.contractChecks.implementer!({ flowId: "focus", taskKind: "dispatch", moduleId: "impl-core" });
-    assert.match(pinnedCheck!, new RegExp(`run：${runId}.*pinned`));
-    assert.match(pinnedCheck!, /文档 roster：docs\/proposals\/focus-roster-v1\.md/);
-    assert.match(pinnedCheck!, /指定模块：impl-core/);
-    assert.match(pinnedCheck!, /taskKind dispatch 必填/);
+    const implementerCheck = h.contractChecks.implementer;
+    assert.equal(typeof implementerCheck, "function");
+    const checkText = await implementerCheck!({ flowId: "focus", taskKind: "dispatch", moduleId: "impl-core" });
+    assert.match(checkText!, /run：run-hub-/, "worker 上下文如实显示当前 planning run");
+    assert.match(checkText!, /state=draft/, "planning run 仍为 draft（未冻结）");
+    assert.match(checkText!, /runId\(pinned\)/, "worker 执行仍要求 pinned run");
+    assert.doesNotMatch(checkText!, /state=pinned/, "不得把 draft planning run 伪装成已冻结");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
@@ -374,11 +412,14 @@ test("run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任
 });
 
 test("D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：handoff 不再提前 pin（manifest.d3 不再由派发写入），但 D3 读取的
+  // 「卡种收口」仍是当前语义——只有真实 appointment（含 legacy 无 cardKind + roster 戳）可作为 D3，
+  // decision 卡的 targetRoleIds 不得顶替。本用例改由当前 advisory 面（d3-missing）证明该收口，再证明
+  // handoff 走独立 planning run（draft）且不写 manifest.d3。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-d3-cardkind-"));
-  const h = harness(root);
+  const h = sourceGatedHarness(root);
   try {
     await writeProject(root);
-    await d3(root); // legacy 兼容：无 cardKind，带 appointment 专属 roster 戳
     // 新格式 decision 卡：选项 qa 与真实角色同名，且（模拟污染）带 targetRoleIds。
     await appendTaskEvent(root, {
       v: 1, at: "2026-10-30T00:00:02.000Z", kind: "request.created", requestId: "req-decision", flowId: "focus",
@@ -401,17 +442,27 @@ test("D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pi
 
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
-    const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+    // 仅 decision 卡 ⇒ D3 选中集为空：advisory 如实报 d3-missing（卡种收口生效）。
+    const polluted = await h.dispatchViaAcceptedTurn({ roleId: "convener", task: "把项目交付运营（决策卡污染场景）", sideEffect: "read-only", flowId: "focus" }, "请派运营（决策卡污染场景）");
+    assert.equal(polluted.ok, true, polluted.message ?? "");
+    assert.match(polluted.message ?? "", /尚无 D3 选中角色/, "decision 卡 targetRoleIds 不得顶替 D3");
+    assert.doesNotMatch(polluted.message ?? "", /d3-selected-cards-incomplete/, "污染 target 不应被当作 D3 选中集");
+
+    await d3(root); // legacy 兼容：真实 appointment（无 cardKind，带 appointment 专属 roster 戳）
+    const handoff = await h.dispatchViaAcceptedTurn({ roleId: "convener", task: "把项目交付运营（D3 到位后）", sideEffect: "read-only", flowId: "focus" }, "请派运营（D3 到位后）");
     assert.equal(handoff.ok, true, handoff.message ?? "");
+    assert.doesNotMatch(handoff.message ?? "", /尚无 D3 选中角色/, "真实 appointment D3 已被读取");
     const state = await readTaskState(root);
-    const handoffRecord = [...state.records.values()].find((record) => record.created?.to === "convener")!;
-    assert.equal(handoffRecord.created!.runState, "pinned");
-    const manifest = await readRunManifest(root, handoffRecord.created!.runId!);
+    const handoffRecord = [...state.records.values()].find((record) => record.created?.to === "convener" && record.created.text.includes("D3 到位后"))!;
+    assert.equal(handoffRecord.created!.stepId, "project-handoff");
+    const runId = handoffRecord.created!.runId!;
+    assert.match(runId, /^run-hub-/);
+    assert.equal(handoffRecord.created!.runState, "draft");
+    const manifest = await readRunManifest(root, runId);
     assert.equal(manifest.ok, true);
     if (manifest.ok) {
-      assert.equal(manifest.manifest.state, "pinned");
-      assert.equal(manifest.manifest.d3?.decisionId, "decision-req-d3", "pin 用真实 appointment 裁决");
-      assert.deepEqual(manifest.manifest.d3?.targetRoleIds, ["implementer"], "decision 选项（含同名 qa）不得顶替 D3");
+      assert.equal(manifest.manifest.state, "draft", "handoff 不再提前 pin");
+      assert.equal(manifest.manifest.d3, undefined, "D3 冻结事实不再由 handoff 写入 manifest");
     }
   } finally {
     await h.mgr.stop(null);
@@ -422,29 +473,31 @@ test("D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pi
 });
 
 test("run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：规划协调不再前置未来 D3，也不再在 handoff 尝试 pin
+  // （dispatch.ts「Planning coordination must not require future D3」）。当前语义改为：缺 D3 只产生
+  // d3-missing advisory，handoff 照常受理并锚定独立 planning run（draft），绝不写 pinned。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-missing-"));
-  const h = harness(root);
+  const h = sourceGatedHarness(root);
   try {
     await writeProject(root);
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
     const before = (await readTaskState(root)).records.size;
-    const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+    const handoff = await h.dispatchViaAcceptedTurn({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" }, "请派运营（缺 D3）");
     assert.equal(handoff.ok, true, handoff.message ?? "");
     assert.match(handoff.message ?? "", /状态提示（未阻断）/);
-    assert.match(handoff.message ?? "", /pin/);
-    const message = handoff.message ?? "";
-    assert.ok(message.indexOf("pin 尝试失败") < message.indexOf("仍为 draft/未 pin"), "run-pin-failed 在 run-pin-required 之前");
+    assert.match(handoff.message ?? "", /尚无 D3 选中角色/, "缺 D3 如实给 d3-missing advisory");
+    assert.doesNotMatch(handoff.message ?? "", /pin 尝试失败|run-pin-failed/, "handoff 不再尝试 pin");
     const after = await readTaskState(root);
-    assert.equal(after.records.size, before + 1, "pin 失败仍创建交接任务");
+    assert.equal(after.records.size, before + 1, "缺 D3 仍创建交接任务");
     const created = [...after.records.values()].find((record) => record.created?.to === "convener")!.created!;
     assert.equal(created.stepId, "project-handoff");
-    assert.equal(created.runState, "draft", "可锚定已有 draft");
-    assert.match(created.runId ?? "", /^run-/);
+    assert.equal(created.runState, "draft", "锚定已有/新建 planning draft");
+    assert.match(created.runId ?? "", /^run-hub-/);
     assert.equal(created.flowId, "focus");
-    const active = await findActiveRun(root, "focus");
-    assert.equal(active.ok, true);
-    if (active.ok) assert.notEqual(active.manifest?.state, "pinned", "draft 不伪造 pinned");
+    const manifest = await readRunManifest(root, created.runId!);
+    assert.equal(manifest.ok, true);
+    if (manifest.ok) assert.equal(manifest.manifest.state, "draft", "draft 不伪造 pinned");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
@@ -560,32 +613,31 @@ test("P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 ver
 });
 
 test("P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：hub 派发必须带 flowId（dispatch.ts `chief-hub-flow-unavailable`，
+  // 与 chief-workflow W36 同款门），「缺 flowId 生成 pending draft / 后续领养」的旧语义已删除；
+  // 即使带 flowId，裸会话（无真实来源/managed 证据）也不得登记文档任务。断言改为当前 fail-closed 两段。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-pending-"));
   const h = harness(root);
   try {
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
     const m1 = (await h.caps.chief!({ roleId: "product", task: "先写产品意图（flow 未定）", sideEffect: "docs" })) as DispatchReceipt;
-    assert.equal(m1.ok, true, m1.message ?? "");
-    const state1 = await readTaskState(root);
-    const m1Record = [...state1.records.values()].find((record) => record.created?.to === "product")!;
-    const runId = m1Record.created!.runId!;
-    assert.match(runId, /^run-/);
-    const pending = await readRunManifest(root, runId);
-    assert.equal(pending.ok, true);
-    if (pending.ok) {
-      assert.equal(pending.manifest.state, "draft");
-      assert.equal(pending.manifest.flowId, "pending");
-    }
+    assert.equal(m1.ok, false, "缺 flowId 的 hub 准备必须硬拒");
+    assert.match(m1.message ?? "", /chief-hub-flow-unavailable/);
+    assert.equal((await readTaskState(root)).records.size, 0, "拒发零任务、无 pending draft");
+    const noRun = await findActiveRun(root, "focus");
+    assert.equal(noRun.ok, true);
+    if (noRun.ok) assert.equal(noRun.manifest, null, "不创建 draft run");
+
     await writeProject(root);
     const m2 = (await h.caps.chief!({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-    assert.equal(m2.ok, true, m2.message ?? "");
+    assert.equal(m2.ok, false, "无真实来源/managed 证据的文档准备必须 fail-closed");
+    assert.match(m2.message ?? "", /document-planning-source-unavailable/);
     const state2 = await readTaskState(root);
-    const m2Record = [...state2.records.values()].find((record) => record.created?.to === "rapporteur")!;
-    assert.equal(m2Record.created!.runId, runId, "真实 flow 到达时领养同一 draft runId");
-    const adopted = await readRunManifest(root, runId);
+    assert.equal(state2.records.size, 0, "source 门拒发零任务（不再领养任何 draft）");
+    const adopted = await findActiveRun(root, "focus");
     assert.equal(adopted.ok, true);
-    if (adopted.ok) assert.equal(adopted.manifest.flowId, "focus");
+    if (adopted.ok) assert.equal(adopted.manifest, null, "不伪造/领养 draft runId");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
@@ -830,21 +882,19 @@ test("§5A contract_check：四角色按裁剪输出意图入口契约与当前�
 });
 
 test("R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：当前 hub 派发必须带 flowId（`chief-hub-flow-unavailable`），
+  // 「无 flowId 受理 + 省略锚点 + run-ledger-unavailable advisory」旧语义已删除；断言改为硬拒且零任务。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-no-flow-"));
   const h = harness(root);
   try {
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
     const receipt = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
-    assert.match(receipt.message ?? "", /run 记录不可用|run/);
+    assert.equal(receipt.ok, false, "缺 flowId 的 handoff 必须硬拒");
+    assert.match(receipt.message ?? "", /chief-hub-flow-unavailable/);
+    assert.doesNotMatch(receipt.message ?? "", /状态提示（未阻断）/, "硬拒不回退 advisory 受理");
     const state = await readTaskState(root);
-    const created = [...state.records.values()].find((record) => record.created?.to === "convener")!.created!;
-    assert.equal(created.stepId, "project-handoff");
-    assert.equal(created.flowId, undefined);
-    assert.equal(created.runId, undefined);
-    assert.equal(created.runState, undefined);
+    assert.equal(state.records.size, 0, "拒发零任务（不创建裸 handoff）");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
@@ -852,24 +902,23 @@ test("R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable", a
 });
 
 test("R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：run 账本不可用时，当前 handoff 不再「受理 + 无锚点 + advisory」，
+  // 而是由 trunk planning 写入门 fail-closed（trunk-verify-failed：ENOTDIR），零任务、零投递。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-ledger-"));
-  const h = harness(root);
+  const h = sourceGatedHarness(root);
   try {
     await writeProject(root);
     await fs.mkdir(path.join(root, ".ans"), { recursive: true });
     await fs.writeFile(path.join(root, ".ans/runs"), "not a directory\n", "utf8");
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
-    const receipt = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
-    assert.match(receipt.message ?? "", /run 记录不可用/);
+    const receipt = await h.dispatchViaAcceptedTurn({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" }, "请派运营（run 账本不可用）");
+    assert.equal(receipt.ok, false, "run 账本不可用 ⇒ planning 写入门 fail-closed");
+    assert.match(receipt.message ?? "", /trunk-verify-failed/);
+    assert.match(receipt.message ?? "", /ENOTDIR/, "如实报告账本路径不可用");
+    assert.doesNotMatch(receipt.message ?? "", /状态提示（未阻断）/, "硬拒不回退 advisory 受理");
     const state = await readTaskState(root);
-    const created = [...state.records.values()].find((record) => record.created?.to === "convener")!.created!;
-    assert.equal(created.stepId, "project-handoff");
-    assert.equal(created.flowId, undefined);
-    assert.equal(created.runId, undefined);
-    assert.equal(created.runState, undefined);
+    assert.equal(state.records.size, 0, "拒发零任务（无无锚点 handoff）");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
@@ -877,24 +926,29 @@ test("R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavai
 });
 
 test("AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：worker 执行改由 trunk execution preflight 冻结——legacy pinned run
+  // 无 trunk 历史证据 ⇒ `Old run lacks its historical evidence` 硬拒（不再「受理 + advisory + 不锚定」）。
+  // 「零 worker 任务、manifest 不被改写、硬拒不回退 advisory」判据保留。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-hash-drift-"));
-  const h = harness(root);
+  const h = sourceGatedHarness(root, { realRoles: ["chief", "convener"] });
   try {
     await writeProject(root);
     const runId = await pinFocusRun(root);
     const manifestPath = runManifestPath(root, runId);
     const manifestBefore = await fs.readFile(manifestPath, "utf8");
     await fs.appendFile(path.join(root, "docs/product/focus-intent-v1.md"), "\n# 漂移\n", "utf8");
-    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
-    await tick(30);
-    const receipt = (await h.caps.convener!({ roleId: "implementer", task: "实现哈希漂移", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
-    assert.match(receipt.message ?? "", /哈希|hash|不锚定/);
-    const created = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("实现哈希漂移"))!.created!;
-    assert.equal(created.flowId, undefined, "不锚定失效 pinned");
-    assert.equal(created.runId, undefined);
-    assert.equal(created.runState, undefined);
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-11-16T00:00:10.000Z", kind: "task.created", taskId: "t-convener-ac28", flowId: "focus",
+      from: "chief", to: "convener", text: "把项目交付运营（哈希漂移场景）", sideEffect: "read-only",
+      idempotencyKey: "ac28-handoff", runId, runState: "pinned",
+    });
+    const receipt = await h.dispatchWorkerViaAssignedTurn("convener", "t-convener-ac28", { roleId: "implementer", task: "实现哈希漂移", sideEffect: "code", flowId: "focus", moduleId: "impl-core" }, "请派实现（哈希漂移场景）");
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /worker-freeze stage=prepare code=trunk-verify-failed/);
+    assert.match(receipt.message ?? "", /Old run lacks its historical evidence/);
+    assert.doesNotMatch(receipt.message ?? "", /状态提示（未阻断）/, "冻结硬拒不回退 advisory");
+    const state = await readTaskState(root);
+    assert.equal([...state.records.values()].some((record) => record.created?.text.includes("实现哈希漂移")), false, "冻结拒绝零 worker 任务");
     assert.equal(await fs.readFile(manifestPath, "utf8"), manifestBefore, "manifest 未被改写");
   } finally {
     await h.mgr.stop(null);
@@ -903,8 +957,10 @@ test("AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改�
 });
 
 test("AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：roster 失效的 legacy pinned run 同样先被 trunk execution
+  // preflight 冻结硬拒（Old run lacks its historical evidence），不再「受理 + roster advisory + 不锚定」。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-roster-invalid-"));
-  const h = harness(root);
+  const h = sourceGatedHarness(root, { realRoles: ["chief", "convener"] });
   try {
     await writeProject(root);
     const runId = await pinFocusRun(root);
@@ -917,17 +973,20 @@ test("AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、�
     manifest["documents"] = { ...(manifest["documents"] as Record<string, unknown>), roster: { path: badRosterPath, sha256: badSha } };
     await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
     const manifestBefore = await fs.readFile(manifestPath, "utf8");
-    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
-    await tick(30);
-    const receipt = (await h.caps.convener!({ roleId: "implementer", task: "实现 roster 失败", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
-    assert.match(receipt.message ?? "", /roster|名单/);
-    assert.doesNotMatch(receipt.message ?? "", /不在 pinned run 的模块集/, "roster 失败不混写模块覆盖 advisory");
-    const created = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("实现 roster 失败"))!.created!;
-    assert.equal(created.flowId, undefined);
-    assert.equal(created.runId, undefined);
-    assert.equal(created.runState, undefined);
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-11-16T00:00:11.000Z", kind: "task.created", taskId: "t-convener-ac28r2", flowId: "focus",
+      from: "chief", to: "convener", text: "把项目交付运营（roster 失效场景）", sideEffect: "read-only",
+      idempotencyKey: "ac28r2-handoff", runId, runState: "pinned",
+    });
+    const receipt = await h.dispatchWorkerViaAssignedTurn("convener", "t-convener-ac28r2", { roleId: "implementer", task: "实现 roster 失败", sideEffect: "code", flowId: "focus", moduleId: "impl-core" }, "请派实现（roster 失效场景）");
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /worker-freeze stage=prepare code=trunk-verify-failed/);
+    assert.match(receipt.message ?? "", /Old run lacks its historical evidence/);
+    assert.doesNotMatch(receipt.message ?? "", /状态提示（未阻断）/, "冻结硬拒不回退 advisory");
+    assert.doesNotMatch(receipt.message ?? "", /不在 pinned run 的模块集/, "不混写模块覆盖 advisory");
+    assert.doesNotMatch(receipt.message ?? "", /run-pinned-roster-invalid/, "不混写 roster advisory");
+    const state = await readTaskState(root);
+    assert.equal([...state.records.values()].some((record) => record.created?.text.includes("实现 roster 失败")), false, "冻结拒绝零 worker 任务");
     assert.equal(await fs.readFile(manifestPath, "utf8"), manifestBefore, "manifest 未被改写");
   } finally {
     await h.mgr.stop(null);
@@ -936,8 +995,11 @@ test("AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、�
 });
 
 test("AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：legacy flow 历史任务不再带来「advisory 受理 + draft 锚点」；
+  // worker 执行必须由 trunk execution preflight 冻结。真实运营受派任务锚定同一 flow 的 draft run 后，
+  // 冻结仍以 effective-manifest-missing 硬拒（planning-only draft 无执行工作流/团队计划证据）。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-legacy-flow-"));
-  const h = harness(root);
+  const h = sourceGatedHarness(root, { realRoles: ["chief", "convener"] });
   try {
     await writeProject(root);
     await appendTaskEvent(root, {
@@ -952,18 +1014,23 @@ test("AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、�
       sideEffect: "docs",
       idempotencyKey: "legacy-flow",
     }, { allowLegacyRun: true });
-    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
-    await tick(30);
-    const receipt = (await h.caps.convener!({ roleId: "implementer", task: "实现 legacy flow", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
-    assert.match(receipt.message ?? "", /legacy|历史/);
+    const draft = await ensureDraftRun(root, "focus");
+    assert.equal(draft.ok, true, draft.ok ? "" : draft.reason);
+    if (!draft.ok) return;
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-11-16T00:00:12.000Z", kind: "task.created", taskId: "t-convener-ac26", flowId: "focus",
+      from: "chief", to: "convener", text: "把项目交付运营（legacy flow 场景）", sideEffect: "read-only",
+      idempotencyKey: "ac26-handoff", runId: draft.manifest.runId, runState: "draft",
+    });
+    const receipt = await h.dispatchWorkerViaAssignedTurn("convener", "t-convener-ac26", { roleId: "implementer", task: "实现 legacy flow", sideEffect: "code", flowId: "focus", moduleId: "impl-core" }, "请派实现（legacy flow 场景）");
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /worker-freeze stage=prepare code=trunk-verify-failed/);
+    assert.match(receipt.message ?? "", /effective-manifest-missing/);
+    assert.doesNotMatch(receipt.message ?? "", /状态提示（未阻断）|run-legacy-readonly/, "冻结硬拒不回退 legacy advisory");
     const state = await readTaskState(root);
-    const created = [...state.records.values()].find((record) => record.created?.text.includes("实现 legacy flow"))!.created!;
-    assert.equal(created.flowId, "focus");
-    assert.equal(created.runState, "draft", "legacy 仅 advisory，锚点用本地 draft");
-    assert.match(created.runId ?? "", /^run-/);
+    assert.equal([...state.records.values()].some((record) => record.created?.text.includes("实现 legacy flow")), false, "冻结拒绝零 worker 任务");
     assert.ok(state.records.has("t-legacy-flow"), "旧 legacy 记录可读");
+    assert.equal(state.records.get("t-legacy-flow")?.created?.runState, "legacy", "旧记录仍如实标 legacy");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
@@ -971,8 +1038,11 @@ test("AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、�
 });
 
 test("P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定", async () => {
+  // B3a 残差（2026-11-16，B4 同口径）：roles 未声明的 legacy pinned run 先由 trunk execution preflight
+  // 冻结硬拒（Old run lacks its historical evidence）；不再产生 run-role-missing advisory、不锚定/建任务，
+  // manifest 未被改写。
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-roles-undefined-"));
-  const h = harness(root);
+  const h = sourceGatedHarness(root, { realRoles: ["chief", "convener"] });
   try {
     await writeProject(root);
     const runId = await pinFocusRun(root);
@@ -981,15 +1051,18 @@ test("P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不�
     delete manifest["roles"];
     await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
     const manifestBefore = await fs.readFile(manifestPath, "utf8");
-    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
-    await tick(30);
-    const receipt = (await h.caps.convener!({ roleId: "implementer", task: "实现 roles 未声明", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-11-16T00:00:13.000Z", kind: "task.created", taskId: "t-convener-p1r08", flowId: "focus",
+      from: "chief", to: "convener", text: "把项目交付运营（roles 未声明场景）", sideEffect: "read-only",
+      idempotencyKey: "p1r08-handoff", runId, runState: "pinned",
+    });
+    const receipt = await h.dispatchWorkerViaAssignedTurn("convener", "t-convener-p1r08", { roleId: "implementer", task: "实现 roles 未声明", sideEffect: "code", flowId: "focus", moduleId: "impl-core" }, "请派实现（roles 未声明场景）");
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /worker-freeze stage=prepare code=trunk-verify-failed/);
+    assert.match(receipt.message ?? "", /Old run lacks its historical evidence/);
     assert.doesNotMatch(receipt.message ?? "", /run-role-missing|不在 pinned run 的角色集/, "roles undefined 视为无事实");
-    const created = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("实现 roles 未声明"))!.created!;
-    assert.equal(created.flowId, undefined, "无法证明覆盖，不锚定");
-    assert.equal(created.runId, undefined);
-    assert.equal(created.runState, undefined);
+    const state = await readTaskState(root);
+    assert.equal([...state.records.values()].some((record) => record.created?.text.includes("实现 roles 未声明")), false, "冻结拒绝零 worker 任务");
     assert.equal(await fs.readFile(manifestPath, "utf8"), manifestBefore, "manifest 未被改写");
   } finally {
     await h.mgr.stop(null);

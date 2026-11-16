@@ -1,0 +1,46 @@
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (52.6838ms)
+✖ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (41.2307ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2051.1418
+
+✖ failing tests:
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:131:1
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (52.6838ms)
+  AssertionError [ERR_ASSERTION]: stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b3ar/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:149:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:187:1
+✖ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (41.2307ms)
+  AssertionError [ERR_ASSERTION]: stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b3ar/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:201:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
