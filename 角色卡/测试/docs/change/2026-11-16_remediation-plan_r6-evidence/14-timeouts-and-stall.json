@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-11-16T11:32:12.066Z",
+  "runId": "43848313583",
+  "timeoutEntries": [
+    {
+      "platform": "macos_x64",
+      "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+      "maxDurationMs": 180003.746956,
+      "count": 2,
+      "files": [
+        "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+      ],
+      "fileLevel": false
+    }
+  ],
+  "fileLevelTimeoutEntries": [],
+  "windowsStall": {
+    "lastResultTs": null,
+    "cancelTs": null,
+    "stallBeforeCancelMs": null,
+    "stallMinutes": null,
+    "lastTopLevelSummaryFound": true,
+    "uniqueNames": 51,
+    "fileLevelCount": 2,
+    "note": "R6 Windows 完整跑完（有顶层汇总，无取消标记）"
+  },
+  "cancelledPlatform": {
+    "platform": "macos-arm64",
+    "conclusion": "cancelled",
+    "startedAt": "2026-11-16T10:22:57Z",
+    "completedAt": "2026-11-16T10:37:57Z",
+    "steps": 0,
+    "artifact": null,
+    "note": "job 级 cancelled，无步骤记录与工件；无测试失败信息，不计入超时/挂起统计。"
+  },
+  "note": "R6 口径与 R2–R5 相同：timeouts = maxDurationMs>=100000 的失败名；两个有工件的平台均有完整顶层汇总。arm64 无工件，平台超时面未知（披露为覆盖缺口）。"
+}

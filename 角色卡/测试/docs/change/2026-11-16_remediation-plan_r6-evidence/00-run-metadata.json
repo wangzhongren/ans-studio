@@ -1,0 +1,99 @@
+{
+  "generatedAt": "2026-11-16T19:40:00Z",
+  "runId": "43848313583",
+  "workflow": "Test matrix (development feedback)",
+  "event": "workflow_dispatch",
+  "headBranch": "main",
+  "headSha": "82dc18003152bec26851b894aa1e011a7bb22219",
+  "conclusion": "failure",
+  "createdAt": "2026-11-16T10:22:55Z",
+  "updatedAt": "2026-11-16T11:09:57Z",
+  "runAttempt": 1,
+  "command": "node --test --test-concurrency=1 --test-timeout=300000 --test-force-exit \"test/**/*.test.ts\"",
+  "workflowNotes": [
+    "test-ci.yml at 82dc180 includes --test-force-exit (PR #121 / commit 9a97ac1) — only affects process exit AFTER all tests complete or are named as failed; test execution semantics unchanged.",
+    "Typecheck step success on both completed jobs; only 'Full regression tests (bounded; development feedback)' failed."
+  ],
+  "jobs": [
+    {
+      "id": 133234075031,
+      "name": "test (macos-15, mac, arm64)",
+      "labels": ["macos-15"],
+      "runnerName": "",
+      "startedAt": "2026-11-16T10:22:57Z",
+      "completedAt": "2026-11-16T10:37:57Z",
+      "duration": "15m00s",
+      "conclusion": "cancelled",
+      "steps": [],
+      "artifact": null,
+      "jobLogs": "BlobNotFound (no log blob)",
+      "note": "Job-level cancellation with zero steps and empty runner_name: runner was never assigned / provisioning failed. NOT a test failure. No artifacts. Retry required next round."
+    },
+    {
+      "id": 133234075222,
+      "name": "test (macos-15-intel, mac, x64)",
+      "labels": ["macos-15-intel"],
+      "runnerName": "GitHub Actions 1000000287",
+      "startedAt": "2026-11-16T10:23:00Z",
+      "completedAt": "2026-11-16T11:09:56Z",
+      "duration": "46m56s",
+      "conclusion": "failure",
+      "steps": [
+        {"name": "Typecheck", "conclusion": "success"},
+        {"name": "Full regression tests (bounded; development feedback)", "conclusion": "failure"},
+        {"name": "Run actions/upload-artifact@v4", "conclusion": "success"}
+      ],
+      "artifact": "test-logs-mac-x64",
+      "artifactApiBytes": 384268,
+      "logBytes": 1667750
+    },
+    {
+      "id": 133234075278,
+      "name": "test (windows-2025, win, x64)",
+      "labels": ["windows-2025"],
+      "runnerName": "GitHub Actions 1000000285",
+      "startedAt": "2026-11-16T10:22:58Z",
+      "completedAt": "2026-11-16T10:50:08Z",
+      "duration": "27m10s",
+      "conclusion": "failure",
+      "steps": [
+        {"name": "Typecheck", "conclusion": "success"},
+        {"name": "Full regression tests (bounded; development feedback)", "conclusion": "failure"},
+        {"name": "Run actions/upload-artifact@v4", "conclusion": "success"}
+      ],
+      "artifact": "test-logs-win-x64",
+      "artifactApiBytes": 330545,
+      "logBytes": 1113600
+    }
+  ],
+  "artifacts": [
+    {"name": "test-logs-mac-x64", "sizeInBytes": 384268, "expired": false},
+    {"name": "test-logs-win-x64", "sizeInBytes": 330545, "expired": false}
+  ],
+  "arm64Evidence": {
+    "status": "cancelled",
+    "steps": 0,
+    "runnerName": "",
+    "jobLogs": "HTTP 404 BlobNotFound",
+    "artifact": null,
+    "duration": "15m00s",
+    "interpretation": "Runner capacity/queue/provisioning issue; no test outcome available. Not counted as failures."
+  },
+  "artifactCheck": {
+    "macos_x64": {
+      "topLevelSummary": {"tests": 5825, "suites": 0, "pass": 5755, "fail": 50, "cancelled": 1, "skipped": 19, "todo": 0, "duration_ms": 2680564.556098},
+      "finalFailingSection": true,
+      "xmarkLines": 106,
+      "uniqueNames": 51,
+      "lineLevelUniqueIncludingHeaders": 55
+    },
+    "windows_x64": {
+      "topLevelSummary": {"tests": 5826, "suites": 0, "pass": 5743, "fail": 51, "cancelled": 0, "skipped": 32, "todo": 0, "duration_ms": 1553909.9747},
+      "finalFailingSection": true,
+      "xmarkLines": 106,
+      "uniqueNames": 51,
+      "lineLevelUniqueIncludingHeaders": 55
+    },
+    "macos_arm64": "no artifact"
+  }
+}

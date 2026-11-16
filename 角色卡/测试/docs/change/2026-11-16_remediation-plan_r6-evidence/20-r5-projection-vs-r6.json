@@ -1,0 +1,118 @@
+{
+  "generatedAt": "2026-11-16T11:32:12.421Z",
+  "r5Projection": 55,
+  "r6Universe": 63,
+  "byKind": {
+    "expected-still-red": 54,
+    "expected-greened": 1,
+    "new-vs-r6": 3,
+    "merged-batch-target-still-red": 5,
+    "r5-name-outside-projection": 1
+  },
+  "mergedBatchSurvival": {
+    "B3a-residual": {
+      "expectedGreen": 14,
+      "greenedInR6": 13,
+      "stillRedInR6": 1,
+      "stillRedNames": [
+        "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned"
+      ]
+    },
+    "B5": {
+      "expectedGreen": 16,
+      "greenedInR6": 16,
+      "stillRedInR6": 0,
+      "stillRedNames": []
+    },
+    "B6a": {
+      "expectedGreen": 12,
+      "greenedInR6": 10,
+      "stillRedInR6": 2,
+      "stillRedNames": [
+        "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+        "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write"
+      ]
+    },
+    "B6b": {
+      "expectedGreen": 18,
+      "greenedInR6": 16,
+      "stillRedInR6": 2,
+      "stillRedNames": [
+        "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+        "Q74 owned Git metadata observer atomic rename race remains bounded and strict"
+      ]
+    }
+  },
+  "deviations": [
+    {
+      "kind": "expected-greened",
+      "name": "W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场",
+      "r5Family": null,
+      "r6Family": "",
+      "platforms": ""
+    },
+    {
+      "kind": "new-vs-r6",
+      "name": "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+      "batch": "",
+      "r6Family": "unclassified-new",
+      "platforms": "x64"
+    },
+    {
+      "kind": "new-vs-r6",
+      "name": "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+      "batch": "",
+      "r6Family": "ci-path-canonical",
+      "platforms": "win"
+    },
+    {
+      "kind": "merged-batch-target-still-red",
+      "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+      "batch": "B6a",
+      "r6Family": "unclassified-new",
+      "platforms": "x64"
+    },
+    {
+      "kind": "merged-batch-target-still-red",
+      "name": "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+      "batch": "B6a",
+      "r6Family": "unclassified-new",
+      "platforms": "win"
+    },
+    {
+      "kind": "merged-batch-target-still-red",
+      "name": "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+      "batch": "B6b",
+      "r6Family": "b0-existing-other",
+      "platforms": "x64+win"
+    },
+    {
+      "kind": "merged-batch-target-still-red",
+      "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+      "batch": "B6b",
+      "r6Family": "b0-existing-other",
+      "platforms": "x64+win"
+    },
+    {
+      "kind": "merged-batch-target-still-red",
+      "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+      "batch": "B3a-residual",
+      "r6Family": "b0-existing-other",
+      "platforms": "x64+win"
+    },
+    {
+      "kind": "new-vs-r6",
+      "name": "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+      "batch": "",
+      "r6Family": "unclassified-new",
+      "platforms": "win"
+    },
+    {
+      "kind": "r5-name-outside-projection",
+      "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+      "batch": "",
+      "r6Family": "e71501c-drift",
+      "platforms": "x64+win"
+    }
+  ]
+}

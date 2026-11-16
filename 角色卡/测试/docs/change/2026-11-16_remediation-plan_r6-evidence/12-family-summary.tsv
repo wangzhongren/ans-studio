@@ -1,0 +1,7 @@
+known-red-62	33	5:trunk-upgrade-validation.test.ts, 3:trio-worker-report.test.ts, 2:section1-write-preauthorization.test.ts, 2:appointment-roster.test.ts, 2:session-dir.test.ts, 2:dispatch-workflow-writer-copy.test.ts
+unclassified-new	13	3:git-action-authorization-gate.test.ts, 1:b31-fixed-release-auto-desktop.test.ts, 1:git-action-cross-runtime-init.test.ts, 1:git-action-cross-runtime-audit-failure.test.ts, 1:git-action-cross-runtime-pi-init.test.ts, 1:git-command.test.ts
+e71501c-drift	10	10:chief-workflow.test.ts
+b0-existing-other	3	1:direct-role-capabilities-e2e.test.ts, 1:git-role-workflows-e2e.test.ts, 1:run-pin.test.ts
+ci-path-canonical	2	1:multi-runtime.test.ts, 1:git-role-workflows-e2e.test.ts
+flake-timing	1	1:task-restart.test.ts
+hang-timeout	1	1:2026-11-09_judge-delegated-effectiveness.test.ts

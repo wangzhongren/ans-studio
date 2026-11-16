@@ -1,0 +1,65 @@
+kind	batch	family	platforms	name
+expected-greened				W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场
+expected-still-red		known-red-62	x64+win	卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report
+expected-still-red		known-red-62	x64+win	卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡
+expected-still-red		known-red-62	x64+win	卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+expected-still-red		known-red-62	x64+win	人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒
+expected-still-red		known-red-62	x64+win	渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+expected-still-red		known-red-62	x64+win	有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒
+expected-still-red		flake-timing	x64+win	重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过
+expected-still-red		known-red-62	x64+win	主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）
+expected-still-red		known-red-62	x64+win	A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）
+expected-still-red		unclassified-new	win	AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录
+expected-still-red		unclassified-new	win	AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）
+expected-still-red		unclassified-new	win	AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确
+expected-still-red		known-red-62	x64+win	AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）
+expected-still-red		known-red-62	x64+win	AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝
+expected-still-red		known-red-62	x64+win	AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）
+expected-still-red		known-red-62	x64+win	AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）
+expected-still-red		known-red-62	x64+win	AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）
+expected-still-red		known-red-62	x64+win	applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+expected-still-red		known-red-62	x64+win	BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed
+expected-still-red		known-red-62	x64+win	BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针
+expected-still-red		known-red-62	x64+win	Core-managed binding rejects a provider that did not register its display profile before first prompt
+expected-still-red		known-red-62	x64+win	D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）
+expected-still-red		known-red-62	x64+win	D-1：projectRoot 为空 → 不传 sessionDir（旧行为）
+expected-still-red		known-red-62	x64+win	D-10：质检卡保留可选质量核对与截图上限，不要求录屏
+expected-still-red		known-red-62	x64+win	D3 linked workspace root remains usable; linked target itself is not replaced
+expected-still-red		known-red-62	x64+win	dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行
+expected-still-red		known-red-62	x64+win	dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」
+expected-still-red		known-red-62	x64+win	doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）
+expected-still-red		unclassified-new	win	gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录
+expected-still-red		unclassified-new	win	gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）
+expected-still-red		unclassified-new	win	gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven
+expected-still-red		known-red-62	x64+win	Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+expected-still-red		unclassified-new	win	host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven
+expected-still-red		known-red-62	x64+win	listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+expected-still-red		known-red-62	x64+win	listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+expected-still-red		known-red-62	x64+win	openRoleSession：普通角色 settle → 发出 handback（形状正确）
+expected-still-red		unclassified-new	win	P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在
+expected-still-red		known-red-62	x64+win	P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界
+expected-still-red		unclassified-new	win	Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed
+expected-still-red		ci-path-canonical	x64	Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
+expected-still-red		known-red-62	x64+win	real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId
+expected-still-red		known-red-62	x64+win	Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+expected-still-red		known-red-62	x64+win	TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+expected-still-red		known-red-62	x64+win	v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力
+expected-still-red		hang-timeout	x64	W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例
+expected-still-red		e71501c-drift	x64	W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+expected-still-red		e71501c-drift	x64	W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin
+expected-still-red		e71501c-drift	x64	W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+expected-still-red		e71501c-drift	x64	W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+expected-still-red		e71501c-drift	x64	W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+expected-still-red		e71501c-drift	x64+win	W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+expected-still-red		e71501c-drift	x64	W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+expected-still-red		e71501c-drift	x64	W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝
+expected-still-red		e71501c-drift	x64	W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+merged-batch-target-still-red	B6a	unclassified-new	x64	Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry
+merged-batch-target-still-red	B6a	unclassified-new	win	Pipeline initial workflow source: actual approved Core request binds task before the real guarded write
+merged-batch-target-still-red	B6b	b0-existing-other	x64+win	Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze
+merged-batch-target-still-red	B6b	b0-existing-other	x64+win	Q74 owned Git metadata observer atomic rename race remains bounded and strict
+merged-batch-target-still-red	B3a-residual	b0-existing-other	x64+win	run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+new-vs-r6		unclassified-new	x64	路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+new-vs-r6		ci-path-canonical	win	actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt
+new-vs-r6		unclassified-new	win	test\测试\g5-reasoning-verify\compatibility-loopback.test.ts
+r5-name-outside-projection		e71501c-drift	x64+win	W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界

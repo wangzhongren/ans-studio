@@ -1,0 +1,42 @@
+{
+  "generatedAt": "2026-11-16T11:32:12.493Z",
+  "runId": "43848313583",
+  "b0": {
+    "total": 191,
+    "hit": 41,
+    "missing": 150,
+    "missingAppearedInSkipLines": 0
+  },
+  "b7": {
+    "total": 190,
+    "hit": 41,
+    "missing": 149,
+    "missingAppearedInSkipLines": 0
+  },
+  "kr62": {
+    "total": 62,
+    "hit": 33,
+    "missing": 29
+  },
+  "nonKnownRedB0Hits": [
+    "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+    "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+    "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+    "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+    "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+    "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+    "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+    "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope"
+  ],
+  "r5ToR6": {
+    "b0MissingR5": 113,
+    "b0MissingR6": 150,
+    "newlyGreenVsR5": 37,
+    "note": "差额 = R5 红而 R6 x64/Windows 未复现的名（arm64 无工件，不判三平台转绿）。"
+  },
+  "skipLineNamesScanned": {
+    "x64": 19,
+    "windows": 32
+  },
+  "disclosure": "arm64 无工件：B0/B7 的 macOS arm64 状态未知；「未复现」仅为 x64/Windows 两平台事实。"
+}

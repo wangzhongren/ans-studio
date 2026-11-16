@@ -1,0 +1,5179 @@
+{
+  "generatedAt": "2026-11-16T11:32:11.945Z",
+  "runId": "43848313583",
+  "workflow": ".github/workflows/test-ci.yml (workflow_dispatch on main @ 82dc180, after B3a-residual/B5/B6a/B6b/cife merges #116-#121)",
+  "jobs": {
+    "macos-arm64": "(run 43848313583) job cancelled at 10:37:57Z — no steps, no artifact; NOT a test failure",
+    "macos-x64": "(run 43848313583) artifact test-logs-mac-x64 — complete summary",
+    "windows-x64": "(run 43848313583) artifact test-logs-win-x64 — complete summary"
+  },
+  "command": "node --test --test-concurrency=1 --test-timeout=300000 --test-force-exit \"test/**/*.test.ts\"",
+  "platforms": {
+    "macos_x64": {
+      "platform": "macos-x64",
+      "logPath": "C:/Users/51054/AppData/Local/Temp/r9-art/test-logs-mac-x64/test-ci-output.log",
+      "logBytes": 1667750,
+      "lineCount": 8378,
+      "hasTimestamps": false,
+      "summaries": [
+        {
+          "index": 2321,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2322,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2323,
+          "ts": null,
+          "key": "pass",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2324,
+          "ts": null,
+          "key": "fail",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2325,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2326,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2327,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2328,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 2310.293405,
+          "rawIndent": 0
+        },
+        {
+          "index": 2334,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2335,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2336,
+          "ts": null,
+          "key": "pass",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2337,
+          "ts": null,
+          "key": "fail",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2338,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2339,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2340,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2341,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 2508.246097,
+          "rawIndent": 0
+        },
+        {
+          "index": 2347,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2348,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2349,
+          "ts": null,
+          "key": "pass",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2350,
+          "ts": null,
+          "key": "fail",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2351,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2352,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2353,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2354,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 1953.705785,
+          "rawIndent": 0
+        },
+        {
+          "index": 2364,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2365,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2366,
+          "ts": null,
+          "key": "pass",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2367,
+          "ts": null,
+          "key": "fail",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2368,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2369,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2370,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2371,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 1853.30422,
+          "rawIndent": 0
+        },
+        {
+          "index": 2399,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2400,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2401,
+          "ts": null,
+          "key": "pass",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2402,
+          "ts": null,
+          "key": "fail",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2403,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2404,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2405,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2406,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 2797.905953,
+          "rawIndent": 0
+        },
+        {
+          "index": 7225,
+          "ts": null,
+          "key": "tests",
+          "value": 5825,
+          "rawIndent": 0
+        },
+        {
+          "index": 7226,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 7227,
+          "ts": null,
+          "key": "pass",
+          "value": 5755,
+          "rawIndent": 0
+        },
+        {
+          "index": 7228,
+          "ts": null,
+          "key": "fail",
+          "value": 50,
+          "rawIndent": 0
+        },
+        {
+          "index": 7229,
+          "ts": null,
+          "key": "cancelled",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 7230,
+          "ts": null,
+          "key": "skipped",
+          "value": 19,
+          "rawIndent": 0
+        },
+        {
+          "index": 7231,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 7232,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 2680564.556098,
+          "rawIndent": 0
+        }
+      ],
+      "summary": {
+        "source": "largest top-level summary",
+        "lineIndex": 7225,
+        "ts": null,
+        "counts": {
+          "tests": 5825,
+          "suites": 0,
+          "pass": 5755,
+          "fail": 50,
+          "cancelled": 1,
+          "skipped": 19,
+          "todo": 0,
+          "duration_ms": 2680564.556098
+        }
+      },
+      "xmarkLineCount": 106,
+      "failingSectionStart": 7234,
+      "finalSectionNames": [
+        {
+          "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5.222674,
+          "files": [
+            "test/runtime-core/dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.109937,
+          "files": [
+            "test/runtime-core/dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 14.533218,
+          "files": [
+            "test/runtime-core/file-write-safety.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /符号链接/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 17.675096,
+          "files": [
+            "test/runtime-core/session.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.929815,
+          "files": [
+            "test/runtime-core/trunk-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.998748,
+          "files": [
+            "test/runtime-core/version-change-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1471.218496,
+          "files": [
+            "test/桌面应用/b31-fixed-release-auto-desktop.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "count": 3,
+          "indents": [
+            0,
+            2
+          ],
+          "maxDurationMs": 2936.767349,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: W52 W19 actual custom Core binding [{\"sessionId\":\"9dd9c0b4-09ff-44c9-9ab0-75e14b79f37c\",\"roleId\":\"convener\",\"state\":\"disposed\",\"lifecycleStatus\":\"unknown\",\"processCoverage\":\"unknown\"},{\"sessionId\":\"8a7d7879-cb89-4fda-920d-2a0715f027b5\",\"roleId\":\"rapporteur\",\"state\":\"d",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 10094.48406,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 10322.364803,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9854.689607,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9910.592221,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9496.838198,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3937.019456,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 542.366551,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: [\"git_candidate: {\\\"operationId\\\":\\\"w29-owned-init\\\",\\\"repoId\\\":\\\"uninitialized\\\",\\\"status\\\":\\\"blocked\\\",\\\"code\\\":\\\"git-file-final-guard-unproven\\\",\\\"message\\\":\\\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\\\"}\"]",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 526.81686,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: [\"git_candidate: {\\\"operationId\\\":\\\"w29-owned-init\\\",\\\"repoId\\\":\\\"uninitialized\\\",\\\"status\\\":\\\"blocked\\\",\\\"code\\\":\\\"git-file-final-guard-unproven\\\",\\\"message\\\":\\\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\\\"}\"]",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3627.922837,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "TypeError: Cannot read properties of undefined (reading 'name')",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3066.267347,
+          "files": [
+            "test/桌面应用/run-pin.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4lu36-676aba20 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2087.818041,
+          "files": [
+            "test/桌面应用/task-restart.test.ts"
+          ],
+          "errorFirst": "Error: 等待超时",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 180003.746956,
+          "files": [
+            "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+          ],
+          "errorFirst": null,
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 173.236802,
+          "files": [
+            "test/测试/direct-role-capabilities-e2e.test.ts"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：未找到 docs/product/direct-e2e-intent-vN.md（最新意图缺失）。）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 161.080087,
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Fixture inventory path must not traverse unknown links",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5417.139341,
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 22.971405,
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 角色卡路径必须经同一 resolveWrite 探测为 allowed",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 26.545861,
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 64.121312,
+          "files": [
+            "test/编排/chat-handback-scope.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 229.936633,
+          "files": [
+            "test/编排/direct-role-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 230.853355,
+          "files": [
+            "test/编排/doc-format-specs.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5238.126375,
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"code\":\"trunk-item-invalid\",\"message\":\"The actual publication task has no original Chief input source\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 272.140674,
+          "files": [
+            "test/编排/git-command.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /git-command-failed:null:unknown/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 28.717082,
+          "files": [
+            "test/编排/governance-matrix-injection.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 74.930203,
+          "files": [
+            "test/编排/handback.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 21.127267,
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 17.809152,
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.947339,
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "errorFirst": "Error: ENOENT: no such file or directory, realpath ''",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 26.800715,
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: runRole（一次性路径）不传 AdapterCapabilities",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.975454,
+          "files": [
+            "test/编排/shell-operator-only.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git clean -fdx：审批通过 ⇒ 放行",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.93988,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 幕僚卡必须写明派发后结束本轮",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.737056,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /主链顺序（必须）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.264064,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 运营卡必须写明验收由 dispatch 质检发起",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 131.797628,
+          "files": [
+            "test/编排/trunk-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 150.338119,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 118.685576,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 108.7729,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 101.289941,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 91.925363,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.514326,
+          "files": [
+            "test/门禁引擎/convener-workflow-write.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\\/workflow\\.md` 由运营落盘维护/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 4.022819,
+          "files": [
+            "test/门禁引擎/governance-matrix-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 178.430915,
+          "files": [
+            "test/门禁引擎/list-project.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 146.752178,
+          "files": [
+            "test/门禁引擎/role-group-metadata.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.166849,
+          "files": [
+            "test/门禁引擎/view-image-cards.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /可选质量核对/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        }
+      ],
+      "allNames": [
+        {
+          "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5.222674,
+          "files": [
+            "test/runtime-core/dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.109937,
+          "files": [
+            "test/runtime-core/dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 14.533218,
+          "files": [
+            "test/runtime-core/file-write-safety.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /符号链接/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 17.675096,
+          "files": [
+            "test/runtime-core/session.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.929815,
+          "files": [
+            "test/runtime-core/trunk-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.998748,
+          "files": [
+            "test/runtime-core/version-change-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1471.218496,
+          "files": [
+            "test/桌面应用/b31-fixed-release-auto-desktop.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "count": 6,
+          "indents": [
+            0,
+            2
+          ],
+          "maxDurationMs": 2936.767349,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The actual creator receipt must supply notification source",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 10094.48406,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 10322.364803,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9854.689607,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9910.592221,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9496.838198,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3937.019456,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 542.366551,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: [\"git_candidate: {\\\"operationId\\\":\\\"w29-owned-init\\\",\\\"repoId\\\":\\\"uninitialized\\\",\\\"status\\\":\\\"blocked\\\",\\\"code\\\":\\\"git-file-final-guard-unproven\\\",\\\"message\\\":\\\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\\\"}\"]",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 526.81686,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3627.922837,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3066.267347,
+          "files": [
+            "test/桌面应用/run-pin.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4lu36-676aba20 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2087.818041,
+          "files": [
+            "test/桌面应用/task-restart.test.ts"
+          ],
+          "errorFirst": "Error: 等待超时",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 180003.746956,
+          "files": [
+            "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+          ],
+          "errorFirst": null,
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 173.236802,
+          "files": [
+            "test/测试/direct-role-capabilities-e2e.test.ts"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：未找到 docs/product/direct-e2e-intent-vN.md（最新意图缺失）。）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 161.080087,
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: The input did not match the regular expression /已获准并落盘/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5417.139341,
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 22.971405,
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 角色卡路径必须经同一 resolveWrite 探测为 allowed",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 26.545861,
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 64.121312,
+          "files": [
+            "test/编排/chat-handback-scope.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 229.936633,
+          "files": [
+            "test/编排/direct-role-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 230.853355,
+          "files": [
+            "test/编排/doc-format-specs.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5238.126375,
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"code\":\"trunk-item-invalid\",\"message\":\"The actual publication task has no original Chief input source\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 272.140674,
+          "files": [
+            "test/编排/git-command.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /git-command-failed:null:unknown/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 28.717082,
+          "files": [
+            "test/编排/governance-matrix-injection.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 74.930203,
+          "files": [
+            "test/编排/handback.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 21.127267,
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 17.809152,
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.947339,
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "errorFirst": "Error: ENOENT: no such file or directory, realpath ''",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 26.800715,
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: runRole（一次性路径）不传 AdapterCapabilities",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.975454,
+          "files": [
+            "test/编排/shell-operator-only.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git clean -fdx：审批通过 ⇒ 放行",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.93988,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 幕僚卡必须写明派发后结束本轮",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.737056,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /主链顺序（必须）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.264064,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 运营卡必须写明验收由 dispatch 质检发起",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 131.797628,
+          "files": [
+            "test/编排/trunk-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 150.338119,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 118.685576,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 108.7729,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 101.289941,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 91.925363,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.514326,
+          "files": [
+            "test/门禁引擎/convener-workflow-write.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\\/workflow\\.md` 由运营落盘维护/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 4.022819,
+          "files": [
+            "test/门禁引擎/governance-matrix-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 178.430915,
+          "files": [
+            "test/门禁引擎/list-project.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 146.752178,
+          "files": [
+            "test/门禁引擎/role-group-metadata.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.166849,
+          "files": [
+            "test/门禁引擎/view-image-cards.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /可选质量核对/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        }
+      ],
+      "fileLevelNames": [],
+      "timeouts": [
+        {
+          "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+          "maxDurationMs": 180003.746956,
+          "count": 2,
+          "files": [
+            "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+          ],
+          "fileLevel": false
+        }
+      ],
+      "testAtLines": 53,
+      "lastResultTs": null,
+      "firstResultTs": null,
+      "cancelTs": null,
+      "resultTsGaps": [],
+      "lineLevel": {
+        "sectionHeaderLines": 3,
+        "uniqueIndentPreservingNames": 52,
+        "lineLevelUniqueIncludingHeaders": 55,
+        "note": "uniqueIndentPreservingNames = 去耗时、保留缩进、排除 section 头；lineLevelUniqueIncludingHeaders = 前者 + section 头行出现次数（R2–R6 口径）"
+      },
+      "notes": [
+        "unique xmark names=51 vs summary fail=50; difference is parent/subtest accounting (inline parent names are not repeated as leaf blocks) and embedded child-run output"
+      ],
+      "authoritativeSource": "whole-log xmark union (top-level failing section present)",
+      "authoritativeNames": [
+        {
+          "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5.222674,
+          "files": [
+            "test/runtime-core/dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.109937,
+          "files": [
+            "test/runtime-core/dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 14.533218,
+          "files": [
+            "test/runtime-core/file-write-safety.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /符号链接/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 17.675096,
+          "files": [
+            "test/runtime-core/session.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.929815,
+          "files": [
+            "test/runtime-core/trunk-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.998748,
+          "files": [
+            "test/runtime-core/version-change-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1471.218496,
+          "files": [
+            "test/桌面应用/b31-fixed-release-auto-desktop.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "count": 6,
+          "indents": [
+            0,
+            2
+          ],
+          "maxDurationMs": 2936.767349,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The actual creator receipt must supply notification source",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 10094.48406,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 10322.364803,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9854.689607,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9910.592221,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9496.838198,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3937.019456,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 542.366551,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: [\"git_candidate: {\\\"operationId\\\":\\\"w29-owned-init\\\",\\\"repoId\\\":\\\"uninitialized\\\",\\\"status\\\":\\\"blocked\\\",\\\"code\\\":\\\"git-file-final-guard-unproven\\\",\\\"message\\\":\\\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\\\"}\"]",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 526.81686,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3627.922837,
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "errorFirst": "code: 'ERR_ASSERTION',",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3066.267347,
+          "files": [
+            "test/桌面应用/run-pin.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4lu36-676aba20 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2087.818041,
+          "files": [
+            "test/桌面应用/task-restart.test.ts"
+          ],
+          "errorFirst": "Error: 等待超时",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 180003.746956,
+          "files": [
+            "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+          ],
+          "errorFirst": null,
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 173.236802,
+          "files": [
+            "test/测试/direct-role-capabilities-e2e.test.ts"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：未找到 docs/product/direct-e2e-intent-vN.md（最新意图缺失）。）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 161.080087,
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: The input did not match the regular expression /已获准并落盘/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5417.139341,
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 22.971405,
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 角色卡路径必须经同一 resolveWrite 探测为 allowed",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 26.545861,
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 64.121312,
+          "files": [
+            "test/编排/chat-handback-scope.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 229.936633,
+          "files": [
+            "test/编排/direct-role-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 230.853355,
+          "files": [
+            "test/编排/doc-format-specs.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 5238.126375,
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"code\":\"trunk-item-invalid\",\"message\":\"The actual publication task has no original Chief input source\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 272.140674,
+          "files": [
+            "test/编排/git-command.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /git-command-failed:null:unknown/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 28.717082,
+          "files": [
+            "test/编排/governance-matrix-injection.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 74.930203,
+          "files": [
+            "test/编排/handback.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 21.127267,
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 17.809152,
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.947339,
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "errorFirst": "Error: ENOENT: no such file or directory, realpath ''",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 26.800715,
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: runRole（一次性路径）不传 AdapterCapabilities",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.975454,
+          "files": [
+            "test/编排/shell-operator-only.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git clean -fdx：审批通过 ⇒ 放行",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.93988,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 幕僚卡必须写明派发后结束本轮",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.737056,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /主链顺序（必须）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.264064,
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 运营卡必须写明验收由 dispatch 质检发起",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 131.797628,
+          "files": [
+            "test/编排/trunk-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 150.338119,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 118.685576,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 108.7729,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 101.289941,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 91.925363,
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.514326,
+          "files": [
+            "test/门禁引擎/convener-workflow-write.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\\/workflow\\.md` 由运营落盘维护/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 4.022819,
+          "files": [
+            "test/门禁引擎/governance-matrix-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 178.430915,
+          "files": [
+            "test/门禁引擎/list-project.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 146.752178,
+          "files": [
+            "test/门禁引擎/role-group-metadata.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.166849,
+          "files": [
+            "test/门禁引擎/view-image-cards.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /可选质量核对/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        }
+      ],
+      "uniqueCount": 51,
+      "topLevelCount": 51,
+      "subtestOnlyCount": 0,
+      "fileLevelCount": 0
+    },
+    "windows_x64": {
+      "platform": "windows-x64 (complete)",
+      "logPath": "C:/Users/51054/AppData/Local/Temp/r9-art/test-logs-win-x64/test-ci-output.log",
+      "logBytes": 1113600,
+      "lineCount": 8289,
+      "hasTimestamps": false,
+      "summaries": [
+        {
+          "index": 2323,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2324,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2325,
+          "ts": null,
+          "key": "pass",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2326,
+          "ts": null,
+          "key": "fail",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2327,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2328,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2329,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2330,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 982.6034,
+          "rawIndent": 0
+        },
+        {
+          "index": 2336,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2337,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2338,
+          "ts": null,
+          "key": "pass",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2339,
+          "ts": null,
+          "key": "fail",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2340,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2341,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2342,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2343,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 1131.8744,
+          "rawIndent": 0
+        },
+        {
+          "index": 2349,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2350,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2351,
+          "ts": null,
+          "key": "pass",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2352,
+          "ts": null,
+          "key": "fail",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2353,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2354,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2355,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2356,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 760.0165,
+          "rawIndent": 0
+        },
+        {
+          "index": 2366,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2367,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2368,
+          "ts": null,
+          "key": "pass",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2369,
+          "ts": null,
+          "key": "fail",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2370,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2371,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2372,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2373,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 725.9085,
+          "rawIndent": 0
+        },
+        {
+          "index": 2401,
+          "ts": null,
+          "key": "tests",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2402,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2403,
+          "ts": null,
+          "key": "pass",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2404,
+          "ts": null,
+          "key": "fail",
+          "value": 1,
+          "rawIndent": 0
+        },
+        {
+          "index": 2405,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2406,
+          "ts": null,
+          "key": "skipped",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2407,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 2408,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 1486.0014,
+          "rawIndent": 0
+        },
+        {
+          "index": 7113,
+          "ts": null,
+          "key": "tests",
+          "value": 5826,
+          "rawIndent": 0
+        },
+        {
+          "index": 7114,
+          "ts": null,
+          "key": "suites",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 7115,
+          "ts": null,
+          "key": "pass",
+          "value": 5743,
+          "rawIndent": 0
+        },
+        {
+          "index": 7116,
+          "ts": null,
+          "key": "fail",
+          "value": 51,
+          "rawIndent": 0
+        },
+        {
+          "index": 7117,
+          "ts": null,
+          "key": "cancelled",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 7118,
+          "ts": null,
+          "key": "skipped",
+          "value": 32,
+          "rawIndent": 0
+        },
+        {
+          "index": 7119,
+          "ts": null,
+          "key": "todo",
+          "value": 0,
+          "rawIndent": 0
+        },
+        {
+          "index": 7120,
+          "ts": null,
+          "key": "duration_ms",
+          "value": 1553909.9747,
+          "rawIndent": 0
+        }
+      ],
+      "summary": {
+        "source": "largest top-level summary",
+        "lineIndex": 7113,
+        "ts": null,
+        "counts": {
+          "tests": 5826,
+          "suites": 0,
+          "pass": 5743,
+          "fail": 51,
+          "cancelled": 0,
+          "skipped": 32,
+          "todo": 0,
+          "duration_ms": 1553909.9747
+        }
+      },
+      "xmarkLineCount": 106,
+      "failingSectionStart": 7122,
+      "finalSectionNames": [
+        {
+          "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.3128,
+          "files": [
+            "test\\runtime-core\\dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.3501,
+          "files": [
+            "test\\runtime-core\\dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 13.4071,
+          "files": [
+            "test\\runtime-core\\file-write-safety.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /符号链接/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 4.9557,
+          "files": [
+            "test\\runtime-core\\session.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.2877,
+          "files": [
+            "test\\runtime-core\\trunk-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8685,
+          "files": [
+            "test\\runtime-core\\version-change-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "count": 3,
+          "indents": [
+            0,
+            2
+          ],
+          "maxDurationMs": 1531.1762,
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: W52 W19 actual custom Core binding [{\"sessionId\":\"cc0eaaa0-4660-498d-9b10-fa00cc50c0b2\",\"roleId\":\"convener\",\"state\":\"disposed\",\"lifecycleStatus\":\"unknown\",\"processCoverage\":\"unknown\"},{\"sessionId\":\"20b9ff64-16d7-44fe-9d92-d645bd797af8\",\"roleId\":\"rapporteur\",\"state\":\"d",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 8701.72,
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The exact cross-run host close notice must retire rather than block the queue[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（statu",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 138.8177,
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ],
+          "errorFirst": "Error: ENOTEMPTY, Directory not empty: \\\\?\\C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-d1-ect9pu '\\\\?\\C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-d1-ect9pu'",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1245.4492,
+          "files": [
+            "test\\桌面应用\\run-pin.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4ggxb-dddf2eee 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2048.8072,
+          "files": [
+            "test\\桌面应用\\task-restart.test.ts"
+          ],
+          "errorFirst": "Error: 等待超时",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 140.93,
+          "files": [
+            "test\\测试\\direct-role-capabilities-e2e.test.ts"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：未找到 docs/product/direct-e2e-intent-vN.md（最新意图缺失）。）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3628.4306,
+          "files": [
+            "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts"
+          ],
+          "errorFirst": null,
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 102.5756,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-audit-failure.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-ac16\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 120.2795,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-codex-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-codex-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 112.1393,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-claude-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 97.94,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-pi-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-pi-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 59.8949,
+          "files": [
+            "test\\测试\\git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Fixture inventory path must not traverse unknown links",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 24.857,
+          "files": [
+            "test\\测试\\run-stop-host-continuation-integration.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 176.649,
+          "files": [
+            "test\\测试\\session-admission-approval-q9-integration.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-q16-pos-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 15.2184,
+          "files": [
+            "test\\编排\\appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 角色卡路径必须经同一 resolveWrite 探测为 allowed",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 16.8206,
+          "files": [
+            "test\\编排\\appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 29.8155,
+          "files": [
+            "test\\编排\\chat-handback-scope.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 167.7511,
+          "files": [
+            "test\\编排\\direct-role-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 55.3772,
+          "files": [
+            "test\\编排\\doc-format-specs.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 27.3623,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.5812,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未撤销的 prepared 条目必须拒绝（H13）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.6496,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2741.6133,
+          "files": [
+            "test\\编排\\git-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"code\":\"trunk-item-invalid\",\"message\":\"The actual publication task has no original Chief input source\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.4926,
+          "files": [
+            "test\\编排\\governance-matrix-injection.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 31.2393,
+          "files": [
+            "test\\编排\\handback.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1696.6024,
+          "files": [
+            "test\\编排\\run-role-submit-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"reason\":\"missing\",\"message\":\"Error: ENOENT: no such file or directory, realpath 'C:\\\\Users\\\\RUNNER~1\\\\AppData\\\\Local\\\\Temp\\\\ans-o10-workflow-source-KljWHL\\\\.ans\\\\trunk\\\\operations\\\\59ff13f4e32417eab058606e1beb81f9eb341923c52db7c50dcddf562dc30223\\\\stable-s",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 8.305,
+          "files": [
+            "test\\编排\\section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.7615,
+          "files": [
+            "test\\编排\\section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.5846,
+          "files": [
+            "test\\编排\\session-dir.test.ts"
+          ],
+          "errorFirst": "Error: ENOENT: no such file or directory, realpath ''",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.4408,
+          "files": [
+            "test\\编排\\session-dir.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: runRole（一次性路径）不传 AdapterCapabilities",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.2307,
+          "files": [
+            "test\\编排\\shell-operator-only.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git clean -fdx：审批通过 ⇒ 放行",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8316,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 幕僚卡必须写明派发后结束本轮",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.5411,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /主链顺序（必须）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.1804,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 运营卡必须写明验收由 dispatch 质检发起",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 263.3117,
+          "files": [
+            "test\\编排\\trunk-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 103.2531,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 175.3535,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 135.077,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 161.9835,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 213.7378,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8302,
+          "files": [
+            "test\\门禁引擎\\convener-workflow-write.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\\/workflow\\.md` 由运营落盘维护/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.1477,
+          "files": [
+            "test\\门禁引擎\\governance-matrix-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 64.7479,
+          "files": [
+            "test\\门禁引擎\\list-project.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 60.6025,
+          "files": [
+            "test\\门禁引擎\\role-group-metadata.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "count": 1,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.7966,
+          "files": [
+            "test\\门禁引擎\\view-image-cards.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /可选质量核对/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        }
+      ],
+      "allNames": [
+        {
+          "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.3128,
+          "files": [
+            "test\\runtime-core\\dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.3501,
+          "files": [
+            "test\\runtime-core\\dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 13.4071,
+          "files": [
+            "test\\runtime-core\\file-write-safety.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /符号链接/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 4.9557,
+          "files": [
+            "test\\runtime-core\\session.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.2877,
+          "files": [
+            "test\\runtime-core\\trunk-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8685,
+          "files": [
+            "test\\runtime-core\\version-change-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "count": 6,
+          "indents": [
+            0,
+            2
+          ],
+          "maxDurationMs": 1531.1762,
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The actual creator receipt must supply notification source",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 8701.72,
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The exact cross-run host close notice must retire rather than block the queue[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（statu",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 138.8177,
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ],
+          "errorFirst": "Error: ENOTEMPTY, Directory not empty: \\\\?\\C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-d1-ect9pu '\\\\?\\C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-d1-ect9pu'",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1245.4492,
+          "files": [
+            "test\\桌面应用\\run-pin.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4ggxb-dddf2eee 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2048.8072,
+          "files": [
+            "test\\桌面应用\\task-restart.test.ts"
+          ],
+          "errorFirst": "Error: 等待超时",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 140.93,
+          "files": [
+            "test\\测试\\direct-role-capabilities-e2e.test.ts"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：未找到 docs/product/direct-e2e-intent-vN.md（最新意图缺失）。）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3628.4306,
+          "files": [
+            "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts"
+          ],
+          "errorFirst": null,
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 102.5756,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-audit-failure.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-ac16\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 120.2795,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-codex-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-codex-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 112.1393,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-claude-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 97.94,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-pi-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-pi-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 59.8949,
+          "files": [
+            "test\\测试\\git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Fixture inventory path must not traverse unknown links",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 24.857,
+          "files": [
+            "test\\测试\\run-stop-host-continuation-integration.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 176.649,
+          "files": [
+            "test\\测试\\session-admission-approval-q9-integration.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-q16-pos-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 15.2184,
+          "files": [
+            "test\\编排\\appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 角色卡路径必须经同一 resolveWrite 探测为 allowed",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 16.8206,
+          "files": [
+            "test\\编排\\appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 29.8155,
+          "files": [
+            "test\\编排\\chat-handback-scope.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 167.7511,
+          "files": [
+            "test\\编排\\direct-role-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 55.3772,
+          "files": [
+            "test\\编排\\doc-format-specs.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 27.3623,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.5812,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未撤销的 prepared 条目必须拒绝（H13）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.6496,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2741.6133,
+          "files": [
+            "test\\编排\\git-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"code\":\"trunk-item-invalid\",\"message\":\"The actual publication task has no original Chief input source\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.4926,
+          "files": [
+            "test\\编排\\governance-matrix-injection.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 31.2393,
+          "files": [
+            "test\\编排\\handback.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1696.6024,
+          "files": [
+            "test\\编排\\run-role-submit-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"reason\":\"missing\",\"message\":\"Error: ENOENT: no such file or directory, realpath 'C:\\\\Users\\\\RUNNER~1\\\\AppData\\\\Local\\\\Temp\\\\ans-o10-workflow-source-KljWHL\\\\.ans\\\\trunk\\\\operations\\\\59ff13f4e32417eab058606e1beb81f9eb341923c52db7c50dcddf562dc30223\\\\stable-s",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 8.305,
+          "files": [
+            "test\\编排\\section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.7615,
+          "files": [
+            "test\\编排\\section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.5846,
+          "files": [
+            "test\\编排\\session-dir.test.ts"
+          ],
+          "errorFirst": "Error: ENOENT: no such file or directory, realpath ''",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.4408,
+          "files": [
+            "test\\编排\\session-dir.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: runRole（一次性路径）不传 AdapterCapabilities",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.2307,
+          "files": [
+            "test\\编排\\shell-operator-only.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git clean -fdx：审批通过 ⇒ 放行",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8316,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 幕僚卡必须写明派发后结束本轮",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.5411,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /主链顺序（必须）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.1804,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 运营卡必须写明验收由 dispatch 质检发起",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 263.3117,
+          "files": [
+            "test\\编排\\trunk-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 103.2531,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 175.3535,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 135.077,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 161.9835,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 213.7378,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8302,
+          "files": [
+            "test\\门禁引擎\\convener-workflow-write.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\\/workflow\\.md` 由运营落盘维护/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.1477,
+          "files": [
+            "test\\门禁引擎\\governance-matrix-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 64.7479,
+          "files": [
+            "test\\门禁引擎\\list-project.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 60.6025,
+          "files": [
+            "test\\门禁引擎\\role-group-metadata.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.7966,
+          "files": [
+            "test\\门禁引擎\\view-image-cards.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /可选质量核对/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        }
+      ],
+      "fileLevelNames": [
+        {
+          "name": "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+          "indent": 0,
+          "durationMs": 3628.4306,
+          "file": null,
+          "line": 3450,
+          "ts": null
+        },
+        {
+          "name": "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+          "indent": 0,
+          "durationMs": 3628.4306,
+          "file": "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+          "line": 7371,
+          "ts": null
+        }
+      ],
+      "timeouts": [],
+      "testAtLines": 53,
+      "lastResultTs": null,
+      "firstResultTs": null,
+      "cancelTs": null,
+      "resultTsGaps": [],
+      "lineLevel": {
+        "sectionHeaderLines": 3,
+        "uniqueIndentPreservingNames": 52,
+        "lineLevelUniqueIncludingHeaders": 55,
+        "note": "uniqueIndentPreservingNames = 去耗时、保留缩进、排除 section 头；lineLevelUniqueIncludingHeaders = 前者 + section 头行出现次数（R2–R6 口径）"
+      },
+      "notes": [],
+      "authoritativeSource": "whole-log xmark union (top-level failing section present)",
+      "authoritativeNames": [
+        {
+          "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.3128,
+          "files": [
+            "test\\runtime-core\\dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.3501,
+          "files": [
+            "test\\runtime-core\\dispatch-workflow-writer-copy.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\\*\\*运营（convener）\\*\\*落盘到 `docs\\/workflow\\.md`/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 13.4071,
+          "files": [
+            "test\\runtime-core\\file-write-safety.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /符号链接/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 4.9557,
+          "files": [
+            "test\\runtime-core\\session.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1.2877,
+          "files": [
+            "test\\runtime-core\\trunk-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8685,
+          "files": [
+            "test\\runtime-core\\version-change-contract.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+          "count": 6,
+          "indents": [
+            0,
+            2
+          ],
+          "maxDurationMs": 1531.1762,
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The actual creator receipt must supply notification source",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 8701.72,
+          "files": [
+            "test\\桌面应用\\chief-workflow.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The exact cross-run host close notice must retire rather than block the queue[{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[],\"lastRole\":\"user\"},{\"role\":\"chief\",\"user\":\"W29 initialize owned repository\",\"tools\":[\"dispatch_task：任务已派发给「convener」（statu",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 138.8177,
+          "files": [
+            "test\\桌面应用\\multi-runtime.test.ts"
+          ],
+          "errorFirst": "Error: ENOTEMPTY, Directory not empty: \\\\?\\C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-d1-ect9pu '\\\\?\\C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\ans-d1-ect9pu'",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1245.4492,
+          "files": [
+            "test\\桌面应用\\run-pin.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 已受理：任务 #t-mwj4ggxb-dddf2eee 已报告，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2048.8072,
+          "files": [
+            "test\\桌面应用\\task-restart.test.ts"
+          ],
+          "errorFirst": "Error: 等待超时",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 140.93,
+          "files": [
+            "test\\测试\\direct-role-capabilities-e2e.test.ts"
+          ],
+          "errorFirst": "Error: AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：未找到 docs/product/direct-e2e-intent-vN.md（最新意图缺失）。）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 3628.4306,
+          "files": [
+            "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts"
+          ],
+          "errorFirst": null,
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 102.5756,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-audit-failure.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-ac16\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 120.2795,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-codex-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-codex-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 112.1393,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-claude-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 97.94,
+          "files": [
+            "test\\测试\\git-action-cross-runtime-pi-init.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-cross-pi-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 59.8949,
+          "files": [
+            "test\\测试\\git-role-workflows-e2e.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Fixture inventory path must not traverse unknown links",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 24.857,
+          "files": [
+            "test\\测试\\run-stop-host-continuation-integration.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 176.649,
+          "files": [
+            "test\\测试\\session-admission-approval-q9-integration.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"operationId\":\"w5-q16-pos-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 15.2184,
+          "files": [
+            "test\\编排\\appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 角色卡路径必须经同一 resolveWrite 探测为 allowed",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 16.8206,
+          "files": [
+            "test\\编排\\appointment-roster.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 29.8155,
+          "files": [
+            "test\\编排\\chat-handback-scope.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 167.7511,
+          "files": [
+            "test\\编排\\direct-role-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: A shape-shaped confirmation without the real request/decision cannot promote migration",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 55.3772,
+          "files": [
+            "test\\编排\\doc-format-specs.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 27.3623,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.5812,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 未撤销的 prepared 条目必须拒绝（H13）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.6496,
+          "files": [
+            "test\\编排\\git-action-authorization-gate.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2741.6133,
+          "files": [
+            "test\\编排\\git-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"code\":\"trunk-item-invalid\",\"message\":\"The actual publication task has no original Chief input source\"}",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.4926,
+          "files": [
+            "test\\编排\\governance-matrix-injection.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 31.2393,
+          "files": [
+            "test\\编排\\handback.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 1696.6024,
+          "files": [
+            "test\\编排\\run-role-submit-capabilities.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"reason\":\"missing\",\"message\":\"Error: ENOENT: no such file or directory, realpath 'C:\\\\Users\\\\RUNNER~1\\\\AppData\\\\Local\\\\Temp\\\\ans-o10-workflow-source-KljWHL\\\\.ans\\\\trunk\\\\operations\\\\59ff13f4e32417eab058606e1beb81f9eb341923c52db7c50dcddf562dc30223\\\\stable-s",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 8.305,
+          "files": [
+            "test\\编排\\section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.7615,
+          "files": [
+            "test\\编排\\section1-write-preauthorization.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.5846,
+          "files": [
+            "test\\编排\\session-dir.test.ts"
+          ],
+          "errorFirst": "Error: ENOENT: no such file or directory, realpath ''",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 9.4408,
+          "files": [
+            "test\\编排\\session-dir.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: runRole（一次性路径）不传 AdapterCapabilities",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 6.2307,
+          "files": [
+            "test\\编排\\shell-operator-only.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: git clean -fdx：审批通过 ⇒ 放行",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8316,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 幕僚卡必须写明派发后结束本轮",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.5411,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /主链顺序（必须）/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.1804,
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: 运营卡必须写明验收由 dispatch 质检发起",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 263.3117,
+          "files": [
+            "test\\编排\\trunk-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 103.2531,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 175.3535,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 135.077,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 161.9835,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 213.7378,
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.8302,
+          "files": [
+            "test\\门禁引擎\\convener-workflow-write.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /项目工作流文件 `docs\\/workflow\\.md` 由运营落盘维护/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 2.1477,
+          "files": [
+            "test\\门禁引擎\\governance-matrix-service.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 64.7479,
+          "files": [
+            "test\\门禁引擎\\list-project.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 60.6025,
+          "files": [
+            "test\\门禁引擎\\role-group-metadata.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+          "firstTs": null,
+          "lastTs": null
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "count": 2,
+          "indents": [
+            0
+          ],
+          "maxDurationMs": 0.7966,
+          "files": [
+            "test\\门禁引擎\\view-image-cards.test.ts"
+          ],
+          "errorFirst": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /可选质量核对/. Input:",
+          "firstTs": null,
+          "lastTs": null
+        }
+      ],
+      "uniqueCount": 51,
+      "topLevelCount": 51,
+      "subtestOnlyCount": 0,
+      "fileLevelCount": 2
+    }
+  },
+  "artifactIntegrity": {
+    "macos_x64": {
+      "logPath": "C:/Users/51054/AppData/Local/Temp/r9-art/test-logs-mac-x64/test-ci-output.log",
+      "logBytes": 1667750,
+      "lineCount": 8378,
+      "hasTopLevelSummary": true,
+      "summaryCounts": {
+        "tests": 5825,
+        "suites": 0,
+        "pass": 5755,
+        "fail": 50,
+        "cancelled": 1,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 2680564.556098
+      },
+      "finalFailingSectionFound": true,
+      "xmarkLineCount": 106,
+      "uniqueNames": 51,
+      "lineLevel": {
+        "sectionHeaderLines": 3,
+        "uniqueIndentPreservingNames": 52,
+        "lineLevelUniqueIncludingHeaders": 55,
+        "note": "uniqueIndentPreservingNames = 去耗时、保留缩进、排除 section 头；lineLevelUniqueIncludingHeaders = 前者 + section 头行出现次数（R2–R6 口径）"
+      },
+      "fileLevelCount": 0,
+      "cancelMarkerInArtifact": false
+    },
+    "windows_x64": {
+      "logPath": "C:/Users/51054/AppData/Local/Temp/r9-art/test-logs-win-x64/test-ci-output.log",
+      "logBytes": 1113600,
+      "lineCount": 8289,
+      "hasTopLevelSummary": true,
+      "summaryCounts": {
+        "tests": 5826,
+        "suites": 0,
+        "pass": 5743,
+        "fail": 51,
+        "cancelled": 0,
+        "skipped": 32,
+        "todo": 0,
+        "duration_ms": 1553909.9747
+      },
+      "finalFailingSectionFound": true,
+      "xmarkLineCount": 106,
+      "uniqueNames": 51,
+      "lineLevel": {
+        "sectionHeaderLines": 3,
+        "uniqueIndentPreservingNames": 52,
+        "lineLevelUniqueIncludingHeaders": 55,
+        "note": "uniqueIndentPreservingNames = 去耗时、保留缩进、排除 section 头；lineLevelUniqueIncludingHeaders = 前者 + section 头行出现次数（R2–R6 口径）"
+      },
+      "fileLevelCount": 2,
+      "cancelMarkerInArtifact": false
+    },
+    "macos_arm64": {
+      "platform": "macos-arm64",
+      "jobConclusion": "cancelled",
+      "jobStartedAt": "2026-11-16T10:22:57Z",
+      "jobCompletedAt": "2026-11-16T10:37:57Z",
+      "steps": [],
+      "artifact": null,
+      "artifactPathChecked": "C:/Users/51054/AppData/Local/Temp/r9-art/test-logs-mac-arm64/test-ci-output.log",
+      "artifactExisted": false,
+      "note": "macOS arm64 job 在 job 级被 cancelled（15m00s，无任何步骤记录、无上传工件）。非测试失败；本轮 arm64 无权威失败清单，平台结论仅来自 macOS x64 与 Windows x64。"
+    }
+  },
+  "artifactCheck": null,
+  "notes": [
+    "R6 数据源为 run 43848313583 的上传工件（/tmp/r9-art）：macOS x64 与 Windows x64 完整；macOS arm64 job 级 cancelled、无工件。",
+    "相对 R5：B3a-residual #116、B5 #117、R5 文档 #118、B6a #119、B6b #120、cife #121 已合入 main（82dc180）；test-ci 增加 --test-force-exit。",
+    "W19/W33、B4-fu、B3c-fu、misc 四批晚于本轮 CI，未合入。"
+  ]
+}
