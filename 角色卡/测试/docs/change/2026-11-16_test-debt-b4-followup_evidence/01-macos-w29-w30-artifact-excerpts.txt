@@ -1,0 +1,231 @@
+# arm64 final failing-section excerpts (R5 run 43829367008)
+## W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin  [log lines 7433-7446]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizqacc-8d7f69d9（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 28; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizqc20-b98cee3c\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=None
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+## W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin  [log lines 7463-7476]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizqmw7-93a70c15（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 28; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizqobk-4bf59912\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=None
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+## W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin  [log lines 7448-7461]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizqgmc-58fde384（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 29; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizqicg-62fb0b6f\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=w52-wrong-report-flow
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+## W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后  [log lines 7478-7491]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizquio-8ef7cfe9（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 28; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizqvu4-597619d5\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=None
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+## W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后  [log lines 7493-7506]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizr0lj-752d7f76（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 28; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizr23f-64991dde\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=None
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+# x64 final failing-section excerpts (R5 run 43829367008)
+## W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin  [log lines 7439-7452]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizvzhr-a21708bf（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 28; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizw3ti-721ce287\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=None
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+## W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin  [log lines 7469-7482]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizwf4p-4fbf2030（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 28; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizwiyb-4a6305f4\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=None
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+## W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin  [log lines 7454-7467]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizw7bv-3b8ef614（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 29; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizwb76-7e9e878d\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=w52-wrong-report-flow
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+## W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后  [log lines 7484-7497]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizwslx-30140808（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 28; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizwwaa-689f1227\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=None
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)
+
+## W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后  [log lines 7499-7512]
+assertion head:   AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务已派发给「convener」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 运营 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mwizx094-7e2715e4（sideEffect=docs；受理 ≠ 完成）。状态提示（未阻断）：1. 尚无 D3 选中角色；运营派实现时目标可能不
+trace rows: 28; write_file denials: 5
+  row 12 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 13 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 24 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  row 25 role=product: write_file 写入前复核未通过：写入被拒绝：file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）（未写入目标文件；可能已创建父目录）
+  last row role=chief user='[工作结果] 已收到 1 份角色结果。\n任务：#t-mwizx3yt-35e209e7\n来源角色：product\n状态：done\n摘要：W21 publication comple' lastToolId=None
+  at waitFor (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1774:220)
+  at async TestContext.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1839:5)

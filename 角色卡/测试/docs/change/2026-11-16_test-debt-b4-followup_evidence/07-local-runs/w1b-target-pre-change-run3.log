@@ -1,0 +1,21 @@
+W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["revise","select"],"missingEvidence":false,"originRoleId":"rapporteur","entries":[{"sessionId":"7952541d-9661-407b-89ff-eb5ead54f07c","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"5db4c004-3961-40bd-89b8-0a19d5b624d0","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"7c9fbb4a-02d3-4267-a080-05f947b6e283","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"398f1c8b-f52d-4bcd-afa6-2a4331f285f9","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场
+✔ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (350.0637ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 818.366
+
+✔ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (855.2714ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1334.3906

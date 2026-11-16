@@ -457,10 +457,10 @@ async function realWaitingChiefLoop(dispositions: readonly ("select" | "reject" 
     const worker = manager.send("提交真实业务决定卡并等待结果", undefined, { projectRoot: root, roleId: originRoleId, runtime: "demo" });
     launched.push(worker);
     // 2026-11-09 缺陷修复 B（fail-closed 呈现）：missingEvidence 时 materials 失败不得呈现卡；回合必须
-    // 自行继续（若阻塞，下方 `Promise.all([main, worker])` 的 2.5s 竞速会失败）。呈现/回执/账本断言在
+    // 自行继续（若阻塞，下方 `Promise.all([main, worker])` 的挂起竞速会失败；B4 跟进（2026-11-16）按 R5 Windows CI 工件把有界值由 2.5s 调为 15s：真实循环 5.2s 内已结算，仅超过原过紧守卫，语义断言不变）。呈现/回执/账本断言在
     // 测试体内按返回事实逐条检查（`shown`/`workerResults`/`audit`）。
     await Promise.race([Promise.all([main, worker]), new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`Real chief loop did not settle: shown=${JSON.stringify(shown)} requests=${actualRequests.length} worker=${JSON.stringify(workerResults)} writes=${JSON.stringify(writeResults)} materials=${JSON.stringify(materialErrors)}`)), 2500);
+      timer = setTimeout(() => reject(new Error(`Real chief loop did not settle: shown=${JSON.stringify(shown)} requests=${actualRequests.length} worker=${JSON.stringify(workerResults)} writes=${JSON.stringify(writeResults)} materials=${JSON.stringify(materialErrors)}`)), 15000);
     })]);
     if (missingEvidence) {
       assert.equal(shown.length, 0, "materials 失败不得在结算后呈现卡");

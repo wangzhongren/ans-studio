@@ -1,0 +1,99 @@
+# B4 跟进本机验证（Windows 11 x64；Node v24.22.1；CI 为 Node 24.14.0）
+
+工作树：`.claude/worktrees/b4fu`（分支 `fix/test-debt-b4-followup`，起点 `82dc180` = origin/main）
+运行日期：2026-11-16
+说明：`test/桌面应用/chief-workflow.test.ts` 为重文件，全部运行带 `--test-force-exit`（B4 既有约定）；未占用 9222/9223/9224。
+
+## 1. 目标用例 3×（改后）
+
+### 1.1 macOS-only 目标名（本机 Windows 场景复跑）
+
+命令（3 次相同）：
+```
+node --test --test-timeout=120000 --test-force-exit \
+  --test-name-pattern="W29 默认|W30 默认|W34 真实首文档|W35 缺team" \
+  "test/桌面应用/chief-workflow.test.ts"
+```
+
+| run | tests | pass | fail | 目标 |
+| --- | ---: | ---: | ---: | --- |
+| 1 | 8 | 8 | 0 | W29×4（含 missing-confirmation）/ W30×2 / W34 / W35 全 ✔ |
+| 2 | 8 | 8 | 0 | 全 ✔ |
+| 3 | 8 | 8 | 0 | 全 ✔ |
+
+日志：`07-local-runs/macos-names-run{1,2,3}.log`。W29 document-change 6.2–6.5s、W29 wrong-flow 5.5–5.7s、
+W29 source-loss 5.3–5.7s、W30 6.1–6.9s、W34 6.3–6.8s、W35 1.9–2.0s（与 B4 记录同量级）。
+
+### 1.2 W1b 目标（改前/改后）
+
+命令：
+```
+node --test --test-timeout=120000 --test-force-exit \
+  --test-name-pattern="W1b 真实无退修选项" "test/桌面应用/chief-workflow.test.ts"
+```
+
+| 阶段 | run | exit | child 内测试耗时 | 父测试耗时 |
+| --- | --- | ---: | ---: | ---: |
+| 改前 | 1 | 0 | 397.6ms | 892.5ms |
+| 改前 | 2 | 0 | 374.2ms | 880.8ms |
+| 改前 | 3 | 0 | 350.1ms | 855.3ms |
+| 改后 | 1 | 0 | 407.0ms | 935.1ms |
+| 改后 | 2 | 0 | 356.1ms | 867.4ms |
+| 改后 | 3 | 0 | 359.4ms | 881.8ms |
+
+结论：本机（空闲、全文件上下文、16 个 CPU burner 负载、单 CPU 亲和）均**不能复现** R5 Windows CI 的 5.2s 结算延迟；
+CI 工件证据见 `03-windows-w1b-artifact-excerpts.txt`。单 CPU 亲和运行（W1b 组 3 条）：EXIT=0，目标 child 347.3ms /
+父 1011.6ms（w1b-group-affinity-1cpu.log）。
+
+改后再跑全部 W1b 三条用例（同一共享 helper）：
+```
+node --test --test-timeout=120000 --test-force-exit --test-name-pattern="W1b" "test/桌面应用/chief-workflow.test.ts"
+→ tests 3 / pass 3 / fail 0（w1b-group-post-change.log）
+```
+
+### 1.3 W36（x64-only 候选）
+
+命令：
+```
+node --test --test-timeout=120000 --test-force-exit \
+  --test-name-pattern="W36 真实Chief可无M0" "test/桌面应用/chief-workflow.test.ts"
+```
+
+| run | exit | 耗时 |
+| --- | ---: | ---: |
+| 改前 1 | 0 | 1949.5ms |
+| 改后 1 | 0 | 1685.6ms |
+| 改后 2 | 0 | 1794.6ms |
+| 改后 3 | 0 | 1721.9ms |
+
+本机 4/4 PASS，不能复现 x64 CI 的 TypeError（工件见 `04-x64-w36-artifact-excerpt.txt`）。
+
+## 2. 全文件零回归（改前/改后各 1×，CI 同口径并发=1）
+
+命令：
+```
+node --test --test-concurrency=1 --test-timeout=300000 --test-force-exit \
+  "test/桌面应用/chief-workflow.test.ts"
+```
+
+| 运行 | tests | pass | fail | 失败名 |
+| --- | ---: | ---: | ---: | --- |
+| 改前基线 | 66 | 64 | 2 | W19、W33（均在范围外，W19/W33 行由并行批次处理） |
+| 改后 | 66 | 64 | 2 | W19、W33（逐名相同；零新增、零转红） |
+
+日志：`07-local-runs/full-file-baseline-pre-change.log`、`07-local-runs/full-file-post-change.log`。
+全部目标名（W29×4/W30×2/W34/W35/W36/W1b×3）两次全文件均 PASS。
+
+## 3. typecheck
+
+```
+npm run typecheck
+→ EXIT=0（tsc --noEmit）
+```
+日志：`07-local-runs/typecheck.log`。
+
+## 4. 限制
+
+- 本机为 Windows x64；macOS 平台结论全部来自 R5 工件（run 43829367008），未在 macOS 本机复跑（无 macOS 环境）。
+- W1b 的 5.2s CI 结算延迟在本机不可复现（空闲/全文件/16 burner 三种条件均 0.35–0.53s child）；改法按工件语义把挂起守卫有界值放宽到 15s。
+- W36 的 TypeError 为 x64 单轮观测；本机 4× 绿，未改测试。

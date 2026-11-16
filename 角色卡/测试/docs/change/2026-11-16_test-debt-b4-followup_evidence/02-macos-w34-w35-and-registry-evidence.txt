@@ -1,0 +1,207 @@
+# macOS W34/W35 final failing-section excerpts (R5 run 43829367008)
+
+## platform arm64
+## ✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope (249.739167ms)  [log lines 7524-7535]
+  ✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope (249.739167ms)
+    AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}"]
+        at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1725:99)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: false,
+      expected: true,
+      operator: '==',
+      diff: 'simple'
+    }
+  
+
+## ✖ W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝 (207.6135ms)  [log lines 7537-7548]
+  ✖ W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝 (207.6135ms)
+    AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}"]
+        at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1725:99)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: false,
+      expected: true,
+      operator: '==',
+      diff: 'simple'
+    }
+  
+
+## platform x64
+## ✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope (436.421249ms)  [log lines 7530-7541]
+  ✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope (436.421249ms)
+    AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}"]
+        at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1725:99)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: false,
+      expected: true,
+      operator: '==',
+      diff: 'simple'
+    }
+  
+
+## ✖ W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝 (465.443996ms)  [log lines 7543-7554]
+  ✖ W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝 (465.443996ms)
+    AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"uninitialized\",\"status\":\"blocked\",\"code\":\"git-file-final-guard-unproven\",\"message\":\"Actual file/edit handlers do not carry the current canonical metadata roots and link guard\"}"]
+        at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1725:99)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: false,
+      expected: true,
+      operator: '==',
+      diff: 'simple'
+    }
+  
+
+
+# Core registry at each chief-workflow init call (console.log chief-workflow.test.ts:1724)
+# role/state/lifecycle fields only; mapping by call order: W29 dc / W29 wf / W29 sl / W29 mc / W30 cont / W30 restart / W33 / W34 / W35
+## arm64
+  line 2432 W29 document-change: total=44 states={'disposed': 41, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "bbdccfac-a2f2-4096-9268-2b87ac72633c", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "55e285fe-270d-4615-8761-cf5ba1263d41", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2446 W29 wrong-flow: total=48 states={'disposed': 45, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "c7d59d74-1027-4fa9-91fc-978bf19e3808", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "c3892e7b-5dc3-4826-9863-94d258ac7b7d", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2460 W29 source-loss: total=52 states={'disposed': 49, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "f053264f-a514-46c6-ad43-cff415445cad", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "ec289646-dd2d-4f24-96c7-8e901629ad04", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2474 W29 missing-confirmation: total=56 states={'disposed': 53, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "6488a620-819f-46f4-b92a-f01e3e599ff9", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "6dadd309-53bd-48c2-a9c9-512e8a4fcf68", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2479 W30 continuous: total=60 states={'disposed': 57, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "29ca9c0d-978f-454c-b3a0-1fa9448d4466", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "caf827d9-de18-4ff0-89c3-216a18f4fde7", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2493 W30 restart: total=64 states={'disposed': 61, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "7cb27cfb-1be0-4701-b09e-527717914e6a", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "385156d5-d145-4527-813b-138331baeacb", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2507 W33: total=68 states={'disposed': 65, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "476b878a-6ca5-4a2b-bc59-3f2c4c99cbe6", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "5b3bd0fb-9983-4425-8ccb-413a5cac2f41", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2509 W34: total=71 states={'disposed': 65, 'prepared': 1, 'active': 5}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "476b878a-6ca5-4a2b-bc59-3f2c4c99cbe6", "roleId": "chief", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "5b3bd0fb-9983-4425-8ccb-413a5cac2f41", "roleId": "convener", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "47ca4b8f-403c-48d8-9022-5ae0dd9345cb", "roleId": "product", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "6c9ec684-8866-48bc-a904-08a55f5891fa", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "f4eb2f06-5450-4374-a1ec-f1e87fd3a90d", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2511 W35: total=73 states={'disposed': 65, 'prepared': 1, 'active': 7}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "476b878a-6ca5-4a2b-bc59-3f2c4c99cbe6", "roleId": "chief", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "5b3bd0fb-9983-4425-8ccb-413a5cac2f41", "roleId": "convener", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "47ca4b8f-403c-48d8-9022-5ae0dd9345cb", "roleId": "product", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "6c9ec684-8866-48bc-a904-08a55f5891fa", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "f4eb2f06-5450-4374-a1ec-f1e87fd3a90d", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "e9a8baa8-660d-4229-8517-5f52380f39a1", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "39bd8c80-98ef-46d5-a2bb-3522bdde21a7", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+
+## x64
+  line 2432 W29 document-change: total=44 states={'disposed': 41, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "a6ebdb7c-a0a0-4e34-9c89-534f50794715", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "193df9ea-e657-4b22-b063-c20921d8d53e", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2446 W29 wrong-flow: total=48 states={'disposed': 45, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "943c90b2-6634-43d8-b7e6-f1b833bda45a", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "994ecc4d-31ae-46d1-9b50-490a265ca1e9", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2460 W29 source-loss: total=52 states={'disposed': 49, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "f424a1a5-53e4-4d34-a4c1-c470f45481ee", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "6edeba4d-f027-497a-8dd5-9804aab285fb", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2474 W29 missing-confirmation: total=56 states={'disposed': 53, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "1c780891-3a97-4177-b771-9078c95daf6e", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "1f8a9033-0e6e-47c0-8a7d-5f99219b3030", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2479 W30 continuous: total=60 states={'disposed': 57, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "4e573ddc-e58a-4f8b-a41c-26af99ab0e03", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "7f500fb1-f3ae-4304-a422-eea9cfb9dba6", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2493 W30 restart: total=64 states={'disposed': 61, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "c0adbb9f-ecd1-42e9-9901-50fb0ae3c9b4", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "1406e56a-c0db-45ea-b596-3dbdfe4cff93", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2507 W33: total=68 states={'disposed': 65, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "7ac4315b-2d5d-465f-bb12-d739a629bd0d", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "9633e17d-a53c-403c-b207-e62a323027cd", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2509 W34: total=71 states={'disposed': 65, 'prepared': 1, 'active': 5}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "7ac4315b-2d5d-465f-bb12-d739a629bd0d", "roleId": "chief", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "9633e17d-a53c-403c-b207-e62a323027cd", "roleId": "convener", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "a2b8cbce-cecc-4265-9817-64095644bd61", "roleId": "product", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "213da063-4f60-4d32-b30e-955aed71e0a6", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "4e258873-1884-42f3-9034-2d6575032040", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2511 W35: total=73 states={'disposed': 65, 'prepared': 1, 'active': 7}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "7ac4315b-2d5d-465f-bb12-d739a629bd0d", "roleId": "chief", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "9633e17d-a53c-403c-b207-e62a323027cd", "roleId": "convener", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "a2b8cbce-cecc-4265-9817-64095644bd61", "roleId": "product", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "213da063-4f60-4d32-b30e-955aed71e0a6", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "4e258873-1884-42f3-9034-2d6575032040", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "b6320b8e-725b-4156-9c6f-e7e9f366c158", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "e331577b-874b-4022-b2f3-d8ac7219af81", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+
+## win
+  line 2442 W29 document-change: total=44 states={'disposed': 41, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "e440c537-1313-4d4c-a2de-230ed59e8903", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "73fc5272-fdfa-43fd-bad6-ca6d752932a9", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2444 W29 wrong-flow: total=49 states={'disposed': 46, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "911d9226-a0f8-49ce-b2b2-160ec03c3484", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "0bc43dca-ee62-47df-8b25-39574af101d7", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2446 W29 source-loss: total=54 states={'disposed': 51, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "b639694e-a786-4045-9447-bee934b0dd9f", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "d934520c-665d-445c-9c47-02711b1f7790", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2448 W29 missing-confirmation: total=59 states={'disposed': 56, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "6b1967c4-9c5b-4c18-b5be-dd8decd8570d", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "e4f72878-fc18-4573-b57d-0ae7cee3b40c", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2453 W30 continuous: total=63 states={'disposed': 60, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "9a6f492a-eb9b-4d6d-9f12-943e2613e8d2", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "070aeecc-53ab-40a7-b4a5-3dd5817272c0", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2455 W30 restart: total=68 states={'disposed': 65, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "212dcd49-9647-422c-a758-405d84d120c2", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "fbdaed1f-3138-49a1-b667-8f266b99e799", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2457 W33: total=74 states={'disposed': 71, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "530021ca-209a-4ab3-8412-4ee14af121d6", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "5971834b-84ce-4fa8-b9dc-999dc2c5dd4c", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2471 W34: total=77 states={'disposed': 74, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "090bc995-4be2-4014-8120-bfa93aadb467", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "8a470b87-a5fe-4d01-81a0-a8fea1bb80f6", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+  line 2473 W35: total=82 states={'disposed': 79, 'prepared': 1, 'active': 2}
+    NON-DISPOSED {"sessionId": null, "roleId": "nominator", "state": "prepared", "lifecycleStatus": null, "providerFinished": null, "processCoverage": null}
+    NON-DISPOSED {"sessionId": "9ed713ca-7fd8-4be1-a3c6-c3829148c573", "roleId": "chief", "state": "active", "lifecycleStatus": "quiescent", "providerFinished": true, "processCoverage": "complete"}
+    NON-DISPOSED {"sessionId": "e9adf55f-23a8-4b1c-b3c6-b85c6b180d55", "roleId": "convener", "state": "active", "lifecycleStatus": "unknown", "providerFinished": false, "processCoverage": "complete"}
+
+
+# Context for W34/W35: W33 macOS early failure (same file-gate root, causes leftover active Core entries)
+  ✖ W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续 (1590.260375ms)
+    AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+    
+      assert.ok(match)
+    
+        at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1715:70)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+      generatedMessage: true,
+      code: 'ERR_ASSERTION',
+      actual: null,
+      expected: true,
+      operator: '==',

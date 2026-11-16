@@ -1,0 +1,11 @@
+# macOS x64 W36 excerpt (R5 run 43829367008)
+
+  ✖ W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒 (4288.368132ms)
+    TypeError: Cannot read properties of undefined (reading 'name')
+        at file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2111:117
+        at Array.some (<anonymous>)
+        at Server.<anonymous> (file:///Users/runner/work/ans-studio/ans-studio/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2111:56)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+  
+  test at test/桌面应用/download-request.test.ts:506:1
+  ✖ 一项目一卡：前一张未决时下载卡排队，不呈现 (3012.073093ms)
