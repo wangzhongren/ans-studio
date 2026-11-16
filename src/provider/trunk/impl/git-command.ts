@@ -511,7 +511,9 @@ function configFormat(text: string): GitRepositoryIdentity["objectFormat"] {
   // B30：桌面 `ensureIdentityDefaults`（A9 基线）写 repo-local `[user] name=ANS / email=ans@local`；
   // 该节不改变仓库对象格式、值不能执行，故只按受限字符集放行这两个键。其余 section/key 仍逐字 fail-closed
   //（core.hooksPath/alias/include/includeIf/unknown section 等保持拒绝）。
-  const allowed: Record<string, readonly string[]> = { core: ["repositoryformatversion", "filemode", "bare", "logallrefupdates", "ignorecase", "symlinks", "longpaths"], extensions: ["objectformat"], user: ["name", "email"] };
+  // B2（2026-11-16）：macOS `git init` 默认写 repo-local `core.precomposeunicode=true`；该键只影响路径
+  // 预组合（只读语义、不改对象格式也不扩大执行面），与既有布尔键同规则仅接受 true/false。
+  const allowed: Record<string, readonly string[]> = { core: ["repositoryformatversion", "filemode", "bare", "logallrefupdates", "ignorecase", "symlinks", "longpaths", "precomposeunicode"], extensions: ["objectformat"], user: ["name", "email"] };
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim(); if (!line || /^[#;]/.test(line)) continue;
     const heading = /^\[([a-z]+)\]$/i.exec(line);

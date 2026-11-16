@@ -1,0 +1,2 @@
+REAL_REPO_INSPECT=ACCEPTED objectFormat=sha1 repoIdLen=64
+REAL_REPO_STATUS termination=exited exitCode=0 stdoutHasFile=true

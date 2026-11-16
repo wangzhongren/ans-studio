@@ -210,6 +210,45 @@ test("B30 user section stays fail-closed: illegal keys/values and every other da
   }
 });
 
+// —————————————— B2（2026-11-16，测试债 R2）：macOS `git init` 默认写入的 repo-local `core.precomposeunicode` ——————————————
+test("B2 macOS core.precomposeunicode accepted: real repo-local Boolean true/false no longer block inspect or status beside existing core keys and B30 user identity", async () => {
+  for (const written of ["true", "false", "TRUE"] as const) {
+    const root = await fixture(), port = createGitQueryPort(root);
+    // Windows 的 `git init` 不写该键（macOS 默认写入 true）；用 `git config --local` 显式写入，模拟 macOS 的真实 repo-local 配置。
+    await raw(git, ["-C", root, "config", "--local", "core.precomposeunicode", written], { windowsHide: true });
+    await raw(git, ["-C", root, "config", "--local", "user.name", "ANS"], { windowsHide: true });
+    const config = await fs.readFile(path.join(root, ".git/config"), "utf8");
+    assert.match(config, new RegExp(`\\[core\\][\\s\\S]*?\\tprecomposeunicode = ${written}\\r?\\n`), "fixture holds the real repo-local key written by Git itself");
+    const identity = await port.inspect();
+    assert.match(identity.repoId, /^[a-f0-9]{64}$/);
+    assert.equal(identity.objectFormat, "sha1");
+    await fs.writeFile(path.join(root, `macos-init-default-${written}.txt`), "ok");
+    const facts = await port.query({ operationId: `b2-precompose-${written.toLowerCase()}-status`, template: "status" });
+    assert.equal(facts.termination, "exited"); assert.equal(facts.exitCode, 0, facts.stderr);
+    assert.match(facts.stdout, new RegExp(`macos-init-default-${written}\\.txt`), "real status output is only readable when config inspection passes first");
+  }
+});
+
+test("B2 precomposeunicode stays fail-closed: non-Boolean values, wrong sections and other unlisted core keys keep the existing rejections", async () => {
+  const cases: Array<[string, string, RegExp]> = [
+    ["git boolean alias yes", "\n[core]\n\tprecomposeunicode = yes\n", /git-config-value-invalid/],
+    ["numeric 1", "\n[core]\n\tprecomposeunicode = 1\n", /git-config-value-invalid/],
+    ["arbitrary string", "\n[core]\n\tprecomposeunicode = always\n", /git-config-value-invalid/],
+    ["empty value", "\n[core]\n\tprecomposeunicode =\n", /git-config-executable-or-unsupported/],
+    ["shell-like value", "\n[core]\n\tprecomposeunicode = $(rm -rf /)\n", /git-config-executable-or-unsupported/],
+    ["wrong section extensions", "\n[extensions]\n\tprecomposeunicode = true\n", /git-config-executable-or-unsupported/],
+    ["wrong section user", "\n[user]\n\tprecomposeunicode = true\n", /git-config-executable-or-unsupported/],
+    ["other unlisted core key autoCRLF", "\n[core]\n\tautocrlf = true\n", /git-config-executable-or-unsupported/],
+    ["other unlisted core key editor", "\n[core]\n\teditor = vim\n", /git-config-executable-or-unsupported/],
+  ];
+  for (const [label, extra, expected] of cases) {
+    const root = await fixture(), config = path.join(root, ".git/config"), original = await fs.readFile(config);
+    await fs.appendFile(config, extra);
+    await assert.rejects(createGitQueryPort(root).inspect(), expected, label);
+    await fs.writeFile(config, original);
+  }
+});
+
 test("Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported", async () => {
   const root = await fixture(), port = createGitQueryPort(root);
   await fs.mkdir(path.join(root, ".git/objects/info"), { recursive: true });

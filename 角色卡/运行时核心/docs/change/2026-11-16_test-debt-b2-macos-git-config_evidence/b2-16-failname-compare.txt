@@ -1,0 +1,65 @@
+core12 BEFORE {"tests":205,"pass":194,"fail":9,"cancelled":0,"skipped":2,"todo":0}
+core12 AFTER  {"tests":207,"pass":196,"fail":9,"cancelled":0,"skipped":2,"todo":0}
+core12 failnames before=9 after=9 added=[] removed=[]
+core12 BEFORE_NAMES:
+  - Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+  - Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+  - R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+  - R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+  - R12 interruption during async factory preparation prevents the subsequent native bind
+  - R8 a custom factory cannot self-report the default Codex Chat production provenance
+  - R8 active HTTP inference alone is not treated as an uncontrolled execution program
+  - R8 native registry/instance/role/runtime/activity mismatches remain unknown
+  - actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+core12 AFTER_NAMES:
+  - Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+  - Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+  - R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+  - R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+  - R12 interruption during async factory preparation prevents the subsequent native bind
+  - R8 a custom factory cannot self-report the default Codex Chat production provenance
+  - R8 active HTTP inference alone is not treated as an uncontrolled execution program
+  - R8 native registry/instance/role/runtime/activity mismatches remain unknown
+  - actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+
+wiring6 BEFORE {"tests":6,"pass":6,"fail":0,"cancelled":0,"skipped":0,"todo":0}
+wiring6 AFTER  {"tests":6,"pass":6,"fail":0,"cancelled":0,"skipped":0,"todo":0}
+wiring6 failnames before=0 after=0 added=[] removed=[]
+wiring6 BEFORE_NAMES:
+wiring6 AFTER_NAMES:
+
+e2e6 BEFORE {"tests":6,"pass":6,"fail":0,"cancelled":0,"skipped":0,"todo":0}
+e2e6 AFTER  {"tests":6,"pass":6,"fail":0,"cancelled":0,"skipped":0,"todo":0}
+e2e6 failnames before=0 after=0 added=[] removed=[]
+e2e6 BEFORE_NAMES:
+e2e6 AFTER_NAMES:
+
+git-role-workflows-e2e BEFORE {"tests":19,"pass":5,"fail":2,"cancelled":0,"skipped":12,"todo":0}
+git-role-workflows-e2e AFTER  {"tests":19,"pass":7,"fail":0,"cancelled":0,"skipped":12,"todo":0}
+git-role-workflows-e2e failnames before=2 after=0 added=[] removed=["Q30 fixture HTTP preserves split UTF8 and byte budget","Q74 owned Git metadata observer atomic rename race remains bounded and strict"]
+git-role-workflows-e2e BEFORE_NAMES:
+  - Q30 fixture HTTP preserves split UTF8 and byte budget
+  - Q74 owned Git metadata observer atomic rename race remains bounded and strict
+git-role-workflows-e2e AFTER_NAMES:
+
+chief-workflow BEFORE {"tests":66,"pass":58,"fail":8,"cancelled":0,"skipped":0,"todo":0}
+chief-workflow AFTER  {"tests":66,"pass":58,"fail":8,"cancelled":0,"skipped":0,"todo":0}
+chief-workflow failnames before=8 after=8 added=[] removed=[]
+chief-workflow BEFORE_NAMES:
+  - W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+  - W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+  - W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+  - W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+  - W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+  - commit-race
+  - required
+  - selected
+chief-workflow AFTER_NAMES:
+  - W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+  - W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+  - W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+  - W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+  - W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+  - commit-race
+  - required
+  - selected
