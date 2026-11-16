@@ -1,0 +1,25 @@
+# Q2 P2 (git-role-workflows-e2e.test.ts) and W48 (unresolved) — local Windows characterization
+
+## Q2 P2 first new project: empty public chief -> formal convener bootstrap…
+
+Local 3× (node --test, plain TEMP; full file; runtime ~178–192s per run):
+  run1 exit=1: 2 fails = "Q30 fixture HTTP preserves split UTF8 and byte budget", "Q74 owned Git metadata observer atomic rename race remains bounded and strict" (both ENOENT writing test evidence directory on a fresh worktree before Q2 P2 creates it; order-dependent local artifact). Q2 P2 itself: ✔ 176.7s
+  run2 exit=0: 0 fails. Q2 P2: ✔ 178.5s
+  run3 exit=0: 0 fails. Q2 P2: ✔ 192.3s
+
+CI (R3 run 43793243595, macOS arm64/x64): deterministic red. Child business process logs:
+  file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required
+  (write_file denied in the real chain), parent then asserts owned-child lifecycle (watchdogFired).
+  R3 family labels this name productCandidate. Not reproducible on Windows local (3× green).
+  No change made: a macOS/CI-targeted host-facts/protection-currency fix is not verifiable locally
+  and sits in the real driver/business chain, not in the 18-file harness set.
+
+## W48 默认Core精确controller停止… foreign-lease (unresolved name)
+
+Located via 17-windows-names.tsv + R3 §4: test/桌面应用/chief-workflow.test.ts, stopMode "foreign-lease".
+Windows CI job 133056200177 was cancelled at 120min; the inline ✖ had no error body.
+Local Windows (this base includes B1b leak fix), name-pattern run 3×:
+  run1 exit=0 pass=1
+  run2 exit=0 pass=1
+  run3 exit=0 pass=1
+Not path-canonical; semantically e71501c/chief-workflow drift. Not in the 19-file list; no change.

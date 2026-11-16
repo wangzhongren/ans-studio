@@ -1,0 +1,16 @@
+✔ wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit (13968.2308ms)
+✖ ..\..\test\编排\git-action-authorization-wiring-initial-workflow.test.ts (49995.5636ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 50000.5446
+
+✖ failing tests:
+
+test at ..\..\test\编排\git-action-authorization-wiring-initial-workflow.test.ts:1:1
+✖ ..\..\test\编排\git-action-authorization-wiring-initial-workflow.test.ts (49995.5636ms)
+  'test failed'

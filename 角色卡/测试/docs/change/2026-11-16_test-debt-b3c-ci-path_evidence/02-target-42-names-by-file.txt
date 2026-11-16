@@ -1,0 +1,166 @@
+# B3c ci-path-canonical 42 names by file (source: 11-families.json @ R3 run 43793243595)
+
+## test/测试/git-action-cross-runtime-init.test.ts (1)
+- AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"operationId":"w5-cross-claude-init","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+
+## test/测试/git-action-cross-runtime-audit-failure.test.ts (1)
+- AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行）
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"operationId":"w5-cross-ac16","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+
+## test/测试/git-action-cross-runtime-pi-init.test.ts (1)
+- AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"operationId":"w5-cross-pi-init","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+
+## test/桌面应用/multi-runtime.test.ts (22)
+- actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt
+   codes: D1 test wait expired
+   first: Error: D1 test wait expired
+- D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly
+   codes: ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+- D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly
+   codes: ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+- D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly
+   codes: ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+- D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly
+   codes: ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+- D1 background dispatch, queued customer input and handback pin the source engine after selection switches
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'input')
+- D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'input')
+- D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn
+   codes: ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+- D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged
+   codes: ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+- D1 same role and project across engines and same role across projects keep distinct handles and exact input targets
+   codes: ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+- D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'input')
+- D1R2 actual ack preserves a failed delayed terminal and the next aborted original client
+   codes: D1 test wait expired
+   first: Error: D1 test wait expired
+- D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text
+   codes: D1 test wait expired
+   first: Error: D1 test wait expired
+- D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'input')
+- D1R2 direct and queued identical inputs retain original client ID through delayed old settled
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'handle')
+- D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'handle')
+- foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'handle')
+- no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'handle')
+- same client IDs across sequential actual turns retain separate first public outcomes
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'handle')
+- send rejection before public events remains unknown; later same-client different turns do not borrow outcomes
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'handle')
+- send result reports the original handle is no longer current after replacement while its turn rejects
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'handle')
+- stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session
+   codes: 
+   first: TypeError: Cannot read properties of undefined (reading 'handle')
+
+## test/编排/git-action-authorization-gate.test.ts (3)
+- gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+- gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）
+   codes: git-file-final-guard-unproven | ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: 未撤销的 prepared 条目必须拒绝（H13）
+- gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+
+## test/测试/run-stop-host-continuation-integration.test.ts (1)
+- host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: git-file-final-guard-unproven: Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+
+## test/测试/git-action-cross-runtime-codex-init.test.ts (1)
+- P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"operationId":"w5-cross-codex-init","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+
+## test/测试/session-admission-approval-q9-integration.test.ts (1)
+- Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"operationId":"w5-q16-pos-init","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+
+## test/测试/git-role-workflows-e2e.test.ts (1)
+- Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
+   codes: ERR_ASSERTION
+   first: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+## (unresolved) (1)
+- W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease
+   codes: 
+   first: 
+
+## test/编排/git-action-authorization-wiring-document-audit-failure.test.ts (1)
+- wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: append 失败必须 fail-closed：{"ok":false,"status":"blocked","operationId":"w3b-doc-audit-blocked","baseDigest":null,"targetDigest":null,"errorCode":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and li
+
+## test/编排/git-action-authorization-wiring-document.test.ts (1)
+- wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"ok":false,"status":"blocked","operationId":"w3b-doc-publication","baseDigest":null,"targetDigest":null,"errorCode":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+
+## test/编排/git-action-authorization-wiring-audit-failure.test.ts (1)
+- wiring failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no repository, journal or ref effects
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: append 失败必须 fail-closed：{"operationId":"w3b-init-audit-blocked","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+
+## test/编排/git-action-authorization-wiring.test.ts (1)
+- wiring init: sidecar carries actor/task/turn/lease + init,candidate digests before effects
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"operationId":"w3b-init-success","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+
+## test/编排/git-action-authorization-wiring-initial-workflow-audit-failure.test.ts (1)
+- wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects
+   codes: git-file-final-guard-unproven | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: Error: fixture initial workflow plan publication: {"ok":false,"status":"blocked","operationId":"w3b-iw-plan-blocked","baseDigest":"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392","targetDigest":null,"errorCode":"git-file-final-guard-unproven","message":"Actual file/edit handlers do
+
+## test/编排/git-action-authorization-wiring-initial-workflow.test.ts (1)
+- wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit
+   codes: git-file-final-guard-unproven | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: Error: fixture initial workflow plan publication: {"ok":false,"status":"blocked","operationId":"w3b-iw-plan","baseDigest":"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392","targetDigest":null,"errorCode":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not car
+
+## test/编排/git-action-authorization-wiring-publication-audit-failure.test.ts (1)
+- wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: append 失败必须 fail-closed：{"ok":false,"status":"blocked","operationId":"w3b-plan-audit-blocked","baseDigest":"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392","targetDigest":null,"errorCode":"git-file-final-guard-unproven","message":"Actual file/edit ha
+
+## test/编排/git-action-authorization-wiring-publication.test.ts (1)
+- wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"ok":false,"status":"blocked","operationId":"w3b-plan-publication","baseDigest":"ca10d09ed82132e60ea273a615b15bfc15c1245a475545e19d4751fefc6c0392","targetDigest":null,"errorCode":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the cu
+
+## test/编排/git-action-authorization-wiring-retry.test.ts (1)
+- wiring retry: same operationId on a new lease/turn appends a sidecar row without replay/init conflicts
+   codes: git-file-final-guard-unproven | ERR_ASSERTION | Actual file/edit handlers do not carry the current canonical metadata roots and link guard
+   first: AssertionError [ERR_ASSERTION]: {"operationId":"w3b-init-retry","repoId":"uninitialized","status":"blocked","code":"git-file-final-guard-unproven","message":"Actual file/edit handlers do not carry the current canonical metadata roots and link guard"}
+

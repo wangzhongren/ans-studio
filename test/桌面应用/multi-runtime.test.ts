@@ -44,18 +44,38 @@ async function until(check: () => boolean) {
     await new Promise<void>((resolve) => setTimeout(resolve, 2));
   }
 }
-function fixture() {
+function fixture(options: { trio?: boolean } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-d1-"));
   const dir = path.join(root, "角色卡", "A");
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "role-card.md"), "# A\n组别：运行时接入组\n组内职责：维护窗口\n");
   fs.writeFileSync(path.join(dir, "boundary.yaml"), "role: A\nentries:\n  - kind: file\n    path: src/a.ts\n    purpose: D1\n");
+  if (options.trio) {
+    // B3c（e71501c 后的客户入口契约）：客户消息只投 chief；trio 项目才枚举内置 chief。
+    fs.mkdirSync(path.join(root, ".ans"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
+  }
   return { root, envPath: path.join(root, "fake.env"), cleanup() { fs.rmSync(root, { recursive: true, force: true }); } };
 }
 function listing(root: string): ProjectListing {
   const roles: ProjectListing["roles"] = ["su", "A", "B"].map((roleId) => ({ roleId, builtIn: roleId === "su", cardPath: "", boundaryPath: "", cardText: roleId,
     boundary: { entries: [], boundarySource: "test:D1", acceptance: { accepted: false, source: "test:D1" } } }));
   return { projectRoot: root, roles, warnings: [], hasRoles: true, primaryRoleId: "su" };
+}
+/** B3c：客户入口目标 chief 的 trio 视图（真实 listProject 由磁盘 `.ans/project.json` 提供；此处为注入式测试）。 */
+function trioListing(root: string): ProjectListing {
+  const roles: ProjectListing["roles"] = ["chief", "A"].map((roleId) => ({ roleId, builtIn: roleId === "chief", ...(roleId === "A" ? { group: "运行时接入组" } : {}),
+    cardPath: "", boundaryPath: "", cardText: roleId,
+    boundary: { entries: [], boundarySource: "test:D1", acceptance: { accepted: false, source: "test:D1" } } }));
+  return { projectRoot: root, roles, warnings: [], hasRoles: true, primaryRoleId: "chief", governanceModel: "trio" };
+}
+/** B3c：真实临时项目根。桌面会话库存登记要求项目根真实存在；旧夹具用 hardcoded "/one"/"/two"，
+ *  仅在本机恰好存在 C:\\one/C:\\two 时才绿，干净 CI（macOS）上 manager.open 直接失败。 */
+function projectRoots() {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "ans-d1-roots-"));
+  const one = path.join(base, "one"), two = path.join(base, "two");
+  fs.mkdirSync(one); fs.mkdirSync(two);
+  return { one, two, cleanup() { fs.rmSync(base, { recursive: true, force: true }); } };
 }
 function harness(extra: Partial<SessionManagerDeps> = {}) {
   const opened: { root: string; role: string; runtime: RuntimeKind; stream: ReturnType<typeof queue<OrchestrationEvent>>; sent: string[]; input: Parameters<SessionManagerDeps["openRoleSession"]>[0]; handle: RoleSessionHandle }[] = [];
@@ -336,13 +356,14 @@ test("i18n B4：设置视图 label/help/choiceLabels 按当前 locale 从共享 
 
 test("D1 same role and project across engines and same role across projects keep distinct handles and exact input targets", async () => {
   const current = harness();
+  const roots = projectRoots();
   try {
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "pi" });
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
-    await current.manager.open({ projectRoot: "/two", roleId: "A", runtime: "claude" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "pi" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "codex" });
+    await current.manager.open({ projectRoot: roots.two, roleId: "A", runtime: "claude" });
     assert.equal(current.opened.length, 3);
-    assert.equal((await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "pi" })).resumed, true);
-    await current.manager.send("pinned", undefined, { projectRoot: "/one", roleId: "A", runtime: "codex" });
+    assert.equal((await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "pi" })).resumed, true);
+    await current.manager.send("pinned", undefined, { projectRoot: roots.one, roleId: "A", runtime: "codex" });
     assert.deepEqual(current.opened[0].sent, []);
     assert.deepEqual(current.opened[1].sent, ["pinned"]);
     assert.deepEqual(current.opened[2].sent, []);
@@ -350,24 +371,25 @@ test("D1 same role and project across engines and same role across projects keep
     current.opened[1].stream.push({ kind: "message", summary: "codex only" });
     await until(() => current.envelopes.some((event) => event.event.summary === "codex only"));
     const event = current.envelopes.find((item) => item.event.summary === "codex only")!;
-    assert.deepEqual({ root: event.projectRoot, runtime: event.runtime, role: event.roleId }, { root: "/one", runtime: "codex", role: "A" });
-  } finally { await current.manager.stop(); }
+    assert.deepEqual({ root: event.projectRoot, runtime: event.runtime, role: event.roleId }, { root: roots.one, runtime: "codex", role: "A" });
+  } finally { await current.manager.stop(); roots.cleanup(); }
 });
 
 test("D1 background dispatch, queued customer input and handback pin the source engine after selection switches", async () => {
   const current = harness();
+  const roots = projectRoots();
   try {
-    await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "codex" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "su", runtime: "codex" });
     const source = current.opened[0];
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "claude" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "claude" });
     const receipt = await source.input.dispatchTask!({ roleId: "A", task: "codex task" });
     assert.equal(receipt?.ok, true);
     await until(() => current.opened.some((entry) => entry.role === "A" && entry.runtime === "codex" && entry.sent.length > 0));
     const target = current.opened.find((entry) => entry.role === "A" && entry.runtime === "codex")!;
     assert.deepEqual(current.opened.find((entry) => entry.runtime === "claude")!.sent, []);
-    const queued = await current.manager.send("queued codex", undefined, { projectRoot: "/one", roleId: "A", runtime: "codex" });
+    const queued = await current.manager.send("queued codex", undefined, { projectRoot: roots.one, roleId: "A", runtime: "codex" });
     assert.equal(queued.queued, true);
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "claude" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "claude" });
     target.stream.push({ kind: "settled", summary: "done" });
     await until(() => target.sent.length === 2);
     assert.equal(target.sent[1], "queued codex");
@@ -376,12 +398,12 @@ test("D1 background dispatch, queued customer input and handback pin the source 
     await until(() => source.sent.length > 0);
     assert.ok(source.sent[0].includes("actual"));
     assert.ok(!current.opened.some((entry) => entry.role === "su" && entry.runtime === "claude"));
-  } finally { await current.manager.stop(); }
+  } finally { await current.manager.stop(); roots.cleanup(); }
 });
 
 for (const runtime of ["demo", "pi", "codex", "claude"] as const) {
   test(`D1 actual Pipeline/Service chooses ${runtime}, writes isolated replay and converts native context honestly`, async () => {
-    const temp = fixture();
+    const temp = fixture({ trio: true });
     const calls: RuntimeProviderOptions[] = [];
     let context: RuntimeContextSource = "fresh";
     const factory: RuntimeProviderFactory = (options) => {
@@ -402,25 +424,26 @@ for (const runtime of ["demo", "pi", "codex", "claude"] as const) {
     try {
       const roles = await desktop.listProject({ projectRoot: temp.root });
       assert.equal(roles.roles.find((role) => role.roleId === "A")?.group, "运行时接入组");
-      const opened = await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime });
+      // e71501c：客户入口只投 chief（trio 主入口）；旧用例直接向非 chief 角色 sendSession 已不再合法。
+      const opened = await desktop.openSession({ projectRoot: temp.root, roleId: "chief", runtime });
       assert.equal(opened.contextSource, "fresh");
       assert.equal(calls.length, 1);
       assert.equal(calls[0].runtime, runtime);
-      assert.equal(calls[0].storage?.directory, path.join(temp.root, ".ans", "sessions", "A", runtime));
-      assert.equal(fs.existsSync(path.join(temp.root, ".ans")), false);
-      assert.equal((await desktop.sendSession({ text: "one" })).ok, true);
+      assert.equal(calls[0].storage?.directory, path.join(temp.root, ".ans", "sessions", "chief", runtime));
+      assert.equal(fs.existsSync(path.join(temp.root, ".ans", "sessions")), false, "打开会话不写会话存储（trio 配置本身已在 .ans）");
+      assert.equal((await desktop.sendSession({ text: "one", target: { projectRoot: temp.root, roleId: "chief", runtime } })).ok, true);
       await until(() => states.some((state) => state.contextSource === "recovered"));
-      const history = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime });
+      const history = await getSessionHistory({ projectRoot: temp.root, roleId: "chief", runtime });
       assert.equal(history.error, null);
       assert.ok(history.rows.some((row) => row.kind === "user" && row.text === "one"));
       assert.ok(history.rows.some((row) => row.text === `${runtime}:one`));
       let otherRuntime: RuntimeKind = "codex";
       if (runtime === "codex") otherRuntime = "claude";
-      const other = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: otherRuntime });
+      const other = await getSessionHistory({ projectRoot: temp.root, roleId: "chief", runtime: otherRuntime });
       assert.deepEqual(other.rows, []);
       context = "recovered";
-      await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime });
-      await desktop.sendSession({ text: "two" });
+      await desktop.openSession({ projectRoot: temp.root, roleId: "chief", runtime });
+      await desktop.sendSession({ text: "two", target: { projectRoot: temp.root, roleId: "chief", runtime } });
       assert.ok(states.some((state) => state.contextSource === "fresh" && state.contextWarning === "native resume failed"));
     } finally { await desktop.stopSession(); temp.cleanup(); }
   });
@@ -431,20 +454,20 @@ test("D1 profile success rebuilds same engine after busy old Pi finishes; ambien
   const env = { ANTHROPIC_AUTH_TOKEN: "old-token" };
   fs.writeFileSync(temp.envPath, "ANTHROPIC_AUTH_TOKEN=old-token\nANS_PI_MODEL=old-model\n");
   const opened: { stream: ReturnType<typeof queue<OrchestrationEvent>>; sent: string[]; token: string }[] = [];
-  const desktop = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {}, envFilePath: temp.envPath, piConfigEnv: env, listProjectFn: async (root) => listing(root), openRoleSessionFn: async () => {
+  const desktop = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {}, envFilePath: temp.envPath, piConfigEnv: env, listProjectFn: async (root) => trioListing(root), openRoleSessionFn: async () => {
     const stream = queue<OrchestrationEvent>(); const sent: string[] = [];
     opened.push({ stream, sent, token: env.ANTHROPIC_AUTH_TOKEN });
     return { async send(text) { sent.push(text); }, events: () => stream.events(), async dispose() { stream.close(); } };
   } });
   try {
     await desktop.listProject({ projectRoot: temp.root });
-    await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime: "pi" });
-    await desktop.sendSession({ text: "busy old" });
+    await desktop.openSession({ projectRoot: temp.root, roleId: "chief", runtime: "pi" });
+    await desktop.sendSession({ text: "busy old", target: { projectRoot: temp.root, roleId: "chief", runtime: "pi" } });
     const saved = await desktop.saveRuntimeConfig({ runtime: "pi", updates: { ANTHROPIC_AUTH_TOKEN: "new-token", ANS_PI_MODEL: "new-model" } });
     assert.equal(saved.revision, 1);
     assert.equal(saved.application, "after-active-turn");
     assert.equal(env.ANTHROPIC_AUTH_TOKEN, "old-token");
-    assert.equal((await desktop.sendSession({ text: "next profile" })).queued, true);
+    assert.equal((await desktop.sendSession({ text: "next profile", target: { projectRoot: temp.root, roleId: "chief", runtime: "pi" } })).queued, true);
     const rejected = await desktop.saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_BASE_URL: "file:///invalid" } });
     assert.equal(rejected.ok, false);
     assert.equal(rejected.revision, 1);
@@ -482,11 +505,12 @@ test("D1 shell terminal failure/timeout and dispose invalidate exact handle card
   const shell = createShellConfirmPresenter({ present: (request) => requests.push(request), onExpired: (event) => expired.push(event), cleanupAfterMs: 1000 });
   const channel = createDesktopOperatorChannel({ presenter: shell.presenter, operatorId: "test", timeoutMs: 1000 });
   const current = harness({ shellOperatorChannel: channel });
+  const roots = projectRoots();
   try {
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "codex" });
     const first = current.opened[0];
     await current.manager.send("start");
-    const pending = first.input.shellOperatorChannel!({ command: "example", argv: ["example"], cwd: "/one", toolCallId: "old" });
+    const pending = first.input.shellOperatorChannel!({ command: "example", argv: ["example"], cwd: roots.one, toolCallId: "old" });
     await until(() => requests.length === 1);
     first.stream.push({ kind: "settled", summary: "native timeout", detail: { outcome: "timed_out" } });
     await until(() => shell.pendingCount() === 0);
@@ -494,12 +518,12 @@ test("D1 shell terminal failure/timeout and dispose invalidate exact handle card
     assert.equal(shell.respond({ id: requests[0].id, allow: true }).expired, true);
     assert.equal(expired[0].runtime, "codex");
     await current.manager.send("new turn");
-    const secondPending = first.input.shellOperatorChannel!({ command: "second", argv: ["second"], cwd: "/one", toolCallId: "new" });
+    const secondPending = first.input.shellOperatorChannel!({ command: "second", argv: ["second"], cwd: roots.one, toolCallId: "new" });
     await until(() => requests.length === 2);
-    await current.manager.stop({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    await current.manager.stop({ projectRoot: roots.one, roleId: "A", runtime: "codex" });
     assert.notEqual((await secondPending)?.outcome, "allow");
     assert.equal(shell.respond({ id: requests[1].id, allow: true }).expired, true);
-  } finally { await current.manager.stop(); shell.rejectAllPending("test cleanup"); }
+  } finally { await current.manager.stop(); shell.rejectAllPending("test cleanup"); roots.cleanup(); }
 });
 
 test("D1 state debouncing and constrained bridges preserve project/runtime identity", () => {
@@ -529,24 +553,25 @@ test("D1 last busy Pi in another project releases queued profile rebuild without
     if (current.manager.profileRevision("pi") > 0) assert.equal(current.manager.hasBusyRuntime("pi"), false, "ambient application only happens while all Pi turns are idle");
     applyCount += 1;
   } });
+  const roots = projectRoots();
   try {
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "pi" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "pi" });
     await current.manager.send("one old");
-    await current.manager.open({ projectRoot: "/two", roleId: "A", runtime: "pi" });
+    await current.manager.open({ projectRoot: roots.two, roleId: "A", runtime: "pi" });
     await current.manager.send("two old");
     current.manager.profileChanged("pi");
-    assert.equal((await current.manager.send("one new", undefined, { projectRoot: "/one", roleId: "A", runtime: "pi" })).queued, true);
+    assert.equal((await current.manager.send("one new", undefined, { projectRoot: roots.one, roleId: "A", runtime: "pi" })).queued, true);
     current.opened[0].stream.push({ kind: "settled", summary: "one ended" });
-    await until(() => current.envelopes.some((event) => event.projectRoot === "/one" && event.event.summary === "one ended"));
+    await until(() => current.envelopes.some((event) => event.projectRoot === roots.one && event.event.summary === "one ended"));
     assert.equal(current.opened.length, 2, "other project Pi still busy, no rebuild/application");
     assert.equal(applyCount, 2, "only initial creations so far");
     current.opened[1].stream.push({ kind: "settled", summary: "two ended" });
     await until(() => current.opened.length === 3 && current.opened[2].sent.length > 0);
-    assert.equal(current.opened[2].root, "/one");
+    assert.equal(current.opened[2].root, roots.one);
     assert.equal(current.opened[2].runtime, "pi");
     assert.deepEqual(current.opened[2].sent, ["one new"]);
     assert.equal(applyCount, 3);
-  } finally { await current.manager.stop(); }
+  } finally { await current.manager.stop(); roots.cleanup(); }
 });
 
 test("D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card", async () => {
@@ -557,8 +582,9 @@ test("D1 confirmation bridge keeps original signal identity and an old disposed 
     assert.equal(metadata?.signal, original.signal);
     return channel.customerInput(request, context, metadata);
   } });
+  const roots = projectRoots();
   try {
-    await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "claude" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "su", runtime: "claude" });
     const first = current.opened[0];
     const pending = first.input.customerInput!({ kind: "confirm", title: "old" }, { signal: original.signal, runtime: "claude", turnId: "original", toolCallId: "actual-call" });
     assert.equal(requests[0].runtime, "claude");
@@ -568,13 +594,13 @@ test("D1 confirmation bridge keeps original signal identity and an old disposed 
     original.abort();
     assert.equal((await pending)?.outcome, "unavailable");
     assert.equal(channel.respond({ id: requests[0].id, decision: { kind: "confirm", confirmed: true } }).expired, true);
-    await current.manager.stop({ projectRoot: "/one", roleId: "su", runtime: "claude" });
-    await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "claude" });
+    await current.manager.stop({ projectRoot: roots.one, roleId: "su", runtime: "claude" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "su", runtime: "claude" });
     first.stream.push({ kind: "settled", summary: "late old" });
     await current.manager.send("new active");
     assert.deepEqual(current.opened[1].sent, ["new active"]);
     assert.ok(!current.envelopes.some((event) => event.event.summary === "late old"));
-  } finally { await current.manager.stop(); channel.rejectAllPending("cleanup"); }
+  } finally { await current.manager.stop(); channel.rejectAllPending("cleanup"); roots.cleanup(); }
 });
 
 
@@ -674,8 +700,9 @@ test("D1R legacy Pi rows keep optional turn/event metadata absent", async () => 
 
 test("D1R2 direct and queued identical inputs retain original client ID through delayed old settled", async () => {
   const current = harness();
+  const roots = projectRoots();
   try {
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "codex" });
     const source = current.opened[0];
     source.handle.send = async (text, opts) => {
       source.sent.push(text);
@@ -701,7 +728,7 @@ test("D1R2 direct and queued identical inputs retain original client ID through 
     source.stream.push({ kind: "message", summary: "third event", roleId: "A", runtime: "codex", turnId: "third-turn" });
     await until(() => current.envelopes.some((event) => event.event.summary === "third event"));
     assert.equal(eventBySummary("third event").clientMessageId, "third-client");
-  } finally { await current.manager.stop(); }
+  } finally { await current.manager.stop(); roots.cleanup(); }
 });
 
 test("D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client", async () => {
@@ -720,12 +747,13 @@ test("D1R2 anonymous dispatch occupies its own origin and unknown/legacy events 
     current.opened.push({ root: input.project.projectRoot, role: input.roleId, runtime: input.runtime!, stream, sent, input, handle });
     return handle;
   } });
+  const roots = projectRoots();
   try {
-    await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "codex" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "su", runtime: "codex" });
     await current.opened[0].input.dispatchTask!({ roleId: "A", task: "anonymous" });
     await until(() => current.opened.some((item) => item.role === "A" && item.sent.length === 1));
     const source = current.opened.find((item) => item.role === "A")!;
-    const target = { projectRoot: "/one", roleId: "A", runtime: "codex" as const };
+    const target = { projectRoot: roots.one, roleId: "A", runtime: "codex" as const };
     assert.equal((await current.manager.send("client", undefined, target, { clientMessageId: "client" })).queued, true);
     source.stream.push({ kind: "message", summary: "anonymous event", roleId: "A", runtime: "codex", turnId: "anonymous-turn" });
     source.stream.push({ kind: "settled", summary: "anonymous settled", roleId: "A", runtime: "codex", turnId: "anonymous-turn" });
@@ -739,11 +767,11 @@ test("D1R2 anonymous dispatch occupies its own origin and unknown/legacy events 
       assert.equal(Object.hasOwn(current.envelopes.find((event) => event.event.summary === summary)!, "clientMessageId"), false, summary);
     }
     assert.equal(current.envelopes.find((event) => event.event.summary === "client event")?.clientMessageId, "client");
-  } finally { await current.manager.stop(); }
+  } finally { await current.manager.stop(); roots.cleanup(); }
 });
 
 test("D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text", async () => {
-  const temp = fixture();
+  const temp = fixture({ trio: true });
   const events: SessionEventEnvelope[] = [];
   const releases: (() => void)[] = [];
   const factory: RuntimeProviderFactory = (options) => (options.registerToolDisplayProfile?.({ credentials: [] }), {
@@ -756,7 +784,7 @@ test("D1R2 actual Pipeline/Service returns original client IDs and real distinct
         async prompt() {
           promptCount += 1;
           stream.push({ kind: "message", summary: `${role.id}:start ${promptCount}` });
-          if (role.id === "A") await new Promise<void>((resolve) => releases.push(resolve));
+          if (role.id === "chief") await new Promise<void>((resolve) => releases.push(resolve));
           stream.push({ kind: "settled", summary: "done", detail: { outcome: "completed" } });
         }, events: () => stream.events(), async dispose() { releases.forEach((release) => release()); stream.close(); },
       };
@@ -765,27 +793,28 @@ test("D1R2 actual Pipeline/Service returns original client IDs and real distinct
   const desktop = createDesktopInterface({ pickDirectory: async () => null, emitEvent: (event) => events.push(event), envFilePath: temp.envPath, piConfigEnv: {}, runtimeOptions: { providerFactories: { claude: factory } } });
   try {
     await desktop.listProject({ projectRoot: temp.root });
-    await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime: "claude" });
-    const first = desktop.sendSession({ text: "same", metadata: { clientMessageId: "actual-first" } });
-    await until(() => events.some((event) => event.event.summary === "A:start 1"));
-    assert.equal((await desktop.sendSession({ text: "same", metadata: { clientMessageId: "actual-second" } })).queued, true);
+    await desktop.openSession({ projectRoot: temp.root, roleId: "chief", runtime: "claude" });
+    const target = { projectRoot: temp.root, roleId: "chief", runtime: "claude" as const };
+    const first = desktop.sendSession({ text: "same", target, metadata: { clientMessageId: "actual-first" } });
+    await until(() => events.some((event) => event.event.summary === "chief:start 1"));
+    assert.equal((await desktop.sendSession({ text: "same", target, metadata: { clientMessageId: "actual-second" } })).queued, true);
     releases[0](); await first;
-    await until(() => events.some((event) => event.event.summary === "A:start 2"));
-    const firstEvent = events.find((event) => event.event.summary === "A:start 1")!;
-    const secondEvent = events.find((event) => event.event.summary === "A:start 2")!;
+    await until(() => events.some((event) => event.event.summary === "chief:start 2"));
+    const firstEvent = events.find((event) => event.event.summary === "chief:start 1")!;
+    const secondEvent = events.find((event) => event.event.summary === "chief:start 2")!;
     assert.equal(firstEvent.clientMessageId, "actual-first");
     assert.equal(secondEvent.clientMessageId, "actual-second");
     assert.ok(firstEvent.event.kind !== "handback" && firstEvent.event.turnId);
     assert.ok(secondEvent.event.kind !== "handback" && secondEvent.event.turnId);
     assert.notEqual(firstEvent.event.turnId, secondEvent.event.turnId);
     releases[1]();
-    await until(() => events.filter((event) => event.roleId === "A" && event.event.kind === "settled").length === 2);
-    assert.deepEqual(events.filter((event) => event.roleId === "A" && event.event.kind === "settled").map((event) => event.clientMessageId), ["actual-first", "actual-second"]);
+    await until(() => events.filter((event) => event.roleId === "chief" && event.event.kind === "settled").length === 2);
+    assert.deepEqual(events.filter((event) => event.roleId === "chief" && event.event.kind === "settled").map((event) => event.clientMessageId), ["actual-first", "actual-second"]);
   } finally { releases.forEach((release) => release()); await desktop.stopSession(); temp.cleanup(); }
 });
 
 test("D1R2 actual ack preserves a failed delayed terminal and the next aborted original client", async () => {
-  const temp = fixture();
+  const temp = fixture({ trio: true });
   const envelopes: SessionEventEnvelope[] = [];
   let releaseTerminal!: () => void;
   const terminalGate = new Promise<void>((resolve) => { releaseTerminal = resolve; });
@@ -799,9 +828,9 @@ test("D1R2 actual ack preserves a failed delayed terminal and the next aborted o
       return { runtime: options.runtime,
         async prompt() {
           calls += 1;
-          if (role.id === "A" && calls === 1) throw new Error("fake first native failure");
+          if (role.id === "chief" && calls === 1) throw new Error("fake first native failure");
           stream.push({ kind: "message", summary: `${role.id}:native ${calls}` });
-          if (role.id === "A" && calls === 2) await new Promise<void>((resolve) => { releaseNative = resolve; });
+          if (role.id === "chief" && calls === 2) await new Promise<void>((resolve) => { releaseNative = resolve; });
           stream.push({ kind: "settled", summary: "native ended", detail: { outcome: "completed" } });
         }, events: () => stream.events(), async abort() { releaseNative?.(); }, async dispose() { releaseNative?.(); stream.close(); },
       };
@@ -810,7 +839,7 @@ test("D1R2 actual ack preserves a failed delayed terminal and the next aborted o
   const desktop = createDesktopInterface({ pickDirectory: async () => null, emitEvent: (event) => envelopes.push(event), envFilePath: temp.envPath, piConfigEnv: {}, runtimeOptions: { providerFactories: { codex: provider } },
     openRoleSessionFn: async (input, deps) => {
       const actual = await openRoleSession(input, deps);
-      if (input.roleId !== "A") return actual;
+      if (input.roleId !== "chief") return actual;
       return { runtime: actual.runtime, send: (text, opts) => actual.send(text, opts), abort: () => actual.abort!(), async dispose() { releaseTerminal(); await actual.dispose(); },
         async *events() {
           for await (const event of actual.events()) {
@@ -823,16 +852,17 @@ test("D1R2 actual ack preserves a failed delayed terminal and the next aborted o
   });
   try {
     await desktop.listProject({ projectRoot: temp.root });
-    await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime: "codex" });
-    const failed = await desktop.sendSession({ text: "same", metadata: { clientMessageId: "failed-original" } });
+    await desktop.openSession({ projectRoot: temp.root, roleId: "chief", runtime: "codex" });
+    const target = { projectRoot: temp.root, roleId: "chief", runtime: "codex" as const };
+    const failed = await desktop.sendSession({ text: "same", target, metadata: { clientMessageId: "failed-original" } });
     assert.equal(failed.ok, false);
     await until(() => terminalPaused);
-    const next = desktop.sendSession({ text: "same", metadata: { clientMessageId: "aborted-original" } });
+    const next = desktop.sendSession({ text: "same", target, metadata: { clientMessageId: "aborted-original" } });
     await until(() => releaseNative !== undefined);
     releaseTerminal();
     await until(() => envelopes.some((event) => event.event.kind === "settled" && event.clientMessageId === "failed-original"));
-    assert.equal((await desktop.sendSession({ text: "after abort", metadata: { clientMessageId: "after-original" } })).queued, true, "late failed terminal cannot clear a newer turn busy");
-    await desktop.abortSession({ projectRoot: temp.root, roleId: "A", runtime: "codex" });
+    assert.equal((await desktop.sendSession({ text: "after abort", target, metadata: { clientMessageId: "after-original" } })).queued, true, "late failed terminal cannot clear a newer turn busy");
+    await desktop.abortSession({ projectRoot: temp.root, roleId: "chief", runtime: "codex" });
     assert.equal((await next).ok, false);
     await until(() => envelopes.some((event) => event.event.kind === "settled" && event.clientMessageId === "aborted-original"));
     const failedTerminal = envelopes.find((event) => event.event.kind === "settled" && event.clientMessageId === "failed-original")!;
@@ -845,8 +875,9 @@ test("D1R2 actual ack preserves a failed delayed terminal and the next aborted o
 
 test("D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call", async () => {
   const current = harness();
+  const roots = projectRoots();
   try {
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "codex" });
     const source = current.opened[0];
     let calls = 0;
     source.handle.send = async (text, opts) => {
@@ -864,14 +895,14 @@ test("D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID
     assert.equal(current.envelopes.find((event) => event.event.summary === "exact next")?.clientMessageId, "next-original");
     for (const summary of ["unknown old", "no turn"]) assert.equal(Object.hasOwn(current.envelopes.find((event) => event.event.summary === summary)!, "clientMessageId"), false);
     await current.manager.stop();
-    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    await current.manager.open({ projectRoot: roots.one, roleId: "A", runtime: "codex" });
     const legacy = current.opened.at(-1)!;
     await current.manager.send("legacy", undefined, undefined, { clientMessageId: "unsupported-original" });
     legacy.stream.push({ kind: "message", summary: "legacy with ID but no ack", roleId: "A", runtime: "codex", turnId: "unsupported-turn" });
     legacy.stream.push({ kind: "settled", summary: "legacy without turn" });
     await until(() => current.envelopes.some((event) => event.event.summary === "legacy without turn"));
     for (const summary of ["legacy with ID but no ack", "legacy without turn"]) assert.equal(Object.hasOwn(current.envelopes.find((event) => event.event.summary === summary)!, "clientMessageId"), false);
-  } finally { await current.manager.stop(); }
+  } finally { await current.manager.stop(); roots.cleanup(); }
 });
 
 
@@ -1012,15 +1043,15 @@ test('A legacy provenance and authoritative metadata omissions survive the prote
 });
 
 test('stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session',async()=>{
- for(const outcome of ['aborted','failed','timed_out'] as const){const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];let prompts=0;
+ for(const outcome of ['aborted','failed','timed_out'] as const){const current=harness();const roots=projectRoots();try{await current.manager.open({projectRoot:roots.one,roleId:'A',runtime:'codex'});const source=current.opened[0];let prompts=0;
  source.handle.send=async(_text,opts)=>{prompts++;const turnId='fact-'+outcome;opts?.onTurnStarted?.({turnId,roleId:'A',runtime:'codex'});source.stream.push({kind:'message',summary:'not used for classification',roleId:'A',runtime:'codex',turnId,detail:{source:'prompt-input',text:'actual accepted input'}});source.stream.push({kind:'settled',summary:'also not used',roleId:'A',runtime:'codex',turnId,detail:{outcome}});await until(()=>current.envelopes.some(e=>e.event.kind==='settled'&&e.event.turnId===turnId));throw new Error('same opaque failure for every outcome');};
  const result=await current.manager.send('input',undefined,undefined,{clientMessageId:'client'});assert.equal(result.ok,false);assert.equal(result.turnId,'fact-'+outcome);assert.equal(result.clientMessageId,'client');assert.equal(result.inputAccepted,true);assert.equal(result.outcome,outcome);assert.equal(result.sessionCurrent,true);assert.equal(prompts,1);
- assert.equal((await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'})).resumed,true,'a rejected turn does not dispose the actual handle');
- }finally{await current.manager.stop();}}
+ assert.equal((await current.manager.open({projectRoot:roots.one,roleId:'A',runtime:'codex'})).resumed,true,'a rejected turn does not dispose the actual handle');
+ }finally{await current.manager.stop();roots.cleanup();}}
 });
 
 test('send rejection before public events remains unknown; later same-client different turns do not borrow outcomes',async()=>{
- const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];let calls=0;
+ const current=harness();const roots=projectRoots();try{await current.manager.open({projectRoot:roots.one,roleId:'A',runtime:'codex'});const source=current.opened[0];let calls=0;
  source.handle.send=async(_text,opts)=>{calls++;opts?.onTurnStarted?.({turnId:'turn-'+calls,roleId:'A',runtime:'codex'});throw new Error('opaque');};
  const first=await current.manager.send('same',undefined,undefined,{clientMessageId:'reused-client'});assert.equal(first.turnId,'turn-1');assert.equal(first.sessionCurrent,true);assert.equal(Object.hasOwn(first,'inputAccepted'),false);assert.equal(Object.hasOwn(first,'outcome'),false,'no waiting or guessing after early rejection');
  const second=await current.manager.send('same',undefined,undefined,{clientMessageId:'reused-client'});assert.equal(second.turnId,'turn-2');
@@ -1028,47 +1059,50 @@ test('send rejection before public events remains unknown; later same-client dif
  source.stream.push({kind:'settled',summary:'new timeout',roleId:'A',runtime:'codex',turnId:'turn-2',detail:{outcome:'timed_out'}});
  await until(()=>current.envelopes.some(e=>e.event.summary==='new timeout'));assert.equal(Object.hasOwn(first,'outcome'),false);assert.equal(Object.hasOwn(second,'outcome'),false,'returned snapshots are not mutated by late events');
  const terminals=current.envelopes.filter(e=>e.event.kind==='settled');assert.deepEqual(terminals.map(e=>[e.clientMessageId,e.event.kind!=='handback'&&e.event.turnId,(e.event as SessionEvent).detail]),[['reused-client','turn-1',{outcome:'aborted'}],['reused-client','turn-2',{outcome:'timed_out'}]]);assert.equal(calls,2);
- }finally{await current.manager.stop();}
+ }finally{await current.manager.stop();roots.cleanup();}
 });
 
 test('no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome',async()=>{
- const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];
+ const current=harness();const roots=projectRoots();try{await current.manager.open({projectRoot:roots.one,roleId:'A',runtime:'codex'});const source=current.opened[0];
  source.handle.send=async()=>{source.stream.push({kind:'message',summary:'本轮已中止 用户指令：looks accepted',turnId:'unacknowledged',detail:{source:'prompt-input',text:'text'}});source.stream.push({kind:'settled',summary:'本轮已中止',turnId:'unacknowledged',detail:{outcome:'aborted'}});await until(()=>current.envelopes.some(e=>e.event.kind==='settled'));throw new Error('AbortError 本轮已中止');};
  const result=await current.manager.send('text',undefined,undefined,{clientMessageId:'not-started'});assert.equal(result.sessionCurrent,true);for(const field of ['turnId','inputAccepted','outcome'])assert.equal(Object.hasOwn(result,field),false,field);
- }finally{await current.manager.stop();}
+ }finally{await current.manager.stop();roots.cleanup();}
 });
 
 test('send result reports the original handle is no longer current after replacement while its turn rejects',async()=>{
- const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];let release!:()=>void;
+ const current=harness();const roots=projectRoots();try{await current.manager.open({projectRoot:roots.one,roleId:'A',runtime:'codex'});const source=current.opened[0];let release!:()=>void;
  source.handle.send=async(_text,opts)=>{opts?.onTurnStarted?.({turnId:'old-handle-turn',roleId:'A',runtime:'codex'});await new Promise<void>(r=>{release=r});throw new Error('opaque old failure');};
- const pending=current.manager.send('text',undefined,undefined,{clientMessageId:'old'});await until(()=>!!release);await current.manager.stop({projectRoot:'/one',roleId:'A',runtime:'codex'});await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});release();const result=await pending;assert.equal(result.turnId,'old-handle-turn');assert.equal(result.sessionCurrent,false);assert.equal(Object.hasOwn(result,'outcome'),false);
- }finally{await current.manager.stop();}
+ const pending=current.manager.send('text',undefined,undefined,{clientMessageId:'old'});await until(()=>!!release);await current.manager.stop({projectRoot:roots.one,roleId:'A',runtime:'codex'});await current.manager.open({projectRoot:roots.one,roleId:'A',runtime:'codex'});release();const result=await pending;assert.equal(result.turnId,'old-handle-turn');assert.equal(result.sessionCurrent,false);assert.equal(Object.hasOwn(result,'outcome'),false);
+ }finally{await current.manager.stop();roots.cleanup();}
 });
 
 test('actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt',async()=>{
  const temp=fixture();const envelopes:SessionEventEnvelope[]=[];const requests:OperatorRequestPayload[]=[];
  const channel=createCustomerInputChannel({operatorId:'stop-test',presenter:request=>requests.push(request)});let prompts=0,firstFinished=false;
  const provider:RuntimeProviderFactory=options=>{options.registerToolDisplayProfile?.({credentials:[]});return {async composeContext(){return {systemPrompt:''}},async bindRole(role){const stream=queue<SessionEvent>();return {runtime:options.runtime,async prompt(){prompts++;const turnId=options.currentTurnId();try{if(prompts===1){const choice=options.tools.find(tool=>tool.name==='request_choice')!;assert.ok(choice);await choice.handler({name:'request_choice',toolCallId:'actual-stop-choice',args:{title:'controlled stop choice',options:[{id:'one',label:'One'},{id:'two',label:'Two'}]}});}stream.push({kind:'settled',summary:'native done',runtime:options.runtime,roleId:role.id,turnId,detail:{outcome:'completed'}});}finally{if(prompts===1)firstFinished=true;}},events:()=>stream.events(),async abort(){},async dispose(){stream.close();}};}}};
- const desktop=createDesktopInterface({pickDirectory:async()=>null,emitEvent:event=>envelopes.push(event),customerInput:channel.customerInput,envFilePath:temp.envPath,piConfigEnv:{},runtimeOptions:{providerFactories:{codex:provider}},openRoleSessionFn:(input,deps)=>openRoleSession({...input,autoRepin:false},deps)});
- try{await desktop.listProject({projectRoot:temp.root});assert.equal((await desktop.openSession({projectRoot:temp.root,roleId:'su',runtime:'codex'})).ok,true);
- const pending=desktop.sendSession({text:'first explicit prompt',metadata:{clientMessageId:'actual-stop'}});await until(()=>requests.length===1);assert.equal((await desktop.abortSession({projectRoot:temp.root,roleId:'su',runtime:'codex'})).ok,true);
- const result=await pending;await until(()=>envelopes.some(e=>e.event.kind==='settled'&&e.clientMessageId==='actual-stop'));
- const terminal=envelopes.find(e=>e.event.kind==='settled'&&e.clientMessageId==='actual-stop')!;assert.equal((terminal.event as SessionEvent).detail && ((terminal.event as SessionEvent).detail as {outcome:string}).outcome,'aborted');assert.equal(result.inputAccepted,true);assert.equal(result.sessionCurrent,true);assert.equal(result.turnId,terminal.event.kind!=='handback'&&terminal.event.turnId);if(result.outcome!==undefined)assert.equal(result.outcome,'aborted');
+ // B3c：e71501c 后 desktop.sendSession 只收 chief 客户消息；本用例的主体是真实 Pipeline 的
+ // request_choice/abort 语义（single 内置 su 才有客户确认制），故直接在 SessionManager 层驱动同一真实链，
+ // 不经客户入口（断言不变：accepted/current/turnId/terminal/expiry/next prompt）。
+ const current=harness({openRoleSession:(input,deps)=>openRoleSession({...input,autoRepin:false},deps),customerInput:channel.customerInput,runtimeOptions:{providerFactories:{codex:provider}}});
+ try{assert.equal((await current.manager.open({projectRoot:temp.root,roleId:'su',runtime:'codex'})).ok,true);
+ const pending=current.manager.send('first explicit prompt',undefined,undefined,{clientMessageId:'actual-stop'});await until(()=>requests.length===1);assert.equal((await current.manager.abort({projectRoot:temp.root,roleId:'su',runtime:'codex'})).ok,true);
+ const result=await pending;await until(()=>current.envelopes.some(e=>e.event.kind==='settled'&&e.clientMessageId==='actual-stop'));
+ const terminal=current.envelopes.find(e=>e.event.kind==='settled'&&e.clientMessageId==='actual-stop')!;assert.equal((terminal.event as SessionEvent).detail && ((terminal.event as SessionEvent).detail as {outcome:string}).outcome,'aborted');assert.equal(result.inputAccepted,true);assert.equal(result.sessionCurrent,true);assert.equal(result.turnId,terminal.event.kind!=='handback'&&terminal.event.turnId);if(result.outcome!==undefined)assert.equal(result.outcome,'aborted');
  assert.equal(channel.respond({id:requests[0].id,decision:{kind:'choice',selected:['one']}}).expired,true);await until(()=>firstFinished);assert.equal(prompts,1,'stop never repeats the model input');
- assert.equal((await desktop.sendSession({text:'second explicit prompt',metadata:{clientMessageId:'after-stop'}})).ok,true);assert.equal(prompts,2);assert.equal((await desktop.openSession({projectRoot:temp.root,roleId:'su',runtime:'codex'})).resumed,true);
- }finally{await desktop.stopSession();desktop.disposeProjectDocuments();channel.rejectAllPending('cleanup');temp.cleanup();}
+ assert.equal((await current.manager.send('second explicit prompt',undefined,undefined,{clientMessageId:'after-stop'})).ok,true);assert.equal(prompts,2);assert.equal((await current.manager.open({projectRoot:temp.root,roleId:'su',runtime:'codex'})).resumed,true);
+ }finally{await current.manager.stop();channel.rejectAllPending('cleanup');temp.cleanup();}
 });
 
 test('same client IDs across sequential actual turns retain separate first public outcomes',async()=>{
- const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];let calls=0;
+ const current=harness();const roots=projectRoots();try{await current.manager.open({projectRoot:roots.one,roleId:'A',runtime:'codex'});const source=current.opened[0];let calls=0;
  source.handle.send=async(_text,opts)=>{const index=++calls;const turnId='sequential-'+index;opts?.onTurnStarted?.({turnId,roleId:'A',runtime:'codex'});source.stream.push({kind:'message',summary:'input',turnId,detail:{source:'prompt-input',text:'same'}});source.stream.push({kind:'settled',summary:'authoritative first '+index,turnId,detail:{outcome:index===1?'aborted':'completed'}});source.stream.push({kind:'settled',summary:'duplicate '+index,turnId,detail:{outcome:'failed'}});await until(()=>current.envelopes.some(e=>e.event.summary==='duplicate '+index));throw new Error('same opaque rejection');};
  const first=await current.manager.send('same',undefined,undefined,{clientMessageId:'same-client'});const second=await current.manager.send('same',undefined,undefined,{clientMessageId:'same-client'});assert.equal(first.outcome,'aborted');assert.equal(second.outcome,'completed');assert.equal(first.inputAccepted,true);assert.equal(second.inputAccepted,true);assert.notEqual(first.turnId,second.turnId);assert.equal(calls,2);
- }finally{await current.manager.stop();}
+ }finally{await current.manager.stop();roots.cleanup();}
 });
 
 test('foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn',async()=>{
- const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];
+ const current=harness();const roots=projectRoots();try{await current.manager.open({projectRoot:roots.one,roleId:'A',runtime:'codex'});const source=current.opened[0];
  source.handle.send=async(_text,opts)=>{opts?.onTurnStarted?.({turnId:'claimed',roleId:'A',runtime:'codex'});source.stream.push({kind:'message',summary:'foreign accepted',turnId:'claimed',roleId:'B',runtime:'codex',detail:{source:'prompt-input',text:'text'}});source.stream.push({kind:'settled',summary:'foreign terminal',turnId:'claimed',roleId:'A',runtime:'pi',detail:{outcome:'aborted'}});await until(()=>current.envelopes.some(e=>e.event.summary==='foreign terminal'));throw new Error('opaque');};
  const result=await current.manager.send('text',undefined,undefined,{clientMessageId:'client'});assert.equal(result.turnId,'claimed');assert.equal(Object.hasOwn(result,'inputAccepted'),false);assert.equal(Object.hasOwn(result,'outcome'),false);assert.ok(current.envelopes.filter(e=>e.event.summary.startsWith('foreign')).every(e=>e.clientMessageId===undefined));
- }finally{await current.manager.stop();}
+ }finally{await current.manager.stop();roots.cleanup();}
 });

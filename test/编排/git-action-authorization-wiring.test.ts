@@ -67,7 +67,8 @@ test("wiring init: sidecar carries actor/task/turn/lease + init,candidate digest
 // ———————————————— 调用点顺序 / 映射 / 不写 sidecar 的源码结构守卫 ————————————————
 
 test("wiring guards: append sits after current gate and before effects with the frozen R2 digest mapping; run-change/stop paths never append", async () => {
-  const source = await fs.readFile(new URL("../../src/pipeline/orchestration/trunk-runtime.ts", import.meta.url), "utf8");
+  // 读取后归一 CRLF（本机 core.autocrlf 检出的源码与 CI 的 LF 只应差行尾；切片标记按 LF 书写）。
+  const source = (await fs.readFile(new URL("../../src/pipeline/orchestration/trunk-runtime.ts", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
   const slice = (from: string, to: string): string => {
     const start = source.indexOf(from), end = source.indexOf(to, start);
     assert.ok(start > 0 && end > start, `源码段可定位：${from} → ${to}`);
