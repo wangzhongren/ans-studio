@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import type { ResolvedRole } from "../../src/model/role.ts";
 import type { WriteGate } from "../../src/model/runtime.ts";
 export function role(id = "core"): ResolvedRole {
@@ -10,6 +13,14 @@ export const deny: WriteGate = () => ({ allowed: false, reason: "fixture denied"
 export async function until(predicate: () => boolean, timeoutMs = 1500): Promise<void> {
   const end = Date.now() + timeoutMs;
   while (!predicate()) { if (Date.now() > end) throw new Error("fixture wait timed out"); await new Promise<void>((resolve) => setTimeout(resolve, 2)); }
+}
+
+/** K1（2026-11-16，KR-33）：中性项目根——`mkdtemp` 生成、无 `.git`。
+ *  linked worktree 的 `.git` 是文件，产品按既有 fail-closed 口径判 `runtime-protection-scope-unknown`；
+ *  测试夹具改用中性根后，断言与产品保护语义保持不变。调用方负责 `cleanup()`。 */
+export async function neutralProjectRoot(prefix = "ans-runtime-core-neutral-"): Promise<{ root: string; cleanup: () => Promise<void> }> {
+  const root = await mkdtemp(path.join(os.tmpdir(), prefix));
+  return { root, cleanup: () => rm(root, { recursive: true, force: true }) };
 }
 
 /** Actual required-v1 protocol for controlled providers; no production bypass. */

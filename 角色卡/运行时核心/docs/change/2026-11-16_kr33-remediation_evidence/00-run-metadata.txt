@@ -1,0 +1,30 @@
+KR-33 运行时核心修复：运行元数据（2026-11-16）
+
+角色：运行时核心（runtime core）
+工作树：C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\kr33fix
+分支：fix/test-debt-kr33；HEAD d1f256f = origin/main（任务给定起点）
+Node：v24.22.1；平台：win32（Windows 11 Pro 10.0.26300）
+依赖准备：node_modules 目录联接（junction）→ refactor-session-ts-b7\node_modules；
+  package.json SHA-256 c37e1e4903d2a64ae9af65311026b59c3b6b5c7d89aa395d35e87049b9130e3c，
+  package-lock.json SHA-256 a5e315ca976467bb6dc8a28c6854d7a387cf9dc13fdbb0d36aea99c8a5de8d63，
+  与该工作树逐字一致。未跟踪环境准备，非仓库改动。
+
+验证命令（任务口径，未加 --test-force-exit / --test-timeout）：
+  node --test --test-concurrency=1 "test/runtime-core/**/*.test.ts"
+
+基线（修改前，kr33fix @ d1f256f）：
+  EXIT=1；tests 604 / pass 567 / fail 33 / cancelled 0 / skipped 4；duration_ms 50068.5866
+  33 失败名与分类基线冻结名单逐名一致（01-kr33-dispositions.tsv 的 status_before 全为 ✖）。
+
+修改后（同一命令连续 3 次）：
+  RUN1 EXIT=0；tests 604 / pass 600 / fail 0 / cancelled 0 / skipped 4；duration_ms 49619.6266
+  RUN2 EXIT=0；tests 604 / pass 600 / fail 0 / cancelled 0 / skipped 4；duration_ms 49443.2619
+  RUN3 EXIT=0；tests 604 / pass 600 / fail 0 / cancelled 0 / skipped 4；duration_ms 49176.5006
+
+冻结 known-red 33 逐名对照：✔ 33 / ✖ 0 / ﹣ 0 / MISSING 0（05-frozen-33-after.txt）。
+新增失败：0（600 pass = 原 567 pass + 33 转绿；skipped 仍为原有 4 个）。
+定向 12 文件（修改后）：tests 157 / pass 153 / fail 0 / skipped 4；EXIT=0（04-test-counts.txt）。
+Typecheck：npm run typecheck（tsc --noEmit）EXIT=0。
+
+跳过披露：仅 4 个既有 win32 chmod/umask D3 用例（D3 write/edit modes、strict umask、chmod failure、sync failure），
+非冻结 33 名；K4 两名未使用 skip——win32 无文件符号链接权限时以 junction 等价适配并通过（06-skips-and-residuals.txt）。

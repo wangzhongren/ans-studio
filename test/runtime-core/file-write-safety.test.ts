@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, open, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { existsSync, renameSync, symlinkSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
@@ -94,7 +94,7 @@ test("D3 parent recheck rejects a changed in-root directory even if gate allows"
   });
 });
 
-test("D3 linked workspace root remains usable; linked target itself is not replaced", async () => {
+test("D3 linked workspace root remains usable; linked target itself is not replaced", async (t) => {
   await withRoot(async (root) => {
     const actual = path.join(root, "actual");
     const linked = path.join(root, "workspace");
@@ -102,10 +102,22 @@ test("D3 linked workspace root remains usable; linked target itself is not repla
     await symlink(actual, linked, "junction");
     const byName = tools(linked);
     assert.equal((await byName.get("write_file")!.handler({ name: "write_file", args: { path: "nested/file.txt", content: "original" } })).ok, true);
-    await symlink(path.join(actual, "nested", "file.txt"), path.join(actual, "link.txt"), "file");
+    // 2026-11-16 KR-33 K3：现行守卫以英文稳定保护码拒绝符号链接目标（e71501c）。
+    // 本机 Windows 无 SeCreateSymbolicLinkPrivilege 时文件符号链接 EPERM；改用 junction 等价覆盖
+    // 「链接目标不得被替换」的同一守卫（lstat().isSymbolicLink() 对 junction 同样为 true）。
+    let linkKind: "file-symlink" | "junction" = "file-symlink";
+    try {
+      await symlink(path.join(actual, "nested", "file.txt"), path.join(actual, "link.txt"), "file");
+    } catch (error) {
+      if (process.platform !== "win32" || (error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+      linkKind = "junction";
+      await symlink(path.join(actual, "nested"), path.join(actual, "link.txt"), "junction");
+    }
+    t.diagnostic(JSON.stringify({ linkKind, platform: process.platform }));
     const result = await byName.get("write_file")!.handler({ name: "write_file", args: { path: "link.txt", content: "changed" } });
     assert.equal(result.ok, false);
-    assert.match(result.message, /符号链接/);
+    assert.match(result.message, /\[file-write-protection\] symbolic-link target/);
+    assert.equal((await lstat(path.join(actual, "link.txt"))).isSymbolicLink(), true, "链接目标本身不得被替换");
     assert.equal(await readFile(path.join(actual, "nested", "file.txt"), "utf8"), "original");
   });
 });

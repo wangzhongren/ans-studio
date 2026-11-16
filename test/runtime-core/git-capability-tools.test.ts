@@ -20,7 +20,7 @@ import { isRuntimeNativeToolSurfaceFacts, isTaskWorkSourceRef, isTaskParentRef, 
   TASK_HUB_ROUTING, isTaskHubRouting, isTaskReviewControllerRef, isDispatchTaskResumeController,
   type TaskReviewControllerRef, type DispatchTaskResumeController, type TaskReviewBasisRef, type TaskCreatedEvent, type TaskWorkSourceRef, type TaskParentRef } from "../../src/model/runtime.ts";
 import { createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
-import { allow, role } from "./fixtures.ts";
+import { allow, neutralProjectRoot, role } from "./fixtures.ts";
 
 test("R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference", () => {
   const reviewBasisRef: TaskReviewBasisRef = { kind: "git-candidate-review", candidateOperationId: "actual-integrate-operation",
@@ -666,9 +666,11 @@ test("R14 actual required scope admits registered scripts through the approval c
   }
 });
 
-test("R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind", async () => {
+test("R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind", async (t) => {
+  // K1：中性临时根（无 .git），避免 linked worktree 的 .git 文件触发保护范围 unknown。
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let constructions = 0;
-  const adapter = createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(),
+  const adapter = createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root,
     apiKeyEnvVar: "R12_PRIVATE_AUTH_NAME", providerFactories: { codex: options => { constructions++; return createDemoRuntimeAdapter(options); } } });
   const prepared = await adapter.prepareRole!(role("r12-custom"));
   assert.equal(prepared.plan.status, "unknown"); assert.equal(prepared.plan.factoryProvenance, "custom-override");
@@ -736,10 +738,11 @@ test("R12 prepared identity is one-shot, instance-bound and rejects config/role/
   await assert.rejects(changed.bindPreparedRole!(rolePlan.token!), /configuration-changed/);
 });
 
-test("R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible", async () => {
+test("R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let constructions = 0, release!: () => void;
   const pending = new Promise<void>(done => { release = done; });
-  const root = process.cwd(), actor = role("r12-judge-like-direct-core");
+  const root = neutral.root, actor = role("r12-judge-like-direct-core");
   const adapter = createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: root, skillRoot: root,
     providerFactories: { demo: async options => { constructions++; await pending; return createDemoRuntimeAdapter(options); } } });
   const blocked = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.equal(blocked.ok, true);
@@ -767,9 +770,10 @@ test("R12 every real Core bind shares the host lease and registry; in-progress/a
   } finally { endGitHostAction({ projectRoot: root, leaseId: owner.leaseId }); }
 });
 
-test("R12 interruption during async factory preparation prevents the subsequent native bind", async () => {
+test("R12 interruption during async factory preparation prevents the subsequent native bind", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   let bindCalls = 0;
-  const root = process.cwd();
+  const root = neutral.root;
   const adapter = createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: root, skillRoot: root,
     providerFactories: { demo: options => {
       recordGitHostInterruption({ projectRoot: root, reason: "owned-fixture-interruption" });
@@ -780,8 +784,9 @@ test("R12 interruption during async factory preparation prevents the subsequent 
   assert.equal(inspectRuntimeCoreRegistry().entries.find(entry => entry.roleId === "r12-interrupted")!.state, "failed");
 });
 
-test("R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry", async () => {
-  const root = process.cwd();
+test("R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
+  const root = neutral.root;
   const stats = () => ({ readCalls: 0, readBytes: 0, deniedReads: 0, truncatedReads: 0, budgetExceeded: false });
   for (const mode of ["shell", "governance", "directive"] as const) {
     const adapter = createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: root, skillRoot: root,
@@ -982,9 +987,10 @@ test("Git schema declarations are strict nested templates, with no host-only fie
   }
 });
 
-test("actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof", async () => {
+test("actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   for (const shellEnabled of [false, true]) {
-    const session = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(),
+    const session = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root,
       ...(shellEnabled ? { shellGate: async () => ({ allow: true as const, by: "fixture" }) } : {}),
     }).bindRole(role("worker"));
     try {
@@ -1000,8 +1006,8 @@ test("actual Service registry snapshots bind the instance and do not convert emp
   }
 });
 
-async function overriddenNativeSurface(change?: (state: { tool: RuntimeNativeToolSurfaceFacts; lifecycle: RuntimeNativeLifecycleFacts; options: RuntimeProviderOptions }) => void, shellEnabled = false) {
-  return createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(),
+async function overriddenNativeSurface(root: string, change?: (state: { tool: RuntimeNativeToolSurfaceFacts; lifecycle: RuntimeNativeLifecycleFacts; options: RuntimeProviderOptions }) => void, shellEnabled = false) {
+  return createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root,
     ...(shellEnabled ? { shellGate: async () => ({ allow: true as const, by: "fixture" }) } : {}),
     providerFactories: { codex: options => {
       const tool: RuntimeNativeToolSurfaceFacts = { source: "native-provider-tool-registry", nativeInstanceId: "fixture-native", roleId: "worker", runtime: "codex", factory: "codex-chat",
@@ -1019,8 +1025,9 @@ async function overriddenNativeSurface(change?: (state: { tool: RuntimeNativeToo
   }).bindRole(role("worker"));
 }
 
-test("R8 a custom factory cannot self-report the default Codex Chat production provenance", async () => {
-  const session = await overriddenNativeSurface();
+test("R8 a custom factory cannot self-report the default Codex Chat production provenance", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
+  const session = await overriddenNativeSurface(neutral.root);
   try {
     const facts = session.inspectToolSurface!();
     assert.equal(facts.factoryProvenance, "custom-override");
@@ -1036,7 +1043,8 @@ test("R8 a custom factory cannot self-report the default Codex Chat production p
   assert.ok(session.inspectToolSurface!().reasons.includes("disposed-registry-not-current"));
 });
 
-test("R8 native registry/instance/role/runtime/activity mismatches remain unknown", async () => {
+test("R8 native registry/instance/role/runtime/activity mismatches remain unknown", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   const cases: [(state: { tool: RuntimeNativeToolSurfaceFacts; lifecycle: RuntimeNativeLifecycleFacts; options: RuntimeProviderOptions }) => void, string][] = [
     [state => { state.tool.nativeInstanceId = "other-instance"; }, "native-tool-registry-binding-unverified"],
     [state => { state.tool.roleId = "other-role"; }, "native-tool-registry-binding-unverified"],
@@ -1053,20 +1061,21 @@ test("R8 native registry/instance/role/runtime/activity mismatches remain unknow
     [state => { state.options.tools[0]!.handler = async () => ({ ok: true, message: "replacement" }); }, "core-tool-handler-changed-after-factory"],
   ];
   for (const [change, reason] of cases) {
-    const session = await overriddenNativeSurface(change);
+    const session = await overriddenNativeSurface(neutral.root, change);
     try {
       const facts = session.inspectToolSurface!();
       assert.equal(facts.nativeToolRegistry, "unknown"); assert.equal(facts.filesystemConfinement, "unknown");
       assert.ok(facts.reasons.includes(reason), JSON.stringify(facts.reasons));
     } finally { await session.dispose(); }
   }
-  const shell = await overriddenNativeSurface(undefined, true);
+  const shell = await overriddenNativeSurface(neutral.root, undefined, true);
   try { assert.ok(shell.inspectToolSurface!().reasons.includes("unmediated-execution-registered")); }
   finally { await shell.dispose(); }
 });
 
-test("R8 active HTTP inference alone is not treated as an uncontrolled execution program", async () => {
-  const session = await overriddenNativeSurface(state => {
+test("R8 active HTTP inference alone is not treated as an uncontrolled execution program", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
+  const session = await overriddenNativeSurface(neutral.root, state => {
     state.lifecycle.status = "running"; state.lifecycle.promptState = "running";
     state.lifecycle.transport.state = "open"; state.lifecycle.reasons = ["chat-http-request-running"];
   });

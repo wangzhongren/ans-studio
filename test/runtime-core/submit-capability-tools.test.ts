@@ -20,7 +20,7 @@ import {
 import { allow } from "./fixtures.ts";
 import { buildChiefDecisionTools, createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
 import { createRuntimeAdapter } from "../../src/service/runtime/session.ts";
-import { role } from "./fixtures.ts";
+import { neutralProjectRoot, role } from "./fixtures.ts";
 import type { ChiefDecisionExecutionContext, RuntimeProviderOptions } from "../../src/model/runtime.ts";
 
 const TOOL_NAMES = [SUBMIT_VERSION_CHANGE_TOOL_NAME, SUBMIT_REFACTOR_TOOL_NAME, REQUEST_STABLE_WRITE_TOOL_NAME] as const;
@@ -500,9 +500,11 @@ test("R2 bounded chief tool binds request/revision/options and never substitutes
   assert.equal((await wrongOrigin!.handler({ name: wrongOrigin!.name, args: decisionArgs })).ok, false);
 });
 
-test("R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget", async () => {
+test("R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget", async (t) => {
+  // K1：中性临时根（无 .git），避免 linked worktree 的 .git 文件触发保护范围 unknown。
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   const captured: RuntimeProviderOptions[] = [];
-  const options = { runtime: "demo" as const, gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), chiefDecisionContext: chiefContext(),
+  const options = { runtime: "demo" as const, gate: allow, projectRoot: neutral.root, skillRoot: neutral.root, chiefDecisionContext: chiefContext(),
     persistSession: true, closeCreatedTask: async () => ({ ...appliedReceipt, taskId: "task-1", eventId: "e-1", taskStatus: "closed" }),
     decidePendingRequest: async () => decisionReceipt as Awaited<ReturnType<NonNullable<GovernedToolsOptions["decidePendingRequest"]>>>,
     providerFactories: { demo: (provider: RuntimeProviderOptions) => { captured.push(provider); return createDemoRuntimeAdapter(provider, [{ name: "decide_pending_request", args: decisionArgs }]); } } };
@@ -534,11 +536,12 @@ test("R2 decision rejection/revision stays pending unless the trusted capability
   assert.equal(wrong.ok, false); assert.match(wrong.message, /结果未知/);
 });
 
-test("R2 chief timeout is finite and normal sessions still receive injected narrow capabilities", async () => {
+test("R2 chief timeout is finite and normal sessions still receive injected narrow capabilities", async (t) => {
+  const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   const captured: RuntimeProviderOptions[] = [];
   const context = chiefContext(); context.limits.timeoutMs = 25;
   let calls = 0;
-  const session = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(),
+  const session = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root,
     chiefDecisionContext: context, decidePendingRequest: async (_input, signal) => {
       calls++;
       await new Promise<void>((_resolve, reject) => { signal!.addEventListener("abort", () => reject(new Error("aborted")), { once: true }); });
@@ -548,7 +551,7 @@ test("R2 chief timeout is finite and normal sessions still receive injected narr
   try { await assert.rejects(session.prompt("Decide"), /超时|超过|到点/); assert.equal(calls, 1); }
   finally { await session.dispose(); }
   let normalCalls = 0;
-  const normal = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(),
+  const normal = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root,
     completeTeamPlan: async () => { normalCalls++; return appliedReceipt; }, providerFactories: { demo: provider => {
       captured.push(provider); return createDemoRuntimeAdapter(provider, [{ name: "complete_team_plan", args: structuredClone(narrowCases[1].args) }]);
     } },

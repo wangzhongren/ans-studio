@@ -1,0 +1,15 @@
+ src/service/runtime/session.ts                     |  3 +-
+ test/runtime-core/abort-quarantine.test.ts         | 22 ++++++----
+ .../dispatch-workflow-writer-copy.test.ts          | 51 +++++++++++++---------
+ test/runtime-core/effective-timeouts.test.ts       | 12 +++--
+ test/runtime-core/file-write-safety.test.ts        | 20 +++++++--
+ test/runtime-core/fixtures.ts                      | 11 +++++
+ test/runtime-core/git-capability-tools.test.ts     | 49 ++++++++++++---------
+ .../prompt-start-acknowledgement.test.ts           | 23 ++++++----
+ test/runtime-core/reasoning-effort.test.ts         | 22 ++++++----
+ test/runtime-core/session-store.test.ts            | 20 +++++++--
+ test/runtime-core/session.test.ts                  | 20 ++++++---
+ test/runtime-core/submit-capability-tools.test.ts  | 15 ++++---
+ test/runtime-core/trunk-contract.test.ts           |  4 ++
+ test/runtime-core/version-change-contract.test.ts  | 19 +++++---
+ 14 files changed, 192 insertions(+), 99 deletions(-)

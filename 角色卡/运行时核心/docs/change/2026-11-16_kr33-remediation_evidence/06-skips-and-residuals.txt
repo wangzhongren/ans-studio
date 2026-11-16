@@ -1,0 +1,25 @@
+KR-33 运行时核心：skip 与剩余披露（2026-11-16）
+
+1. 修改后全量 604 用例的 4 个 skip（全部为既有 win32 平台 skip，非本轮新增）：
+   ﹣ D3 write and edit preserve existing ordinary modes and strip special bits
+   ﹣ D3 handler under strict umask retains existing mode and keeps new files private
+   ﹣ D3 chmod failure reaches the handler without committing file or mode
+   ﹣ D3 sync failure reaches the handler without committing file or mode
+   来源：test/runtime-core/file-write-safety.test.ts 的 `{ skip: process.platform === "win32" }`（未改动）。
+   冻结 known-red 33 名均不在上述 skip 中。
+
+2. K4 两名未 skip：
+   本机无 SeCreateSymbolicLinkPrivilege，`fs.symlink(..., "dir"/"file")` 返回 EPERM（已探针确认）。
+   `session-store.test.ts` 的 directoryLink() 先尝试真实符号链接，win32 EPERM 时回退 junction；
+   junction 的 lstat().isSymbolicLink() 为 true（本机实测），store 的「非普通目录」拒绝语义不变。
+   TAP 诊断：`{"linkKind":"junction","platform":"win32"}` × 2；两名均 ok（未放宽断言）。
+
+3. D3 linked workspace（K3，#9）同样以能力回退执行：
+   文件符号链接 EPERM 时改用 junction 指向目录，仍由同一 finalFileProtection 的
+   `[file-write-protection] symbolic-link target` 拒绝；断言链接未被替换、原文件内容不变。
+   TAP 诊断：`{"linkKind":"junction","platform":"win32"}` × 1；该名 ok。
+
+4. 剩余：无。冻结 33 名 33/33 转绿；runtime-core 604 集 0 fail；无诊断 skip 用于冻结名。
+   范围外观察（不在本轮修改）：src/service/runtime/session.ts 另有一处 native-factory-plan 绑定失败路径
+   在 try 内 dispose 后由外层 catch 再 dispose（:758 附近）；本轮 K2 按任务仅处理 assertReady 路径，
+   该处未改、未被本轮测试覆盖，留待后续 owner 评估。
