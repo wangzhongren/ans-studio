@@ -4,9 +4,18 @@ export const SOURCE_SHA = 'c289309883c7fd2529312519de16d86ccc69d7bb';
 // B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化（默认路径零 trunk/bootstrap/
 // stable-write，治理走应用账本）、B29–B34 修复；`app/desktop/session.ts` 十三模块重构（barrel 30 行 +
 // 门面 + 13 协作模块，导出面 51 与 import 路径逐字不变）；全量测试债清零——三平台 5,828 用例 0 失败、
-// 冻结 known-red 62→0、B7 收口）；白名单**重置为基础集**（files＝package.json、package-lock.json、
-// .github/workflows/release.yml；dirs＝src/common/装配/、test/装配/），**无产品/测试 overlay 条目**
-// （v2.0.0 及更早条目已随冻结源吸收，见下）。
+// 冻结 known-red 62→0、B7 收口）；白名单＝**基础集 + 1 条 v2.1.0 发布阻断诊断条目**——files＝package.json、
+// package-lock.json、.github/workflows/release.yml、test/桌面应用/project-document.test.ts（诊断条目见下
+// 「v2.1.0 发布阻断诊断」段）；dirs＝src/common/装配/、test/装配/。v2.0.0 及更早的逐文件条目仍保留在
+// files Set 中，但对应文件已随冻结源吸收、不出现在 v2.1.0 tag→overlay 差异中（历史注释不逐条对应）。
+// v2.1.0 发布阻断诊断（arm64 Regression 27 名 UNSUPPORTED_ENVIRONMENT；run 44032276465）：测试 1 条——
+// 测试侧只加诊断、不改产品。`fs.statfs(root).type` 不在 localTypes 白名单
+// （src/provider/project-document/impl/file-reader.ts:28）时 `resolveRoot` 抛 UNSUPPORTED_ENVIRONMENT；
+// 诊断在 resolveRoot 失败路径打印 FS_DIAGNOSTIC（platform/arch/tmpdir 与 fixture root 的 statfs type，
+// 十进制+十六进制）后原样 rethrow，Service/Pipeline 的 updateListing 返回
+// documentReadUnavailable==='UNSUPPORTED_ENVIRONMENT' 时同打诊断（win32 预期 fail-closed 除外）。
+// 断言/测试名零放宽、零跳过；下一轮 arm64 日志据 FS type 数值由协调者决定扩白名单或修环境。
+// · 测试 1 条：test/桌面应用/project-document.test.ts
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v2.0.0 overlay）：冻结源 tag v2.0.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 /
 // 修改 B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化、B29–B34 修复）；当时白名单为
@@ -231,7 +240,8 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'test/测试/g4v2-mcp-verify/f-handler.test.ts',
   'app/desktop/session.ts',
   'test/桌面应用/handback-delivery.test.ts',
-  'test/桌面应用/queue-visibility.test.ts']);
+  'test/桌面应用/queue-visibility.test.ts',
+  'test/桌面应用/project-document.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];
