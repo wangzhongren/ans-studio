@@ -1,0 +1,28 @@
+# B0 NEW BASELINE — mac-x64
+run: 44010606352 headSha: ffe75ce623a659320e9caf1079ef7e9d81330b02
+job: test (macos-15-intel, mac, x64) (133796455083)
+counts: tests=5828 pass=5809 fail=0 cancelled=0 skipped=19
+typecheck: success
+failure names: 0
+file-level entries: 0
+old-baseline hits (arm64/x64/win): 0/0/0
+skipped (19):
+  - Windows 反斜杠路径也识别为角色边界文件（平台条件）  # SKIP
+  - B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid  # 8.3 short names only exist on Windows
+  - B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe）  # 8.3 short names only exist on Windows
+  - Q75 persisted governance status pointer is information only and bound across Desktop rebuild  # SKIP
+  - Q87 quality document filename version keeps schema and actual metadata bindings  # SKIP
+  - Q22 explicit outer failure after real blocked cleanup  # SKIP
+  - Q37 CHANGE existing-delivery entry to actual product draft creator-close  # SKIP
+  - Q43 CHANGE real intent confirmation and version2 planning creator-close  # SKIP
+  - CHANGE actual v2 publication and frozen-run mode  # SKIP
+  - CHANGE standalone replacement admission diagnostic, not creator-report continuity  # SKIP
+  - Q48 hub ordinary no-Git product draft report and Chief typed close  # SKIP
+  - Q59 Product same-candidate denied write recovers within original task  # SKIP
+  - Q70 workflow formal Product blocked Chief rework and real same-goal draft recovery  # SKIP
+  - Q71 Nominator formal blocked Chief rework and customer-visible stop  # SKIP
+  - Q72 Convener ordinary preparation formal blocked Chief rework and visible stop  # SKIP
+  - Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources  # SKIP
+  - Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources  # SKIP
+  - B3-2：Windows 8.3 短名拼写与规范长名命中同一托管证据；不同真实根仍拒绝  # 8.3 short names only exist on Windows
+  - 规范化：Windows 大小写不敏感（仅 win32）  # 仅 Windows
