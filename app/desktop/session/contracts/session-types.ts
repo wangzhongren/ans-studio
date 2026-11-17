@@ -71,6 +71,8 @@ export interface SessionOpenRequest {
 export interface InternalSessionOpenRequest extends SessionOpenRequest {
   /** 仅内部投递/固定路由使用；仅 `"fixed"` 在 trio 项目生效（否则忽略，走既有 task/chat 解析）。 */
   forcedWorkflowMode?: WorkflowMode;
+  /** Live grant from an ordinary customer send, used when replacing an ended workflow session. */
+  workflowChatInput?: TrustedWorkflowCustomerInput;
 }
 
 /**

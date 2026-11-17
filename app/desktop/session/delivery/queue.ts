@@ -129,7 +129,7 @@ export interface DeliveryPorts {
 }
 
 /** queue 方法读取的 deps 切片（原 this.deps 的只读查询）。 */
-type DeliveryDeps = Pick<SessionManagerDeps, "emitEvent" | "emitRoleState" | "getListing" | "refreshListing" | "now" | "demoRuntimeAutoDeliver" | "durableWorkflow">;
+type DeliveryDeps = Pick<SessionManagerDeps, "emitEvent" | "emitRoleState" | "getListing" | "refreshListing" | "now" | "demoRuntimeAutoDeliver" | "durableWorkflow" | "workflowChiefStart">;
 
 /** 「已投递」应用任务标记的内存上界（FIFO 淘汰；防长跑进程无界增长）。 */
 const MAX_DELIVERED_APP_TASK_IDS = 1024;
@@ -971,16 +971,20 @@ export class Delivery {
       entry.sessionWorkflowMode !== "fixed";
     const needsFixedTaskBind = fixedOpenTaskId !== undefined && entry !== undefined && entry.projectRoot === projectRoot
       && entry.sessionWorkflowMode === "fixed" && boundTaskOf(entry) !== fixedOpenTaskId;
+    const workflowChatInput = item.kind === "message" && resolvedTarget === "chief" && entry && durable?.isSession(entry.handle)
+      && entry.assignedTaskId === undefined && item.workflowInput?.text === item.text
+      && this.deps.workflowChiefStart?.isInputCurrent(projectRoot, item.workflowInput) ? item.workflowInput : undefined;
+    if (workflowChatInput && entry?.busy) return;
     // 目标忙且尚未绑定本次任务 ⇒ 保持排队（settle 后重试再安全重开）；绝不把任务投进未绑定/别的任务的会话。
     if (entry?.busy && (taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedTaskBind)) return;
     if (stopped()) return;
-    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedRebind || needsFixedTaskBind) {
+    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedRebind || needsFixedTaskBind || workflowChatInput) {
       // 2026-11-05（真机缺陷「又卡住」）：生产宿主（Interface）把 `demoRuntimeAutoDeliver` 置 false ⇒
       // **演示运行时（demo）不自动开会话**。demo 适配器执行内置演示脚本（对 `src/evil.ts` 的越界写，
       // 用于演示"写前被拒"），自动唤醒只会得到被门禁拒绝的回合，失败结果再经回交/派发级联成 blocked
       // （重启后持久队列里的历史 demo 项会连锁触发）。demo 仅供用户显式体验：只投给已打开的 demo 会话；
       // 未打开则保持排队（不丢消息、不自动开启）。缺省 true 保持测试/演示宿主既有语义。
-      if (runtime === "demo" && this.deps.demoRuntimeAutoDeliver === false) {
+      if (runtime === "demo" && this.deps.demoRuntimeAutoDeliver === false && !workflowChatInput) {
         diagnostic.record("delivery.skip.demo-not-opened", { state: item.kind, targetRoleId: resolvedTarget, queueDepth: q.length });
         return;
       }
@@ -990,7 +994,8 @@ export class Delivery {
       const openTaskId = taskBoundSession ? assignedDeliveryId : fixedOpenTaskId;
       const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime,
         ...(openTaskId !== undefined ? { taskId: openTaskId } : {}),
-        ...(forcedDeliveryMode !== undefined ? { forcedWorkflowMode: forcedDeliveryMode } : {}) }, false);
+        ...(forcedDeliveryMode !== undefined ? { forcedWorkflowMode: forcedDeliveryMode } : {}),
+        ...(workflowChatInput ? { workflowChatInput } : {}) }, false);
       if (!opened.ok) {
         item.lastAttempt = { state: "blocked", code: "unknown", at: new Date(this.now()).toISOString() };
         this.emitDeliveryNote(projectRoot, runtime,

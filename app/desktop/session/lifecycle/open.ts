@@ -310,6 +310,19 @@ export class LifecycleOpen {
     // （聊天打开/上一任务）时同样按 B8.1 口径安全重开；busy/关闭失败 ⇒ fail-closed。O-1 重建续段
     // （`internalReopen`）不参与任务重绑：其 taskId 取自被重建条目自身，不能反过来打断并发新会话。
     const forcedExisting = this.sessions.get(key);
+    if (req.workflowChatInput && forcedExisting && durable?.isSession(forcedExisting.handle)) {
+      const ended = !internalReopen && !durableOwned && req.roleId === "chief" && req.taskId === undefined
+        && forcedExisting.assignedTaskId === undefined && await durable.canRebindCompletedSession(req.projectRoot, forcedExisting.handle);
+      if (stopped()) return stoppedResult();
+      if (!ended || this.sessions.get(key) !== forcedExisting || forcedExisting.busy
+        || !this.deps.workflowChiefStart?.isInputCurrent(req.projectRoot, req.workflowChatInput)) {
+        return { ok: false, error: "workflow-chat-rebind-blocked" };
+      }
+      this.host.healStaleOrigin(forcedExisting, "stale-origin-before-workflow-chat-rebind");
+      if (this.activeRoleId === key && this.selectionVersion === selectionVersion) ctx.userInitiated = true;
+      const closed = await this.disposeEntry(key, forcedExisting);
+      if (closed !== null) return { ok: false, error: "workflow-chat-rebind-close-failed" };
+    }
     const fixedTaskRebindPending = forcedSessionWorkflowMode === "fixed" && !internalReopen
       && typeof req.taskId === "string" && req.taskId !== ""
       && forcedExisting !== undefined && forcedExisting.projectRoot === req.projectRoot
@@ -1144,7 +1157,8 @@ export class LifecycleOpen {
         const live = this.sessions.get(key);
         return live?.handle === gitBinding.handle ? live : undefined;
       });
-      const graph = durable && durableOwned && (await durable.find(req.projectRoot))?.schema === 2 ? graphRolePorts({
+      const durableProjection = durableOwned ? await durable?.find(req.projectRoot) : undefined;
+      const graph = durable && durableProjection?.schema === 2 ? graphRolePorts({
         durable, customer: customerInput, chiefDecision, isRegistered: () => !!this.deps.getRegisteredProjectLifecycle?.(req.projectRoot), session: () => {
           const entry = this.sessions.get(key);
           return entry?.handle === gitBinding.handle ? entry : undefined;
@@ -1341,7 +1355,7 @@ export class LifecycleOpen {
       dispatchBinding.handle = handle;
       gitBinding.handle = handle;
       planBinding.handle = handle;
-      if (durableOwned) durable?.markSession(handle);
+      if (durableOwned) durable?.markSession(handle, durableProjection?.status === "waiting" ? durableProjection.ref : undefined);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }

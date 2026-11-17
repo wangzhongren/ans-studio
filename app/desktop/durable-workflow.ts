@@ -170,7 +170,7 @@ export class DesktopDurableWorkflow {
   private retryAfter = 0;
   private readonly projectWorkers = new Map<string, (projection: DurableProjection) => Promise<void>>();
   private readonly deliveries = new Map<string, DurableDelivery>();
-  private readonly sessions = new WeakSet<object>();
+  private readonly sessions = new WeakMap<object, DurableInstanceRef | undefined>();
 
   constructor(options: { userDataRoot: string; resourceRoot: string; presetRoot?: string }) {
     this.dataDir = path.join(options.userDataRoot, "business");
@@ -426,8 +426,19 @@ export class DesktopDurableWorkflow {
     return { claimTaskGit, claimFileWrite };
   }
 
-  markSession(handle: object): void { this.sessions.add(handle); }
+  markSession(handle: object, ref?: DurableInstanceRef): void { this.sessions.set(handle, ref); }
   isSession(handle: object): boolean { return this.sessions.has(handle); }
+
+  async canRebindCompletedSession(projectRoot: string, handle: object): Promise<boolean> {
+    const ref = this.sessions.get(handle);
+    if (!ref) return false;
+    const store = await this.store();
+    const projections = await store.listProjections(projectRoot);
+    const previous = projections.find(projection => projection.ref.instanceId === ref.instanceId
+      && projection.ref.projectId === ref.projectId && projection.ref.definitionDigest === ref.definitionDigest);
+    return previous !== undefined && previous.status !== "waiting" && !projections.some(projection => projection.status === "waiting")
+      && await store.owner(projectRoot) === undefined;
+  }
 
   async close(): Promise<void> {
     this.closing = true;

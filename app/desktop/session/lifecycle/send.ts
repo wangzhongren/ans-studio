@@ -107,14 +107,21 @@ export class LifecycleSend {
         return { ok: false, error: mainT("main.session.rebuildFailedNoSend", { detail: rebuilt.reopened.error ?? mainT("shared.common.unknownReason") }) };
       }
     }
+    const initial = targetRoleId !== null ? this.sessions.get(targetRoleId) : undefined;
+    const candidate = metadata?.workflowInput;
+    const workflowInput = !background && initial?.roleId === "chief" && candidate?.text === text
+      && this.deps.workflowChiefStart?.isInputCurrent(initial.projectRoot, candidate) ? candidate : undefined;
+    if (targetRoleId !== null && initial && workflowInput && this.deps.durableWorkflow?.isSession(initial.handle)
+      && initial.assignedTaskId === undefined && !initial.busy) {
+      const reopened = await this.host.openInternal({ projectRoot: initial.projectRoot, roleId: initial.roleId,
+        runtime: initial.runtime, workflowChatInput: workflowInput }, true, selectionVersion);
+      if (!reopened.ok) return { ok: false, error: mainT("main.session.rebuildFailedNoSend", { detail: reopened.error ?? mainT("shared.common.unknownReason") }) };
+    }
     const entry = targetRoleId !== null ? this.sessions.get(targetRoleId) : undefined;
     if (!entry) {
       diagnostic.record("session.send.failed", { reasonCode: "session-not-open" });
       return { ok: false, error: mainT("main.session.notOpen") };
     }
-    const candidate = metadata?.workflowInput;
-    const workflowInput = !background && entry.roleId === "chief" && candidate?.projectRoot === entry.projectRoot
-      && candidate.text === text ? candidate : undefined;
     // **同一应用任务已在队列/在途（含直接 send 开跑的那一轮）⇒ 不重复入队/发送**——重建前后、两条应用
     // 链路各调一次时，客户侧只看到一条 user 消息（重复调用方拿到 `duplicate:true`，仍视为已受理）。
     if (appTaskId !== undefined) {

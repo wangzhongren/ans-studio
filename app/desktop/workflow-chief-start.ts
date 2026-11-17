@@ -62,6 +62,11 @@ export class WorkflowChiefStart {
     return grant;
   }
 
+  isInputCurrent(projectRoot: string, input: TrustedWorkflowCustomerInput): boolean {
+    return input.projectRoot === projectRoot && this.grants.get(input)?.() === true
+      && this.dependencies.selection(projectRoot)?.selectionId === input.selectionId;
+  }
+
   requestForSession(
     projectRoot: string, roleId: string, assignedTaskId: string | undefined,
     readSession: () => LiveSession | undefined,
@@ -72,12 +77,11 @@ export class WorkflowChiefStart {
       const origin = entry?.origins.running;
       const grant = origin?.workflowInput;
       const ack = origin?.workflowInputAck;
-      const isCurrent = () => !!entry && !!origin && !!grant && !!ack && this.grants.get(grant)?.() === true
+      const isCurrent = () => !!entry && !!origin && !!grant && !!ack && this.isInputCurrent(projectRoot, grant)
         && entry.projectRoot === projectRoot && entry.roleId === "chief" && entry.assignedTaskId === undefined
         && readSession() === entry && entry.origins.running === origin && entry.busy && !origin.settled
         && !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted
-        && origin.kind === "message" && origin.turnId === ack && origin.workflowInputAck === ack
-        && this.dependencies.selection(projectRoot)?.selectionId === grant.selectionId;
+        && origin.kind === "message" && origin.turnId === ack && origin.workflowInputAck === ack;
       if (!isCurrent() || !entry || !grant || !ack) {
         return durableFailure("workflow-start-input-unverified", "A proposal requires the current acknowledged customer message in the ordinary Chief session.");
       }
