@@ -1,0 +1,361 @@
+{
+  "schema": "ans-b7-closure-skipped/v1",
+  "platforms": {
+    "mac-arm64": [
+      {
+        "name": "Windows 反斜杠路径也识别为角色边界文件（平台条件）",
+        "reason": "SKIP",
+        "durationMs": 0.12525
+      },
+      {
+        "name": "B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid",
+        "reason": "8.3 short names only exist on Windows",
+        "durationMs": 0.602625
+      },
+      {
+        "name": "B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe）",
+        "reason": "8.3 short names only exist on Windows",
+        "durationMs": 0.128125
+      },
+      {
+        "name": "Q75 persisted governance status pointer is information only and bound across Desktop rebuild",
+        "reason": "SKIP",
+        "durationMs": 0.140708
+      },
+      {
+        "name": "Q87 quality document filename version keeps schema and actual metadata bindings",
+        "reason": "SKIP",
+        "durationMs": 0.067125
+      },
+      {
+        "name": "Q22 explicit outer failure after real blocked cleanup",
+        "reason": "SKIP",
+        "durationMs": 0.193625
+      },
+      {
+        "name": "Q37 CHANGE existing-delivery entry to actual product draft creator-close",
+        "reason": "SKIP",
+        "durationMs": 0.080625
+      },
+      {
+        "name": "Q43 CHANGE real intent confirmation and version2 planning creator-close",
+        "reason": "SKIP",
+        "durationMs": 0.02675
+      },
+      {
+        "name": "CHANGE actual v2 publication and frozen-run mode",
+        "reason": "SKIP",
+        "durationMs": 0.02175
+      },
+      {
+        "name": "CHANGE standalone replacement admission diagnostic, not creator-report continuity",
+        "reason": "SKIP",
+        "durationMs": 0.0185
+      },
+      {
+        "name": "Q48 hub ordinary no-Git product draft report and Chief typed close",
+        "reason": "SKIP",
+        "durationMs": 0.018625
+      },
+      {
+        "name": "Q59 Product same-candidate denied write recovers within original task",
+        "reason": "SKIP",
+        "durationMs": 0.0205
+      },
+      {
+        "name": "Q70 workflow formal Product blocked Chief rework and real same-goal draft recovery",
+        "reason": "SKIP",
+        "durationMs": 0.018625
+      },
+      {
+        "name": "Q71 Nominator formal blocked Chief rework and customer-visible stop",
+        "reason": "SKIP",
+        "durationMs": 0.017542
+      },
+      {
+        "name": "Q72 Convener ordinary preparation formal blocked Chief rework and visible stop",
+        "reason": "SKIP",
+        "durationMs": 0.026833
+      },
+      {
+        "name": "Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources",
+        "reason": "SKIP",
+        "durationMs": 0.589167
+      },
+      {
+        "name": "Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources",
+        "reason": "SKIP",
+        "durationMs": 0.0695
+      },
+      {
+        "name": "B3-2：Windows 8.3 短名拼写与规范长名命中同一托管证据；不同真实根仍拒绝",
+        "reason": "8.3 short names only exist on Windows",
+        "durationMs": 0.308291
+      },
+      {
+        "name": "规范化：Windows 大小写不敏感（仅 win32）",
+        "reason": "仅 Windows",
+        "durationMs": 0.149959
+      }
+    ],
+    "mac-x64": [
+      {
+        "name": "Windows 反斜杠路径也识别为角色边界文件（平台条件）",
+        "reason": "SKIP",
+        "durationMs": 0.289232
+      },
+      {
+        "name": "B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid",
+        "reason": "8.3 short names only exist on Windows",
+        "durationMs": 0.628154
+      },
+      {
+        "name": "B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe）",
+        "reason": "8.3 short names only exist on Windows",
+        "durationMs": 0.243294
+      },
+      {
+        "name": "Q75 persisted governance status pointer is information only and bound across Desktop rebuild",
+        "reason": "SKIP",
+        "durationMs": 0.18546
+      },
+      {
+        "name": "Q87 quality document filename version keeps schema and actual metadata bindings",
+        "reason": "SKIP",
+        "durationMs": 0.138904
+      },
+      {
+        "name": "Q22 explicit outer failure after real blocked cleanup",
+        "reason": "SKIP",
+        "durationMs": 0.601424
+      },
+      {
+        "name": "Q37 CHANGE existing-delivery entry to actual product draft creator-close",
+        "reason": "SKIP",
+        "durationMs": 0.162319
+      },
+      {
+        "name": "Q43 CHANGE real intent confirmation and version2 planning creator-close",
+        "reason": "SKIP",
+        "durationMs": 0.064098
+      },
+      {
+        "name": "CHANGE actual v2 publication and frozen-run mode",
+        "reason": "SKIP",
+        "durationMs": 0.057373
+      },
+      {
+        "name": "CHANGE standalone replacement admission diagnostic, not creator-report continuity",
+        "reason": "SKIP",
+        "durationMs": 0.048297
+      },
+      {
+        "name": "Q48 hub ordinary no-Git product draft report and Chief typed close",
+        "reason": "SKIP",
+        "durationMs": 0.056975
+      },
+      {
+        "name": "Q59 Product same-candidate denied write recovers within original task",
+        "reason": "SKIP",
+        "durationMs": 0.044726
+      },
+      {
+        "name": "Q70 workflow formal Product blocked Chief rework and real same-goal draft recovery",
+        "reason": "SKIP",
+        "durationMs": 0.042869
+      },
+      {
+        "name": "Q71 Nominator formal blocked Chief rework and customer-visible stop",
+        "reason": "SKIP",
+        "durationMs": 0.046586
+      },
+      {
+        "name": "Q72 Convener ordinary preparation formal blocked Chief rework and visible stop",
+        "reason": "SKIP",
+        "durationMs": 0.044333
+      },
+      {
+        "name": "Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources",
+        "reason": "SKIP",
+        "durationMs": 1.211625
+      },
+      {
+        "name": "Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources",
+        "reason": "SKIP",
+        "durationMs": 0.1432
+      },
+      {
+        "name": "B3-2：Windows 8.3 短名拼写与规范长名命中同一托管证据；不同真实根仍拒绝",
+        "reason": "8.3 short names only exist on Windows",
+        "durationMs": 0.80349
+      },
+      {
+        "name": "规范化：Windows 大小写不敏感（仅 win32）",
+        "reason": "仅 Windows",
+        "durationMs": 0.164512
+      }
+    ],
+    "win-x64": [
+      {
+        "name": "owned native process group cleanup kills a wrapper and child that ignore SIGTERM",
+        "reason": "SKIP",
+        "durationMs": 0.0714
+      },
+      {
+        "name": "会话目录不可写：明确抛错（含目录与原因），绝不静默退化成「不落盘」",
+        "reason": "chmod 语义在 Windows 不适用",
+        "durationMs": 0.197
+      },
+      {
+        "name": "D3 write and edit preserve existing ordinary modes and strip special bits",
+        "reason": "SKIP",
+        "durationMs": 0.1152
+      },
+      {
+        "name": "D3 handler under strict umask retains existing mode and keeps new files private",
+        "reason": "SKIP",
+        "durationMs": 0.0702
+      },
+      {
+        "name": "D3 chmod failure reaches the handler without committing file or mode",
+        "reason": "SKIP",
+        "durationMs": 0.0858
+      },
+      {
+        "name": "D3 sync failure reaches the handler without committing file or mode",
+        "reason": "SKIP",
+        "durationMs": 0.0415
+      },
+      {
+        "name": "Q75 persisted governance status pointer is information only and bound across Desktop rebuild",
+        "reason": "SKIP",
+        "durationMs": 0.1118
+      },
+      {
+        "name": "Q87 quality document filename version keeps schema and actual metadata bindings",
+        "reason": "SKIP",
+        "durationMs": 0.0735
+      },
+      {
+        "name": "Q22 explicit outer failure after real blocked cleanup",
+        "reason": "SKIP",
+        "durationMs": 0.1224
+      },
+      {
+        "name": "Q37 CHANGE existing-delivery entry to actual product draft creator-close",
+        "reason": "SKIP",
+        "durationMs": 0.0892
+      },
+      {
+        "name": "Q43 CHANGE real intent confirmation and version2 planning creator-close",
+        "reason": "SKIP",
+        "durationMs": 0.0345
+      },
+      {
+        "name": "CHANGE actual v2 publication and frozen-run mode",
+        "reason": "SKIP",
+        "durationMs": 0.0255
+      },
+      {
+        "name": "CHANGE standalone replacement admission diagnostic, not creator-report continuity",
+        "reason": "SKIP",
+        "durationMs": 0.025
+      },
+      {
+        "name": "Q48 hub ordinary no-Git product draft report and Chief typed close",
+        "reason": "SKIP",
+        "durationMs": 0.0232
+      },
+      {
+        "name": "Q59 Product same-candidate denied write recovers within original task",
+        "reason": "SKIP",
+        "durationMs": 0.0179
+      },
+      {
+        "name": "Q70 workflow formal Product blocked Chief rework and real same-goal draft recovery",
+        "reason": "SKIP",
+        "durationMs": 0.0198
+      },
+      {
+        "name": "Q71 Nominator formal blocked Chief rework and customer-visible stop",
+        "reason": "SKIP",
+        "durationMs": 0.016
+      },
+      {
+        "name": "Q72 Convener ordinary preparation formal blocked Chief rework and visible stop",
+        "reason": "SKIP",
+        "durationMs": 0.0169
+      },
+      {
+        "name": "D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute",
+        "reason": "SKIP",
+        "durationMs": 0.1206
+      },
+      {
+        "name": "D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives",
+        "reason": "SKIP",
+        "durationMs": 0.0524
+      },
+      {
+        "name": "D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking",
+        "reason": "SKIP",
+        "durationMs": 0.0557
+      },
+      {
+        "name": "D3 AC6: real write/edit preserve regular modes and new files use safe creation",
+        "reason": "SKIP",
+        "durationMs": 0.0386
+      },
+      {
+        "name": "D3 AC6: strict umask in isolated child cannot strip old executable mode",
+        "reason": "SKIP",
+        "durationMs": 0.0542
+      },
+      {
+        "name": "D3 AC7: chmod/fsync failure and abort do not commit or leave a temp",
+        "reason": "SKIP",
+        "durationMs": 0.16
+      },
+      {
+        "name": "Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources",
+        "reason": "SKIP",
+        "durationMs": 0.6369
+      },
+      {
+        "name": "Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources",
+        "reason": "SKIP",
+        "durationMs": 0.0776
+      },
+      {
+        "name": "unreadable（权限）：文件不可读 → status=unreadable、actual=null",
+        "reason": "SKIP",
+        "durationMs": 0.0971
+      },
+      {
+        "name": "D3 finalMode 应用普通权限位，未传时保持既有安全创建行为",
+        "reason": "SKIP",
+        "durationMs": 0.0593
+      },
+      {
+        "name": "D3 严格 umask 下 finalMode 不丢执行位（独立子进程）",
+        "reason": "SKIP",
+        "durationMs": 0.0246
+      },
+      {
+        "name": "D3 chmod 失败不提交内容或权限，并清理临时文件",
+        "reason": "SKIP",
+        "durationMs": 0.0184
+      },
+      {
+        "name": "D3 sync 失败不提交内容或权限，并清理临时文件",
+        "reason": "SKIP",
+        "durationMs": 0.0157
+      },
+      {
+        "name": "D3 chmod 完成后中止仍保留原文件及权限",
+        "reason": "SKIP",
+        "durationMs": 0.0162
+      }
+    ]
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "schema": "ans-b7-closure-boundary-gate/v1",
+  "generatedAt": "2026-11-17",
+  "worktree": {
+    "path": "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/b7-closure",
+    "branch": "closure/b7-baseline-rebuild",
+    "head": "ffe75ce623a659320e9caf1079ef7e9d81330b02",
+    "headEqualsOriginMain": true,
+    "trackedDiffAgainstOriginMain": "empty",
+    "gitStatusPorcelain": [
+      "?? 角色卡/测试/docs/change/2026-11-17_b7-closure.md",
+      "?? 角色卡/测试/docs/change/2026-11-17_b7-closure_evidence/"
+    ],
+    "note": "仅本角色记录/证据为未跟踪新增；无代码/测试/workflow/配置/角色卡/边界改动。"
+  },
+  "readOnlyVerifiedFiles": {
+    ".github/workflows/release.yml": {
+      "sha256": "22e5d0d64487540c51f77d689f86af396029e6214eb44975d463e28ac9042c95",
+      "lastCommit": "3edf2e5",
+      "lastCommitDate": "2026-11-12",
+      "testCommand": "node --test --test-concurrency=1 \"test/**/*.test.ts\"",
+      "changed": false
+    },
+    ".github/workflows/test-ci.yml": {
+      "sha256": "9b776c07128a9618d78ce7b5882d864bc99a21416ccd718232cc9dc3b2d288d9",
+      "testCommand": "node --test --test-concurrency=1 --test-timeout=600000 --test-force-exit \"test/**/*.test.ts\"",
+      "scope": "development feedback only (workflow_dispatch, read-only, no publish)",
+      "changed": false
+    },
+    "src/common/装配/release-policy.mjs": {
+      "sha256": "c9605f5521de6c26fec2d03c800ae4b575092548f292b303de0d876c67e935a6",
+      "changed": false
+    },
+    "src/common/装配/release-prepare.mjs": {
+      "sha256": "1523e9ca46a5a1ab41f58affe95dfb44016343dad127f9fc0c6f59cbceec2abe",
+      "changed": false
+    }
+  },
+  "ports": {
+    "9222": "no listener observed (netstat -ano)",
+    "9223": "no listener observed (netstat -ano)",
+    "9224": "no listener observed (netstat -ano)"
+  },
+  "notDone": [
+    "未 commit/push",
+    "未触发 CI",
+    "未 tag",
+    "未碰 main",
+    "未读 .env",
+    "未修改产品/测试/workflow/配置/角色卡/边界",
+    "未启动 Electron/真实模型"
+  ],
+  "releaseGate": {
+    "workflow": ".github/workflows/release.yml",
+    "testCommand": "node --test --test-concurrency=1 \"test/**/*.test.ts\"",
+    "note": "发布验证仍以 release.yml 为准；本轮 test-ci.yml 运行仅为开发反馈，不构成发布放行。"
+  }
+}
