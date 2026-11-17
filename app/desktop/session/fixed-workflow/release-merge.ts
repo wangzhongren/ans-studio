@@ -96,26 +96,34 @@ export class FixedWorkflowRelease {
       effect.intent.requestId === release?.requestId && effect.state !== "not-started");
     if (release && tried) {
       this.closeDurablePresentation(projectRoot);
-      const savedOid = tried.result?.result?.mainOid;
-      if (tried.state === "succeeded" && typeof savedOid === "string") {
-        await store.submit(ref, { ...address, kind: "release-merged", source: "host", key: `release-result:${release.requestId}`,
-          requestId: release.requestId, effectKey: tried.intent.key, mainOid: savedOid, closed: true });
-        return;
+      let mainOid = tried.state === "succeeded" ? tried.result?.result?.mainOid : undefined;
+      if (typeof mainOid !== "string") {
+        const result = await verifyDurableMerge({ projectRoot, workflowId: ref.instanceId, requestId: release.requestId,
+          snapshot: release.snapshot, writePaths });
+        if (!result.ok) {
+          store.block(ref, "workflow-merge-reconciliation-required", tried.result?.evidence ?? result.message);
+          return;
+        }
+        const receipt = await store.settleEffect(ref, {
+          key: tried.intent.key, token: tried.token, outcome: "succeeded",
+          evidence: "Exact approved merge parents, operation marker, clean worktree and actual scoped diff.",
+          result: result.value,
+        });
+        if (!receipt.ok) {
+          store.block(ref, receipt.code, receipt.message);
+          return;
+        }
+        mainOid = result.value.mainOid;
       }
-      const result = await verifyDurableMerge({ projectRoot, workflowId: ref.instanceId, requestId: release.requestId,
-        snapshot: release.snapshot, writePaths });
-      if (!result.ok) {
-        store.block(ref, "workflow-merge-reconciliation-required", tried.result?.evidence ?? result.message);
-        return;
-      }
-      const receipt = await store.settleEffect(ref, {
-        key: tried.intent.key, token: tried.token, outcome: "succeeded",
-        evidence: "Exact approved merge parents, operation marker, clean worktree and actual scoped diff.",
-        result: result.value,
+      const saved = await store.submit(ref, { ...address, kind: "release-merged", source: "host", key: `release-result:${release.requestId}`,
+        requestId: release.requestId, effectKey: tried.intent.key, mainOid, closed: true }).catch(error => {
+        createDiagnosticLogger({ component: "desktop.durable-workflow", projectRoot }).error("workflow.release-result.failed", error);
+        return { ok: false as const, code: "release-result-write-failed", message: "The verified Git merge could not be recorded." };
       });
-      if (!receipt.ok) return;
-      await store.submit(ref, { ...address, kind: "release-merged", source: "host", key: `release-result:${release.requestId}`,
-        requestId: release.requestId, effectKey: tried.intent.key, mainOid: result.value.mainOid, closed: true });
+      if (!saved.ok) store.block(ref, saved.code, saved.message);
+      else if (saved.value.state === "ignored") {
+        store.block(ref, "release-result-ignored", saved.value.reason ?? "The verified Git merge was not accepted by the current workflow.");
+      }
       return;
     }
     if (release?.decision?.action === "reject") {

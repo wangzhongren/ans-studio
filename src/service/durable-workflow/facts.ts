@@ -219,9 +219,11 @@ export function deliveryFor(ledger: DurableLedger, instance: StoredInstance, sou
     || effect.intent.expected?.mainOid !== snapshot.mainOid || effect.intent.expected.tipOid !== snapshot.tipOid
     || effect.intent.expected.branch !== snapshot.branch || !equal(effect.intent.expected.files, snapshot.files)
     || outcome?.outcome !== 'succeeded' || outcome.token !== effect.token || verified?.mainOid !== merge.mainOid
-    || typeof verified.diffDigest !== 'string' || !hashValid(verified.diffDigest) || verified.diffDigest !== snapshot.diffDigest
-    || !Array.isArray(verified.files) || verified.files.length === 0 || !verified.files.every(safePath)
-    || !equal(verified.files, snapshot.files)) return undefined;
+    || typeof verified.diffDigest !== 'string' || !hashValid(verified.diffDigest)) return undefined;
+  // The approval describes the task baseline to tip. The verified merge delta is relative to approved main.
+  const files = verified.files;
+  if (!Array.isArray(files) || files.length === 0 || new Set(files).size !== files.length
+    || !files.every(file => safePath(file) && snapshot.files.includes(file))) return undefined;
 
   const { operatorReport, operatorReportArtifacts } = snapshot;
   if (!instance.implementation || instance.implementation.key !== snapshot.b3CloseKey
@@ -230,7 +232,7 @@ export function deliveryFor(ledger: DurableLedger, instance: StoredInstance, sou
     || operatorReportArtifacts?.some(artifact => !hasEvidence(ledger, id, artifact))) return undefined;
   return {
     id: 'delivery:' + digest(stableJson([instance.ref.projectId, id, release.requestId, merge.effectKey])),
-    state: 'pending', releaseRequestId: release.requestId, mergeOid: merge.mainOid, files: verified.files,
+    state: 'pending', releaseRequestId: release.requestId, mergeOid: merge.mainOid, files,
     diffDigest: verified.diffDigest, operatorReport, ...(operatorReportArtifacts ? { operatorReportArtifacts } : {}),
     // A role's report is retained as evidence. No independent runtime-verification fact exists in this workflow.
     runtimeVerification: 'not-independently-verified', createdAt,

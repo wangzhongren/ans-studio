@@ -7,8 +7,10 @@ import test, { type TestContext } from "node:test";
 import { buildMergeMainCardRequest, createCustomerInputChannel, MERGE_MAIN_OPTION_IDS } from "../../app/desktop/customer-input.ts";
 import { DesktopDurableWorkflow } from "../../app/desktop/durable-workflow.ts";
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
+import { FixedWorkflowRelease } from "../../app/desktop/session/fixed-workflow/release-merge.ts";
 import { createDesktopTaskGitShellPort, mergeDurableMain, previewDurableMerge, verifyDurableMerge, verifyDurableTaskCommit } from "../../app/desktop/workflow-git.ts";
-import { DURABLE_ACTIVITY_CONTRACT, DURABLE_EXECUTOR, type DurableReleaseSnapshot, type DurableResult } from "../../src/model/durable-workflow.ts";
+import { DURABLE_ACTIVITY_CONTRACT, DURABLE_EXECUTOR, type DurableEffectOutcome, type DurableEffectRecord,
+  type DurableFact, type DurableProjection, type DurableReleaseSnapshot, type DurableResult } from "../../src/model/durable-workflow.ts";
 import { DurableLedger, repositoryIdentity } from "../../src/provider/durable-workflow/public.ts";
 
 function git(root: string, ...args: string[]): string {
@@ -149,6 +151,69 @@ test("the actual Git commit and merge use their effect claim and can be verified
   assert.equal(actual.value.mainOid, git(root, "rev-parse", "main"));
   assert.deepEqual(actual.value.files, ["feature.txt"]);
   assert.equal((await verifyDurableMerge({ ...release, requestId: "wrong-request", writePaths: files })).ok, false);
+
+  await t.test("a verified merge retries failed admission by the same fact and never merges again", async () => {
+    const durable = new DesktopDurableWorkflow({ userDataRoot: path.join(root, ".ans", "desktop-test"), resourceRoot: root });
+    const ref = { projectId: "fixture", instanceId: release.workflowId, definitionId: "path-b", definitionVersion: 1,
+      definitionDigest: diffDigest, executor: DURABLE_EXECUTOR, activityContract: DURABLE_ACTIVITY_CONTRACT };
+    const address = { stepId: "release", attempt: 1 };
+    const request = { logicalKey: "release", releaseId: "rel", requestId: release.requestId, digest: diffDigest, generation: 1,
+      snapshot, decision: { id: release.requestId, action: "approve" as const, at: new Date().toISOString(), source: "customer" as const } };
+    const projection: DurableProjection = {
+      ...address, ref, projectRoot: root, stepName: "Release", definitionName: "Path B", status: "waiting",
+      action: "b4-customer-merge-main", engine: "healthy", pendingFacts: 0, metadata: {}, release: request,
+      baseline: { branch, oid: baselineOid },
+      scope: { stepId: "scope", attempt: 1, kind: "b3-advance", source: "chief", key: "scope", sourceTaskId: "chief-turn",
+        requestDigest: diffDigest, b1Attempt: 1, reportKey: "analysis", baselineOid, candidateSource: "modulePaths",
+        candidates: files, writeSets: [{ roleId: "owner", paths: files }], reason: "Fixture scope" },
+      implementation: { stepId: "implement", attempt: 1, source: "convener", kind: "implementation-accepted", key: snapshot.b3CloseKey,
+        task: { stage: "B3", stageAttempt: 1, executionAttempt: 1, parentTaskId: "parent", taskId: "task", roleId: "owner" },
+        reportKey: "implementation-report", operatorReport: snapshot.operatorReport },
+    };
+    const effect: DurableEffectRecord = { intent: { ...address, key: "real-merge", kind: "release-merge", requestId: request.requestId },
+      token: "merge-claim", state: "claimed" };
+    const submitted: DurableFact[] = [];
+    const blocks: string[] = [];
+    const store = {
+      listEffects: () => [effect],
+      settleEffect: t.mock.fn((_ref: unknown, result: DurableEffectOutcome) => {
+        effect.state = "succeeded";
+        effect.result = result;
+        return { ok: true };
+      }),
+      submit: async (_ref: unknown, fact: DurableFact) => {
+        submitted.push(fact);
+        return submitted.length === 1
+          ? { ok: false, code: "fact-write-failed", message: "Fixture database temporarily unavailable" }
+          : { ok: true, value: { key: fact.key, state: "pending" } };
+      },
+      block: (_ref: unknown, code: string, detail: string) => { blocks.push(`${code}: ${detail}`); },
+    };
+    t.mock.method(durable, "store", async () => store);
+    type ReleaseParams = ConstructorParameters<typeof FixedWorkflowRelease>;
+    const unexpectedSession = () => { throw new Error("Reconciliation must not open a role session."); };
+    const handler = new FixedWorkflowRelease({} as ReleaseParams[0], {} as ReleaseParams[1], {
+      durableWorkflow: durable,
+      getRegisteredProjectLifecycle: () => ({ selectionId: "fixture", selectedRoot: root, projectRoot: root, selectedAt: request.decision.at,
+        source: "native-directory-selection", listingGeneration: 1 }),
+      openRoleSession: unexpectedSession,
+      createPiAdapterFactory: unexpectedSession,
+      createDemoAdapter: unexpectedSession,
+      buildProjectConfig: unexpectedSession,
+      getListing: () => undefined,
+      emitEvent: () => {},
+    });
+    await handler.syncDurableRelease(projection);
+    assert.deepEqual(blocks, ["fact-write-failed: Fixture database temporarily unavailable"]);
+    assert.equal(store.settleEffect.mock.callCount(), 1);
+    assert.equal(effect.result?.result?.mainOid, actual.value.mainOid);
+    await handler.syncDurableRelease(projection);
+    assert.deepEqual(submitted[0], submitted[1]);
+    assert.equal(submitted.length, 2);
+    assert.equal(store.settleEffect.mock.callCount(), 1);
+    assert.equal(blocks.length, 1);
+    assert.equal(git(root, "rev-parse", "main"), actual.value.mainOid);
+  });
 });
 
 function accepted<T>(result: DurableResult<T>): T {

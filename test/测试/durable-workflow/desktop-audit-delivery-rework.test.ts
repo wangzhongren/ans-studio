@@ -4,9 +4,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { MERGE_MAIN_OPTION_IDS } from "../../../app/desktop/customer-input.ts";
+import { createDesktopReleaseGitPort } from "../../../app/desktop/workflow-git.ts";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
-import { analysis, app, businessDb, daprdListener, fixture, git, operatorReport, pathBModel, resourceRoot,
-  sqliteSnapshot, successful, target, until, unwrap, type Log } from "./fixture.ts";
+import { analysis, app, businessDb, daprdListener, fix, fixture, git, operatorReport, pathBModel, resourceRoot,
+  sqliteSnapshot, successful, target, until, unwrap, write, type Log } from "./fixture.ts";
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 type Snapshot = ReturnType<typeof sqliteSnapshot>;
@@ -19,6 +20,12 @@ function factsOf(snapshot: Snapshot, kind: string) {
 
 function mainReflog(f: Fixture) {
   return git(f.root, "reflog", "show", "--format=%H", "refs/heads/main").split(/\r?\n/);
+}
+
+function gitDiffDigest(f: Fixture, from: string, to: string) {
+  const names = git(f.root, "diff", "--name-status", "-z", from, to);
+  const stat = git(f.root, "diff", "--stat", "--no-color", from, to);
+  return sha256(Buffer.from(`${names}\n${stat}`));
 }
 
 function receipts(f: Fixture, deliveryId: string) {
@@ -169,9 +176,7 @@ test("Windows B2 audit and B4 delivery recover from the real merge without a sec
   assert.deepEqual(parents.slice(0, 2), [mainOid, f.baselineOid]);
   assert.equal(parents.length, 3);
   assert.equal(git(projectRoot, "diff", "--name-only", f.baselineOid, mainOid), target);
-  const names = git(projectRoot, "diff", "--name-status", "-z", f.baselineOid, mainOid);
-  const stat = git(projectRoot, "diff", "--stat", "--no-color", f.baselineOid, mainOid);
-  const diffDigest = sha256(Buffer.from(`${names}\n${stat}`));
+  const diffDigest = gitDiffDigest(f, f.baselineOid, mainOid);
   assert.deepEqual(Object.fromEntries(model.runs), { chief: 2, convener: 4, worker: 2 });
   log("only-original-merge-recovered", { pending, parents, gitBefore, recovered });
 
@@ -281,4 +286,103 @@ test("Windows B4 customer rejection cannot create a note, delivery receipt or me
   assert.equal((await handle.respond(card.id, MERGE_MAIN_OPTION_IDS[1])).ok, true);
   assert.equal((await handle.respond(card.id, MERGE_MAIN_OPTION_IDS[0])).ok, false);
   log("rejected-without-merge-or-delivery", { stopped, snapshot, before });
+});
+
+test("Windows B4 records the actual subset when main independently has the first approved change", native, async t => {
+  const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
+  const f = await fixture();
+  const projectRoot = f.root;
+  const companion = "src/core/w5-companion.ts";
+  await write(projectRoot, companion, "export const COMPANION = 1;\n");
+  git(projectRoot, "add", "--", companion);
+  git(projectRoot, "commit", "-m", "Add the second isolated baseline file");
+  f.baselineOid = git(projectRoot, "rev-parse", "main");
+  log("fixture", f);
+  let instanceId = "";
+  let independentMain: string | undefined;
+  const model = pathBModel(f, () => instanceId, log, {
+    changes: [{ path: target, content: fix }, { path: companion, content: "export const COMPANION = 2;\n" }],
+    async afterImplementationReport() {
+      // The role's commit is done on the task branch. The application has yet to finish
+      // the report or form a release preview. An independent actor changes this isolated main.
+      const originalBranch = git(projectRoot, "symbolic-ref", "--short", "HEAD");
+      assert.equal(originalBranch, `ans/task/${instanceId}`);
+      git(projectRoot, "-c", "core.autocrlf=false", "switch", "main");
+      assert.equal(git(projectRoot, "rev-parse", "HEAD"), f.baselineOid);
+      await write(projectRoot, target, fix);
+      git(projectRoot, "-c", "core.autocrlf=false", "add", "--", target);
+      git(projectRoot, "-c", "core.autocrlf=false", "commit", "-m", "Independent main already makes the same first change");
+      independentMain = git(projectRoot, "rev-parse", "main");
+      git(projectRoot, "-c", "core.autocrlf=false", "switch", originalBranch);
+      const inspected = await createDesktopReleaseGitPort().inspectRepository({ projectRoot });
+      assert.ok(inspected.ok, JSON.stringify(inspected));
+      assert.equal(inspected.facts.trackedChanges, 0);
+      assert.deepEqual(inspected.facts.untracked, []);
+      log("independent-main-already-has-first-change", { independentMain, originalBranch, baseline: f.baselineOid });
+    },
+  });
+  let handle = await app(f, model, log);
+  t.after(() => handle.close());
+  const started = unwrap(await handle.desktop.startDurableWorkflow({ projectRoot, enabled: true, definitionId: "path-b",
+    requestId: "w5-b4-actual-subset", summary: "Fix both thresholds and compare the approved and actual merge" }));
+  assert.ok(started.instance);
+  instanceId = started.instance.instanceId;
+  const selector = { projectRoot, instanceId };
+  const projection = () => handle.desktop.getDurableWorkflowProjection(selector).then(unwrap);
+  const card = await until("trusted B4 approval showing the two authorized paths", async () => [...handle.cards.values()][0], model.errors);
+  assert.ok(independentMain);
+  const [{ fact: preview }] = factsOf(sqliteSnapshot(f, instanceId), "release-preview");
+  assert.equal(preview.snapshot.mainOid, independentMain);
+  assert.equal(preview.snapshot.baselineOid, f.baselineOid);
+  assert.deepEqual([...preview.snapshot.files].sort(), [target, companion].sort());
+  assert.ok(card.request.preview?.includes(target));
+  assert.ok(card.request.preview?.includes(companion));
+  assert.equal((await handle.respond(card.id, MERGE_MAIN_OPTION_IDS[0])).ok, true);
+  const mergeOid = await until("main receives the actual merge of an approved subset", async () => {
+    const current = git(projectRoot, "rev-parse", "main");
+    return current === independentMain ? undefined : current;
+  }, model.errors);
+  const actualDigest = gitDiffDigest(f, independentMain, mergeOid);
+  assert.equal(git(projectRoot, "diff", "--name-only", independentMain, mergeOid), companion);
+  assert.notEqual(actualDigest, preview.snapshot.diffDigest);
+  assert.deepEqual(git(projectRoot, "rev-list", "--parents", "-n", "1", mergeOid).split(" "), [mergeOid, independentMain, preview.snapshot.tipOid]);
+  const afterMerge = mainReflog(f);
+  assert.equal(afterMerge.filter(oid => oid === mergeOid).length, 1);
+  log("approved-both-but-actual-git-merged-second-only", { preview: preview.snapshot, actual: { files: [companion], actualDigest, mergeOid }, afterMerge });
+  try {
+    const note = await until("one pending explanation for the verified actual subset", async () => {
+      const { instance } = await projection();
+      if (instance?.status === "delivered" && instance.delivery?.state === "pending") return instance.delivery;
+    }, model.errors);
+    const delivery = { ...selector, deliveryId: note.id };
+    const viewing = unwrap(await handle.desktop.readDurableWorkflowDelivery(delivery));
+    assert.deepEqual(viewing.delivery.files, [companion]);
+    assert.equal(viewing.delivery.diffDigest, actualDigest);
+    assert.equal(viewing.delivery.mergeOid, mergeOid);
+    assert.equal(viewing.delivery.releaseRequestId, card.id);
+    assert.equal(receipts(f, note.id).length, 0);
+    const proof = sqliteSnapshot(f, instanceId);
+    const mergeEffects = proof.effect.filter(row => String(row.business_key).startsWith("release-merge:"));
+    assert.equal(mergeEffects.length, 1);
+    assert.equal(mergeEffects[0].state, "succeeded");
+    assert.equal(factsOf(proof, "release-merged").length, 1);
+    assert.equal(factsOf(proof, "release-merged")[0].fact.closed, true);
+    assert.equal(proof.delivery_note.length, 1);
+    const delivered = unwrap(await handle.desktop.acknowledgeDurableWorkflowDelivery({ ...delivery, viewToken: viewing.viewToken }));
+    assert.equal(delivered.state, "delivered");
+    await handle.close();
+    handle = await app(f, model, log);
+    const revisited = unwrap(await handle.desktop.readDurableWorkflowDelivery(delivery));
+    assert.equal(revisited.delivery.deliveredAt, delivered.deliveredAt);
+    assert.deepEqual(mainReflog(f), afterMerge);
+    assert.equal(receipts(f, note.id).length, 1);
+    const reopened = sqliteSnapshot(f, instanceId);
+    assert.deepEqual(reopened.effect.filter(row => String(row.business_key).startsWith("release-merge:")), mergeEffects);
+    assert.deepEqual(factsOf(reopened, "release-merged"), factsOf(proof, "release-merged"));
+    log("actual-subset-note-delivered-after-one-merge", { delivered: revisited.delivery, afterMerge });
+  } finally {
+    const snapshot = sqliteSnapshot(f, instanceId);
+    log("actual-subset-final-state", { projection: await projection(), mergeEffects: snapshot.effect.filter(row => String(row.business_key).startsWith("release-merge:")),
+      releaseFacts: factsOf(snapshot, "release-merged"), deliveryNotes: snapshot.delivery_note });
+  }
 });

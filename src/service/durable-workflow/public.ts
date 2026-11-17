@@ -332,6 +332,7 @@ export class DurableWorkflowService {
         const delivery = newDelivery ? deliveryFor(ledger, current, stored, savedAt) : undefined;
         if (newScope && !scope) return fail('scope-audit-evidence-invalid', '无法将 B2 决定绑定到持久的 B1 证据与原 B3 请求。');
         if (newDelivery && !delivery) return fail('delivery-evidence-invalid', '合并回执与已批准的交付证据不一致。');
+        if (delivery) delete current.businessReason;
         for (const item of evidence) ledger.saveEvidence(ref.instanceId, item.ref.sha256, item.bytes);
         ledger.save(current);
         ledger.saveFact(ref.instanceId, stored);

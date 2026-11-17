@@ -115,6 +115,7 @@ export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Lo
 }
 
 type PathBHooks = {
+  changes?: readonly { path: string; content: string }[];
   beforeScope?(turn: ModelTurn, request: Record<string, unknown>): Promise<void>;
   afterScope?(turn: ModelTurn, request: Record<string, unknown>): Promise<void>;
   afterImplementationReport?(): Promise<void>;
@@ -122,6 +123,8 @@ type PathBHooks = {
 
 export function pathBModel(f: Fixture, instanceId: () => string, log: Log, hooks: PathBHooks = {}) {
   const flowId = "snake";
+  const changes = hooks.changes ?? [{ path: target, content: fix }];
+  const files = changes.map(change => change.path);
   const runs = new Map<string, number>();
   const model = modelFixture(async turn => {
     const { roleId } = turn;
@@ -132,7 +135,7 @@ export function pathBModel(f: Fixture, instanceId: () => string, log: Log, hooks
       const stage = run === 1 ? "B1" : "B3";
       const request = { roleId: "convener", task: `Advance ${stage} for collision repair`, flowId,
         workflowId: instanceId(), taskKind: "stage-request", workflowPath: "B", stage, workflowAction: "advance", sideEffect: "read-only",
-        ...(stage === "B3" ? { requestedEvidence: [target], reason: "Verified analysis identifies the single source file" } : {}) };
+        ...(stage === "B3" ? { requestedEvidence: files, reason: "Verified analysis identifies the affected source files" } : {}) };
       if (stage === "B3") await hooks.beforeScope?.(turn, request);
       await successful(turn, "dispatch_task", request);
       if (stage === "B3") await hooks.afterScope?.(turn, request);
@@ -140,8 +143,8 @@ export function pathBModel(f: Fixture, instanceId: () => string, log: Log, hooks
     }
     if (roleId === "convener" && (run === 1 || run === 3)) {
       const stage = run === 1 ? "B1" : "B3";
-      await successful(turn, "dispatch_task", { roleId: "worker", task: `W5 ${stage} assigned file ${target}`, flowId, workflowId: instanceId(),
-        stage, sideEffect: stage === "B1" ? "read-only" : "code", moduleId: "core", modulePaths: [target] });
+      await successful(turn, "dispatch_task", { roleId: "worker", task: `W5 ${stage} assigned ${files.join(", ")}`, flowId, workflowId: instanceId(),
+        stage, sideEffect: stage === "B1" ? "read-only" : "code", moduleId: "core", modulePaths: files });
       return;
     }
     if (roleId === "convener" && (run === 2 || run === 4)) {
@@ -154,15 +157,15 @@ export function pathBModel(f: Fixture, instanceId: () => string, log: Log, hooks
       return;
     }
     if (roleId === "worker" && run === 1) {
-      await successful(turn, "read_file", { path: target });
+      for (const file of files) await successful(turn, "read_file", { path: file });
       await successful(turn, "submit_report", { status: "completed", summary: "Analysis identifies the collision threshold", evidence: [analysis] });
       return;
     }
     if (roleId === "worker" && run === 2) {
-      await successful(turn, "write_file", { path: target, content: fix });
-      await successful(turn, "run_shell", { command: `git add ${target}` });
+      for (const { path, content } of changes) await successful(turn, "write_file", { path, content });
+      await successful(turn, "run_shell", { command: `git add ${files.join(" ")}` });
       await successful(turn, "run_shell", { command: 'git commit -m "W5 fix collision threshold"' });
-      await successful(turn, "submit_report", { status: "completed", summary: "Changed only the collision threshold", evidence: [target] });
+      await successful(turn, "submit_report", { status: "completed", summary: "Changed only the collision thresholds in scope", evidence: files });
       await hooks.afterImplementationReport?.();
       return;
     }

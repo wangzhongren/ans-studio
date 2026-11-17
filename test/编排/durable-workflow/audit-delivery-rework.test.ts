@@ -16,12 +16,15 @@ function unwrap<T>(result: DurableResult<T>): T {
   return result.value;
 }
 
-async function enterScope(t: TestContext) {
+async function enterScope(t: TestContext, files = [file]) {
   const { project, dataDir, cleanup } = await fixture(t);
   const role = join(project, '角色卡', 'owner');
   await mkdir(role, { recursive: true });
-  await writeFile(join(role, 'boundary.md'),
-    '# Owner\n\n## Section 1: 可修改文件与目录\n\n| 类型 | 路径 | 用途 |\n| --- | --- | --- |\n| 单文件 | change.txt | scope |\n');
+  await writeFile(join(role, 'boundary.md'), [
+    '# Owner\n\n## Section 1: 可修改文件与目录\n\n| 类型 | 路径 | 用途 |\n| --- | --- | --- |',
+    ...files.map(path => '| 单文件 | ' + path + ' | scope |'),
+    '',
+  ].join('\n'));
   let service = new DurableWorkflowService(dataDir);
   const db = new DatabaseSync(join(dataDir, 'ans-workflow.sqlite'));
   db.exec('PRAGMA foreign_keys=ON;');
@@ -43,7 +46,7 @@ async function enterScope(t: TestContext) {
     requestDigest: hash('impact'), dispatch: { text: 'impact', flowId: 'audit-fixture' } }));
   service.apply({ ref, stepId: b1.stepId, entry: 0, turn: 0 });
   const task = { stage: 'B1' as const, stageAttempt: 1, executionAttempt: 1, parentTaskId: 'operator-1', taskId: 'analysis-1', roleId: 'owner' };
-  unwrap(await service.submit(ref, { ...b1, kind: 'task-bound', source: 'host', key: 'bound-1', task, modulePaths: [file] }));
+  unwrap(await service.submit(ref, { ...b1, kind: 'task-bound', source: 'host', key: 'bound-1', task, modulePaths: files }));
   const b1Report = unwrap(service.storeEvidence(ref, { report: 'Change owner file' }));
   const operatorReport = unwrap(service.storeEvidence(ref, { report: 'Operations report says task was inspected' }));
   unwrap(await service.submit(ref, { ...b1, kind: 'task-report', source: 'host', key: 'report-1', task, evidence: b1Report }));
@@ -53,23 +56,23 @@ async function enterScope(t: TestContext) {
   const advance = {
     kind: 'b3-advance', source: 'chief', key: 'real-b3-request', stepId: 'scope', attempt: 1,
     sourceTaskId: 'chief-turn-2', requestDigest: hash('advance'), b1Attempt: 1, reportKey: 'report-1',
-    baselineOid: oid, candidateSource: 'modulePaths', candidates: [file],
-    writeSets: [{ roleId: task.roleId, paths: [file] }], reason: 'Bound B1 owner report',
+    baselineOid: oid, candidateSource: 'modulePaths', candidates: files,
+    writeSets: [{ roleId: task.roleId, paths: [...files].sort() }], reason: 'Bound B1 owner report',
     dispatch: { text: 'advance', flowId: 'audit-fixture' },
   } satisfies DurableFact;
   return { service, db, ref, branch, oid, advance, b1Report, operatorReport, reopen, project };
 }
 
-async function enterRelease(t: TestContext) {
-  const work = await enterScope(t);
+async function enterRelease(t: TestContext, files = [file], approvedFiles = files) {
+  const work = await enterScope(t, files);
   const { service, ref, branch, oid, advance, operatorReport } = work;
   unwrap(await service.submit(ref, advance));
   assert.equal(service.apply({ ref, stepId: 'scope', entry: 1, turn: 0 }).next, 'implement');
   const b3 = { stepId: 'implement', attempt: 1 };
   const task = { stage: 'B3' as const, stageAttempt: 1, executionAttempt: 1, parentTaskId: 'operator-2', taskId: 'build-1', roleId: 'owner' };
-  unwrap(await service.submit(ref, { ...b3, kind: 'task-bound', source: 'host', key: 'bound-2', task, modulePaths: [file] }));
+  unwrap(await service.submit(ref, { ...b3, kind: 'task-bound', source: 'host', key: 'bound-2', task, modulePaths: files }));
   const tipOid = 'b'.repeat(40);
-  const committed = unwrap(service.claimEffect(ref, { ...b3, kind: 'task-commit', key: 'commit-1', task, expected: { paths: [file] } }));
+  const committed = unwrap(service.claimEffect(ref, { ...b3, kind: 'task-commit', key: 'commit-1', task, expected: { paths: files } }));
   unwrap(service.settleEffect(ref, { key: committed.key, token: committed.token, outcome: 'succeeded',
     evidence: 'simulated test host commit proof', result: { oid: tipOid } }));
   const buildReport = unwrap(service.storeEvidence(ref, { report: 'Implemented' }));
@@ -79,7 +82,7 @@ async function enterRelease(t: TestContext) {
   assert.equal(service.apply({ ref, stepId: b3.stepId, entry: 2, turn: 0 }).next, 'release');
   const b4 = { stepId: 'release', attempt: 1 };
   const snapshot = {
-    mainOid: oid, branch, tipOid, baselineOid: oid, files: [file], diffDigest: hash('approved diff'),
+    mainOid: oid, branch, tipOid, baselineOid: oid, files: approvedFiles, diffDigest: hash('approved diff'),
     b3CloseKey: 'close-2', operatorReport,
   };
   const release = unwrap(await service.submit(ref, { ...b4, kind: 'release-preview', source: 'host', key: 'preview', snapshot })).release!;
@@ -151,7 +154,10 @@ test('known merge creates and independently acknowledges one note across rollbac
   db.exec("CREATE TRIGGER fail_delivery BEFORE INSERT ON delivery_note BEGIN SELECT RAISE(ABORT, 'injected delivery failure'); END");
   const first = await service.submit(ref, merged);
   assert.equal(first.ok, false);
-  if (!first.ok) assert.match(first.message, /injected delivery failure/);
+  if (!first.ok) {
+    assert.match(first.message, /injected delivery failure/);
+    service.block(ref, first.code, first.message);
+  }
   assert.equal(service.lookup(ref)?.delivery, undefined);
   assert.equal(db.prepare('SELECT 1 FROM outbox WHERE business_key=?').get(merged.key), undefined);
   assert.equal(db.prepare('SELECT 1 FROM fact WHERE business_key=?').get(merged.key), undefined);
@@ -159,6 +165,7 @@ test('known merge creates and independently acknowledges one note across rollbac
 
   db.exec('DROP TRIGGER fail_delivery');
   let recovered = reopen();
+  assert.match(recovered.lookup(ref)?.blockedReason ?? '', /injected delivery failure/);
   assert.equal(unwrap(recovered.claimEffect(ref, operation)).execute, false);
   const receipt = unwrap(await recovered.submit(ref, merged));
   assert.deepEqual(unwrap(await recovered.submit(ref, merged)), receipt);
@@ -174,6 +181,7 @@ test('known merge creates and independently acknowledges one note across rollbac
   assert.equal(db.prepare('SELECT 1 FROM outbox WHERE business_key=?').get(note.id), undefined);
   assert.equal(recovered.apply({ ref, stepId: b4.stepId, entry: 3, turn: 0 }).terminal, 'delivered');
   assert.equal(recovered.lookup(ref)?.delivery?.state, 'pending');
+  assert.equal(recovered.lookup(ref)?.blockedReason, undefined);
 
   const input = { deliveryId: note.id, requestId: release.requestId };
   assert.equal(recovered.acknowledgeDelivery({ ...ref, projectId: 'other-project' }, input).ok, false);
@@ -210,4 +218,59 @@ test('rejected snapshot never creates a delivery note', async t => {
   assert.equal(service.apply({ ref, stepId: b4.stepId, entry: 3, turn: 0 }).terminal, 'stopped');
   assert.equal(reopen().lookup(ref)?.delivery, undefined);
   assert.equal(db.prepare('SELECT count(*) AS n FROM delivery_note').get()?.n, 0);
+});
+
+test('delivery uses the verified main-to-merge delta when approved main already contains one task change', async t => {
+  const mergedOnly = 'second.txt';
+  const { service, ref, db, b4, snapshot, approval, operation, mainOid, merged, reopen } = await enterRelease(t, [file, mergedOnly]);
+  unwrap(await service.submit(ref, approval));
+  const effect = unwrap(service.claimEffect(ref, operation));
+  const actual = { mainOid, files: [mergedOnly], diffDigest: hash('approved main to merge contains only second.txt') };
+  unwrap(service.settleEffect(ref, { key: effect.key, token: effect.token, outcome: 'succeeded',
+    evidence: 'simulated trusted Git reconciliation for approved main that already contains the first change', result: actual }));
+  assert.equal((await service.submit(ref, { ...merged, mainOid: 'd'.repeat(40) })).ok, false);
+  assert.equal(service.lookup(ref)?.delivery, undefined);
+  unwrap(await service.submit(ref, merged));
+  assert.equal(service.apply({ ref, stepId: b4.stepId, entry: 3, turn: 0 }).terminal, 'delivered');
+  const stored = service.lookup(ref)?.delivery;
+  assert.equal(stored?.mergeOid, mainOid);
+  assert.deepEqual(stored?.files, actual.files);
+  assert.equal(stored?.diffDigest, actual.diffDigest);
+  assert.notEqual(stored?.diffDigest, snapshot.diffDigest);
+  assert.deepEqual(service.lookup(ref)?.release?.snapshot.files, [file, mergedOnly]);
+
+  db.exec('DELETE FROM delivery_note');
+  const recovered = reopen();
+  const note = recovered.lookup(ref)?.delivery;
+  assert.equal(note?.id, stored?.id);
+  assert.deepEqual(note?.files, actual.files);
+  assert.equal(note?.diffDigest, actual.diffDigest);
+  assert.equal(unwrap(recovered.claimEffect(ref, operation)).execute, false);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM delivery_note').get()?.n, 1);
+});
+
+test('unapproved files and unusable merge proof cannot close a release or create a note', async t => {
+  const other = 'second.txt';
+  const invalid = [
+    ['path in B2 but outside the approved snapshot', [file, other], hash('unapproved file')],
+    ['empty actual delta', [], hash('empty delta')],
+    ['malformed digest', [file], 'forged-digest'],
+  ] as const;
+  for (const [label, files, diffDigest] of invalid) {
+    await t.test(label, async it => {
+      const { service, ref, db, approval, operation, mainOid, merged, reopen } = await enterRelease(it, [file, other], [file]);
+      unwrap(await service.submit(ref, approval));
+      const effect = unwrap(service.claimEffect(ref, operation));
+      unwrap(service.settleEffect(ref, { key: effect.key, token: effect.token, outcome: 'succeeded',
+        evidence: 'simulated host proof with an invalid delivery delta', result: { mainOid, files, diffDigest } }));
+      const rejected = await service.submit(ref, merged);
+      assert.equal(rejected.ok, false);
+      if (!rejected.ok) assert.equal(rejected.code, 'delivery-evidence-invalid');
+      assert.equal(db.prepare('SELECT state FROM effect WHERE business_key=?').get(effect.key)?.state, 'succeeded');
+      assert.equal(db.prepare('SELECT 1 FROM fact WHERE business_key=?').get(merged.key), undefined);
+      const recovered = reopen();
+      assert.equal(recovered.lookup(ref)?.stepId, 'release');
+      assert.equal(recovered.lookup(ref)?.delivery, undefined);
+    });
+  }
 });
