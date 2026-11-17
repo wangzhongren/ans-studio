@@ -31,7 +31,9 @@ jobs:
             platform: win
             arch: x64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # v2.1.0：全量回归在 x64 runner 上约 70–75 分钟（v1.9.2 时代整套约 18 分钟）；45 分钟会取消合法测试。
+    # 仅放宽作业时限；测试命令与断言逐字不变，门禁内容不变。
+    timeout-minutes: 120
     steps:
       - name: Preserve repository byte identity on native runners
         run: |
