@@ -6,6 +6,7 @@ import type {
   DurableEffectIntent,
   DurableEffectOutcome,
   DurableInstanceRef,
+  DurableOwner,
   DurableProblem,
   DurableProjection,
   DurableResult,
@@ -20,6 +21,7 @@ import type { ClaimDurableTaskGit } from "./workflow-git.ts";
 
 type WorkflowStore = Awaited<ReturnType<typeof openDurableWorkflow>>;
 type DaprHost = ReturnType<typeof createDaprHost>;
+type DurableSessionOwner = { projectRoot: string } & ({ ref: DurableInstanceRef } | { foreign: DurableOwner });
 
 export interface DesktopDurableControlPlane {
   state: "stopped" | "starting" | "ready" | "failed";
@@ -170,7 +172,7 @@ export class DesktopDurableWorkflow {
   private retryAfter = 0;
   private readonly projectWorkers = new Map<string, (projection: DurableProjection) => Promise<void>>();
   private readonly deliveries = new Map<string, DurableDelivery>();
-  private readonly sessions = new WeakMap<object, DurableInstanceRef | undefined>();
+  private readonly sessions = new WeakMap<object, DurableSessionOwner | undefined>();
 
   constructor(options: { userDataRoot: string; resourceRoot: string; presetRoot?: string }) {
     this.dataDir = path.join(options.userDataRoot, "business");
@@ -426,18 +428,29 @@ export class DesktopDurableWorkflow {
     return { claimTaskGit, claimFileWrite };
   }
 
-  markSession(handle: object, ref?: DurableInstanceRef): void { this.sessions.set(handle, ref); }
+  async markSession(handle: object, projectRoot: string, projection?: DurableProjection): Promise<void> {
+    if (projection?.status === "waiting") {
+      this.sessions.set(handle, { projectRoot, ref: projection.ref });
+      return;
+    }
+    const owner = await (await this.store()).owner(projectRoot);
+    this.sessions.set(handle, owner?.engine === "dapr" && !owner.ownedByThisDataDir ? { projectRoot, foreign: owner } : undefined);
+  }
+
   isSession(handle: object): boolean { return this.sessions.has(handle); }
 
   async canRebindCompletedSession(projectRoot: string, handle: object): Promise<boolean> {
-    const ref = this.sessions.get(handle);
-    if (!ref) return false;
+    const binding = this.sessions.get(handle);
+    if (binding?.projectRoot !== projectRoot) return false;
     const store = await this.store();
     const projections = await store.listProjections(projectRoot);
-    const previous = projections.find(projection => projection.ref.instanceId === ref.instanceId
-      && projection.ref.projectId === ref.projectId && projection.ref.definitionDigest === ref.definitionDigest);
-    return previous !== undefined && previous.status !== "waiting" && !projections.some(projection => projection.status === "waiting")
-      && await store.owner(projectRoot) === undefined;
+    if (projections.some(projection => projection.status === "waiting") || await store.owner(projectRoot)) return false;
+    // A foreign workflow was never executable by this handle. Its shared owner is authoritative here.
+    if ("foreign" in binding) return true;
+    const { ref } = binding;
+    return projections.some(projection => projection.ref.instanceId === ref.instanceId
+      && projection.ref.projectId === ref.projectId && projection.ref.definitionDigest === ref.definitionDigest
+      && projection.status !== "waiting");
   }
 
   async close(): Promise<void> {

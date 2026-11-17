@@ -310,8 +310,8 @@ export class LifecycleOpen {
     // （聊天打开/上一任务）时同样按 B8.1 口径安全重开；busy/关闭失败 ⇒ fail-closed。O-1 重建续段
     // （`internalReopen`）不参与任务重绑：其 taskId 取自被重建条目自身，不能反过来打断并发新会话。
     const forcedExisting = this.sessions.get(key);
-    if (req.workflowChatInput && forcedExisting && durable?.isSession(forcedExisting.handle)) {
-      const ended = !internalReopen && !durableOwned && req.roleId === "chief" && req.taskId === undefined
+    if (req.workflowChatInput && !durableOwned && forcedExisting && durable?.isSession(forcedExisting.handle)) {
+      const ended = !internalReopen && req.roleId === "chief" && req.taskId === undefined
         && forcedExisting.assignedTaskId === undefined && await durable.canRebindCompletedSession(req.projectRoot, forcedExisting.handle);
       if (stopped()) return stoppedResult();
       if (!ended || this.sessions.get(key) !== forcedExisting || forcedExisting.busy
@@ -1355,7 +1355,7 @@ export class LifecycleOpen {
       dispatchBinding.handle = handle;
       gitBinding.handle = handle;
       planBinding.handle = handle;
-      if (durableOwned) durable?.markSession(handle, durableProjection?.status === "waiting" ? durableProjection.ref : undefined);
+      if (durableOwned) await durable?.markSession(handle, req.projectRoot, durableProjection);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
