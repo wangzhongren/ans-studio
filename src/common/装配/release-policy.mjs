@@ -1,10 +1,16 @@
-export const SOURCE_REF = 'v2.0.0';
-export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
-// v2.0.0 overlay：冻结源 tag v2.0.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 / 修改
+export const SOURCE_REF = 'v2.1.0';
+export const SOURCE_SHA = 'c289309883c7fd2529312519de16d86ccc69d7bb';
+// v2.1.0 overlay：冻结源 tag v2.1.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 / 修改
 // B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化（默认路径零 trunk/bootstrap/
-// stable-write，治理走应用账本）、B29–B34 修复）；白名单为基础集 + 各批发布阻断修复条目（见下）：
-// files＝package.json、package-lock.json、.github/workflows/release.yml 及各批按精确路径列名的测试/
-// 回归文件；dirs＝src/common/装配/、test/装配/（v1.9.2 及更早条目已随冻结源吸收，见下）。
+// stable-write，治理走应用账本）、B29–B34 修复；`app/desktop/session.ts` 十三模块重构（barrel 30 行 +
+// 门面 + 13 协作模块，导出面 51 与 import 路径逐字不变）；全量测试债清零——三平台 5,828 用例 0 失败、
+// 冻结 known-red 62→0、B7 收口）；白名单**重置为基础集**（files＝package.json、package-lock.json、
+// .github/workflows/release.yml；dirs＝src/common/装配/、test/装配/），**无产品/测试 overlay 条目**
+// （v2.0.0 及更早条目已随冻结源吸收，见下）。
+// 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
+// 历史（v2.0.0 overlay）：冻结源 tag v2.0.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 /
+// 修改 B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化、B29–B34 修复）；当时白名单为
+// 基础集 + 各批发布阻断修复条目（见下）。
 // v2.0.0 发布阻断修复：tag v2.0.0 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽。
 // · 测试 1 条：test/桌面应用/optional-acceptance.test.ts——macOS arm64 CI Regression 挂起修复（>45 分钟
 // 被取消）：v2.0.0 起 acceptance 属幕僚业务卡、不再进通用 judge，旧夹具 `await customerInput` 永不解
