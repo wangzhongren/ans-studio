@@ -40,6 +40,7 @@ import { desktopProjectExecutionInventory } from "./shared/inventory.ts";
 import { mainT } from "../i18n.ts";
 import { dispatchFlowIdOf, ensureFixedPathStarted, isFixedPathEnabledForFlow, resolveFixedPathMode, sessionWorkflowModeForChat, type WorkflowMode } from "../workflow.ts";
 import type { FixedDispatchPort } from "./contracts/ports.ts";
+import type { DurableProjection } from "../../../src/model/durable-workflow.ts";
 import type { SessionManagerDeps } from "./contracts/deps.ts";
 import type { ActualDispatchSource, DeliveryItem, InternalSessionOpenRequest, LiveSession, OpenResult } from "./contracts/session-types.ts";
 import { now } from "./shared/clock.ts";
@@ -63,6 +64,8 @@ export interface DispatchRefs {
 
 /** 尚未迁出（B6 范围外）的门面方法端口；门面以箭头回调注入，参数逐位原样转发。 */
 export interface DispatchPorts {
+  routeDurableDispatch?(projection: DurableProjection, runtime: RuntimeKind, fromRoleId: string, request: DispatchTaskPayload,
+    targetRoleId: string, task: string, source: ActualDispatchSource | undefined): Promise<DispatchReceipt>;
   openInternal(req: InternalSessionOpenRequest, userInitiated: boolean): Promise<OpenResult>;
   findLiveRuntime(projectRoot: string, roleId: string): RuntimeKind | undefined;
   enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void;
@@ -209,6 +212,15 @@ export class Dispatch {
     };
     if (targetRoleId === "" || task.trim() === "") {
       return fail(mainT("main.session.dispatchRejectedEmpty"), mainT("main.session.dispatchRejectedEmpty"));
+    }
+    const durable = this.deps.durableWorkflow;
+    if (durable && await durable.owns(projectRoot)) {
+      const delivery = durable.delivery(projectRoot, source?.origin.clientMessageId);
+      const projection = delivery ? await durable.lookup(delivery.ref) : undefined;
+      if (!projection || !this.port.routeDurableDispatch) {
+        return { ok: false, message: "workflow-owner-conflict: This repository has an active durable workflow." };
+      }
+      return this.port.routeDurableDispatch(projection, runtime, fromRoleId, d, targetRoleId, task, source);
     }
     // —— 来源防御性校验 ——
     // trio：只有幕僚（chief）可派发（星形主链）；single：主入口（su）。正常路径由 `open()` 的能力注入

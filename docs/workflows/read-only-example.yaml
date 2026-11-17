@@ -1,0 +1,17 @@
+schema: 1
+id: read-only-example
+version: 1
+name: 只读报告示例
+start: inspect
+steps:
+  inspect:
+    action: readonly-report
+    role: module-owner
+    next: review
+  review:
+    action: wait-for-review
+    on:
+      accepted: completed
+      blocked: blocked
+  completed: { terminal: completed }
+  blocked: { terminal: blocked }

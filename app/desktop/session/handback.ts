@@ -31,6 +31,9 @@ import type { RuntimeLiveReportViewV1, RuntimeReportSnapshotV1, TaskStateEvent }
 import type { GovernanceModel } from "../../../src/model/role.ts";
 import { mainT } from "../i18n.ts";
 import type { SessionManagerDeps } from "./contracts/deps.ts";
+import type { DurableEvidenceRef, DurableFact, DurableProjection } from "../../../src/model/durable-workflow.ts";
+import { durableTaskId } from "../durable-workflow.ts";
+import { isRuntimeKind } from "../runtime-config.ts";
 import type { DeliveryItem, DesktopOrchestrationEvent, LiveSession } from "./contracts/session-types.ts";
 import { now } from "./shared/clock.ts";
 import { queueKey } from "./shared/keys.ts";
@@ -198,6 +201,9 @@ export class Handback {
       hb = structuredClone(hb);
       if (report) report = structuredClone(report);
       if (liveReport) liveReport = structuredClone(liveReport);
+      if (hb.taskId?.startsWith("dw-") && this.deps.durableWorkflow) {
+        return this.commitDurableHandback(projectRoot, runtime, hb, report);
+      }
       const ownerRoleId = this.handbackOwnerRoleId(projectRoot);
       // 2026-10-29（方案 v2.1 §5.1/M9，F1）：任务绑定报告**按 `task.created.from` 回创建者**——
       // 项目 worker/质检 → 发起者（运营或幕僚）；产品/策划/人事/运营由幕僚派发 → 幕僚。
@@ -389,6 +395,90 @@ export class Handback {
       return false;
     } finally {
       if (pendingKey) this.pendingHandbackKeys.delete(pendingKey);
+    }
+  }
+
+  private async commitDurableHandback(
+    projectRoot: string, runtime: RuntimeKind, handback: TaskHandback, report: RuntimeReportSnapshotV1 | undefined,
+  ): Promise<boolean> {
+    if (!report || report.origin !== "submitted-report" || report.taskId !== handback.taskId
+      || report.source.roleId !== handback.roleId || report.source.runtime !== runtime
+      || report.source.turnId !== handback.turnId || report.status !== handback.status) return false;
+    const durable = this.deps.durableWorkflow!;
+    const store = await durable.store();
+    const convener = this.handbackOwnerRoleId(projectRoot);
+    const projection = (await store.listProjections(projectRoot)).find(view => view.status === "waiting" &&
+      (view.task?.taskId === report.taskId || view.task?.parentTaskId === report.taskId || (convener && [
+        durableTaskId(view.ref, convener, "B1", view.attempt), durableTaskId(view.ref, convener, "B3", view.attempt),
+      ].includes(report.taskId ?? ""))));
+    if (!projection || projection.status !== "waiting") return false;
+    const { ref, attempt, stepId, action } = projection;
+    const facts = store.listFacts(ref);
+    const assigned = facts.find(({ fact }) => fact.kind === "task-bound" && fact.task.taskId === report.taskId)?.fact;
+    const operatorStage = action === "b3-implement-and-accept" ? "B3" : "B1";
+    const operatorAttempt = operatorStage === "B1" ? projection.analysisReport?.attempt ?? attempt : attempt;
+    const operatorTaskId = convener && durableTaskId(ref, convener, operatorStage, operatorAttempt);
+    const parent = operatorStage === "B1"
+      ? facts.find(({ fact }) => fact.kind === "stage-request" && fact.attempt === operatorAttempt)?.fact
+      : projection.scope;
+    const production = assigned?.kind === "task-bound" && assigned.task.roleId === handback.roleId;
+    const operator = !!parent && handback.roleId === convener && report.taskId === operatorTaskId;
+    if (!production && !operator) return false;
+    const workStep = production ? assigned.stepId : operatorStage === "B1" ? parent?.stepId : stepId;
+    const workAttempt = production ? assigned.attempt : operatorAttempt;
+    if (!workStep) return false;
+    const cleanHandback = this.durableHandbackOf(report);
+    const artifacts: DurableEvidenceRef[] = [];
+    for (const reference of [...new Set(cleanHandback.evidence)].sort()) {
+      const artifact = await store.readEvidence(projectRoot, reference);
+      if (artifact.ok) artifacts.push(artifact.value);
+    }
+    const evidence = store.storeEvidence(ref, { report, handback: cleanHandback, artifacts });
+    if (!evidence.ok) return false;
+    const address = { stepId: workStep, attempt: workAttempt, key: `report:${report.reportId}` };
+    const fact: DurableFact = production
+      ? { ...address, kind: "task-report", source: "host", task: assigned.task, evidence: evidence.value }
+      : { ...address, kind: "operator-report", source: "host", parentTaskId: report.taskId!, evidence: evidence.value };
+    const result = await store.submit(ref, fact);
+    return result.ok && result.value.state !== "ignored";
+  }
+
+  private durableHandbackOf(report: RuntimeReportSnapshotV1): TaskHandback {
+    return { roleId: report.source.roleId, taskId: report.taskId ?? undefined, status: report.status,
+      summary: report.summary.text, evidence: report.evidence.map(item => item.text), at: report.at,
+      turnId: report.source.turnId, runtime: report.source.runtime, origin: report.origin };
+  }
+
+  async resumeDurableReports(projection: DurableProjection, roleBusy: (roleId: string, runtime: RuntimeKind) => boolean): Promise<void> {
+    const durable = this.deps.durableWorkflow;
+    const read = this.deps.readDurableReports;
+    const { ref, task, projectRoot, status } = projection;
+    if (!durable || !read || !task || status !== "waiting") return;
+    const store = await durable.store();
+    const facts = store.listFacts(ref);
+    const required = [
+      !facts.some(({ fact }) => fact.kind === "task-report" && fact.task.taskId === task.taskId) ? task.taskId : undefined,
+      task.stage !== "readonly" && !facts.some(({ fact }) => fact.kind === "operator-report" && fact.parentTaskId === task.parentTaskId)
+        ? task.parentTaskId : undefined,
+    ].filter((id): id is string => id !== undefined);
+    const effects = store.listEffects(ref, "model-send");
+    for (const taskId of required) {
+      const remote = effects.filter(effect => effect.intent.task?.taskId === taskId && effect.state !== "not-started");
+      // The production dispatch and the operations review each have a single authorized reporting turn.
+      const effect = remote.find(row => row.intent.key.startsWith("model:report:")) ?? (taskId === task.taskId && remote.length === 1 ? remote[0] : undefined);
+      const roleId = effect?.intent.task?.roleId;
+      const runtime = effect?.intent.expected?.runtime;
+      if (!effect || !roleId || !isRuntimeKind(runtime) || roleBusy(roleId, runtime)) continue;
+      const storedTurnId = effect.result?.result?.turnId;
+      const matches = (await read({ projectRoot, roleId, runtime })).filter(report => report.taskId === taskId
+        && report.origin === "submitted-report" && (typeof storedTurnId !== "string" || storedTurnId === report.source.turnId));
+      if (matches.length !== 1) continue;
+      const report = matches[0]!;
+      if (!await this.commitDurableHandback(projectRoot, runtime, this.durableHandbackOf(report), report)) continue;
+      if (effect.state === "unknown" || effect.state === "claimed") {
+        await store.settleEffect(ref, { key: effect.intent.key, token: effect.token, outcome: "succeeded",
+          evidence: "Recovered the exact assigned runtime turn and its durable submitted report.", result: { turnId: report.source.turnId } });
+      }
     }
   }
 }

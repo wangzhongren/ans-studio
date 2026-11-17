@@ -340,9 +340,19 @@ export class SessionManager {
    this.dispatch = new Dispatch( { sessions: this.sessions, activeDispatchKeys: this.activeDispatchKeys, starTaskIds: this.starTaskIds, deliveredAppTaskIds: this.deliveredAppTaskIds, deliveredDeliveryKeys: this.deliveredDeliveryKeys, deliveryQueues: () => this.deliveryQueues, activeDeliveries: () => this.activeDeliveries,
    lastRoleActivity: this.lastRoleActivity, }, { openInternal: (req, userInitiated) => this.openInternal(req, userInitiated), findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId), enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId,
    item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), appDispatchClientMessageId: (dedupKey) => this.appDispatchClientMessageId(dedupKey), appTaskClientMessageIdFromSeed: (seed) => this.appTaskClientMessageIdFromSeed(seed), deliveryIsStopped: (key) => this.deliveryIsStopped(key),
-   runTaskIsFenced: (projectRoot, taskId, runId) => this.runTaskIsFenced(projectRoot, taskId, runId), routeStarDispatch: (projectRoot, runtime, fromRoleId, d, targetRoleId, task, source) => this.routeStarDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source), }, this.fixedDispatchPort,
+   runTaskIsFenced: (projectRoot, taskId, runId) => this.runTaskIsFenced(projectRoot, taskId, runId), routeStarDispatch: (projectRoot, runtime, fromRoleId, d, targetRoleId, task, source) => this.routeStarDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source),
+   routeDurableDispatch: (...args) => this.fixedWorkflowRoute.routeDurableDispatch(...args), }, this.fixedDispatchPort,
    deps, ); }
   // —————————————— G-2（W1）：看护的观察/活动转发与时钟 ——————————————
+  observeDurableProject(projectRoot: string): () => void {
+    return this.fixedWorkflowRoute.observeDurableProject(projectRoot, {
+      resumeReports: (projection, roleBusy) => this.handback.resumeDurableReports(projection, roleBusy),
+      syncRelease: projection => this.fixedWorkflowRelease.syncDurableRelease(projection),
+      closeRelease: () => this.fixedWorkflowRelease.closeDurablePresentation(projectRoot),
+    });
+  }
+  hasActiveRoleTurn(projectRoot: string): boolean { return this.fixedWorkflowRoute.hasActiveRoleTurn(projectRoot); }
+
   /** 时钟（薄委托 → `shared/clock.ts`；注入以便单测；缺省 Date.now——与会话时间戳、投递入队时间同源）。 */
   private now(): number { return now(this.deps); }
   /** 转发一条结构化事件给看护器（隔离：看护回调抛错绝不影响会话/投递——看护永不阻断判定链）。 */

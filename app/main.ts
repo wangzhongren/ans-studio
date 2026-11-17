@@ -49,6 +49,7 @@ import {
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
 import { createCustomerInputChannel, type AutoReworkCallbackInfo } from "./desktop/customer-input.ts";
+import { DesktopDurableWorkflow, durableFailure } from "./desktop/durable-workflow.ts";
 // 客户授权平面（C1，2026-11-03）：主进程侧指令控制器——每项目 B1 Pipeline 公共句柄、确认面板、
 // 指令 IPC 与 `directivesEnabled` 能力位；系统行复用既有 delivery-note（A3 文案）。
 import { createDirectiveInputController } from "./desktop/directive-input.ts";
@@ -87,6 +88,7 @@ if (smokeRequest) {
   app.setPath("userData", smokeRequest.userDataPath);
 }
 let desktopEnvPath: string | undefined;
+let durableWorkflow: DesktopDurableWorkflow | undefined;
 // i18n B0（2026-10-23）：启动早期读取偏好后设置；默认 zh-CN（读不到/损坏时保持默认，不阻塞启动）。
 // main.ts 与 Interface 共享同一 translator 实例——窗口标题、对话框、启动错误框与 IPC 错误文案同一 locale。
 const mainI18n = createMainI18n();
@@ -810,6 +812,7 @@ function registerIpc(win: BrowserWindow): void {
   if (!preferencesPath) throw new Error("语言偏好路径尚未初始化。");
   const desktop = createDesktopInterface({
     envFilePath: desktopEnvPath,
+    durableWorkflow,
     // P2（2026-10-30）：网络状态门经运行时选项透传（Service → Provider → 适配器 deadline 暂停/恢复）；
     // 同一实例经 Interface 交给 SessionManager（离线队列保留、恢复继续）。
     runtimeOptions: { networkGate: networkMonitor.gate },
@@ -962,12 +965,26 @@ function registerIpc(win: BrowserWindow): void {
 
   // 交互回包（A-5）：渲染侧提交决定 → 通道按**请求快照**校验（选项 id ⊆ 已发、单选恰一个、类型相符）
   // → 解挂为冻结三态；非法回包不受理（pending 保留，界面可重试失败后修正）。
-  registerHandler("session:operator-response", (_e, input) =>
-    customerChannel.respond(input && typeof input === "object" ? input : {}),
-  );
+  registerHandler("session:operator-response", async (event, input) => {
+    if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) {
+      return { ok: false, error: "Invalid customer decision source." };
+    }
+    const response = input && typeof input === "object" ? input : {};
+    return await customerChannel.respondDurable(response) ?? await desktop.replayDurableReleaseDecision(response)
+      ?? customerChannel.respond(response);
+  });
 
   registerHandler("app:pick-project", () => desktop.pickProject());
   registerHandler("project:document-read", (_e, input) => desktop.readProjectDocument(input));
+  const workflowSourceError = () => durableFailure("workflow-source-invalid", "Invalid workflow request source.");
+  registerHandler("durable-workflow:list", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.listDurableWorkflows(input) : workflowSourceError());
+  registerHandler("durable-workflow:validate", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.validateDurableWorkflow(input) : workflowSourceError());
+  registerHandler("durable-workflow:start", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.startDurableWorkflow(input) : workflowSourceError());
+  registerHandler("durable-workflow:projection", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.getDurableWorkflowProjection(input) : workflowSourceError());
   registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
   registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
   registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));
@@ -1195,6 +1212,11 @@ app.whenReady().then(async () => {
   // Resolve once after Electron initialization; package resources are never the settings write target.
   const userDataPath = app.getPath("userData");
   if (app.isPackaged) await fs.promises.mkdir(userDataPath, { recursive: true, mode: 0o700 });
+  durableWorkflow = new DesktopDurableWorkflow({
+    userDataRoot: path.join(userDataPath, "ans", "durable-workflow"),
+    resourceRoot: app.isPackaged ? process.resourcesPath : app.getAppPath(),
+  });
+  void durableWorkflow.resume().catch(error => mainDiagnostic.error("workflow.recovery.failed", error));
   // i18n B0（2026-10-23）：建窗前**尽早**读取应用级语言偏好（`<userData>/ans/preferences.json`）。
   // 缺失 ⇒ zh-CN 且**不写文件**；损坏/不可读/非法 locale/未知 version ⇒ zh-CN + 稳定诊断，不阻塞启动。
   preferencesPath = preferencesFilePath(userDataPath);
@@ -1279,11 +1301,15 @@ process.on("unhandledRejection", (error) => {
   showMainFailure?.(); // 明确显示故障，不把被拒绝的业务当成功或自动重发。
 });
 let diagnosticsFlushed = false;
+let closingApplication = false;
 app.on("before-quit", (event) => {
   if (diagnosticsFlushed) return;
   event.preventDefault();
+  if (closingApplication) return;
+  closingApplication = true;
   mainDiagnostic.record("app.quit");
-  void flushDiagnostics().then(() => disposeDiagnostics()).finally(() => {
+  void Promise.resolve(durableWorkflow?.close()).catch(error => mainDiagnostic.error("workflow.shutdown.failed", error))
+    .then(() => flushDiagnostics()).then(() => disposeDiagnostics()).finally(() => {
     diagnosticsFlushed = true;
     app.quit();
   });

@@ -822,6 +822,7 @@ export interface CustomerInputChannel {
    *    **不得**解冻反复重试。
    */
   respond(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean };
+  respondDurable(input: { id?: unknown; decision?: unknown }): Promise<{ ok: boolean; error?: string; expired?: boolean } | undefined>;
   /** 关闭通道：所有挂起请求归 `declined`（窗口已关——未获同意，fail-closed）。幂等。 */
   rejectAllPending(reason: string): void;
   /** 当前挂起数（测试/如实呈现用）：**已呈现的那张＋排队中的请求**（排队者另见 `queuedCount`）。 */
@@ -846,6 +847,10 @@ export interface CustomerInputChannel {
    */
   presentAcceptanceTriageCard: PresentAcceptanceTriageCardFn;
 }
+
+export type PersistReleaseDecision = (choice: "approve" | "reject") => Promise<
+  { ok: true; decisionId: string } | { ok: false; message: string; stale?: boolean }
+>;
 
 /**
  * 桌面侧的客户通道（**带角色上下文**）：与冻结家 `CustomerInputFn` 同形，但多一个 `ctx.roleId`——
@@ -889,6 +894,8 @@ export type DesktopCustomerInputFn = (
      * 与「尚未呈现/立即失败」区分开（工具回执不得谎称已提交）。排队中的卡在真正呈现时才回调。
      */
     onPresented?: () => void;
+    /** Application-owned merge card. The response is acknowledged only after durable storage. */
+    persistReleaseDecision?: PersistReleaseDecision;
   },
   metadata?: CustomerInputMetadata,
 ) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
@@ -1025,6 +1032,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     /** 应用自有卡（分诊卡）：作答后的处置与被它拦住/挂靠的验收请求。 */
     appCard?: AppCardState;
   }
+  const durableChoices = new Map<string, { persist: PersistReleaseDecision; accepted: boolean }>();
 
   /** 应用自有 choice 卡（分诊卡）的通道状态：不是角色工具请求、不写账本、不推导下一步。 */
   interface AppCardState {
@@ -2504,6 +2512,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
     req = structuredClone(req);
+    if (ctx.persistReleaseDecision !== undefined && (
+      !ctx.requestId || req.kind !== "choice" || !req.application || req.cardKind !== MERGE_MAIN_CARD_KIND
+    )) {
+      return { outcome: "unavailable", reason: "Invalid durable release card." };
+    }
     if (metadata?.judgeContext !== undefined) metadata = { ...metadata, judgeContext: structuredClone(metadata.judgeContext) };
     // decision 卡发卡前校验（2026-10-26）：在**呈现/判断/排队之前** fail-closed。
     // 拒发卡 ⇒ declined + notPresented:true（卡片从未呈现；不冒充客户拒绝、不写账本、不占一项目一卡）。
@@ -2541,6 +2554,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         return;
       }
       const id = ctx.requestId ?? (opts.nextId ? opts.nextId() : `op-${++seq}`);
+      if (ctx.persistReleaseDecision) durableChoices.set(id, { persist: ctx.persistReleaseDecision, accepted: false });
       const payload: OperatorRequestPayload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
       // 镜像面（四角色评审 §6.1）：由 SessionManager 计算并给出；仅非空字符串进入载荷。
       // 同一请求仍只登记一条 pending、只结算一次——本字段不改变任何校验/账本/下一步推导。
@@ -2630,7 +2644,12 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         return;
       }
       presentEntry(entry);
-    }).then(result.resolve, result.reject);
+    }).then(outcome => {
+      if (ctx.persistReleaseDecision && ctx.requestId && outcome.outcome !== "answered") {
+        requestResults.delete(ctx.requestId);
+      }
+      result.resolve(outcome);
+    }, result.reject);
     return result.promise;
   };
 
@@ -2659,6 +2678,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   function respondUnsafe(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
     const id = input && typeof input.id === "string" ? input.id : "";
+    if (durableChoices.has(id)) return { ok: false, error: "This release decision requires durable storage." };
     diagnostic.record("interaction.response", { requestId: id });
     const entry = pending.get(id);
     if (!entry) {
@@ -2779,6 +2799,34 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     return result;
   }
 
+  async function respondDurable(input: { id?: unknown; decision?: unknown }): Promise<{ ok: boolean; error?: string; expired?: boolean } | undefined> {
+    if (typeof input.id !== "string") return undefined;
+    const choice = durableChoices.get(input.id);
+    if (!choice) return undefined;
+    const entry = pending.get(input.id);
+    if (!choice.accepted && !entry?.presented) {
+      return { ok: false, error: mainT("main.customerInput.noPendingRequest"), expired: true };
+    }
+    const decision = input.decision as OperatorDecisionPayload | undefined;
+    if (decision?.kind !== "choice" || decision.cancelled || !Array.isArray(decision.selected)
+      || decision.selected.length !== 1 || !MERGE_MAIN_OPTION_IDS.includes(decision.selected[0]!)) {
+      return { ok: false, error: "Select approve or reject on the release card." };
+    }
+    const selected = decision.selected[0]!;
+    try {
+      const saved = await choice.persist(selected === MERGE_MAIN_OPTION_IDS[0] ? "approve" : "reject");
+      if (!saved.ok) return { ok: false, error: saved.message, expired: saved.stale };
+      choice.accepted = true;
+      if (entry && pending.get(input.id) === entry) {
+        settleActive(entry, { outcome: "answered", value: { selected: [selected] }, decisionId: saved.decisionId, operatorId });
+      }
+      return { ok: true };
+    } catch (error) {
+      diagnostic.error("interaction.durable.response.failed", error, { requestId: input.id });
+      return { ok: false, error: "The release decision could not be saved. Retry the same choice." };
+    }
+  }
+
   function replayPending(): number {
     let count = 0;
     for (const entry of pending.values()) {
@@ -2822,6 +2870,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   return {
     customerInput,
     respond,
+    respondDurable,
     rejectAllPending,
     pendingCount: () => pending.size + queuedCount(),
     queuedCount,

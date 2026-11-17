@@ -17,17 +17,18 @@ import { classifyShellDetailed } from "../../../src/service/gate/shell-rules.ts"
 import { beginGitHostAction, createGitRoleRuntime, endGitHostAction, recordGitHostInterruption, resolveDeliveryAssignment } from "../../../src/pipeline/orchestration/trunk-runtime.ts";
 import type { RoleSessionHandle } from "../../../src/pipeline/orchestration/run-role.ts";
 import type { LiveSession } from "./contracts/session-types.ts";
-import { createDesktopBaselineGitPort, createDesktopReleaseGitPort, createDesktopTaskGitShellPort } from "../workflow-git.ts";
+import { createDesktopBaselineGitPort, createDesktopReleaseGitPort, createDesktopTaskGitShellPort, type ClaimDurableTaskGit } from "../workflow-git.ts";
+export { mergeDurableMain, previewDurableMerge, verifyDurableMerge, verifyDurableTaskCommit } from "../workflow-git.ts";
 
 /** fixed 路径 Git 端口（`complete_team_plan` v4 / 路径 B 起步走 baseline；发布合并走 release；同一实现）。 */
 export { createDesktopBaselineGitPort, createDesktopReleaseGitPort };
 
 /** fixed 会话任务级 Git 写注入面（原 `openInternalUnsafe` 内联 `taskGit` 片段；同一分类器/同一端口工厂）。 */
-export function buildFixedTaskGitSurface(projectRoot: string): {
+export function buildFixedTaskGitSurface(projectRoot: string, claimDurable?: ClaimDurableTaskGit): {
   classifyShellDetailed: typeof classifyShellDetailed;
   port: ReturnType<typeof createDesktopTaskGitShellPort>;
 } {
-  return { classifyShellDetailed, port: createDesktopTaskGitShellPort(projectRoot) };
+  return { classifyShellDetailed, port: createDesktopTaskGitShellPort(projectRoot, claimDurable) };
 }
 
 /** turn 级 Git runtime 装配的上下文（原 `currentGitRuntime` 闭包的自由变量；同一求值时机/次数）。 */

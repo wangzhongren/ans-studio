@@ -35,6 +35,7 @@ import { loadLatestRoster as loadLatestWorkflowRoster } from "../../../../src/co
 import type { CompleteTeamPlanFn, CustomerInputRequest, TaskStateEvent, WorkflowDocumentRef, WorkflowEvent } from "../../../../src/model/runtime.ts";
 import { WORKFLOW_LEDGER_SCHEMA } from "../../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
+import type { DurableFact } from "../../../../src/model/durable-workflow.ts";
 import type { RoleSessionHandle } from "../../../../src/pipeline/orchestration/run-role.ts";
 import { isFixedReleaseTriggerStage, type FixedReleaseTriggerStage } from "../../workflow.ts";
 import type { SessionManagerDeps } from "../contracts/deps.ts";
@@ -223,6 +224,10 @@ export class FixedWorkflowCards {
     if (signal?.aborted) {
       return { ok: false, code: "close-task-invalid", message: "本轮已中止，未执行收口。" };
     }
+    const durable = this.deps.durableWorkflow;
+    if (durable && (input.taskId.startsWith("dw-") || await durable.owns(projectRoot))) {
+      return this.closeDurableTask(projectRoot, actorRoleId, input, signal);
+    }
     // T3 B2.1（AC-19/T-08；MF-B2-02）：fixed verifier 的 A12a/A12b accepted 收口（criteria/report
     // 收口，含 A12b 应用验收归档）前 basis drift 复核——A12a/A12b 为 chief→verifier 直派，
     // 不经 convener 派发 basis 门。drift/缺失 ⇒ `basis-drift`/`basis-missing` fail-closed：
@@ -266,6 +271,58 @@ export class FixedWorkflowCards {
       }
     }
     return closed;
+  }
+
+  private async closeDurableTask(
+    projectRoot: string, actorRoleId: string, input: FixedCloseCreatedTaskToolInput, signal?: AbortSignal,
+  ): Promise<Awaited<ReturnType<typeof closeFixedWorkflowTask>>> {
+    const durable = this.deps.durableWorkflow!;
+    const store = await durable.store();
+    const projection = (await store.listProjections(projectRoot)).find(view => view.task?.taskId === input.taskId && view.status === "waiting");
+    const task = projection?.task;
+    const reject = (code: string, message: string) => ({ ok: false as const, code, message });
+    if (!projection || projection.status !== "waiting" || !task || task.taskId !== input.taskId) {
+      return reject("close-task-invalid", "The task is not the current durable production task.");
+    }
+    const { ref, attempt, stepId, action } = projection;
+    const current = () => !signal?.aborted && [...this.sessions.values()].some(entry =>
+      entry.projectRoot === projectRoot && entry.roleId === actorRoleId && entry.assignedTaskId === task.parentTaskId
+      && entry.busy && !entry.origins.running?.settled
+      && durable.delivery(projectRoot, entry.origins.running?.clientMessageId)?.ref.instanceId === ref.instanceId);
+    if (actorRoleId !== "convener" || !current()) {
+      return reject("close-task-invalid", "The current operations turn must hold the real parent task.");
+    }
+    const facts = store.listFacts(ref);
+    const report = facts.find(({ fact, receipt }) => fact.kind === "task-report" && fact.task.taskId === task.taskId
+      && receipt.state !== "ignored")?.fact;
+    if (report?.kind !== "task-report") {
+      return reject("close-report-missing", "A saved report from the assigned project role is required.");
+    }
+    const snapshot = store.getEvidence(ref, report.evidence) as { handback?: TaskHandback } | undefined;
+    if (!snapshot?.handback || (input.outcome === "accepted" && snapshot.handback.status !== "completed")) {
+      return reject("close-report-missing", "Accepted work requires the assigned role's completed report.");
+    }
+    const key = `close:${stepId}:${attempt}:${task.taskId}`;
+    const address = { key, stepId, attempt };
+    let fact: DurableFact;
+    if (task.stage === "B1" && action === "b1-impact-readonly") {
+      fact = { ...address, kind: "analysis-disposition", source: "convener", task, reportKey: report.key,
+        outcome: input.outcome === "accepted" ? "usable" : input.outcome === "rework" ? "needsFollowup" : "blocked" };
+    } else if (task.stage === "B3" && action === "b3-implement-and-accept" && input.outcome === "accepted") {
+      fact = { ...address, kind: "implementation-close", source: "convener", task, reportKey: report.key };
+    } else if (task.stage === "readonly" && action === "wait-for-review") {
+      fact = { ...address, kind: "readonly-review", source: "convener", reportKey: report.key,
+        outcome: input.outcome === "accepted" ? "accepted" : "blocked" };
+    } else {
+      return reject("close-task-invalid", "This disposition has no authorized transition for the current definition.");
+    }
+    if (!current()) return reject("close-task-invalid", "The operations turn changed during validation.");
+    const saved = await store.submit(ref, fact);
+    if (!saved.ok) return saved;
+    if (saved.value.state === "ignored") return reject("close-task-invalid", "The task attempt has been retired.");
+    return { ok: true, eventId: saved.value.key, taskId: task.taskId, operationId: input.operationId,
+      outcome: input.outcome, workflowId: ref.instanceId, ...(task.stage === "readonly" ? {} : { stage: task.stage }),
+      replay: facts.some(item => item.fact.key === key), stageCompleted: saved.value.state === "consumed" };
   }
   // —— verifyFixedReviewCloseBasis（B6 自 session.ts 逐字搬移）——
   /**

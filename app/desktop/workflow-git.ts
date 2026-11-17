@@ -38,6 +38,7 @@ import type {
   WorkflowServiceFailure,
 } from "../../src/common/编排/workflow-service.ts";
 import type { GitOid } from "../../src/model/trunk.ts";
+import type { DurableEffectOutcome, DurableProblem, DurableReleaseSnapshot, DurableResult } from "../../src/model/durable-workflow.ts";
 import type { ReleaseFileChange, ReleaseMergeKind } from "../../src/model/runtime.ts";
 // B4.2（2026-11-10）：固定 staged 检查 argv 的唯一合法来源（门禁引擎经 Service 出口再导出；
 // 消费者不得另抄一份）。桌面端口只读消费，不复制规则/门禁实现。
@@ -568,6 +569,11 @@ async function mergeMainReal(request: {
   baseOid: GitOid | null;
   tipOid: GitOid;
   mergeKind: ReleaseMergeKind;
+  durable?: {
+    snapshot: DurableReleaseSnapshot;
+    marker: string;
+    claim(): Promise<{ ok: true } | ({ ok: false } & DurableProblem)>;
+  };
 }): Promise<
   | {
       ok: true;
@@ -604,8 +610,18 @@ async function mergeMainReal(request: {
     } else if (request.baseOid === null || facts.mainOid === null || facts.mainOid.hex !== request.baseOid.hex) {
       return portFailure("release-merge-failed", "main base OID 已漂移；未合并。");
     }
-    const preview = await previewMergeReal(request.projectRoot, request.baseOid, request.tipOid);
+    const durableBaseline = request.durable?.snapshot.baselineOid;
+    const preview = await previewMergeReal(request.projectRoot, durableBaseline
+      ? { objectFormat: request.tipOid.objectFormat, hex: durableBaseline } : request.baseOid, request.tipOid);
     if (!preview.ok) return preview;
+    if (request.durable) {
+      if (preview.diffDigest !== request.durable.snapshot.diffDigest
+        || JSON.stringify(preview.files.map(file => file.path)) !== JSON.stringify(request.durable.snapshot.files)) {
+        return portFailure("release-workflow-not-ready", "The approved diff has changed.");
+      }
+      const claimed = await request.durable.claim();
+      if (!claimed.ok) return portFailure("release-workflow-not-ready", claimed.message);
+    }
     if (request.mergeKind === "initial") {
       // main unborn ⇒ `git switch -c main <tipOid>`（mergeKind:"initial"；工作区停在 main）。
       const created = await runGit(request.projectRoot, ["switch", "-c", "main", request.tipOid.hex]);
@@ -635,12 +651,18 @@ async function mergeMainReal(request: {
     if (!switched.ok) {
       return portFailure("release-main-busy", `切换到 main 失败（可能被其他 worktree 占用）：${asMessage(switched)}`);
     }
+    if (request.durable) {
+      const beforeMerge = await revParseOid(request.projectRoot, "HEAD");
+      if (beforeMerge?.hex !== request.durable.snapshot.mainOid) {
+        return portFailure("release-workflow-not-ready", "Main changed before the actual merge command.");
+      }
+    }
     const merged = await runGit(request.projectRoot, [
       "merge",
       "--no-ff",
       "-m",
-      `ANS release merge ${request.branch} (${request.workflowId})`,
-      request.branch,
+      request.durable?.marker ?? `ANS release merge ${request.branch} (${request.workflowId})`,
+      request.durable ? request.tipOid.hex : request.branch,
     ]);
     if (!merged.ok) {
       const conflict = /CONFLICT|Automatic merge failed/i.test(`${merged.stdout}\n${merged.stderr}`);
@@ -875,6 +897,108 @@ export function createDesktopReleaseGitPort(): ReleaseGitPort {
   };
 }
 
+export async function previewDurableMerge(input: {
+  projectRoot: string;
+  branch: string;
+  baselineOid: string;
+}): Promise<DurableResult<{
+  mainOid: string;
+  tipOid: string;
+  files: string[];
+  diffDigest: string;
+  diffStat: string;
+}>> {
+  const facts = await inspectRepositoryFacts(input.projectRoot);
+  if (!facts.ok) return facts;
+  const { branch, headOid, mainOid, trackedChanges, untracked } = facts.facts;
+  if (mainOid === null || branch !== input.branch || trackedChanges || untracked.length) {
+    return portFailure("release-workflow-not-ready", "The task branch and main must have known commits and the worktree must be clean.");
+  }
+  const [baseline, alreadyMerged] = await Promise.all([
+    runGit(input.projectRoot, ["merge-base", "--is-ancestor", input.baselineOid, headOid.hex]),
+    runGit(input.projectRoot, ["merge-base", "--is-ancestor", headOid.hex, mainOid.hex]),
+  ]);
+  if (!baseline.ok || alreadyMerged.ok || alreadyMerged.exitCode !== 1 || headOid.hex === input.baselineOid) {
+    return portFailure("release-workflow-not-ready", "The task tip does not prove a new change from its authorized baseline.");
+  }
+  const preview = await previewMergeReal(input.projectRoot, { objectFormat: headOid.objectFormat, hex: input.baselineOid }, headOid);
+  if (!preview.ok) return preview;
+  return {
+    ok: true,
+    value: {
+      mainOid: mainOid.hex,
+      tipOid: headOid.hex,
+      files: preview.files.map(file => file.path),
+      diffDigest: preview.diffDigest,
+      diffStat: preview.diffStat,
+    },
+  };
+}
+
+function durableMergeMarker(workflowId: string, requestId: string): string {
+  return `ANS durable release ${workflowId} ${requestId}`;
+}
+
+export async function mergeDurableMain(input: {
+  projectRoot: string;
+  workflowId: string;
+  flowId: string;
+  requestId: string;
+  snapshot: DurableReleaseSnapshot;
+  confirmation: MergeMainConfirmation;
+  claim: NonNullable<Parameters<typeof mergeMainReal>[0]["durable"]>["claim"];
+}): ReturnType<typeof mergeMainReal> {
+  const invalid = mergeMainConfirmationError(input.confirmation);
+  if (invalid) return portFailure("release-workflow-not-ready", invalid.message);
+  const objectFormat = await objectFormatOf(input.projectRoot);
+  return mergeMainReal({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    flowId: input.flowId,
+    branch: input.snapshot.branch,
+    baseOid: { objectFormat, hex: input.snapshot.mainOid },
+    tipOid: { objectFormat, hex: input.snapshot.tipOid },
+    mergeKind: "merge",
+    durable: {
+      snapshot: input.snapshot,
+      marker: durableMergeMarker(input.workflowId, input.requestId),
+      claim: input.claim,
+    },
+  });
+}
+
+export async function verifyDurableMerge(input: {
+  projectRoot: string;
+  workflowId: string;
+  requestId: string;
+  snapshot: DurableReleaseSnapshot;
+  writePaths: readonly string[];
+}): Promise<DurableResult<{ mainOid: string; files: string[]; diffDigest: string }>> {
+  const { projectRoot, workflowId, requestId, snapshot } = input;
+  const facts = await inspectRepositoryFacts(projectRoot);
+  if (!facts.ok) return facts;
+  const { branch, headOid, mainOid, trackedChanges, untracked } = facts.facts;
+  if (branch !== "main" || mainOid?.hex !== headOid.hex || trackedChanges || untracked.length) {
+    return portFailure("release-workflow-not-ready", "The current worktree cannot establish the durable merge result.");
+  }
+  const [commit, taskTip] = await Promise.all([
+    runGit(projectRoot, ["show", "-s", "--format=%P%n%s", headOid.hex]),
+    revParseOid(projectRoot, `refs/heads/${snapshot.branch}`),
+  ]);
+  if (!commit.ok || taskTip?.hex !== snapshot.tipOid
+    || commit.stdout.trim().replace(/\r\n/g, "\n") !== `${snapshot.mainOid} ${snapshot.tipOid}\n${durableMergeMarker(workflowId, requestId)}`) {
+    return portFailure("release-workflow-not-ready", "Main does not prove this exact approved merge.");
+  }
+  const diff = await previewMergeReal(projectRoot, { objectFormat: headOid.objectFormat, hex: snapshot.mainOid }, headOid);
+  if (!diff.ok) return diff;
+  const files = diff.files.map(file => file.path);
+  const allowed = new Set(input.writePaths);
+  if (files.length === 0 || files.some(file => !allowed.has(file))) {
+    return portFailure("release-workflow-not-ready", "The actual merge has no authorized diff.");
+  }
+  return { ok: true, value: { mainOid: headOid.hex, files, diffDigest: diff.diffDigest } };
+}
+
 /**
  * 构造**真实** `BaselineGitPort`（桌面 B3 注入 `completeTeamPlanFixed`/`preparePathBStart`）：
  * A9 `git init -b main`（allowInit=true）；路径 B 无仓库 ⇒ `b-repository-required`（不自动 init）。
@@ -1061,13 +1185,44 @@ export function createDesktopTaskGitPort(): TaskGitPort {
  * run-role 以固定 argv 调用 `inspectStaged`/`commit`；本适配器再复核 argv 形状后转给真实端口
  * （形态外的 argv ⇒ 失败事实/抛错，不执行）。`acquireCriticalSection` 与 B3 发布合并共用同一把锁。
  */
-export function createDesktopTaskGitShellPort(projectRoot: string): TaskGitShellPort {
+export type ClaimDurableTaskGit = (request: {
+  kind: "task-write" | "task-commit";
+  key: string;
+  expected: Readonly<Record<string, string | readonly string[]>>;
+}) => Promise<DurableResult<{
+  execute: boolean;
+  finish(outcome: DurableEffectOutcome["outcome"], evidence: string, result?: DurableEffectOutcome["result"]): Promise<void>;
+}>>;
+
+export function createDesktopTaskGitShellPort(projectRoot: string, claimDurable?: ClaimDurableTaskGit): TaskGitShellPort {
   const root = path.resolve(projectRoot);
   const port = createDesktopTaskGitPort();
   return {
     acquireCriticalSection: (owner) => port.acquireCriticalSection(root, owner),
     currentBranch: () => port.currentBranch({ projectRoot: root }),
-    add: (paths, budgets) => port.add({ projectRoot: root, paths }, budgets),
+    add: async (paths, budgets) => {
+      if (!claimDurable) return port.add({ projectRoot: root, paths }, budgets);
+      const release = port.acquireCriticalSection(root, "durable-task-add");
+      if (!release) return rejectedTaskGit("Git worktree is busy.");
+      try {
+        const invalid = taskGitAddTransportError(paths);
+        if (invalid) return rejectedTaskGit(invalid);
+        const before = await durableTaskGitFacts(root);
+        if (!before) return rejectedTaskGit("Task branch could not be read.");
+        const diff = await runGit(root, ["diff", "HEAD", "--binary", "--no-ext-diff", "--", ...paths]);
+        if (!diff.ok) return rejectedTaskGit("Files to stage could not be read.");
+        const effect = await claimDurable({ kind: "task-write", key: `git-add:${hashSha256(JSON.stringify([before.branch, before.head, paths, diff.stdout]))}`,
+          expected: { ...before, paths } });
+        if (!effect.ok) return rejectedTaskGit(effect.message);
+        if (!effect.value.execute) return { exitCode: 0, stdout: "This staging operation is already recorded.", stderr: "" };
+        const result = await port.add({ projectRoot: root, paths }, budgets);
+        await effect.value.finish(result.exitCode === 0 ? "succeeded" : "unknown", result.exitCode === 0
+          ? "git add returned success" : "git add returned without proven index state");
+        return result;
+      } finally {
+        release();
+      }
+    },
     inspectStaged: (argv) => {
       if (!isFixedStagedInspectionArgv(argv)) {
         throw new Error(
@@ -1076,12 +1231,62 @@ export function createDesktopTaskGitShellPort(projectRoot: string): TaskGitShell
       }
       return port.inspectStaged({ projectRoot: root });
     },
-    commit: (argv, budgets) => {
+    commit: async (argv, budgets) => {
       const verdict = readFixedCommitMessage(argv);
       if (!verdict.ok) {
         return { stdout: "", stderr: verdict.error, error: verdict.error };
       }
-      return port.commit({ projectRoot: root, message: verdict.message }, budgets);
+      if (!claimDurable) return port.commit({ projectRoot: root, message: verdict.message }, budgets);
+      const before = await durableTaskGitFacts(root);
+      if (!before) return rejectedTaskGit("Task branch could not be read.");
+      const paths = await port.inspectStaged({ projectRoot: root });
+      const diff = await runGit(root, ["diff", "--cached", "--binary", "--no-ext-diff", before.head]);
+      if (!diff.ok || paths.length === 0) return rejectedTaskGit("The staged commit diff could not be established.");
+      const diffDigest = hashSha256(diff.stdout);
+      const operation = hashSha256(JSON.stringify([before.branch, before.head, paths, diffDigest, verdict.message]));
+      const key = `task-commit:${operation}`;
+      const marker = `ANS-Durable-Operation: ${operation}`;
+      const effect = await claimDurable({ kind: "task-commit", key, expected: { ...before, paths, diffDigest, marker } });
+      if (!effect.ok) return rejectedTaskGit(effect.message);
+      if (!effect.value.execute) return { exitCode: 0, stdout: "This task commit is already recorded.", stderr: "" };
+      const result = await port.commit({ projectRoot: root, message: `${verdict.message}\n\n${marker}` }, budgets);
+      const verified = await verifyDurableTaskCommit(root, { ...before, paths, diffDigest, marker });
+      await effect.value.finish(verified ? "succeeded" : "unknown",
+        verified ? "Task commit marker, parent and staged diff verified." : "Git returned without a proven task commit.",
+        verified);
+      return verified ? result : rejectedTaskGit("Task commit result requires verification.");
     },
   };
+}
+
+function rejectedTaskGit(message: string): ShellTaskGitCommandFacts {
+  return { stdout: "", stderr: message, error: message };
+}
+
+async function durableTaskGitFacts(projectRoot: string): Promise<{ branch: string; head: string } | undefined> {
+  const [head, branch] = await Promise.all([revParseOid(projectRoot, "HEAD"), currentBranchOf(projectRoot)]);
+  return head && branch ? { branch, head: head.hex } : undefined;
+}
+
+export async function verifyDurableTaskCommit(
+  projectRoot: string, expected: Readonly<Record<string, string | readonly string[]>>,
+): Promise<{ oid: string; diffDigest: string } | undefined> {
+  const { branch, head, paths, diffDigest, marker } = expected;
+  if (typeof branch !== "string" || typeof head !== "string" || typeof diffDigest !== "string" ||
+    typeof marker !== "string" || !Array.isArray(paths)) return undefined;
+  const observed = await durableTaskGitFacts(projectRoot);
+  if (!observed || observed.branch !== branch || observed.head === head) return undefined;
+  const tip = await revParseOid(projectRoot, `refs/heads/${branch}`);
+  if (!tip || tip.hex !== observed.head) return undefined;
+  const [commit, diff, names] = await Promise.all([
+    runGit(projectRoot, ["show", "-s", "--format=%P%n%B", tip.hex]),
+    runGit(projectRoot, ["diff", "--binary", "--no-ext-diff", head, tip.hex]),
+    runGit(projectRoot, ["diff", "--name-only", "-z", head, tip.hex]),
+  ]);
+  if (!commit.ok || !diff.ok || !names.ok) return undefined;
+  const [parents, ...body] = commit.stdout.trim().split(/\r?\n/);
+  const files = names.stdout.split("\0").filter(Boolean).sort();
+  if (parents !== head || !body.includes(marker) || hashSha256(diff.stdout) !== diffDigest
+    || JSON.stringify(files) !== JSON.stringify([...paths].sort())) return undefined;
+  return { oid: tip.hex, diffDigest };
 }

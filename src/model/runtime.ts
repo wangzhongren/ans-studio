@@ -17,6 +17,7 @@ import type {
   VersionDecisionStatus,
 } from "./project-state.ts";
 import type { DownloadJudgeFacts, RequestDownloadFn } from "./download.ts";
+import type { DurableResult } from "./durable-workflow.ts";
 import type { GovernanceMatrixFn } from "./governance-matrix.ts";
 import type {
   DirectActionReceipt,
@@ -574,6 +575,24 @@ export function isRuntimeNativeLifecycleFacts(value: unknown): value is RuntimeN
 
 /** 写门禁操作类型（F6）：仅内容上下文的分类，不改变任何判定/审批/预授权语义。 */
 export type WriteGateOperation = "write" | "edit";
+
+/** Facts supplied by the live host invocation after read-only write protection. */
+export interface FileWriteClaimInput {
+  operationId: string;
+  targetPath: string;
+  operation: WriteGateOperation;
+  contentSha256: string;
+  signal: AbortSignal | undefined;
+}
+
+export type FileWriteClaimOutcome = "not-started" | "succeeded" | "unknown";
+
+export interface FileWriteClaim {
+  /** Settle the durable claim after the effect and audit. Reject if the receipt cannot be confirmed. */
+  finish(outcome: FileWriteClaimOutcome, evidence: string): Promise<void>;
+}
+
+export type ClaimFileWriteFn = (input: FileWriteClaimInput) => Promise<DurableResult<FileWriteClaim>>;
 
 /** Host observations only. These shapes neither grant access nor prove an issued context. */
 export type FileGateStage = "lexical-read" | "canonical-read" | "final-write";
@@ -4274,6 +4293,8 @@ export interface GovernedToolsOptions {
   fileGateProtocol?: "host-facts-v1";
   /** Preserve the host's coverage/digest/reasons; an array of roots alone proves no coverage. */
   fileGateProtection?: FileGateProtectionFacts;
+  /** Durably claim each write before file effects. Requires live host-facts-v1. */
+  claimFileWrite?: ClaimFileWriteFn;
   /** Host-only canonical repo/gitdir/common/other-worktree roots. Not model tool arguments or a safe flag. */
   protectedGitRoots?: readonly string[];
   extraCredentialEnvVars?: readonly string[];

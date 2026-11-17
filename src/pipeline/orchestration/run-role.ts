@@ -126,7 +126,7 @@ import { readGitProtectionFacts, checkGitProtectionFactsCurrent, readGitHostProt
 // 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git matcher 经 Service 公共出口**同一函数引用**
 // （门禁引擎单一实现；不复制白名单/解析逻辑）。
 // 2026-11-10（B4.1）：任务级 Git 写 matcher 同经 Service 出口消费（同一函数引用；生产不导入私有 common/）。
-import { matchReadonlyGit, matchTaskGit } from "../../service/gate/shell-rules.ts";
+import { classifyShellDetailed, defaultShellRules, matchReadonlyGit, matchTaskGit } from "../../service/gate/shell-rules.ts";
 import type { TaskGitMatch, TaskGitScope } from "../../service/gate/shell-rules.ts";
 import {
   GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
@@ -152,6 +152,7 @@ import type {
   RuntimeKind,
   FileGateFacts,
   FileGateProtectionFacts,
+  ClaimFileWriteFn,
   WriteGateContext,
   RoleSession,
   RuntimeAdapter,
@@ -346,6 +347,7 @@ export interface AdapterCapabilities {
   protectedGitRoots?: readonly string[];
   fileGateProtocol?: "host-facts-v1";
   fileGateProtection?: FileGateProtectionFacts;
+  claimFileWrite?: ClaimFileWriteFn;
   customerInput?: CustomerInputFn;
   reportHandback?: ReportHandbackFn;
   sessionDir?: string;
@@ -931,6 +933,8 @@ export interface TaskGitShellRuntimeInput {
   classifyShellDetailed?: ClassifyShellDetailedFn;
   /** 执行端口（桌面注入；`acquireCriticalSection` 与发布合并同一把项目级锁）。 */
   port?: TaskGitShellPort;
+  /** Desktop-resolved prototype scope from the current, authoritative task binding. */
+  durableScope?(input: { projectRoot: string; taskId: string; roleId: string }): TaskGitScope | undefined | Promise<TaskGitScope | undefined>;
 }
 
 /** 任务级 Git 写集解析结果（稳定码复用 v5 `git-task-scope-*`；本层只做诊断/不注入）。 */
@@ -1457,6 +1461,8 @@ export async function openRoleSession(
      * **模型不可自报**：taskId/角色/写集全部来自应用事实。
      */
     taskGit?: TaskGitShellRuntimeInput;
+    /** Actual guarded-write claim for a task assigned by the durable workflow host. */
+    claimFileWrite?: ClaimFileWriteFn;
     /**
      * **R-1：审读结论工具的能力**（`report_shell_verdict`「注入才注册」）——审读会话专用，由
      * `pm-reviewer` 注入；一般调用方不传。
@@ -1561,7 +1567,8 @@ export async function openRoleSession(
   const conditions = conditionSlugsOf(setup.role.boundary);
   const gitProtection = isBlankProjectRoot(input.project.projectRoot) ? blankRootGitProtectionFacts() : await readGitProtectionFacts(input.project.projectRoot);
   const roleCapabilityProtection = isBlankProjectRoot(input.project.projectRoot) ? BLANK_ROOT_HOST_PROTECTION : await readGitHostProtectionRequirement({ projectRoot: input.project.projectRoot });
-  const managedFileProtocol = roleCapabilityProtection.state !== "unmanaged";
+  // A durable write claim needs a live file invocation even in an ordinary Git worktree.
+  const managedFileProtocol = roleCapabilityProtection.state !== "unmanaged" || input.claimFileWrite !== undefined;
   const managedBoundary = structuredClone(setup.role.boundary);
   const gateCtx = { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot, protectedGitRoots: gitProtection.protectedGitRoots };
   const staticScope = input.scope === undefined ? undefined : structuredClone(input.scope);
@@ -1616,11 +1623,17 @@ export async function openRoleSession(
   let taskGitRuntime: { scope: TaskGitScope; execution: TaskGitShellExecution } | undefined;
   if (sessionWorkflowMode === "fixed" && input.taskId !== undefined
     && input.taskGit?.port !== undefined && input.taskGit.classifyShellDetailed !== undefined) {
-    const resolved = await resolveTaskGitScope({
+    const scopeInput = {
       projectRoot: input.project.projectRoot,
       taskId: input.taskId,
       roleId: setup.role.id,
-    });
+    };
+    const durableScope = await input.taskGit.durableScope?.(scopeInput);
+    const resolved = input.taskGit.durableScope === undefined
+      ? await resolveTaskGitScope(scopeInput)
+      : durableScope?.taskId === input.taskId && durableScope.paths.length > 0
+        ? { ok: true as const, scope: durableScope }
+        : taskGitScopeMissing("当前持久任务没有有效的 Git 写集");
     if (resolved.ok) {
       taskGitRuntime = {
         scope: resolved.scope,
@@ -1669,6 +1682,11 @@ export async function openRoleSession(
   const refreshAssignedTaskScope = async () => {
     if (!assignedTaskWritePaths || !input.taskId) return;
     assignedTaskWritePaths.splice(0);
+    if (input.taskGit?.durableScope) {
+      const scope = await input.taskGit.durableScope({ projectRoot: input.project.projectRoot, taskId: input.taskId, roleId: setup.role.id });
+      if (scope?.taskId === input.taskId) assignedTaskWritePaths.push(...scope.paths);
+      return;
+    }
     // B26（2026-11-11，RR23 失败修复）：fixed 任务（task.created.workflowId）的受派写集**不读 legacy trunk**
     // ——`prepareAssignedTaskWriteScope` 要求 runId，fixed 任务必然失败 ⇒ 空交集、worker 全部写入被拒。
     // 写集 = 应用派发时记录的 modulePaths（B21 派生）∩ 团队计划角色写集（resolveTaskGitScope 同一权威）；
@@ -1786,7 +1804,9 @@ export async function openRoleSession(
     }
     // One immutable boundary/task intersection is used at all three genuine Provider stages.
     // Read preflight authorizes only the next bounded read, never a stable write or permit consumption.
-    const stageScope = confirmationMode
+    const stageScope = input.claimFileWrite !== undefined
+      ? { writeSet: assignedTaskWritePaths ?? [], conditions: staticScope?.conditions ?? [] }
+      : confirmationMode
       ? scopeWithPreauthorizedWrites({ writeSet: [...confinedWriteSet, ...issued], conditions }, p, input.project.projectRoot, preauthorization)
       : staticScope !== undefined ? (hasPreauthorization ? scopeWithPreauthorizedWrites(staticScope, p, input.project.projectRoot, preauthorization) : staticScope)
       : hasPreauthorization ? scopeWithPreauthorizedWrites({ writeSet: [], conditions }, p, input.project.projectRoot, preauthorization) : undefined;
@@ -2685,6 +2705,20 @@ export async function openRoleSession(
     }
   }
 
+  if (input.claimFileWrite && shellGate) {
+    const originalGate = shellGate;
+    const rules = defaultShellRules();
+    shellGate = async request => {
+      const classification = classifyShellDetailed(request.argv, rules, { taskGitScope: taskGitRuntime?.scope });
+      const approvedShape = classification.decision === "allow"
+        && (classification.ruleId.startsWith("allow:readonly:") || classification.ruleId.startsWith("allow:task-git:"));
+      if (request.entry === "start_background_task" || !approvedShape) {
+        return { allow: false, by: "durable-workflow", reason: "持久任务的实际写入必须经过工作流认领。" };
+      }
+      return originalGate(request);
+    };
+  }
+
   // 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git 固定传输能力（注入才生效）——
   // matcher 经 Service 公共出口**同一函数引用**（门禁引擎单一实现）；执行经 trunk Provider 固定传输
   // （绝对可执行 + 固定 config/env + 规范 argv 体，不接受任意 argv）。`run_shell` 在 gate 放行后对
@@ -3015,6 +3049,7 @@ export async function openRoleSession(
     ...(sessionDir !== undefined ? { sessionDir } : {}),
     protectedGitRoots: gitProtection.protectedGitRoots,
     ...(managedFileProtocol ? { fileGateProtocol: "host-facts-v1" as const, fileGateProtection: gitProtection } : {}),
+    ...(input.claimFileWrite ? { claimFileWrite: input.claimFileWrite } : {}),
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
@@ -4667,6 +4702,7 @@ export function createRuntimeAdapterFactory(
     protectedGitRoots: capabilities?.protectedGitRoots,
     fileGateProtocol: capabilities?.fileGateProtocol,
     fileGateProtection: capabilities?.fileGateProtection,
+    claimFileWrite: capabilities?.claimFileWrite,
     submitRefactor: capabilities?.submitRefactor,
     requestStableWrite: capabilities?.requestStableWrite,
     // 治理权力矩阵（C3）：纯展示提示段（C2 `RuntimeProviderOptions.contextSections`）与只读工具
@@ -4716,7 +4752,7 @@ export function createRuntimeAdapterFactory(
     // **只由编排 `createGovernanceJudge` 使用**（judge 会话），普通角色会话不传；
     // Service 侧二者互斥（同时给出 ⇒ 抛配置错误）。
     governanceJudge: capabilities?.governanceJudge ?? options.governanceJudge,
-    shellGate: capabilities?.shellGate ?? options.shellGate,
+    shellGate: capabilities?.claimFileWrite ? capabilities.shellGate : capabilities?.shellGate ?? options.shellGate,
     // 2026-11-08（W3b，I0-4）：只读 Git 固定传输能力（运行时核心 `GovernedToolsOptions.readonlyGit`）；
     // capabilities 优先（每会话注入），其次 runtimeOptions（桌面/测试统一工厂透传）。缺省 ⇒ `run_shell`
     // 对 `git` 一律 `readonly-git-runner-unavailable`（零执行、绝不回退通用 spawn）。

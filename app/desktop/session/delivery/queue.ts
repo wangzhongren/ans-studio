@@ -129,7 +129,7 @@ export interface DeliveryPorts {
 }
 
 /** queue 方法读取的 deps 切片（原 this.deps 的只读查询）。 */
-type DeliveryDeps = Pick<SessionManagerDeps, "emitEvent" | "emitRoleState" | "getListing" | "refreshListing" | "now" | "demoRuntimeAutoDeliver">;
+type DeliveryDeps = Pick<SessionManagerDeps, "emitEvent" | "emitRoleState" | "getListing" | "refreshListing" | "now" | "demoRuntimeAutoDeliver" | "durableWorkflow">;
 
 /** 「已投递」应用任务标记的内存上界（FIFO 淘汰；防长跑进程无界增长）。 */
 const MAX_DELIVERED_APP_TASK_IDS = 1024;
@@ -695,7 +695,12 @@ export class Delivery {
     // 2026-10-20 真机（Convener 卡 1h、队列 24 条回交被 system 看护项堵住）：**回交/派发优先于 system**。
     // 认领时跳过 system 看护项、取第一个非 system 条目（回交/派发/客户消息的相对顺序不变——客户消息屏障
     // 语义保留；同类仍按到达序）。只有在队列全是 system 时才投 system。
-    const priorityIndex = q.findIndex((i) => i.kind !== "system");
+    const durable = this.deps.durableWorkflow;
+    const owned = durable && await durable.owns(projectRoot);
+    if (stopped()) return;
+    const priorityIndex = owned ? q.findIndex(item => durable?.delivery(projectRoot, item.clientMessageId) !== undefined)
+      : q.findIndex(item => item.kind !== "system");
+    if (owned && priorityIndex === -1) return;
     const headIndex = priorityIndex >= 0 ? priorityIndex : 0;
     const item = q[headIndex];
     // These identities come from the selected transport item, never from the latest role/task.

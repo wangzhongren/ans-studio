@@ -3,12 +3,14 @@ productName: ANS Studio
 copyright: Copyright © 2026 ANS Studio contributors
 asar: false
 npmRebuild: false
+beforePack: ./src/common/装配/dapr-assets.mjs
 directories:
   output: release-output
 files:
   - app/**/*
   - src/**/*
   - bin/**/*
+  - docs/workflows/**/*.yaml
   - package.json
   - LICENSE
   - '!**/.env*'
@@ -16,6 +18,9 @@ files:
   - '!**/*.{log,map}'
   - '!**/test{,/**/*}'
   - '!**/tests{,/**/*}'
+extraResources:
+  - from: 'release-output/dapr-assets/${os}-${arch}/dapr-runtime'
+    to: dapr-runtime
 artifactName: 'ANS-Studio-${version}-${os}-${arch}.${ext}'
 mac:
   icon: app/desktop/assets/ans-studio-ans-icon.png
@@ -26,4 +31,7 @@ mac:
 win:
   icon: app/desktop/assets/ans-studio-ans-icon.png
   target: zip
+  signExts:
+    - '!daprd.exe'
+    - '!scheduler.exe'
 publish: null

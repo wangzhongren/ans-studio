@@ -78,7 +78,7 @@ export interface TasksPorts {
 }
 
 /** tasks 方法读取的 deps 切片（原 `this.deps` 的两项只读查询）。 */
-type TasksDeps = Pick<SessionManagerDeps, "getListing" | "customerInput" | "now" | "emitEvent">;
+type TasksDeps = Pick<SessionManagerDeps, "getListing" | "customerInput" | "now" | "emitEvent" | "durableWorkflow">;
 
 /** 任务账本业务/重派/终止/升级（原 `SessionManager` 17 方法的同签名实现）。 */
 export class Tasks {
@@ -315,6 +315,7 @@ export class Tasks {
   }
 
   async restoreTasks(projectRoot: string): Promise<TaskRestoreReport> {
+    if (await this.deps.durableWorkflow?.owns(projectRoot)) return { restored: 0, skipped: 0, taskIds: [] };
     const state = await this.readTasks(projectRoot);
     for (const record of state.records.values()) {
       this.starTaskIds.add(record.taskId);
@@ -330,6 +331,7 @@ export class Tasks {
     for (const record of state.unclosed) {
       const created = record.created;
       if (created === undefined) continue;
+      if (created.idempotencyKey.startsWith("durable-task:")) continue;
       if (record.delivered !== undefined || record.reports.length > 0) {
         report.skipped += 1;
         continue;
@@ -487,6 +489,11 @@ export class Tasks {
   }
 
   async terminateRoleRun(input: TerminateRoleRunInput, chiefSource?: ActualDispatchSource): Promise<TerminateRoleRunResult> {
+    if (input.taskId?.startsWith("dw-") || await this.deps.durableWorkflow?.owns(input.projectRoot)) {
+      return { ok: false, roleId: input.roleId, terminationConfirmed: false, childProcesses: 0, childProcessesStopped: 0,
+        childResults: [], partialArtifacts: [], isolatedArtifacts: [], sessionFresh: false,
+        abort: { ok: false, supported: false }, message: "Use the current session stop control. Durable task attempts require verified recovery." };
+    }
     if (input.roleId === "convener") return this.stopExactController(input, chiefSource);
     const projectRoot = input.projectRoot;
     const roleId = input.roleId;
@@ -620,6 +627,10 @@ export class Tasks {
    */
   async redispatchTask(input: RedispatchTaskInput): Promise<RedispatchTaskResult> {
     const projectRoot = input.projectRoot;
+    if (input.taskId.startsWith("dw-") || await this.deps.durableWorkflow?.owns(projectRoot)) {
+      return { ok: false, safety: "unsafe", autoAllowed: false, reasons: ["workflow-owner-conflict"],
+        message: "The durable workflow owns attempts for this repository." };
+    }
     const state = await this.readTasks(projectRoot);
     const record = state.records.get(input.taskId);
     const created = record?.created;

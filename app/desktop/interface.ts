@@ -458,7 +458,19 @@ export function registerPreferencesIpc(
   });
 }
 
+import {
+  durableFailure,
+  durableIdentifier,
+  durableRequest,
+  type DesktopDurableDefinition,
+  type DesktopDurableView,
+  type DesktopDurableWorkflow,
+} from "./durable-workflow.ts";
+import type { DurableResult } from "../../src/model/durable-workflow.ts";
+import { MERGE_MAIN_OPTION_IDS } from "./customer-input.ts";
+
 export interface DesktopDeps {
+  durableWorkflow?: DesktopDurableWorkflow;
   /** 系统文件夹选择器（由主进程用 electron dialog 注入；测试可注入假实现）。 */
   pickDirectory: () => Promise<string | null>;
   /** 会话事件外推（主进程用它 webContents.send; 测试可注入收集器）。**入参为带 `roleId` 信封的
@@ -753,6 +765,11 @@ export interface DesktopInterface {
   getSessionPersistence(input: unknown): Promise<PersistenceReply<PersistenceValues['getSessionPersistence']>>;
   pickProject(): Promise<string | null>;
   readProjectDocument(input: unknown): Promise<ReadProjectDocumentResult>;
+  listDurableWorkflows(input: unknown): Promise<DurableResult<{ definitions: DesktopDurableDefinition[]; controlPlane: DesktopDurableView["controlPlane"] }>>;
+  validateDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
+  startDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableView>>;
+  getDurableWorkflowProjection(input: unknown): Promise<DurableResult<DesktopDurableView>>;
+  replayDurableReleaseDecision(input: unknown): Promise<{ ok: boolean; error?: string } | undefined>;
   disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
   /**
@@ -2136,6 +2153,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
+    durableWorkflow: deps.durableWorkflow,
+    readDurableReports: deps.durableWorkflow ? async input => (await getSessionHistory(input, {
+      credentialEnvNames: [...(deps.runtimeOptions?.extraCredentialEnvVars ?? []),
+        ...(deps.runtimeOptions?.apiKeyEnvVar ? [deps.runtimeOptions.apiKeyEnvVar] : [])],
+    })).reports ?? [] : undefined,
     getRegisteredProjectLifecycle: projectRoot =>
       importedProjectRoot === projectRoot && registeredProjectLifecycle?.projectRoot === projectRoot
         ? { ...registeredProjectLifecycle } : undefined,
@@ -2417,6 +2439,28 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return { projectRoot: value.projectRoot, runtime: value.runtime, roleId: value.roleId, taskId: value.taskId };
   };
 
+  let unobserveDurableProject: (() => void) | undefined;
+  let observedDurableProjectRoot: string | undefined;
+
+  async function durableCall<T>(
+    input: unknown,
+    operation: (durable: DesktopDurableWorkflow, projectRoot: string, request: Record<string, unknown>) => Promise<DurableResult<T>>,
+  ): Promise<DurableResult<T>> {
+    const request = durableRequest(input);
+    const registration = registeredProjectLifecycle;
+    if (!registration || request.projectRoot !== registration.projectRoot || importedProjectRoot !== registration.projectRoot) {
+      return durableFailure("workflow-project-unselected", "Open the project using the directory picker before using durable workflows.");
+    }
+    const durable = deps.durableWorkflow;
+    if (!durable) return durableFailure("workflow-unavailable", "Durable workflow support is unavailable.");
+    try {
+      return await operation(durable, registration.projectRoot, request);
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.durable-workflow", projectRoot: registration.projectRoot }).error("workflow.request.failed", error);
+      return durableFailure("workflow-operation-failed", "The durable workflow operation could not be completed.");
+    }
+  }
+
   return {
     retryReportSave: input => persistenceCall('retryReportSave', input),
     getReportSaveState: input => persistenceCall('getReportSaveState', input),
@@ -2426,6 +2470,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async pickProject(): Promise<string | null> {
       let selection = 0;
       changeProjectSource([], () => {
+        unobserveDurableProject?.();
+        unobserveDurableProject = undefined;
+        observedDurableProjectRoot = undefined;
         selection = ++nativeSelectionSequence;
         nativeSelection = undefined;
         registeredProjectLifecycle = undefined;
@@ -2445,8 +2492,63 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return root;
     },
     readProjectDocument(input) { return documentReader.read(input); },
+    listDurableWorkflows: input => durableCall(input, async (durable, projectRoot) => {
+      const definitions = await durable.listDefinitions(projectRoot);
+      return { ok: true, value: { definitions, controlPlane: durable.controlPlane() } };
+    }),
+    validateDurableWorkflow: input => durableCall(input, async (durable, projectRoot, request) => {
+      if (!durableIdentifier(request.definitionId)) return durableFailure("workflow-definition-invalid", "Select a workflow definition.");
+      return durable.validateDefinition(projectRoot, request.definitionId);
+    }),
+    startDurableWorkflow: input => durableCall(input, async (durable, projectRoot, request) => {
+      if (request.enabled !== true || !durableIdentifier(request.definitionId) || !durableIdentifier(request.requestId)
+        || typeof request.summary !== "string" || !request.summary.trim() || request.summary.length > 12_000) {
+        return durableFailure("workflow-start-invalid", "Enable the prototype, select a workflow, and enter a change request.");
+      }
+      if (registeredProjectLifecycle?.projectRoot !== projectRoot) {
+        return durableFailure("workflow-project-unselected", "The selected project changed.");
+      }
+      if (listingCache.get(projectRoot)?.governanceModel !== "trio") {
+        return durableFailure("workflow-project-roles-missing", "The selected project must have its governance roles configured.");
+      }
+      if (!await durable.owns(projectRoot)) {
+        if (manager.hasActiveRoleTurn(projectRoot)) {
+          return durableFailure("workflow-existing-turn", "Wait for the project's active role turn to finish.");
+        }
+        const existing = await manager.activeRunViews(projectRoot);
+        if (!existing.ok || existing.runs.length !== 0 || manager.hasActiveRoleTurn(projectRoot)) {
+          return durableFailure("workflow-existing-run", "The project's active execution could not be cleared for a new workflow.");
+        }
+      }
+      return durable.start(projectRoot, request.definitionId, request.requestId, request.summary.trim(),
+        await resolveNoteRuntime(projectRoot) ?? "pi");
+    }),
+    getDurableWorkflowProjection: input => durableCall(input, async (durable, projectRoot, request) => {
+      if (request.instanceId !== undefined && !durableIdentifier(request.instanceId)) {
+        return durableFailure("workflow-instance-invalid", "Invalid workflow instance.");
+      }
+      return { ok: true, value: durable.view(await durable.find(projectRoot, request.instanceId)) };
+    }),
+    async replayDurableReleaseDecision(input) {
+      const durable = deps.durableWorkflow;
+      const selection = registeredProjectLifecycle;
+      const { id, decision } = durableRequest(input);
+      if (!durable || !selection || typeof id !== "string" || !/^rel-[a-f0-9]{24}-decision$/.test(id)) return undefined;
+      const value = durableRequest(decision);
+      if (value.kind !== "choice" || value.cancelled || !Array.isArray(value.selected) || value.selected.length !== 1
+        || !MERGE_MAIN_OPTION_IDS.includes(value.selected[0])) return undefined;
+      const projections = await (await durable.store()).listProjections(selection.projectRoot);
+      if (registeredProjectLifecycle?.selectionId !== selection.selectionId) return undefined;
+      const previous = projections.find(projection => projection.release?.requestId === id)?.release?.decision;
+      if (!previous) return undefined;
+      return previous.action === (value.selected[0] === MERGE_MAIN_OPTION_IDS[0] ? "approve" : "reject")
+        ? { ok: true } : { ok: false, error: "A different decision was already recorded for this release." };
+    },
     disposeProjectDocuments() {
       changeProjectSource([], () => {
+        unobserveDurableProject?.();
+        unobserveDurableProject = undefined;
+        observedDurableProjectRoot = undefined;
         ++nativeSelectionSequence; nativeSelection = undefined; registeredProjectLifecycle = undefined;
         documentReader.dispose();
       });
@@ -2549,9 +2651,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (picked && path.resolve(picked.root) === path.resolve(listing.projectRoot)) {
           registeredProjectLifecycle = { selectionId: picked.selectionId, selectedRoot: picked.root, projectRoot: listing.projectRoot,
             source: "native-directory-selection", selectedAt: picked.selectedAt, listingGeneration: generation };
+          if (observedDurableProjectRoot !== listing.projectRoot) {
+            unobserveDurableProject?.();
+            unobserveDurableProject = manager.observeDurableProject(listing.projectRoot);
+            observedDurableProjectRoot = listing.projectRoot;
+          }
         } else if (registeredProjectLifecycle?.projectRoot !== listing.projectRoot) {
           registeredProjectLifecycle = undefined;
           nativeSelection = undefined;
+          unobserveDurableProject?.();
+          unobserveDurableProject = undefined;
+          observedDurableProjectRoot = undefined;
         }
       });
       const documentListing = documentReader.updateListing(documentSequence, listing.projectRoot, roles.map(projectDocumentCandidates));

@@ -34,6 +34,9 @@ import type { PersistenceUpdated } from "./persistence.ts";
 import type { OpenResult, SessionEventEnvelope } from "./session-types.ts";
 
 export interface SessionManagerDeps {
+  durableWorkflow?: import("../../durable-workflow.ts").DesktopDurableWorkflow;
+  readDurableReports?: (input: { projectRoot: string; roleId: string; runtime: RuntimeKind }) =>
+    Promise<readonly import("../../../../src/model/runtime.ts").RuntimeReportSnapshotV1[]>;
   /** Native selection + successful same-root listing only; never renderer/model metadata. */
   getRegisteredProjectLifecycle?: (projectRoot: string) => NativeProjectRegistration | undefined;
   prepareChiefDecisionEvidence?: (input: {
@@ -52,6 +55,7 @@ export interface SessionManagerDeps {
       routineShellPolicy?: RoutineShellPolicy;
       taskId?: string;
       scope?: undefined;
+      claimFileWrite?: import("../../../../src/model/runtime.ts").ClaimFileWriteFn;
       /**
        * **T3 B4.2（2026-11-10，AC-21 / T-09）：fixed 会话的任务级 Git 写注入位**——
        * `{ classifyShellDetailed, port }`（分类器 = 门禁引擎 Service 出口同一函数引用；端口 = 桌面真实

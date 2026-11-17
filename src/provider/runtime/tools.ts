@@ -10,6 +10,7 @@ import type {
   WriteGate,
   WriteGateContext,
   WriteGateOperation,
+  ClaimFileWriteFn, FileWriteClaim, FileWriteClaimOutcome,
   FileGateStage, FileGateFacts, FileGateProtectionFacts, CanonicalWriteFacts, CurrentFileFacts,
   ShellGate,
   ShellPostAuditFn,
@@ -694,6 +695,7 @@ async function writeGuarded(
   onWrite?: (abs: string) => boolean | void | Promise<boolean | void>,
   protectedGitRoots?: readonly string[],
   invocation?: FileInvocation,
+  claimFileWrite?: ClaimFileWriteFn,
 ): Promise<ToolResult> {
   if (signal?.aborted) return { ok: false, message: `${name}：会话已中止，未写入` };
   const protectedBefore = await finalFileProtection(abs, protectedGitRoots);
@@ -704,70 +706,121 @@ async function writeGuarded(
     return { ok: false, message: `${name} 拒绝写入：${guarded.reason}（未写入，目标文件未被触碰）` };
   }
 
-  // 2) 建父目录（仅 write_file 需要；edit_file 目标必已存在）。
-  if (opts.createParent) {
+  let claim: FileWriteClaim | undefined;
+  if (claimFileWrite !== undefined) {
+    if (!invocation?.active || !invocation.host.isCurrent() || invocation.canonical?.coverage !== "complete"
+      || !invocation.currentFile || invocation.target !== abs || invocation.operation !== operation || signal?.aborted) {
+      return { ok: false, message: `${name}：写入认领需要当前的宿主调用事实，未写入` };
+    }
+    try {
+      const claimed = await claimFileWrite({
+        operationId: invocation.operationId,
+        targetPath: invocation.target,
+        operation: invocation.operation,
+        contentSha256: sha256Hex(data),
+        signal,
+      });
+      if (claimed.ok === false) return { ok: false, message: `${name} 写入认领被拒绝（${claimed.code}）：${claimed.message}` };
+      if (claimed.ok !== true || typeof claimed.value?.finish !== "function") throw new Error("invalid file write claim receipt");
+      claim = claimed.value;
+    } catch (err) {
+      return { ok: false, message: `${name} 写入认领失败，未写入：${reasonOf(err)}` };
+    }
+  }
+
+  let mutationStarted = false;
+  const performWrite = async (): Promise<ToolResult> => {
+    if (claim && signal?.aborted) return { ok: false, message: `${name}：会话已中止，未写入` };
+    // 认领可能等待。mkdir 前用原调用事实和父目录复核认领期间是否发生漂移。
+    if (claim && opts.createParent && invocation) {
+      const parent = await recheckParentInsideWriteRoot(writeRoot, guarded.target.parentAbs, guarded.target.parentReal);
+      if (!parent.ok) return { ok: false, message: `${name} 拒绝写入：${parent.reason}` };
+      const changed = await recheckFileInvocation(invocation);
+      if (changed) return { ok: false, message: `${name}: ${changed}; no write` };
+      if (!invocation.host.isCurrent()) return { ok: false, message: `${name}: host facts expired; no write` };
+    }
+
+    // 仅 write_file 需要建父目录。递归 mkdir 失败时也可能已经建成部分目录。
+    if (opts.createParent) {
+      try {
+        signal?.throwIfAborted();
+        mutationStarted = true;
+        await ensureParentDir(guarded.target.parentAbs);
+      } catch (err) {
+        return { ok: false, message: `${name} 写入失败（建目录）：${path}（${reasonOf(err)}）` };
+      }
+    }
+
+    // mkdir 后复用同一个门禁重新判定，随后复核真实父目录和目标。
+    const changed = invocation ? await recheckFileInvocation(invocation) : undefined;
+    if (changed) return { ok: false, message: `${name}: ${changed}; no write` };
+    const reauthorized = invocation ? stagedFileGate(gate, name, invocation, "final-write", data) : govern(gate, name, abs, writeRoot, {
+      contentSha256: sha256Hex(data),
+      operation,
+    });
+    if (!reauthorized.proceed) {
+      return { ok: false, message: `${name} 写入前复核未通过：${reauthorized.result.message}（未写入目标文件；可能已创建父目录）` };
+    }
+    const recheck = await recheckParentInsideWriteRoot(writeRoot, guarded.target.parentAbs, guarded.target.parentReal);
+    if (!recheck.ok) {
+      return { ok: false, message: `${name} 拒绝写入：${recheck.reason}` };
+    }
+    const protectedFinal = await finalFileProtection(abs, protectedGitRoots);
+    if (!protectedFinal.ok) return { ok: false, message: `${name} 拒绝写入：${protectedFinal.reason}` };
+    const finalChanged = invocation ? await recheckFileInvocation(invocation) : undefined;
+    if (finalChanged) return { ok: false, message: `${name}: ${finalChanged}; no write` };
+
+    // 原子写（同目录 temp + rename）。
+    if (claim && !invocation?.host.isCurrent()) return { ok: false, message: `${name}: host facts expired; no write` };
     try {
       signal?.throwIfAborted();
-      await ensureParentDir(guarded.target.parentAbs);
+      mutationStarted = true;
+      await atomicWriteFile(abs, data, signal);
     } catch (err) {
-      return { ok: false, message: `${name} 写入失败（建目录）：${path}（${reasonOf(err)}）` };
+      return { ok: false, message: `${name} 写入失败：${path}（${reasonOf(err)}）` };
     }
-  }
-
-  // 3) mkdir 后复用同一个门禁重新判定（角色/真实目标授权仍由 gate 负责）。
-  //    F6：本次为写前复核，携带最终字节 sha256 与操作类型；首次调用（无上下文）语义不变。
-  const changed = invocation ? await recheckFileInvocation(invocation) : undefined;
-  if (changed) return { ok: false, message: `${name}: ${changed}; no write` };
-  const reauthorized = invocation ? stagedFileGate(gate, name, invocation, "final-write", data) : govern(gate, name, abs, writeRoot, {
-    contentSha256: sha256Hex(data),
-    operation,
-  });
-  if (!reauthorized.proceed) {
-    return { ok: false, message: `${name} 写入前复核未通过：${reauthorized.result.message}（未写入目标文件；可能已创建父目录）` };
-  }
-  // 再复核真实父目录与先前一致，仅缩小并发替换窗口，不声称消除全部 TOCTOU。
-  const recheck = await recheckParentInsideWriteRoot(writeRoot, guarded.target.parentAbs, guarded.target.parentReal);
-  if (!recheck.ok) {
-    return { ok: false, message: `${name} 拒绝写入：${recheck.reason}` };
-  }
-  const protectedFinal = await finalFileProtection(abs, protectedGitRoots);
-  if (!protectedFinal.ok) return { ok: false, message: `${name} 拒绝写入：${protectedFinal.reason}` };
-  const finalChanged = invocation ? await recheckFileInvocation(invocation) : undefined;
-  if (finalChanged) return { ok: false, message: `${name}: ${finalChanged}; no write` };
-
-  // 4) 原子写（同目录 temp + rename）。
-  try {
-    signal?.throwIfAborted();
-    await atomicWriteFile(abs, data, signal);
-  } catch (err) {
-    return { ok: false, message: `${name} 写入失败：${path}（${reasonOf(err)}）` };
-  }
-  if (onWrite !== undefined) {
-    try {
-      const registered = await onWrite(abs);
-      if (registered === false) {
-        // v2.15：guard 预检/登记失败 ⇒ 新建版本文件回退（仅 write_file 新建场景；edit 旧版已被 guard 拒绝）。
+    if (onWrite !== undefined) {
+      try {
+        const registered = await onWrite(abs);
+        if (registered === false) {
+          // v2.15：guard 预检/登记失败 ⇒ 新建版本文件回退（仅 write_file 新建场景；edit 旧版已被 guard 拒绝）。
+          if (opts.createParent) await unlink(abs).catch(() => undefined);
+          return { ok: false, message: `${name}  wrote ${path} 但版本登记预检失败，已回退（不留下未登记的新版本）。` };
+        }
+      } catch (err) {
         if (opts.createParent) await unlink(abs).catch(() => undefined);
-        return { ok: false, message: `${name}  wrote ${path} 但版本登记预检失败，已回退（不留下未登记的新版本）。` };
+        return { ok: false, message: `${name} 已写入 ${path}，但版本登记失败：${reasonOf(err)}（已尝试回退新版本）` };
       }
-    } catch (err) {
-      if (opts.createParent) await unlink(abs).catch(() => undefined);
-      return { ok: false, message: `${name} 已写入 ${path}，但版本登记失败：${reasonOf(err)}（已尝试回退新版本）` };
     }
+    // 审计归因（ANS-AUDIT-2026-11-05-001）：区分工具的合法落盘与 shell/外部进程写入。
+    recordToolWrite(abs, sha256Hex(data));
+    return { ok: true, message: `${name} 已获准并落盘：${path}（${data.length} 字节写入 ${abs}）` };
+  };
+
+  if (!claim) return performWrite();
+  let result: ToolResult;
+  try {
+    result = await performWrite();
+  } catch (err) {
+    result = { ok: false, message: `${name} 写入失败：${path}（${reasonOf(err)}）` };
   }
-  // 2026-11-05（审计归因修复，回执 ANS-AUDIT-2026-11-05-001）：登记写日志，供 shell 执行后审计
-  // 把本次合法落盘（含并发会话）与 shell/外部进程写入区分开；不改变任何写权限。
-  recordToolWrite(abs, sha256Hex(data));
-  return { ok: true, message: `${name} 已获准并落盘：${path}（${data.length} 字节写入 ${abs}）` };
+  const outcome: FileWriteClaimOutcome = result.ok ? "succeeded" : mutationStarted ? "unknown" : "not-started";
+  try {
+    await claim.finish(outcome, result.message);
+  } catch (err) {
+    return { ok: false, message: `${result.message}\n${name} 持久写入回执未确认，操作待核对：${reasonOf(err)}` };
+  }
+  return result;
 }
 
 /** write_file：获准后 mkdir -p 父目录 → 原子写 content（UTF-8，不加 BOM）。 */
-function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>, protectedGitRoots?: readonly string[], host?: FileGateHost): ExecutableTool {
+function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>, protectedGitRoots?: readonly string[], host?: FileGateHost, claimFileWrite?: ClaimFileWriteFn): ExecutableTool {
   const name = "write_file";
   return {
     name,
     async handler(call) {
       const invalidHost = rejectFileHostArguments(call.args, name); if (invalidHost) return invalidHost;
+      if (claimFileWrite !== undefined && !host) return { ok: false, message: `${name}：写入认领需要 host-facts-v1` };
       const path = readTargetPath(call.args);
       if (path === undefined) return { ok: false, message: `${name}: 缺少 path 参数，无法判定写入目标` };
       const content = readStringArg(call.args, ["content", "text"]);
@@ -783,7 +836,7 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWri
         const staged = await beginFileInvocation(gate, name, resolveWriteAbs(path, writeRoot), "write", host, writeRoot, protectedGitRoots, call.signal);
         if (!staged.ok) return staged.result;
         try { return await writeGuarded(gate, name, path, staged.invocation.target, writeRoot, data,
-          { createParent: true }, "write", call.signal, onWrite, protectedGitRoots, staged.invocation); }
+          { createParent: true }, "write", call.signal, onWrite, protectedGitRoots, staged.invocation, claimFileWrite); }
         finally { staged.invocation.active = false; }
       }
       const pre = govern(gate, name, path, writeRoot, { contentSha256: sha256Hex(data), operation: "write" });
@@ -818,12 +871,13 @@ function decodeForEdit(raw: Buffer): { ok: true; text: string; bom: boolean } | 
 }
 
 /** edit_file：获准后读原文件 → old_string 替换（未命中不写）→ 原子写回。 */
-function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>, protectedGitRoots?: readonly string[], host?: FileGateHost): ExecutableTool {
+function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>, protectedGitRoots?: readonly string[], host?: FileGateHost, claimFileWrite?: ClaimFileWriteFn): ExecutableTool {
   const name = "edit_file";
   return {
     name,
     async handler(call) {
       const invalidHost = rejectFileHostArguments(call.args, name); if (invalidHost) return invalidHost;
+      if (claimFileWrite !== undefined && !host) return { ok: false, message: `${name}：写入认领需要 host-facts-v1` };
       const path = readTargetPath(call.args);
       if (path === undefined) return { ok: false, message: `${name}: 缺少 path 参数，无法判定写入目标` };
       const oldString = readStringArg(call.args, ["old_string", "oldString"]);
@@ -874,7 +928,7 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrit
       const readParent = await recheckParentInsideWriteRoot(writeRoot, readTarget.target.parentAbs, readTarget.target.parentReal);
       if (!readParent.ok) return { ok: false, message: `${name} 拒绝编辑：${readParent.reason}` };
 
-      return await writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, "edit", call.signal, onWrite, protectedGitRoots, invocation);
+      return await writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, "edit", call.signal, onWrite, protectedGitRoots, invocation, claimFileWrite);
       } finally { if (invocation) invocation.active = false; }
     },
   };
@@ -5364,8 +5418,8 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const host = fileGateHost(options);
   const protectedGitRoots = host?.protectedRoots ?? (Array.isArray(options?.protectedGitRoots) ? Object.freeze([...options.protectedGitRoots]) : options?.protectedGitRoots);
   const tools: ExecutableTool[] = [
-    makeWriteFileTool(gate, writeRoot, options?.versionedDocAfterWrite, protectedGitRoots, host),
-    makeEditFileTool(gate, writeRoot, options?.versionedDocAfterWrite, protectedGitRoots, host),
+    makeWriteFileTool(gate, writeRoot, options?.versionedDocAfterWrite, protectedGitRoots, host, options?.claimFileWrite),
+    makeEditFileTool(gate, writeRoot, options?.versionedDocAfterWrite, protectedGitRoots, host, options?.claimFileWrite),
     makeReadTool(readRoot),
     makeListDirTool(readRoot),
   ];

@@ -39,6 +39,7 @@ import {
 import { isRuntimeId } from "@/chat/runtime-config";
 import { useDirectiveStore, type DirectiveBridge } from "@/stores/directive-store";
 import { useVersionChangeStore } from "@/stores/version-change-store";
+import type { DurableProblem, DurableProjection, DurableResult } from "../../../../src/model/durable-workflow.ts";
 
 export type { DirectiveBridge } from "@/stores/directive-store";
 
@@ -83,6 +84,99 @@ export function directiveBridgeOf(value: unknown): DirectiveBridge | null {
     if (typeof record[method] !== "function") return null;
   }
   return record as unknown as DirectiveBridge;
+}
+
+type DurableProjectRequest = { projectRoot: string };
+type DurableDefinitionRequest = DurableProjectRequest & { definitionId: string };
+type DurableStartDraft = DurableDefinitionRequest & { summary: string };
+type DurableStartRequest = DurableStartDraft & { requestId: string; enabled: true };
+
+// Wire DTOs exposed by preload. Keep renderer compilation independent of Node and Dapr.
+export interface DesktopDurableDefinition {
+  id: string;
+  file: string;
+  version?: number;
+  digest?: string;
+  error?: DurableProblem;
+}
+
+export interface DesktopDurableInstance {
+  owner: "dapr";
+  instanceId: string;
+  definitionId: string;
+  definitionName: string;
+  definitionVersion: number;
+  definitionDigest: string;
+  action?: string;
+  engine: DurableProjection["engine"];
+  runtime?: string;
+  status: string;
+  stepId: string;
+  stepName: string;
+  attempt: number;
+  waiting?: string;
+  blockedReason?: string;
+  approval?: { requestId: string; status: string };
+  evidence?: { kind: "analysis" | "scope" | "operator" | "approval"; sha256: string }[];
+}
+
+export interface DesktopDurableView {
+  controlPlane: { state: "stopped" | "starting" | "ready" | "failed"; code?: string; message?: string };
+  instance?: DesktopDurableInstance;
+}
+
+export interface DurableWorkflowBridge {
+  listDurableWorkflows(input: DurableProjectRequest): Promise<DurableResult<{
+    definitions: DesktopDurableDefinition[];
+    controlPlane: DesktopDurableView["controlPlane"];
+  }>>;
+  validateDurableWorkflow(input: DurableDefinitionRequest): Promise<DurableResult<DesktopDurableDefinition>>;
+  startDurableWorkflow(input: DurableStartRequest): Promise<DurableResult<DesktopDurableView>>;
+  getDurableWorkflowProjection(input: DurableProjectRequest & {
+    instanceId?: string;
+  }): Promise<DurableResult<DesktopDurableView>>;
+}
+
+const DURABLE_METHODS = [
+  "listDurableWorkflows",
+  "validateDurableWorkflow",
+  "startDurableWorkflow",
+  "getDurableWorkflowProjection",
+] as const;
+
+export function getDurableWorkflowBridge(): DurableWorkflowBridge | null {
+  const bridge = getDesktopBridge();
+  const record = asRecord(bridge);
+  if (!DURABLE_METHODS.every((method) => typeof record[method] === "function")) return null;
+  return bridge as unknown as DurableWorkflowBridge;
+}
+
+// Keep an unacknowledged start across visits to the task drawer so a retry uses the original key.
+const durableStarts = new Map<string, {
+  request: DurableStartRequest;
+  pending?: ReturnType<DurableWorkflowBridge["startDurableWorkflow"]>;
+}>();
+
+export function pendingDurableStart(projectRoot: string): DurableStartRequest | undefined {
+  return durableStarts.get(projectRoot)?.request;
+}
+
+export async function submitDurableStart(bridge: DurableWorkflowBridge, draft: DurableStartDraft) {
+  const { projectRoot } = draft;
+  let attempt = durableStarts.get(projectRoot);
+  if (!attempt) {
+    attempt = { request: { ...draft, enabled: true, requestId: crypto.randomUUID() } };
+    durableStarts.set(projectRoot, attempt);
+  }
+  if (attempt.pending) return attempt.pending;
+  try {
+    attempt.pending = bridge.startDurableWorkflow(attempt.request);
+    const result = await attempt.pending;
+    if (result.ok || result.code !== "workflow-operation-failed") durableStarts.delete(projectRoot);
+    return result;
+  } finally {
+    attempt.pending = undefined;
+  }
 }
 
 function viewIdentity(): { projectRoot: string | null; runtime: string } {

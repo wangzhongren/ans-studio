@@ -1,0 +1,27 @@
+schema: 1
+id: path-b
+version: 1
+name: 路径 B
+start: impact
+steps:
+  impact:
+    action: b1-impact-readonly
+    role: module-owner
+    on:
+      usable: scope
+      needsFollowup: blocked
+      blocked: blocked
+  scope:
+    action: accept-b3-advance-with-b2-scope
+    next: implement
+  implement:
+    action: b3-implement-and-accept
+    next: release
+  release:
+    action: b4-customer-merge-main
+    on:
+      merged: delivered
+      rejected: stopped
+  blocked: { terminal: blocked }
+  stopped: { terminal: stopped }
+  delivered: { terminal: delivered }

@@ -12,6 +12,7 @@ import { createGitRoleRuntime, createDirectRoleRuntime, recordTaskObservation, p
 import type { OrchestrationEvent, HandbackEvent } from "../../../../src/common/编排/handback.ts";
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../../../src/common/shared/diagnostics.ts";
 import { mainT } from "../../i18n.ts";
+import { durableHash } from "../../durable-workflow.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage } from "../../../../src/model/runtime.ts";
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn, WorkflowEvent, WorkflowArtifactRef, BasisEvent } from "../../../../src/model/runtime.ts";
 import type {
@@ -205,6 +206,12 @@ export class LifecycleSend {
     const current = () => this.sessions.get(key) === entry && entry.origins.running === origin && !origin.settled &&
       !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted && !this.deliveryIsStopped(key);
     if (!current()) throw new Error("delivery-assignment-source-changed:当前会话或投递来源已变化");
+    const durable = this.deps.durableWorkflow;
+    const sent = durable?.delivery(entry.projectRoot, origin.clientMessageId);
+    if (sent?.assignmentTaskId) {
+      if (entry.assignedTaskId !== sent.assignmentTaskId) throw new Error("workflow-task-binding: The report recipient does not hold the assigned task.");
+      origin.taskId = sent.assignmentTaskId;
+    }
     let assignment: DeliveryAssignment | undefined;
     const resolve = async (source: Parameters<typeof resolveDeliveryAssignment>[0]["source"], flowId?: string, runId?: string) => {
       const result = await resolveDeliveryAssignment({ projectRoot: entry.projectRoot, recipientRoleId: entry.roleId, source,
@@ -307,7 +314,42 @@ export class LifecycleSend {
       if (!current() || assignment?.taskId !== inspected.value.taskId || assignment.runId !== inspected.value.runId || assignment.flowId !== inspected.value.flowId)
         { origin.assignmentRejectionCode = "controller-resume-source-changed"; throw new Error("controller-resume-source-changed:实际运营输入身份已变化"); }
     }
-    await entry.handle.send(text, promptOptions);
+    if (durable && (sent || await durable.owns(entry.projectRoot))) {
+      if (!sent || !durable.isSession(entry.handle) || (origin.kind !== "dispatch" && origin.kind !== "system" && origin.kind !== "handback")
+        || sent.roleId !== entry.roleId || sent.runtime !== entry.runtime ||
+        sent.intent.expected?.inputDigest !== durableHash(text)) {
+        throw new Error("workflow-owner-conflict: This turn is outside the active durable workflow.");
+      }
+      const store = await durable.store();
+      const claim = await store.claimEffect(sent.ref, sent.intent);
+      if (!claim.ok) throw new Error(`${claim.code}: ${claim.message}`);
+      if (!claim.value.execute) {
+        if (claim.value.state === "succeeded") return;
+        throw new Error("workflow-send-uncertain: An earlier execution must be reconciled.");
+      }
+      const { key: effectKey, token } = claim.value;
+      if (!current()) {
+        await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "not-started", evidence: "session changes before model send" });
+        throw new Error("workflow-send-session-changed: The intended session is no longer current.");
+      }
+      try {
+        await entry.handle.send(text, promptOptions);
+      } catch (error) {
+        await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "unknown",
+          evidence: "model send failed after the host entered the effect boundary",
+          ...(origin.turnId ? { result: { turnId: origin.turnId } } : {}) });
+        throw error;
+      }
+      const turnId = origin.turnId;
+      const receipt = await store.settleEffect(sent.ref, {
+        key: effectKey, token, outcome: turnId ? "succeeded" : "unknown",
+        evidence: turnId ? "runtime acknowledged the model turn and send returned" : "missing runtime turn receipt",
+        ...(turnId ? { result: { turnId } } : {}),
+      });
+      if (!receipt.ok || !turnId) throw new Error("workflow-send-uncertain: The model send receipt could not establish delivery.");
+    } else {
+      await entry.handle.send(text, promptOptions);
+    }
     acceptAssignment();
   }
 

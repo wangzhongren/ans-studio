@@ -23,6 +23,7 @@
     "dev:renderer": "vite --config vite.config.ts",
     "build:renderer": "vite build --config vite.config.ts",
     "preview:renderer": "vite preview --config vite.config.ts",
+    "dapr:assets": "node src/common/装配/dapr-assets.mjs",
     "package": "electron-builder --config electron-builder.yml",
     "package:local": "npm run build:renderer && electron-builder --config electron-builder.yml --publish never -c.directories.output=release-output/local",
     "verify:local": "node test/装配/verify-local-package.mjs",
@@ -32,6 +33,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.299",
     "@anthropic-ai/sdk": "0.93.0",
+    "@dapr/dapr": "3.19.0",
     "@earendil-works/pi-coding-agent": "1.1.0",
     "@earendil-works/pi-mcp": "1.1.0",
     "@modelcontextprotocol/sdk": "1.32.1",

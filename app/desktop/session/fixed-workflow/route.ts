@@ -21,9 +21,12 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { createDiagnosticLogger } from "../../../../src/common/shared/diagnostics.ts";
 import { extractDispatchReadPaths, planDispatchDelivery } from "../../../../src/common/编排/handback.ts";
+import { renderWorkReportPrompt, type TaskHandback } from "../../../../src/common/编排/handback.ts";
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskEvent, taskIdempotencyKey, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
 import { evaluateFixedPathDispatchAuthorization, stageRequestIdempotencyKey, stageStopIdempotencyKey } from "../../../../src/common/编排/workflow-dispatch.ts";
 import {
+  deriveDurablePathBWriteSets,
+  prepareDurablePathBBaseline,
   preparePathBStart as prepareFixedPathBStart,
   readBasisLedger,
   readWorkflowLedger,
@@ -40,6 +43,9 @@ import { isWorkflowPath, isWorkflowStage } from "../../../../src/model/runtime.t
 import type { BasisEvent, DispatchReceipt, DispatchTaskPayload, TaskStateEvent, WorkflowEvent, WorkflowStage } from "../../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
 import type { RoleDispatchPurpose } from "../../../../src/model/role.ts";
+import type { DurableDispatchDetails, DurableEvidenceRef, DurableFact, DurableProjection, DurableTaskBinding } from "../../../../src/model/durable-workflow.ts";
+import { isRuntimeKind } from "../../runtime-config.ts";
+import { durableHash, durableTaskId } from "../../durable-workflow.ts";
 import { mainT } from "../../i18n.ts";
 import {
   recordFixedPathBScopeDecisionForDispatch,
@@ -50,7 +56,7 @@ import type { SessionManagerDeps } from "../contracts/deps.ts";
 import type { CardGateway } from "../card-gateway.ts";
 import type { ActualDispatchSource, DeliveryItem, InternalSessionOpenRequest, LiveSession, OpenResult } from "../contracts/session-types.ts";
 import type { Evidence } from "../evidence.ts";
-import { createDesktopBaselineGitPort } from "../git-ports.ts";
+import { createDesktopBaselineGitPort, verifyDurableTaskCommit } from "../git-ports.ts";
 import type { RunChange } from "../run-change.ts";
 import { now } from "../shared/clock.ts";
 import { sessionKey } from "../shared/keys.ts";
@@ -143,6 +149,310 @@ export class FixedWorkflowRoute {
   }
   private appDispatchClientMessageId(dedupKey: string): string {
     return this.port.appDispatchClientMessageId(dedupKey);
+  }
+
+  private durableRuntime(projection: DurableProjection, preferred?: string): RuntimeKind {
+    const runtime = preferred ?? projection.metadata.runtime;
+    return isRuntimeKind(runtime) ? runtime : "pi";
+  }
+
+  hasActiveRoleTurn(projectRoot: string): boolean {
+    return [...this.sessions.values()].some(session =>
+      session.projectRoot === projectRoot && (session.busy || session.origins.running !== undefined));
+  }
+
+  observeDurableProject(projectRoot: string, ports: {
+    resumeReports(projection: DurableProjection, roleBusy: (roleId: string, runtime: RuntimeKind) => boolean): Promise<void>;
+    syncRelease(projection: DurableProjection): Promise<void>;
+    closeRelease(): void;
+  }): () => void {
+    const unobserve = this.deps.durableWorkflow?.observeProject(projectRoot, async projection => {
+      await ports.resumeReports(projection, (roleId, runtime) =>
+        this.sessions.get(this.sessionKey(projectRoot, roleId, runtime))?.busy ?? false);
+      await this.syncDurableTasks(projection);
+      await ports.syncRelease(projection);
+    });
+    return () => {
+      unobserve?.();
+      ports.closeRelease();
+    };
+  }
+
+  async syncDurableTasks(projection: DurableProjection): Promise<void> {
+    const durable = this.deps.durableWorkflow;
+    if (!durable || projection.status !== "waiting" || projection.engine !== "healthy") return;
+    const store = await durable.store();
+    const { ref, projectRoot, stepId, attempt, action } = projection;
+    const convener = this.handbackOwnerRoleId(projectRoot);
+    const chief = this.chiefTaskRoleIdOf(projectRoot);
+    if (!chief || !convener) return;
+    const address = { stepId, attempt };
+    const facts = store.listFacts(ref);
+    const currentTask = projection.task;
+    if (currentTask && action === "b3-implement-and-accept" && ![...this.sessions.values()].some(entry =>
+      entry.projectRoot === projectRoot && entry.assignedTaskId === currentTask.taskId && entry.busy)) {
+      for (const effect of store.listEffects(ref, "task-commit")) {
+        if ((effect.state !== "claimed" && effect.state !== "unknown")
+          || effect.intent.task?.taskId !== currentTask.taskId || !effect.intent.expected) continue;
+        const verified = await verifyDurableTaskCommit(projectRoot, effect.intent.expected);
+        if (verified) {
+          await store.settleEffect(ref, { key: effect.intent.key, token: effect.token, outcome: "succeeded",
+            evidence: "Recovered task commit marker, parent and staged diff verified.", result: verified });
+        } else {
+          store.block(ref, "workflow-task-commit-uncertain", "The original task commit requires verification.");
+        }
+      }
+    }
+    if (action === "accept-b3-advance-with-b2-scope" && projection.analysisReport) {
+      const b1Attempt = projection.analysisReport.attempt;
+      const parent = durableTaskId(ref, convener, "B1", b1Attempt);
+      const report = facts.find(row => row.fact.kind === "operator-report" && row.fact.parentTaskId === parent)?.fact;
+      if (report?.kind === "operator-report") {
+        const recorded = store.getEvidence(ref, report.evidence) as { handback?: TaskHandback } | undefined;
+        if (recorded?.handback) {
+          const text = renderWorkReportPrompt(recorded.handback) +
+            `\n如 B1 依据可用，请向运营使用真实路径 B 的 B3 advance（workflowId ${ref.instanceId}），保持 B1 flowId，给出文件候选和理由。`;
+          await this.queueDurablePrompt(projection, chief, convener, text, this.durableRuntime(projection), `report:${report.key}`);
+        }
+      }
+    }
+    const stageRequest = facts.find(row => row.fact.kind === "stage-request" && row.fact.attempt === attempt
+      && row.fact.stepId === stepId && row.receipt.state === "consumed")?.fact;
+    if ((action === "b1-impact-readonly" || action === "readonly-report") && !stageRequest) {
+      const task = `客户已从桌面启动持久工作流 ${ref.instanceId}。需求：${projection.metadata.summary ?? ""}\n`
+        + `请使用 dispatch_task 向运营 ${convener} 发真实路径 B 的 B1 advance 阶段请求。为本次工作选择一个 flowId、指明需核对的模块和问题，要求运营只读派发给现有模块属主。当前轮是第 ${attempt} 次影响面分析。`;
+      await this.queueDurablePrompt(projection, chief, "application", task, this.durableRuntime(projection), `chief-intake:${stepId}:${attempt}`);
+      return;
+    }
+    if (action === "b1-impact-readonly" && !projection.baseline) {
+      const claimed = await store.claimEffect(ref, {
+        ...address, key: "git:baseline", kind: "baseline", expected: { workflowId: ref.instanceId },
+      });
+      if (!claimed.ok || !claimed.value.execute) return;
+      const prepared = await prepareDurablePathBBaseline({ projectRoot, workflowId: ref.instanceId, port: createDesktopBaselineGitPort() });
+      await store.settleEffect(ref, prepared.ok && prepared.repo.baseOid ? {
+        key: claimed.value.key, token: claimed.value.token, outcome: "succeeded", evidence: "baseline-branch-prepared",
+        result: { branch: prepared.repo.branch, oid: prepared.repo.baseOid },
+      } : {
+        key: claimed.value.key, token: claimed.value.token, outcome: "unknown",
+        evidence: prepared.ok ? "baseline-oid-missing" : `${prepared.code}: ${prepared.message}`,
+      });
+      return;
+    }
+    const dispatch = stageRequest?.kind === "stage-request" ? stageRequest.dispatch
+      : action === "b3-implement-and-accept" ? projection.scope?.dispatch : undefined;
+    if (dispatch) {
+      const stage = action === "b3-implement-and-accept" ? "B3" : "B1";
+      const parentId = durableTaskId(ref, convener, stage, attempt);
+      const sourceTaskId = stageRequest?.kind === "stage-request" ? stageRequest.sourceTaskId : projection.scope?.sourceTaskId;
+      if (!sourceTaskId) return;
+      await this.materializeDurableTask(projection, {
+        taskId: parentId, sourceRoleId: chief, roleId: convener, stage, details: dispatch, stageRequest: true,
+        binding: { stage: action === "readonly-report" ? "readonly" : stage, stageAttempt: attempt,
+          executionAttempt: 1, parentTaskId: sourceTaskId, taskId: parentId, roleId: convener },
+      });
+    }
+    const binding = projection.task;
+    if (binding?.stageAttempt !== attempt) return;
+    const taskFact = facts.find(row => row.fact.kind === "task-bound" && row.fact.task.taskId === binding.taskId
+      && row.receipt.state === "consumed")?.fact;
+    if (taskFact?.kind === "task-bound" && taskFact.dispatch) {
+      await this.materializeDurableTask(projection, {
+        taskId: binding.taskId, sourceRoleId: convener, roleId: binding.roleId,
+        stage: binding.stage === "B3" ? "B3" : "B1", details: taskFact.dispatch, binding, modulePaths: taskFact.modulePaths,
+      });
+    }
+    const taskReport = facts.find(row => row.fact.kind === "task-report" && row.fact.task.taskId === binding.taskId
+      && row.receipt.state === "consumed")?.fact;
+    if (taskReport?.kind === "task-report") {
+      const recorded = store.getEvidence(ref, taskReport.evidence) as { handback?: TaskHandback } | undefined;
+      if (recorded?.handback) {
+        const finish = binding.stage === "readonly"
+          ? "请核对只读报告，再用 close_created_task accepted 或 rejected 给出审阅结论。"
+          : binding.stage === "B3"
+          ? "核对实现报告与任务分支的提交；接受时调用 close_created_task accepted，并在本轮使用 submit_report 提交运营报告。"
+          : "核对本次只读报告；依据可用用 close_created_task accepted，需要补查用 rework，阻塞用 rejected。请在本轮使用 submit_report 将处置依据回交幕僚。";
+        const firstRequest = facts.find(row => row.fact.kind === "stage-request" && row.fact.attempt === attempt)?.fact;
+        const parent = firstRequest?.kind === "stage-request" ? firstRequest.sourceTaskId : projection.scope?.sourceTaskId;
+        const operator = parent ? { stage: binding.stage, stageAttempt: attempt, executionAttempt: 1,
+          parentTaskId: parent, taskId: binding.parentTaskId, roleId: convener } : undefined;
+        await this.queueDurablePrompt(projection, convener, binding.roleId, `${renderWorkReportPrompt(recorded.handback)}\n${finish}`,
+          this.durableRuntime(projection), `report:${taskReport.key}`, undefined, operator, binding.parentTaskId);
+      }
+    }
+  }
+
+  private async queueDurablePrompt(
+    projection: DurableProjection, roleId: string, sourceRoleId: string, text: string, runtime: RuntimeKind,
+    key: string, taskId?: string, task?: DurableTaskBinding, assignmentTaskId?: string,
+  ): Promise<void> {
+    const durable = this.deps.durableWorkflow!;
+    const store = await durable.store();
+    const { ref, stepId, attempt, projectRoot } = projection;
+    const operation = `model:${key}`;
+    const existing = store.listEffects(ref, "model-send").find(effect => effect.intent.key === operation);
+    if (existing && existing.state !== "not-started") return;
+    const dedupKey = `${projectRoot}\0${runtime}\0durable\0${ref.instanceId}\0${key}`;
+    const clientMessageId = this.appDispatchClientMessageId(dedupKey);
+    durable.registerDelivery(projectRoot, clientMessageId, {
+      ref, roleId, runtime, assignmentTaskId,
+      intent: {
+        key: operation, kind: "model-send", stepId, attempt, task,
+        expected: { roleId, runtime, inputDigest: durableHash(text), clientMessageId },
+      },
+    });
+    const existingSession = this.sessions.get(this.sessionKey(projectRoot, roleId, runtime));
+    if (!taskId && (existingSession?.sessionWorkflowMode !== "fixed" || !durable.isSession(existingSession.handle) ||
+        (assignmentTaskId !== undefined && existingSession.assignedTaskId !== assignmentTaskId))) {
+      if (existingSession?.busy || existingSession?.origins.running) return;
+      const opened = await this.openInternal({ projectRoot, roleId, runtime, forcedWorkflowMode: "fixed",
+        ...(assignmentTaskId ? { taskId: assignmentTaskId } : {}) }, false);
+      if (!opened.ok) return;
+    }
+    this.enqueueDelivery(projectRoot, roleId, {
+      kind: taskId ? "dispatch" : "system", runtime, targetRoleId: roleId, sourceRoleId,
+      taskId, text, summary: shortenSummary(text), dedupKey, clientMessageId,
+    });
+    void this.drainQueue(projectRoot, roleId, runtime);
+  }
+
+  private async materializeDurableTask(projection: DurableProjection, input: {
+    taskId: string; sourceRoleId: string; roleId: string; stage: "B1" | "B3"; details: DurableDispatchDetails;
+    stageRequest?: true; binding?: DurableTaskBinding; modulePaths?: readonly string[];
+  }): Promise<void> {
+    const { projectRoot, ref } = projection;
+    const key = `durable-task:${input.taskId}`;
+    const state = await this.readTasks(projectRoot);
+    const current = state.records.get(input.taskId)?.created;
+    if (!current) {
+      // The SQLite fact already exists. This journal row is a replayable projection for existing role tools.
+      const result = await appendTaskEvent(projectRoot, taskEvent("task.created", {
+        taskId: input.taskId,
+        from: input.stageRequest ? "chief" : "convener",
+        to: input.roleId,
+        flowId: input.details.flowId,
+        workflowId: ref.instanceId,
+        stage: input.stage,
+        ...(input.stageRequest ? { taskKind: "stage-request" as const } : {}),
+        text: input.details.text,
+        sideEffect: input.stage === "B3" && !input.stageRequest ? "code" : "read-only",
+        idempotencyKey: key,
+        ...(input.modulePaths?.length ? { modulePaths: [...input.modulePaths] } : {}),
+      }, () => new Date(this.now())));
+      if (!result.ok) return;
+    } else if (current.idempotencyKey !== key || current.to !== input.roleId || current.workflowId !== ref.instanceId) {
+      return;
+    }
+    this.starTaskIds.add(input.taskId);
+    taskCreators.set(input.taskId, input.stageRequest ? "chief" : "convener");
+    const probes = new Map<string, string | undefined>();
+    for (const readPath of extractDispatchReadPaths(input.details.text)) {
+      probes.set(readPath, await filePrint(path.join(projectRoot, readPath)));
+    }
+    const plan = planDispatchDelivery({ roleId: input.roleId, task: input.details.text }, probes,
+      { sourceRoleId: this.roleDisplayName(projectRoot, input.sourceRoleId), taskId: input.taskId });
+    if (plan.action === "reject") return;
+    await this.queueDurablePrompt(projection, input.roleId, input.sourceRoleId, plan.text,
+      this.durableRuntime(projection, input.details.runtime), input.taskId, input.taskId, input.binding);
+  }
+
+  async routeDurableDispatch(
+    projection: DurableProjection, runtime: RuntimeKind, fromRoleId: string, d: DispatchTaskPayload,
+    targetRoleId: string, text: string, source: ActualDispatchSource | undefined,
+  ): Promise<DispatchReceipt> {
+    const durable = this.deps.durableWorkflow!;
+    const store = await durable.store();
+    const { ref, projectRoot, stepId, attempt, action } = projection;
+    const reject = (code: string, message: string): DispatchReceipt => ({ ok: false, message: `${code}: ${message}` });
+    const current = () => !!source && this.sessions.get(this.sessionKey(projectRoot, fromRoleId, runtime)) === source.entry
+      && source.entry.busy && source.entry.origins.running === source.origin && !source.origin.settled
+      && !source.entry.interactionState.lifetime.signal.aborted && !source.entry.interactionState.turn.signal.aborted
+      && durable.delivery(projectRoot, source.origin.clientMessageId)?.ref.instanceId === ref.instanceId;
+    if (!current() || !source?.origin.turnId || projection.engine !== "healthy" || projection.status !== "waiting") {
+      return reject("workflow-owner-conflict", "The current turn does not own this durable workflow.");
+    }
+    const convener = this.handbackOwnerRoleId(projectRoot);
+    const chief = this.chiefTaskRoleIdOf(projectRoot);
+    if (!convener || !chief || (d.workflowId !== undefined && d.workflowId !== ref.instanceId)) {
+      return reject("stage-request-invalid", "The request does not match the registered workflow.");
+    }
+    const address = { stepId, attempt };
+    const requestedFlow = typeof d.flowId === "string" && /^[a-z0-9][a-z0-9-]{0,79}$/.test(d.flowId) ? d.flowId : undefined;
+    let fact: DurableFact;
+    if (d.taskKind === "stage-request") {
+      if (d.stage === "B2") return reject("b2-stage-request-forbidden", "Use B3 advance after the accepted B1 report.");
+      if (fromRoleId !== chief || targetRoleId !== convener || d.workflowPath !== "B" || d.workflowAction !== "advance"
+        || !requestedFlow || d.moduleId || d.modulePaths?.length || d.reworkOf) {
+        return reject("stage-request-invalid", "Only the lead may send this Path B advance to operations.");
+      }
+      const sourceTaskId = source.origin.turnId;
+      const requestDigest = durableHash(text);
+      const dispatch = { text, runtime, flowId: requestedFlow, actor: fromRoleId };
+      if (d.stage === "B1" && (action === "b1-impact-readonly" || action === "readonly-report")) {
+        fact = { ...address, key: `b1-request:${attempt}`, kind: "stage-request", source: "chief", sourceTaskId, requestDigest, dispatch };
+      } else if (d.stage === "B3" && action === "accept-b3-advance-with-b2-scope" && projection.analysisReport && projection.baseline) {
+        const report = projection.analysisReport;
+        const original = store.listFacts(ref).find(row => row.fact.kind === "stage-request" && row.fact.attempt === report.attempt)?.fact;
+        if (original?.kind !== "stage-request" || original.dispatch.flowId !== requestedFlow) {
+          return reject("b-change-scope-invalid", "The advance must match the current B1 request.");
+        }
+        const savedReport = store.getEvidence(ref, report.evidence) as { artifacts?: DurableEvidenceRef[] } | undefined;
+        if (!savedReport) return reject("b2-report-missing", "The current B1 report cannot be verified.");
+        for (const artifact of savedReport.artifacts ?? []) {
+          const fresh = await store.readEvidence(projectRoot, artifact.path);
+          if (!fresh.ok || fresh.value.sha256 !== artifact.sha256) {
+            return reject("b2-report-drift", "An artifact referenced by the current B1 report has changed.");
+          }
+        }
+        const candidateSource = d.requestedEvidence?.length ? "requestedEvidence" : "modulePaths";
+        const candidates = [...new Set((candidateSource === "requestedEvidence" ? d.requestedEvidence! : report.modulePaths).map(file => file.trim().replace(/\\/g, "/")))];
+        if (!candidates.length || !d.reason?.trim()) {
+          return reject("b-change-scope-invalid", "The current B1 report, file candidates and reason are required.");
+        }
+        const sets = await deriveDurablePathBWriteSets({ projectRoot, flowId: requestedFlow, scopeFiles: candidates });
+        if (!sets.ok) return reject(sets.code, sets.message);
+        fact = { ...address, key: `b3-advance:${attempt}`, kind: "b3-advance", source: "chief", sourceTaskId, requestDigest,
+          b1Attempt: report.attempt, reportKey: report.key, baselineOid: projection.baseline.oid, candidateSource, candidates,
+          writeSets: sets.writesets, reason: d.reason.trim(), dispatch };
+      } else {
+        return reject("stage-transition-invalid", "The durable workflow is not waiting for that advance.");
+      }
+    } else {
+      const stage = action === "b3-implement-and-accept" ? "B3" : action === "b1-impact-readonly" ? "B1" : action === "readonly-report" ? "readonly" : undefined;
+      const parentStage = stage === "B3" ? "B3" : "B1";
+      const parentTaskId = durableTaskId(ref, convener, parentStage, attempt);
+      if (fromRoleId !== convener || !stage || source.entry.assignedTaskId !== parentTaskId
+        || (d.stage !== undefined && d.stage !== parentStage)
+        || (source.origin.taskId ?? source.entry.assignedTaskId) !== parentTaskId || d.workflowPath !== undefined) {
+        return reject("workflow-binding-unavailable", "Production dispatch must come from the assigned operations task.");
+      }
+      await this.refreshListingNow(projectRoot);
+      const target = this.deps.getListing(projectRoot)?.roles.find(role => role.roleId === targetRoleId);
+      if (!target || target.builtIn || isBuiltInGovernanceRoleId(targetRoleId)) {
+        return reject("dispatch-evidence-missing", "Choose the authorized project module owner.");
+      }
+      const flowId = stage === "B3" ? projection.scope?.dispatch?.flowId : projection.stageRequest?.dispatch.flowId;
+      if (!flowId) return reject("workflow-binding-unavailable", "The authorized stage request lacks a flow binding.");
+      const modulePaths = [...new Set((d.modulePaths ?? []).map(file => file.trim().replace(/\\/g, "/")))];
+      if (!modulePaths.length || modulePaths.some(file => file === "")) {
+        return reject("dispatch-evidence-missing", "The production task must identify its module files.");
+      }
+      const allowed = stage === "B3" ? projection.scope?.writeSets.find(set => set.roleId === targetRoleId)
+        : await deriveDurablePathBWriteSets({ projectRoot, flowId, scopeFiles: modulePaths }).then(result =>
+          result.ok ? result.writesets.find(set => set.roleId === targetRoleId) : undefined);
+      if (!allowed || modulePaths.some(file => !allowed.paths.includes(file)) ||
+        (stage !== "B3" && d.sideEffect !== undefined && d.sideEffect !== "read-only")) {
+        return reject("b-change-scope-invalid", "The requested files are outside the assigned module scope.");
+      }
+      const taskId = durableTaskId(ref, targetRoleId, stage, attempt);
+      const task: DurableTaskBinding = { stage, stageAttempt: attempt, executionAttempt: 1, parentTaskId, taskId, roleId: targetRoleId };
+      fact = { ...address, key: `task-bound:${attempt}:${stepId}`, kind: "task-bound", source: "host", task, modulePaths,
+        dispatch: { text, flowId, runtime, actor: fromRoleId } };
+    }
+    if (!current()) return reject("dispatch-source-changed", "The originating turn changed during validation.");
+    const saved = await store.submit(ref, fact);
+    if (!saved.ok) return reject(saved.code, saved.message);
+    return { ok: true, message: `已保存本次请求（${saved.value.key}）。工作流消费后将按相同业务键投递。` };
   }
 
   // —— routeFixedPathDispatch（B6 自 session.ts 逐字搬移）——

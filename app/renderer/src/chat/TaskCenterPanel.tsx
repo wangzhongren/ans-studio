@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ListChecks, RefreshCw } from "lucide-react";
+import { DurableWorkflowPanel } from "@/chat/DurableWorkflowPanel";
 import { ProjectStatePanel } from "@/chat/ProjectStatePanel";
 import { useChatStore } from "@/chat/chat-store";
 import { findRole, roleDisplayName } from "@/chat/role-view";
@@ -199,6 +200,7 @@ export function TaskCenterPanel() {
   return (
     <div className="task-center">
       <ProjectStatePanel />
+      {projectRoot ? <DurableWorkflowPanel key={projectRoot} projectRoot={projectRoot} /> : null}
       <div className="tc-tools">
         <span className="tc-title">
           <ListChecks size={14} strokeWidth={1.5} aria-hidden="true" />

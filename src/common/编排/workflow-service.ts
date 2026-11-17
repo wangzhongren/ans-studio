@@ -97,6 +97,8 @@ import {
   verifyBasisDocuments,
 } from "./basis-guard.ts";
 import { stageRequestIdempotencyKey, stageStopIdempotencyKey } from "./workflow-dispatch.ts";
+import { releaseOwner, repositoryIdentity, repositoryOwner, reserveOwner } from "../../provider/durable-workflow/public.ts";
+import type { RepositoryIdentity } from "../../provider/durable-workflow/public.ts";
 
 // —————————————— 账本路径 / schema / 轮转 ——————————————
 
@@ -226,11 +228,32 @@ export function readReleaseLedger(projectRoot: string): Promise<FixedLedgerReadR
 }
 
 /** 追加 workflow 事件；同幂等键 replay 返回原事件、不重复追加。 */
-export function appendWorkflowEvent(
+export async function appendWorkflowEvent(
   projectRoot: string,
   event: WorkflowEvent,
 ): Promise<FixedLedgerAppendResult<WorkflowEvent>> {
-  return appendFixedLedgerEvent(workflowsStatePath(projectRoot), event, isWorkflowEvent, "ans-workflow/v1");
+  const result = await appendFixedLedgerEvent(workflowsStatePath(projectRoot), event, isWorkflowEvent, "ans-workflow/v1");
+  if (result.ok && result.event.kind === "workflow.closed") {
+    const repo = await legacyRepository(projectRoot);
+    if (repo && repositoryOwner(repo)?.engine === "legacy") {
+      releaseOwner(repo, { engine: "legacy", instanceId: result.event.workflowId, dataDir: repo.root });
+    }
+  }
+  return result;
+}
+
+async function legacyRepository(projectRoot: string): Promise<RepositoryIdentity | undefined> {
+  try {
+    await fs.lstat(path.join(projectRoot, ".git"));
+    return await repositoryIdentity(projectRoot);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function legacyWorkflowHasPrototypeOwner(projectRoot: string): Promise<boolean> {
+  const repo = await legacyRepository(projectRoot);
+  return repo !== undefined && repositoryOwner(repo)?.engine === "dapr";
 }
 
 /** 追加 basis 事件（`basis.recorded`/`amended`/`verified`/`drift`）。 */
@@ -824,6 +847,9 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
     return serviceFailure(WORKFLOW_CORRUPT_CODE, "workflowId 解析失败（不猜）");
   }
   const resolvedWorkflowId: string = workflowId;
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已经独占此 Git 仓库，旧引擎不能推进。");
+  }
   const wfEvents = workflowEventList(events, resolvedWorkflowId);
   const view: WorkflowView | undefined = startingNew
     ? undefined
@@ -950,6 +976,10 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   // 1) workflow 账本事件（先记请求，再创建任务；任务失败如实上抛）。
   if (startingNew) {
     const legacy = await detectLegacyStateIgnored(input.projectRoot);
+    const repo = await legacyRepository(input.projectRoot);
+    if (repo && !reserveOwner(repo, { engine: "legacy", instanceId: resolvedWorkflowId, dataDir: repo.root })) {
+      return serviceFailure("workflow-owner-conflict", "其他工作流已独占此 Git 仓库，旧引擎无法启动。");
+    }
     const startedEvent: WorkflowEvent = {
       v: 1,
       at,
@@ -1086,6 +1116,9 @@ export async function recordStageDispatch(input: {
   moduleId?: string;
   now?: () => Date;
 }): Promise<{ ok: true; replay: boolean } | WorkflowServiceFailure> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有仓库的推进权。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.workflowId) || !isNonEmptyText(input.taskId) || !isNonEmptyText(input.targetRoleId)) {
     return serviceFailure("stage-request-invalid", "recordStageDispatch 缺少 workflowId/taskId/targetRoleId。");
@@ -1282,6 +1315,9 @@ function closeStageCompletionCheck(
  * - **不写** `.ans/runs`/`.ans/trunk`、不做 CAS/snapshot；legacy 实现逐字保留（本函数只服务 fixed）。
  */
 export async function closeTask(input: CloseTaskInput): Promise<CloseTaskResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型实例须从自身的受信收口入口处理。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.operationId) || input.operationId.length > 500) {
     return serviceFailure("close-task-invalid", "operationId 缺失或超过 500 字符。");
@@ -2867,6 +2903,9 @@ export type ConfirmStopResult =
  * 任一缺失 ⇒ 记 `workflow.stop-unconfirmed`、返回 `workflow-stop-unconfirmed`（**不写 stopped**）。
  */
 export async function confirmStop(input: ConfirmStopInput): Promise<ConfirmStopResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有仓库的停止权。");
+  }
   const now = input.now ?? (() => new Date());
   const outcome: WorkflowClosedOutcome = input.outcome ?? "stopped";
   if (outcome !== "stopped" && outcome !== "reclassified") {
@@ -3186,6 +3225,9 @@ export async function findAcceptanceArchive(input: {
  * 返回 preview（应用据此构造 merge-main 非判断卡）；**本函数不构成客户确认**，执行须 `executeReleaseMerge`。
  */
 export async function prepareReleaseMerge(input: PrepareReleaseMergeInput): Promise<PrepareReleaseMergeResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有仓库的发布权。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.workflowId)) return serviceFailure("release-workflow-not-ready", "workflowId 缺失。");
   if (!isNonEmptyText(input.operationId)) return serviceFailure("release-workflow-not-ready", "operationId 缺失。");
@@ -3537,6 +3579,9 @@ async function completeReleaseWorkflow(input: {
  * - 幂等 `release:<workflowId>:<tipOid>`；已合并 ⇒ no-op 成功（`release-already-merged`）。
  */
 export async function executeReleaseMerge(input: ExecuteReleaseMergeInput): Promise<ExecuteReleaseMergeResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有仓库的发布合并权。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.workflowId)) return serviceFailure("release-workflow-not-ready", "workflowId 缺失。");
   if (!isNonEmptyText(input.releaseId)) return serviceFailure("release-workflow-not-ready", "releaseId 缺失。");
@@ -3883,12 +3928,19 @@ async function prepareBaselineGit(input: {
   workflowId: string;
   reason: "baseline" | "path-b" | "amendment";
   port: BaselineGitPort;
+  durable?: true;
 }): Promise<{ ok: true; repo: WorkflowRepoSnapshot; receipt: BaselineGitReceipt } | WorkflowServiceFailure> {
   const repository = await input.port.ensureRepository({
     projectRoot: input.projectRoot,
     allowInit: input.reason === "baseline",
   });
   if (!repository.ok) return repository;
+  if (input.durable !== true) {
+    const repo = await legacyRepository(input.projectRoot);
+    if (repo && !reserveOwner(repo, { engine: "legacy", instanceId: input.workflowId, dataDir: repo.root })) {
+      return serviceFailure("workflow-owner-conflict", "其他工作流已独占此 Git 仓库，旧引擎无法准备基线。");
+    }
+  }
   const gitignore = await input.port.ensureGitignore({ projectRoot: input.projectRoot });
   if (!gitignore.ok) return gitignore;
   const worktree = await input.port.inspectWorktree({ projectRoot: input.projectRoot });
@@ -3904,7 +3956,7 @@ async function prepareBaselineGit(input: {
     );
   }
   const expectedBranch = taskBranchName(input.workflowId);
-  const allowReuse = await workflowOwnsTaskBranch(input.projectRoot, input.workflowId, expectedBranch);
+  const allowReuse = input.durable !== true && await workflowOwnsTaskBranch(input.projectRoot, input.workflowId, expectedBranch);
   const branchResult = await input.port.prepareTaskBranch({
     projectRoot: input.projectRoot,
     workflowId: input.workflowId,
@@ -4083,6 +4135,11 @@ export async function completeTeamPlanFixed(input: CompleteTeamPlanFixedInput): 
   };
 }
 
+/** 复用路径 B 的 Git 初始化守卫。原型在调用前领取实际基线作用权，并持久化回执。 */
+export function prepareDurablePathBBaseline(input: { projectRoot: string; workflowId: string; port: BaselineGitPort }) {
+  return prepareBaselineGit({ ...input, reason: "path-b", durable: true });
+}
+
 export interface PreparePathBStartInput {
   projectRoot: string;
   flowId: string;
@@ -4259,9 +4316,26 @@ export type DerivePathBWriteSetsResult =
  *    要求走路径 A）；`.ans/**`、`角色卡/**` 永不进入实现写集。
  */
 export async function derivePathBWriteSets(input: DerivePathBWriteSetsInput): Promise<DerivePathBWriteSetsResult> {
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const started = ledger.events.find((event) => event.workflowId === input.workflowId && event.kind === "workflow.started");
+  if (started === undefined || started.kind !== "workflow.started") {
+    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+  }
+  if (started.path !== "B") {
+    return serviceFailure("b-change-scope-invalid", "B3 写集派生只适用于路径 B workflow（A 路径用团队计划 writesets）。");
+  }
+  return derivePathBScope(input, false);
+}
+
+/** 只读派生。原型所有权与 B1/B2 前置由调用方的权威账本核对。 */
+export function deriveDurablePathBWriteSets(input: Omit<DerivePathBWriteSetsInput, "workflowId">): Promise<DerivePathBWriteSetsResult> {
+  return derivePathBScope(input, true);
+}
+
+async function derivePathBScope(input: Omit<DerivePathBWriteSetsInput, "workflowId">, requireRosterBoundary: boolean): Promise<DerivePathBWriteSetsResult> {
   const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
   if (!isWorkflowSlug(flowId)) return serviceFailure("b-change-scope-invalid", `flowId 非法：${String(input.flowId)}`);
-  if (!isNonEmptyText(input.workflowId)) return serviceFailure("b-change-scope-invalid", "workflowId 缺失。");
+
   if (!Array.isArray(input.scopeFiles) || input.scopeFiles.length === 0) {
     return serviceFailure("b-change-scope-invalid", "scope.files 为空：B3 写集来源缺失（要求至少一个候选路径）。", ["scope.files"]);
   }
@@ -4277,17 +4351,9 @@ export async function derivePathBWriteSets(input: DerivePathBWriteSetsInput): Pr
     }
     if (!normalized.includes(candidate)) normalized.push(candidate);
   }
-  const ledger = await readWorkflowLedger(input.projectRoot);
-  const wfEvents = workflowEventList(ledger.events, input.workflowId);
-  const started = wfEvents.find((event) => event.kind === "workflow.started");
-  if (started === undefined || started.kind !== "workflow.started") {
-    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
-  }
-  if (started.path !== "B") {
-    return serviceFailure("b-change-scope-invalid", "B3 写集派生只适用于路径 B workflow（A 路径用团队计划 writesets）。");
-  }
   const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId });
   if (roster.ok) {
+    const boundaries = requireRosterBoundary ? await loadProjectRoleBoundaries(input.projectRoot) : undefined;
     const byRole = new Map<string, string[]>();
     for (const candidate of normalized) {
       const owners = new Set<string>();
@@ -4307,6 +4373,9 @@ export async function derivePathBWriteSets(input: DerivePathBWriteSetsInput): Pr
         );
       }
       const owner = [...owners][0]!;
+      if (boundaries && !boundaryContainsPath(boundaries.get(owner) ?? [], candidate)) {
+        return serviceFailure("b-change-scope-invalid", `名单属主 ${owner} 的边界未授权此路径：${candidate}。`);
+      }
       if (isGovernanceDocPath(candidate) && owner !== "rapporteur" && owner !== "product") {
         return serviceFailure(
           "b-change-scope-requires-rapporteur",
@@ -4386,6 +4455,9 @@ export type RecordChangeScopeDecisionResult =
  * 投影据此完成 B2；scope 越界/无法唯一归属 ⇒ `b-change-scope-invalid`（要求走 A/新 basis）。
  */
 export async function recordChangeScopeDecision(input: RecordChangeScopeDecisionInput): Promise<RecordChangeScopeDecisionResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有本仓库的 B2 范围记录权。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.workflowId)) return serviceFailure("b-change-scope-invalid", "workflowId 缺失。");
   if (!isNonEmptyText(input.requestTaskId)) return serviceFailure("b-change-scope-invalid", "requestTaskId 缺失。");

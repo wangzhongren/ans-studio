@@ -117,6 +117,7 @@ export class DeliveryStore {
   // —— persistableDeliveryItem（B4 自 session.ts 逐字搬移）——
   /** 一条投递条目的 JSON 安全快照；不可序列化（含用户载荷里塞了怪对象）⇒ undefined（该条不落盘）。 */
   persistableDeliveryItem(item: DeliveryItem): PersistedDeliveryItemV1["item"] | undefined {
+    if (item.dedupKey.includes("\u0000durable\u0000")) return undefined;
     try {
       const snapshot: PersistedDeliveryItemV1["item"] = {
         kind: item.kind,

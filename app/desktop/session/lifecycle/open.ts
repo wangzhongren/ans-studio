@@ -272,8 +272,10 @@ export class LifecycleOpen {
     // 收到 `request_stable_write`）。强制只在 trio 生效（固定路径为 trio 产品流程）；未携带时下面
     // task/chat 逻辑逐字不变。
     const listingGovernanceModel = this.deps.getListing(req.projectRoot)?.governanceModel ?? "single";
+    const durable = this.deps.durableWorkflow;
+    const durableOwned = durable ? await durable.owns(req.projectRoot) : false;
     const forcedSessionWorkflowMode: WorkflowMode | undefined =
-      req.forcedWorkflowMode === "fixed" && listingGovernanceModel === "trio" ? "fixed" : undefined;
+      (req.forcedWorkflowMode === "fixed" || durableOwned) && listingGovernanceModel === "trio" ? "fixed" : undefined;
     const requestedSessionMode: WorkflowMode =
       forcedSessionWorkflowMode ??
       (listingGovernanceModel === "trio"
@@ -313,7 +315,8 @@ export class LifecycleOpen {
       && forcedExisting.sessionWorkflowMode === "fixed"
       && forcedExisting.assignedTaskId !== req.taskId;
     if (forcedSessionWorkflowMode === "fixed" && forcedExisting && forcedExisting.projectRoot === req.projectRoot
-        && (forcedExisting.sessionWorkflowMode !== "fixed" || fixedTaskRebindPending)) {
+        && (forcedExisting.sessionWorkflowMode !== "fixed" || fixedTaskRebindPending
+          || durableOwned && !durable?.isSession(forcedExisting.handle))) {
       const rebindDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId });
       if (forcedExisting.busy || forcedExisting.origins.running !== undefined) {
         rebindDiagnostic.record("session.fixed-rebind.blocked", { reasonCode: "target-busy", previousWorkflowMode: forcedExisting.sessionWorkflowMode, taskBinding: fixedTaskRebindPending ? "different-task" : "not-fixed" });
@@ -1132,6 +1135,15 @@ export class LifecycleOpen {
       // 桌面是否统一改走该入口：另行评估（更正记录见
       // `角色卡/桌面应用/docs/change/2026-10-12_change_session-comment-refresh.md`）。
       if (stopped()) return stoppedResult();
+      const durable = this.deps.durableWorkflow;
+      const durableOwned = durable ? await durable.owns(req.projectRoot) : false;
+      const effectClaims = durableOwned ? durable?.taskEffectClaims(req, () => {
+        const entry = this.sessions.get(key);
+        const origin = entry?.origins.running;
+        if (!entry || !origin || origin.settled || entry.handle !== gitBinding.handle
+          || entry.interactionState.turn.signal.aborted || entry.interactionState.lifetime.signal.aborted) return undefined;
+        return origin.clientMessageId;
+      }) : undefined;
       handle = await this.openObservedRoleSession(
         {
           roleId: req.roleId,
@@ -1154,8 +1166,17 @@ export class LifecycleOpen {
           // 编排不注入 scope ⇒ `git add`/`git commit` 一律拒（fail-closed）。端口 `acquireCriticalSection`
           // 与 B3 发布合并共用同一把项目级锁（`acquireProjectGitCriticalSection` 同一实现）。
           ...(sessionWorkflowMode === "fixed" && req.taskId !== undefined
-            ? { taskGit: buildFixedTaskGitSurface(req.projectRoot) }
+            ? { taskGit: {
+              ...buildFixedTaskGitSurface(req.projectRoot, effectClaims?.claimTaskGit),
+              ...(durableOwned && durable ? {
+                durableScope: async ({ taskId, roleId }: { taskId: string; roleId: string }) => {
+                  const projection = await durable.find(req.projectRoot);
+                  return projection ? (await durable.store()).taskGitScope(projection.ref, taskId, roleId) : undefined;
+                },
+              } : {}),
+            } }
             : {}),
+          ...(effectClaims ? { claimFileWrite: effectClaims.claimFileWrite } : {}),
           ...(routineShellPolicy ? { routineShellPolicy } : {}),
           // 客户交互通道（A-5）：仅内置治理角色（su / trio 三人）会话注入；Liaison 不注入（§4.3）。
           // **每会话闭包绑定 roleId**（请求本体不带角色标识——渲染侧据它把交互卡落到该角色的聊天流、
@@ -1232,14 +1253,14 @@ export class LifecycleOpen {
           // B29（2026-11-11）：fixed 注入实现返回 **fixed 服务形状**（工具层按入参 workflowId+plan 分流到
           // B25 `fixedCompleteTeamPlanReceiptResult`）；注入位类型仍是 legacy `CompleteTeamPlanFn`（共享
           // 同一能力位），运行时形状由工具层校验——故此处显式断言，legacy 分支零改动。
-          ...(direct !== undefined && req.roleId === "convener" ? {
+          ...(!durableOwned && direct !== undefined && req.roleId === "convener" ? {
             completeTeamPlan: sessionWorkflowMode === "fixed"
               ? ((input: Parameters<CompleteTeamPlanFn>[0], planSignal?: AbortSignal) =>
                   this.completeTeamPlanFixedForHandle(req.projectRoot, req.runtime, planBinding.handle, input, planSignal)) as unknown as CompleteTeamPlanFn
               : (input, signal) => this.completeTeamPlanForHandle(req.projectRoot, req.runtime, planBinding.handle, input, direct, signal),
           } : {}),
-          ...(direct !== undefined && req.roleId === "nominator" ? { activateRoleDocuments: direct.activateRoleDocuments } : {}),
-          ...(closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
+          ...(!durableOwned && direct !== undefined && req.roleId === "nominator" ? { activateRoleDocuments: direct.activateRoleDocuments } : {}),
+          ...(!durableOwned && closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
           // T3 B3（AC-18/AC-20）：fixed 会话的 `close_created_task` v2 应用实现（补 artifacts/branchTipOid/
           // acceptanceArchive 证据；A12b accepted 时应用生成 `docs/acceptance/*`）；legacy 不注入本键。
           ...(closeCreatedTaskFixed !== undefined ? { closeCreatedTaskFixed } : {}),
@@ -1299,6 +1320,7 @@ export class LifecycleOpen {
       dispatchBinding.handle = handle;
       gitBinding.handle = handle;
       planBinding.handle = handle;
+      if (durableOwned) durable?.markSession(handle);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }

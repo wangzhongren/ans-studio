@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/chat/chat-store";
 import {
   confirmDecisionPayload,
+  decisionRequestOf,
   decisionView,
   pendingMoreCount,
   rejectDecisionPayload,
@@ -194,9 +195,11 @@ export function DecisionDialog() {
 
   const reject = () => {
     if (view.kind === "choice") {
-      // VCA 客户主权卡（选项含 reject-version-change）：底部「拒绝」必须**真正拒绝申请**
-      // （选中拒绝项并提交）；不能用 cancelled——那只是放弃作答，申请会继续挂在待批（旧陷阱）。
-      const rejectOption = view.options.find((option) => option.id === "reject-version-change");
+      // Application release cards and version changes have explicit negative decisions.
+      const request = decisionRequestOf(payload);
+      const rejectOption = request.application === true && request.cardKind === "merge-main"
+        ? view.options.find((option) => option.id === "reject-merge-main")
+        : view.options.find((option) => option.id === "reject-version-change");
       if (rejectOption !== undefined) {
         void send({ kind: "choice", selected: [rejectOption.id] }, { allowCancel: true });
         return;
