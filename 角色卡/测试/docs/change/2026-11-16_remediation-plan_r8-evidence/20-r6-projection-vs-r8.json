@@ -1,0 +1,167 @@
+{
+  "generatedAt": "2026-11-16T14:09:58.121Z",
+  "r6Projection": 50,
+  "r8Universe": 42,
+  "byKind": {
+    "expected-still-red": 38,
+    "expected-greened": 12,
+    "r6-name-outside-projection": 2,
+    "new-vs-r6": 2
+  },
+  "batches": {
+    "W19/W33 (w19@a469a83)": {
+      "expectedGreen": 2,
+      "greenedInR8": 1,
+      "stillRedInR8": 1,
+      "stillRedNames": [
+        "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续"
+      ]
+    },
+    "B4-fu (b4fu@84c4a3c)": {
+      "expectedGreen": 0,
+      "greenedInR8": 0,
+      "stillRedInR8": 0,
+      "stillRedNames": []
+    },
+    "B3c-fu (b3cfu@99adf94)": {
+      "expectedGreen": 9,
+      "greenedInR8": 9,
+      "stillRedInR8": 0,
+      "stillRedNames": []
+    },
+    "misc (misc@2c323ff)": {
+      "expectedGreen": 2,
+      "greenedInR8": 1,
+      "stillRedInR8": 1,
+      "stillRedNames": [
+        "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过"
+      ]
+    }
+  },
+  "deviations": [
+    {
+      "kind": "expected-greened",
+      "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "expected-greened",
+      "name": "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒",
+      "r6Family": null,
+      "r8Family": "",
+      "platforms": "",
+      "note": "R6 投影后转绿"
+    },
+    {
+      "kind": "r6-name-outside-projection",
+      "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+      "r8Family": "hang-timeout",
+      "platforms": "arm64+x64",
+      "note": "R6 宇宙内但不在 R6 投影剩余"
+    },
+    {
+      "kind": "new-vs-r6",
+      "name": "independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC",
+      "r8Family": "unclassified-new",
+      "platforms": "arm64",
+      "note": "R6 宇宙外新增"
+    },
+    {
+      "kind": "new-vs-r6",
+      "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin",
+      "r8Family": "e71501c-drift",
+      "platforms": "x64",
+      "note": "R6 宇宙外新增"
+    },
+    {
+      "kind": "r6-name-outside-projection",
+      "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+      "r8Family": "e71501c-drift",
+      "platforms": "x64",
+      "note": "R6 宇宙内但不在 R6 投影剩余"
+    }
+  ]
+}

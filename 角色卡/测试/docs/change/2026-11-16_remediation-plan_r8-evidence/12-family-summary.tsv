@@ -1,0 +1,4 @@
+known-red-62	27	5:trunk-upgrade-validation.test.ts, 3:trio-worker-report.test.ts, 2:section1-write-preauthorization.test.ts, 2:appointment-roster.test.ts, 2:session-dir.test.ts, 1:convener-workflow-write.test.ts
+e71501c-drift	9	9:chief-workflow.test.ts
+hang-timeout	3	1:task-restart.test.ts, 1:git-role-workflows-e2e.test.ts, 1:2026-11-09_judge-delegated-effectiveness.test.ts
+unclassified-new	3	1:git-command.test.ts, 1:p1p7-window-provenance-integration.test.ts, 1:compatibility-loopback.test.ts

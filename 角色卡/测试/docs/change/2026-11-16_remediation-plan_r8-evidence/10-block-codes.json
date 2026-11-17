@@ -1,0 +1,1104 @@
+{
+  "generatedAt": "2026-11-16T13:59:03.533Z",
+  "platforms": {
+    "macos_arm64": {
+      "source": "C:/Users/51054/AppData/Local/Temp/r8-art/test-logs-mac-arm64/test-ci-output.log",
+      "topLevelTests": 5828,
+      "blockCount": 30,
+      "names": [
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "files": [
+            "test/桌面应用/task-restart.test.ts"
+          ],
+          "codes": [
+            "等待超时"
+          ],
+          "firstLine": "✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (55646.301042ms)",
+          "blocks": 1
+        },
+        {
+          "name": "independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC",
+          "files": [
+            "test/测试/p1p7-window-provenance-integration.test.ts"
+          ],
+          "codes": [
+            "ENOTEMPTY"
+          ],
+          "firstLine": "✖ independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC (51.5845ms)",
+          "blocks": 1
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针 (13.299ms)",
+          "blocks": 1
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed (14.114666ms)",
+          "blocks": 1
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "files": [
+            "test/编排/chat-handback-scope.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId (26.240459ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "files": [
+            "test/编排/direct-role-capabilities.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation (49.686375ms)",
+          "blocks": 1
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "files": [
+            "test/编排/doc-format-specs.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由） (59.305791ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (2050.911041ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+          "files": [
+            "test/编排/git-command.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry (111.841667ms)",
+          "blocks": 1
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "files": [
+            "test/编排/governance-matrix-injection.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入） (5.578208ms)",
+          "blocks": 1
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "files": [
+            "test/编排/handback.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ openRoleSession：普通角色 settle → 发出 handback（形状正确） (24.052208ms)",
+          "blocks": 1
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒 (4.491083ms)",
+          "blocks": 1
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒 (3.632416ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "codes": [],
+          "firstLine": "✖ D-1：projectRoot 为空 → 不传 sessionDir（旧行为） (0.634208ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义） (9.452375ms)",
+          "blocks": 1
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "files": [
+            "test/编排/shell-operator-only.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界 (4.985666ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report (0.42175ms)",
+          "blocks": 1
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力 (0.346291ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡 (0.103708ms)",
+          "blocks": 1
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "files": [
+            "test/编排/trunk-service.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接 (91.606ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "vca-channel-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin） (41.10725ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid） (31.324333ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝 (26.529125ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed） (23.291292ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验） (22.576334ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "files": [
+            "test/门禁引擎/convener-workflow-write.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者 (1.09325ms)",
+          "blocks": 1
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "files": [
+            "test/门禁引擎/governance-matrix-service.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中 (2.277667ms)",
+          "blocks": 1
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "files": [
+            "test/门禁引擎/list-project.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告 (88.846333ms)",
+          "blocks": 1
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "files": [
+            "test/门禁引擎/role-group-metadata.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留 (89.155125ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "files": [
+            "test/门禁引擎/view-image-cards.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ D-10：质检卡保留可选质量核对与截图上限，不要求录屏 (0.690042ms)",
+          "blocks": 1
+        }
+      ]
+    },
+    "macos_x64": {
+      "source": "C:/Users/51054/AppData/Local/Temp/r8-art/test-logs-mac-x64/test-ci-output.log",
+      "topLevelTests": 5828,
+      "blockCount": 40,
+      "names": [
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin (11437.204533ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin (513.486814ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin (578.442803ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin (450.114124ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后 (604.813927ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后 (398.377961ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续 (443.089132ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope (472.472087ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝",
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝 (439.680718ms)",
+          "blocks": 1
+        },
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "files": [
+            "test/桌面应用/task-restart.test.ts"
+          ],
+          "codes": [
+            "等待超时"
+          ],
+          "firstLine": "✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (158106.619751ms)",
+          "blocks": 1
+        },
+        {
+          "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+          "files": [
+            "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+          ],
+          "codes": [
+            "test timed out after"
+          ],
+          "firstLine": "✖ W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例 (180003.447753ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+          "files": [
+            "test/测试/git-role-workflows-e2e.test.ts"
+          ],
+          "codes": [
+            "test timed out after"
+          ],
+          "firstLine": "✖ Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (300001.334164ms)",
+          "blocks": 1
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针 (29.777069ms)",
+          "blocks": 1
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "files": [
+            "test/编排/appointment-roster.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed (31.031894ms)",
+          "blocks": 1
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "files": [
+            "test/编排/chat-handback-scope.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId (54.22736ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "files": [
+            "test/编排/direct-role-capabilities.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation (152.595105ms)",
+          "blocks": 1
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "files": [
+            "test/编排/doc-format-specs.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由） (194.016824ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "files": [
+            "test/编排/git-capabilities.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (4254.938809ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+          "files": [
+            "test/编排/git-command.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry (251.429017ms)",
+          "blocks": 1
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "files": [
+            "test/编排/governance-matrix-injection.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入） (21.391277ms)",
+          "blocks": 1
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "files": [
+            "test/编排/handback.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ openRoleSession：普通角色 settle → 发出 handback（形状正确） (60.715443ms)",
+          "blocks": 1
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒 (14.745031ms)",
+          "blocks": 1
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "files": [
+            "test/编排/section1-write-preauthorization.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒 (10.554146ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "codes": [],
+          "firstLine": "✖ D-1：projectRoot 为空 → 不传 sessionDir（旧行为） (1.704242ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "files": [
+            "test/编排/session-dir.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义） (21.254508ms)",
+          "blocks": 1
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "files": [
+            "test/编排/shell-operator-only.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界 (8.331403ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report (0.772756ms)",
+          "blocks": 1
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力 (1.602603ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "files": [
+            "test/编排/trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡 (0.240859ms)",
+          "blocks": 1
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "files": [
+            "test/编排/trunk-service.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接 (103.764636ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "vca-channel-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin） (133.32811ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid） (109.551338ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝 (102.973685ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed） (106.460938ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "files": [
+            "test/编排/trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验） (101.532218ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "files": [
+            "test/门禁引擎/convener-workflow-write.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者 (1.107606ms)",
+          "blocks": 1
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "files": [
+            "test/门禁引擎/governance-matrix-service.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中 (2.544458ms)",
+          "blocks": 1
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "files": [
+            "test/门禁引擎/list-project.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告 (110.408102ms)",
+          "blocks": 1
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "files": [
+            "test/门禁引擎/role-group-metadata.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留 (110.186058ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "files": [
+            "test/门禁引擎/view-image-cards.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ D-10：质检卡保留可选质量核对与截图上限，不要求录屏 (1.00319ms)",
+          "blocks": 1
+        }
+      ]
+    },
+    "windows_x64": {
+      "source": "C:/Users/51054/AppData/Local/Temp/r8-art/test-logs-win-x64/test-ci-output.log",
+      "topLevelTests": 5829,
+      "blockCount": 28,
+      "names": [
+        {
+          "name": "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+          "files": [
+            "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts"
+          ],
+          "codes": [],
+          "firstLine": "✖ test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts (3196.326ms)",
+          "blocks": 1
+        },
+        {
+          "name": "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+          "files": [
+            "test\\编排\\appointment-roster.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针 (14.9045ms)",
+          "blocks": 1
+        },
+        {
+          "name": "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+          "files": [
+            "test\\编排\\appointment-roster.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed (15.1172ms)",
+          "blocks": 1
+        },
+        {
+          "name": "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+          "files": [
+            "test\\编排\\chat-handback-scope.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId (29.0578ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+          "files": [
+            "test\\编排\\direct-role-capabilities.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation (147.9994ms)",
+          "blocks": 1
+        },
+        {
+          "name": "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+          "files": [
+            "test\\编排\\doc-format-specs.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由） (60.1368ms)",
+          "blocks": 1
+        },
+        {
+          "name": "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+          "files": [
+            "test\\编排\\git-capabilities.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority (2549.3745ms)",
+          "blocks": 1
+        },
+        {
+          "name": "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+          "files": [
+            "test\\编排\\governance-matrix-injection.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入） (9.5842ms)",
+          "blocks": 1
+        },
+        {
+          "name": "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+          "files": [
+            "test\\编排\\handback.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ openRoleSession：普通角色 settle → 发出 handback（形状正确） (33.6231ms)",
+          "blocks": 1
+        },
+        {
+          "name": "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+          "files": [
+            "test\\编排\\section1-write-preauthorization.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒 (7.983ms)",
+          "blocks": 1
+        },
+        {
+          "name": "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+          "files": [
+            "test\\编排\\section1-write-preauthorization.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒 (6.462ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+          "files": [
+            "test\\编排\\session-dir.test.ts"
+          ],
+          "codes": [],
+          "firstLine": "✖ D-1：projectRoot 为空 → 不传 sessionDir（旧行为） (0.5281ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+          "files": [
+            "test\\编排\\session-dir.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义） (9.0866ms)",
+          "blocks": 1
+        },
+        {
+          "name": "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+          "files": [
+            "test\\编排\\shell-operator-only.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界 (3.7193ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report (0.4738ms)",
+          "blocks": 1
+        },
+        {
+          "name": "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力 (0.3481ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+          "files": [
+            "test\\编排\\trio-worker-report.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡 (0.125ms)",
+          "blocks": 1
+        },
+        {
+          "name": "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+          "files": [
+            "test\\编排\\trunk-service.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接 (99.6573ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "vca-channel-unavailable",
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin） (97.8997ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid） (82.9716ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝 (81.9677ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed） (88.4634ms)",
+          "blocks": 1
+        },
+        {
+          "name": "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+          "files": [
+            "test\\编排\\trunk-upgrade-validation.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验） (88.3565ms)",
+          "blocks": 1
+        },
+        {
+          "name": "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+          "files": [
+            "test\\门禁引擎\\convener-workflow-write.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者 (0.6234ms)",
+          "blocks": 1
+        },
+        {
+          "name": "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中",
+          "files": [
+            "test\\门禁引擎\\governance-matrix-service.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中 (1.5772ms)",
+          "blocks": 1
+        },
+        {
+          "name": "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+          "files": [
+            "test\\门禁引擎\\list-project.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告 (58.9108ms)",
+          "blocks": 1
+        },
+        {
+          "name": "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+          "files": [
+            "test\\门禁引擎\\role-group-metadata.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留 (57.9125ms)",
+          "blocks": 1
+        },
+        {
+          "name": "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+          "files": [
+            "test\\门禁引擎\\view-image-cards.test.ts"
+          ],
+          "codes": [
+            "ERR_ASSERTION"
+          ],
+          "firstLine": "✖ D-10：质检卡保留可选质量核对与截图上限，不要求录屏 (0.7007ms)",
+          "blocks": 1
+        }
+      ]
+    }
+  },
+  "arm64": {
+    "status": "complete",
+    "artifact": "C:/Users/51054/AppData/Local/Temp/r8-art/test-logs-mac-arm64/test-ci-output.log",
+    "note": "run 43867573699 arm64 artifact present when --arm64 is provided; block attribution included in platforms.macos_arm64"
+  }
+}

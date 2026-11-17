@@ -1,0 +1,66 @@
+{
+  "generatedAt": "2026-11-16T14:06:36.817Z",
+  "runId": "43867573699",
+  "platforms": {
+    "macos_arm64": {
+      "summary": {
+        "tests": 5828,
+        "suites": 0,
+        "pass": 5779,
+        "fail": 30,
+        "cancelled": 0,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 1435548.906875
+      },
+      "uniqueAuthoritativeNames": 30,
+      "lineLevelUniqueIncludingHeaders": 31,
+      "coordinator": {
+        "fail": 30,
+        "unique": 31
+      },
+      "matchUnique": true,
+      "matchFail": true
+    },
+    "macos_x64": {
+      "summary": {
+        "tests": 5828,
+        "suites": 0,
+        "pass": 5769,
+        "fail": 38,
+        "cancelled": 2,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 2877968.185256
+      },
+      "uniqueAuthoritativeNames": 40,
+      "lineLevelUniqueIncludingHeaders": 41,
+      "coordinator": {
+        "fail": 38,
+        "unique": 41
+      },
+      "matchUnique": true,
+      "matchFail": true
+    },
+    "windows_x64": {
+      "summary": {
+        "tests": 5829,
+        "suites": 0,
+        "pass": 5769,
+        "fail": 28,
+        "cancelled": 0,
+        "skipped": 32,
+        "todo": 0,
+        "duration_ms": 1386883.7669
+      },
+      "uniqueAuthoritativeNames": 28,
+      "lineLevelUniqueIncludingHeaders": 29,
+      "coordinator": {
+        "fail": 28,
+        "unique": 29
+      },
+      "matchUnique": true,
+      "matchFail": true
+    }
+  }
+}

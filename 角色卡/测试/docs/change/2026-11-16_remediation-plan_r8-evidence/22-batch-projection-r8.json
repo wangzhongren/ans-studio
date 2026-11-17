@@ -1,0 +1,302 @@
+{
+  "generatedAt": "2026-11-16T14:09:58.119Z",
+  "basis": "R8 宇宙 42（run 43867573699，main@5661a73，三平台工件齐全）",
+  "r6ProjectionAudit": {
+    "projected50": 50,
+    "stillRedInR8": 38,
+    "greenedSinceProjection": 12,
+    "greenedNames": [
+      "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+      "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+      "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt",
+      "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+      "D3 linked workspace root remains usable; linked target itself is not replaced",
+      "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+      "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+      "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+      "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+      "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+      "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+      "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒"
+    ],
+    "outsideProjection": 4,
+    "outsideProjectionNames": [
+      "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+      "independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin",
+      "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续"
+    ],
+    "batches": {
+      "W19/W33 (w19@a469a83)": {
+        "expectedGreen": 2,
+        "greenedInR8": 1,
+        "stillRedInR8": 1,
+        "stillRedNames": [
+          "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续"
+        ]
+      },
+      "B4-fu (b4fu@84c4a3c)": {
+        "expectedGreen": 0,
+        "greenedInR8": 0,
+        "stillRedInR8": 0,
+        "stillRedNames": []
+      },
+      "B3c-fu (b3cfu@99adf94)": {
+        "expectedGreen": 9,
+        "greenedInR8": 9,
+        "stillRedInR8": 0,
+        "stillRedNames": []
+      },
+      "misc (misc@2c323ff)": {
+        "expectedGreen": 2,
+        "greenedInR8": 1,
+        "stillRedInR8": 1,
+        "stillRedNames": [
+          "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过"
+        ]
+      }
+    }
+  },
+  "mergedBatchAudit": {
+    "w19 #122": {
+      "role": "W19 close-notify 产品修复 + W33 hub 跨 run 例外",
+      "targets": [
+        "W19（全平台）",
+        "W33（原三平台）"
+      ],
+      "r8": {
+        "w19Present": [],
+        "w33Present": [
+          "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续"
+        ]
+      },
+      "verdict": "W19 全平台转绿；W33 arm64/Windows 转绿、x64 仍红（git-core-in-flight-unproven）"
+    },
+    "b4fu #123": {
+      "role": "W1b 守卫 2.5s→15s",
+      "targets": [],
+      "r8": {},
+      "verdict": "W1b 在 R7/R8 均未入宇宙（早已绿）；不影响其他名"
+    },
+    "b3cfu #124": {
+      "role": "9 名 Windows-only git-file-final-guard 残差（realpathSync.native）",
+      "targets": [],
+      "r8": {
+        "matchedPresent": 0
+      },
+      "verdict": "9 名在 R7/R8 均未出现（转绿）"
+    },
+    "misc #125": {
+      "role": "task-restart v2.0.0 run-bound 重写；direct-role e2e 旧名退役（Q normal-new early chain）",
+      "r8": {
+        "taskRestart": [
+          "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过"
+        ],
+        "qNormalNew": []
+      },
+      "verdict": "Q normal-new early chain 旧名已退役且未再出现；task-restart 仍红：arm64 55.6s / x64 158.1s（等待超时），Windows 绿——与批内 3× 绿不符，需重开"
+    },
+    "KR-33 #129": {
+      "role": "runtime-core 冻结 33：产品回归 1 + 测试假设 5 修复；环境 27 本已绿",
+      "r8": {
+        "present": 0,
+        "total": 33
+      },
+      "verdict": "33/33 未出现在三平台任何失败名（KR-33 归零）"
+    },
+    "macOS file-gate nlink #128": {
+      "role": "W29×3/W30×2/Q2 P2 的 file-gate-host-facts-unproven 产品修复（目录 nlink 不入 digest）",
+      "r8": {
+        "w29w30q2Present": [
+          "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+          "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+          "W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin",
+          "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+          "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+          "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+          "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后"
+        ],
+        "w34w35": [
+          "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+          "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝"
+        ]
+      },
+      "verdict": "arm64/Windows：W29×3/W30×2/Q2 P2 全部转绿，W34/W35 亦转绿；x64：W29×3+新变体 missing-confirmation、W30×2、Q2 P2（改为 300s 超时）、W34/W35 仍红——file-gate 码已消失，后续阻塞为 chief-workflow.test.ts:1726 git-core-in-flight-unproven（Q2 P2 为超时）"
+    },
+    "misc2 #130": {
+      "role": "run-pin M1/M2/M3、Pipeline initial workflow、Q74、W36；spawn fence 仅记录",
+      "r8": {
+        "present": [],
+        "spawnFence": [
+          "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry"
+        ]
+      },
+      "verdict": "4 个目标全部转绿（三平台/原平台均未再现）；spawn fence 如预期仍在（arm64+x64）"
+    },
+    "misc3 #131": {
+      "role": "b31 路径 B 屏障、multi-runtime ENOTEMPTY 清理；compatibility-loopback / W-J5 仅记录",
+      "r8": {
+        "present": [],
+        "compatLoop": [
+          "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts"
+        ],
+        "wj5": [
+          "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例"
+        ]
+      },
+      "verdict": "b31、multi-runtime ENOTEMPTY 转绿；compatibility-loopback 仍 Windows file-level 原生崩溃；W-J5 仍 x64 180s"
+    }
+  },
+  "pendingBatches": {
+    "kr29a (门禁 5)": {
+      "targets": [
+        "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+        "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+        "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+        "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+        "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中"
+      ],
+      "presentInR8": [
+        "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+        "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+        "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+        "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+        "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中"
+      ],
+      "note": "kr29a 批记录：5 文件断言更新、门禁 577/576/0/1 3× 绿、typecheck 0；未合入 R8 CI。"
+    },
+    "kr29b (编排 23)": {
+      "targets": [
+        "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+        "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+        "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+        "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+        "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+        "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+        "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+        "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+        "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+        "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+        "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+        "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+        "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+        "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+        "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+        "node test外指符号链接路径不获委托；项目内测试路径获委托",
+        "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+        "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+        "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+        "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+        "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+        "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+        "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒"
+      ],
+      "presentInR8": [
+        "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）",
+        "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+        "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+        "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）",
+        "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+        "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+        "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+        "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed",
+        "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+        "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）",
+        "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority",
+        "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界",
+        "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation",
+        "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）",
+        "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接",
+        "openRoleSession：普通角色 settle → 发出 handback（形状正确）",
+        "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId",
+        "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+        "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒",
+        "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+        "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡",
+        "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒"
+      ],
+      "note": "orchestration-24 中 wiring guards 已由 B3c 修复、按 REMOVED 登记（R7/R8 均绿）；其余 23 名由 kr29b 更新（含 1 名本机 symlink 环境项，CI 本已绿）。R8 中实际红：22/23（arm64/x64/Windows 三平台同红 22 + CI 已绿的 symlink 名 1 不计）。"
+    },
+    "plat (平台硬化)": {
+      "targets": [
+        "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+        "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+        "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例"
+      ],
+      "presentInR8": [
+        "Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry",
+        "test\\测试\\g5-reasoning-verify\\compatibility-loopback.test.ts",
+        "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例"
+      ],
+      "note": "spawn fence 两路分类（macOS）、compatibility-loopback 子进程隔离+有界重试（Windows）、W-J5 预算观测（x64）；未合入 R8 CI。"
+    },
+    "KR-29 docs": {
+      "targets": [],
+      "note": "分类文档，不改宇宙。"
+    }
+  },
+  "deductedTotal": 30,
+  "projectedRemaining": 12,
+  "projectedRemainingPerPlatform": {
+    "arm64": 2,
+    "x64": 11,
+    "win": 0
+  },
+  "remainingByFamily": {
+    "hang-timeout": [
+      "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+      "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards"
+    ],
+    "unclassified-new": [
+      "independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC"
+    ],
+    "e71501c-drift": [
+      "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin",
+      "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+      "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后",
+      "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+      "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+      "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝"
+    ]
+  },
+  "remainingByCategory": {
+    "misc 未竟：arm64 55.6s / x64 158.1s 等待超时，Windows 绿": [
+      "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过"
+    ],
+    "R8 新增（arm64-only ENOTEMPTY 临时目录清理；flake 候选）": [
+      "independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC"
+    ],
+    "macOS-x64 300s 超时（原 file-gate 失败已消失，改为真实链超时）": [
+      "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards"
+    ],
+    "macOS-x64 file-gate 后续阻塞（git-core-in-flight-unproven @ chief-workflow:1726；新变体 missing-confirmation）": [
+      "W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin",
+      "W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin"
+    ],
+    "macOS-x64 后续阻塞（同上 git-core-in-flight-unproven）": [
+      "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后",
+      "W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后"
+    ],
+    "macOS-x64（w19 后 Windows/arm64 已绿；x64 仍 git-core-in-flight-unproven）": [
+      "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续"
+    ],
+    "macOS-x64 平台链（file-gate 码已消失；x64 仍 git-core-in-flight-unproven）": [
+      "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+      "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝"
+    ]
+  },
+  "risks": {
+    "fileGateX64": "file-gate-host-facts-unproven 在 R8 三平台均不再出现；但 x64 在 chief-workflow.test.ts:1726 出现 git-core-in-flight-unproven（400–600ms 快失败），Q2 P2 改为 300s 超时。arm64/Windows 同名全部转绿。x64 特有形态，需 owner 定性为产品守卫时序/夹具清理/runner 时序。",
+    "taskRestart": "misc 批在本机 3× 绿；R8 CI arm64/x64 均红且耗时 55.6s/158.1s（等待超时），Windows 绿。需按 v2.0.0 run-bound 语义重开或标注平台候选。",
+    "independentCWindow": "arm64-only ENOTEMPTY（ans-p1p7-window-report-*）——与 R6 multi-runtime ENOTEMPTY 同族；flake 候选，若复现按有界清理修复。",
+    "spawnFence": "plat 未合入；R8 中 arm64 亦红（R7 已双 macOS 红），修复合入后预期 macOS 两平台回绿。",
+    "compatibilityLoopback": "plat 未合入；Windows file-level 原生 libuv 崩溃 R8 再现（3.2s）。合入后预期有界重试兜底，但门禁不放松。",
+    "wj5": "plat 仅加预算观测；合入后 x64 180s 是否消除未知，仍属平台/性能候选。",
+    "kr29": "kr29a/kr29b 均未合入 R8 CI；批内验证为定向 3× 绿（门禁 577/576/0/1；编排 1375/1373/0/2 + 13/13），投影以名单扣除。"
+  }
+}
