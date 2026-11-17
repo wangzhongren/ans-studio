@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-11-16T14:04:29.183Z",
+  "runId": "43867573699",
+  "timeoutEntries": [
+    {
+      "platform": "macos_x64",
+      "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+      "maxDurationMs": 158106.619751,
+      "count": 2,
+      "files": [
+        "test/桌面应用/task-restart.test.ts"
+      ],
+      "fileLevel": false
+    },
+    {
+      "platform": "macos_x64",
+      "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+      "maxDurationMs": 180003.447753,
+      "count": 2,
+      "files": [
+        "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts"
+      ],
+      "fileLevel": false
+    },
+    {
+      "platform": "macos_x64",
+      "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+      "maxDurationMs": 300001.334164,
+      "count": 2,
+      "files": [
+        "test/测试/git-role-workflows-e2e.test.ts"
+      ],
+      "fileLevel": false
+    }
+  ],
+  "fileLevelTimeoutEntries": [],
+  "perPlatform": {
+    "macos_arm64": {
+      "lastResultTs": null,
+      "summaryPresent": true,
+      "uniqueNames": 30,
+      "fileLevelCount": 0,
+      "timeoutCount": 0,
+      "timeouts": []
+    },
+    "macos_x64": {
+      "lastResultTs": null,
+      "summaryPresent": true,
+      "uniqueNames": 40,
+      "fileLevelCount": 0,
+      "timeoutCount": 3,
+      "timeouts": [
+        {
+          "name": "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过",
+          "maxDurationMs": 158106.619751,
+          "count": 2
+        },
+        {
+          "name": "W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例",
+          "maxDurationMs": 180003.447753,
+          "count": 2
+        },
+        {
+          "name": "Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards",
+          "maxDurationMs": 300001.334164,
+          "count": 2
+        }
+      ]
+    },
+    "windows_x64": {
+      "lastResultTs": null,
+      "summaryPresent": true,
+      "uniqueNames": 28,
+      "fileLevelCount": 2,
+      "timeoutCount": 0,
+      "timeouts": []
+    }
+  },
+  "windowsStall": null,
+  "note": "R8 口径与 R2–R6 相同：timeouts = maxDurationMs>=100000 的失败名。三平台均有完整顶层汇总、无 canceled 标记（x64 summary.cancelled=2 来自 180s/300s 测试超时，不是 job 取消）。"
+}

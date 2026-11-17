@@ -1,0 +1,35 @@
+{
+  "generatedAt": "2026-11-16T14:04:35.484Z",
+  "runId": "43867573699",
+  "definition": "lineLevelUniqueIncludingHeaders = uniqueIndentPreservingNames（去耗时、保留缩进、排除 section 头）+ sectionHeaderLines（`✖ failing tests:` 行全部出现次数）；R2–R8 逐字沿用。",
+  "platforms": {
+    "macos_arm64": {
+      "fail": 30,
+      "cancelled": 0,
+      "uniqueAuthoritativeNames": 30,
+      "uniqueIndentPreservingNames": 30,
+      "sectionHeaderLines": 1,
+      "lineLevelUniqueIncludingHeaders": 31,
+      "multiIndentNames": []
+    },
+    "macos_x64": {
+      "fail": 38,
+      "cancelled": 2,
+      "uniqueAuthoritativeNames": 40,
+      "uniqueIndentPreservingNames": 40,
+      "sectionHeaderLines": 1,
+      "lineLevelUniqueIncludingHeaders": 41,
+      "multiIndentNames": []
+    },
+    "windows_x64": {
+      "fail": 28,
+      "cancelled": 0,
+      "uniqueAuthoritativeNames": 28,
+      "uniqueIndentPreservingNames": 28,
+      "sectionHeaderLines": 1,
+      "lineLevelUniqueIncludingHeaders": 29,
+      "multiIndentNames": []
+    }
+  },
+  "reconcile": "arm64 30 唯一名 + 1 section 头 = 31；x64 40 唯一名（fail 38 + cancelled 2）+ 1 = 41；Windows 28 唯一名（含 1 个 file-level）+ 1 = 29；与协调者 30/31、38/41、28/29 精确吻合。"
+}

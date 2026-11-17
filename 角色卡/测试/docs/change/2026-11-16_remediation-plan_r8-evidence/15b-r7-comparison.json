@@ -1,0 +1,347 @@
+{
+  "generatedAt": "2026-11-16T14:06:36.815Z",
+  "r7Source": "R7 第六轮 = GitHub Actions run 43859105048（main @ d1f256f，2026-11-16T11:35:36Z，三平台工件 /tmp/r10-art 重新提取；汇总 fail 46/47/46 与协调者口径一致）。R7 分析文档/证据目录未在本工作树，名称级数据仅由工件提取。",
+  "r7Summary": {
+    "macos_arm64": {
+      "summary": {
+        "tests": 5825,
+        "suites": 0,
+        "pass": 5760,
+        "fail": 46,
+        "cancelled": 0,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 1273847.498417
+      },
+      "unique": 46,
+      "lineLevel": 47
+    },
+    "macos_x64": {
+      "summary": {
+        "tests": 5825,
+        "suites": 0,
+        "pass": 5757,
+        "fail": 47,
+        "cancelled": 2,
+        "skipped": 19,
+        "todo": 0,
+        "duration_ms": 3104465.888986
+      },
+      "unique": 49,
+      "lineLevel": 50
+    },
+    "windows_x64": {
+      "summary": {
+        "tests": 5826,
+        "suites": 0,
+        "pass": 5747,
+        "fail": 46,
+        "cancelled": 1,
+        "skipped": 32,
+        "todo": 0,
+        "duration_ms": 2483236.5716
+      },
+      "unique": 47,
+      "lineLevel": 48
+    }
+  },
+  "r7Universe": 53,
+  "r8Universe": 42,
+  "intersection": 40,
+  "r8Only": 2,
+  "r7Only": 13,
+  "r7R8PerPlatform": {
+    "arm64": {
+      "r7": 46,
+      "r8": 30,
+      "common": 29,
+      "onlyR7": 8,
+      "onlyR8": 1
+    },
+    "x64": {
+      "r7": 49,
+      "r8": 40,
+      "common": 39,
+      "onlyR7": 10,
+      "onlyR8": 1
+    },
+    "win": {
+      "r7": 47,
+      "r8": 28,
+      "common": 28,
+      "onlyR7": 10,
+      "onlyR8": 0
+    }
+  },
+  "r8OnlyNames": [
+    {
+      "name": "independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC",
+      "platforms": {
+        "macos_arm64": {
+          "count": 2,
+          "maxDurationMs": 51.5845,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/测试/p1p7-window-provenance-integration.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r8Family": "unclassified-new",
+      "r6": false,
+      "errorFirst": "Error: ENOTEMPTY, Directory not empty: /private/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-p1p7-window-report-c5l8el '/private/var/folders/9d/l02zfgrs7c16twd3wbpdmhkc0000gn/T/ans-p1p7-window-report-c5l8el'"
+    },
+    {
+      "name": "W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin",
+      "platforms": {
+        "macos_x64": {
+          "count": 2,
+          "maxDurationMs": 450.114124,
+          "indents": [
+            0
+          ],
+          "files": [
+            "test/桌面应用/chief-workflow.test.ts"
+          ]
+        }
+      },
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r8Family": "e71501c-drift",
+      "r6": false,
+      "errorFirst": "AssertionError [ERR_ASSERTION]: [\"git_candidate: {\\\"operationId\\\":\\\"w29-owned-init\\\",\\\"repoId\\\":\\\"uninitialized\\\",\\\"status\\\":\\\"blocked\\\",\\\"code\\\":\\\"git-core-in-flight-unproven\\\",\\\"message\\\":\\\"An actual Core session is still preparing/creating/disposing\\\"}\"]"
+    }
+  ],
+  "r7OnlyNames": [
+    {
+      "name": "路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）",
+      "r7Platforms": {
+        "macos_arm64": 593.373708,
+        "macos_x64": 1509.665624
+      },
+      "r6": true,
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r8Family": null,
+      "r6Family": "unclassified-new",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）",
+      "r7Platforms": {
+        "macos_arm64": 2.654208,
+        "macos_x64": 4.571385,
+        "windows_x64": 1.6843
+      },
+      "r6": true,
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": true,
+        "triage": "KR"
+      },
+      "r8Family": null,
+      "r6Family": "known-red-62",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提）",
+      "r7Platforms": {
+        "macos_x64": 300001.338274
+      },
+      "r6": false,
+      "sets": {
+        "b0": false,
+        "b7": false
+      },
+      "r8Family": null,
+      "r6Family": null,
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "Core-managed binding rejects a provider that did not register its display profile before first prompt",
+      "r7Platforms": {
+        "macos_arm64": 13.430917,
+        "macos_x64": 16.162245,
+        "windows_x64": 8.0861
+      },
+      "r6": true,
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": true,
+        "triage": "KR"
+      },
+      "r8Family": null,
+      "r6Family": "known-red-62",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "D3 linked workspace root remains usable; linked target itself is not replaced",
+      "r7Platforms": {
+        "macos_arm64": 6.926334,
+        "macos_x64": 28.02483,
+        "windows_x64": 16.4364
+      },
+      "r6": true,
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": true,
+        "triage": "KR"
+      },
+      "r8Family": null,
+      "r6Family": "known-red-62",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+      "r7Platforms": {
+        "macos_arm64": 1.986,
+        "macos_x64": 6.97509,
+        "windows_x64": 3.3286
+      },
+      "r6": true,
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": true,
+        "triage": "KR"
+      },
+      "r8Family": null,
+      "r6Family": "known-red-62",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」",
+      "r7Platforms": {
+        "macos_arm64": 0.282,
+        "macos_x64": 1.175948,
+        "windows_x64": 0.89
+      },
+      "r6": true,
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": true,
+        "triage": "KR"
+      },
+      "r8Family": null,
+      "r6Family": "known-red-62",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）",
+      "r7Platforms": {
+        "macos_arm64": 1.206792,
+        "macos_x64": 1.934868,
+        "windows_x64": 1.0471
+      },
+      "r6": true,
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": true,
+        "triage": "KR"
+      },
+      "r8Family": null,
+      "r6Family": "known-red-62",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "Pipeline initial workflow source: actual approved Core request binds task before the real guarded write",
+      "r7Platforms": {
+        "windows_x64": 2092.4648
+      },
+      "r6": true,
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": null
+      },
+      "r8Family": null,
+      "r6Family": "unclassified-new",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "Q74 owned Git metadata observer atomic rename race remains bounded and strict",
+      "r7Platforms": {
+        "macos_arm64": 387.466833,
+        "macos_x64": 177.852405,
+        "windows_x64": 78.3846
+      },
+      "r6": true,
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r8Family": null,
+      "r6Family": "b0-existing-other",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+      "r7Platforms": {
+        "windows_x64": 4036.4925
+      },
+      "r6": true,
+      "sets": {
+        "b0": true,
+        "b7": true,
+        "kr62": false,
+        "triage": null
+      },
+      "r8Family": null,
+      "r6Family": "b0-existing-other",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒",
+      "r7Platforms": {
+        "macos_x64": 2935.342054
+      },
+      "r6": true,
+      "sets": {
+        "b0": false,
+        "b7": false,
+        "kr62": false,
+        "triage": "NEW"
+      },
+      "r8Family": null,
+      "r6Family": "e71501c-drift",
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    },
+    {
+      "name": "W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease",
+      "r7Platforms": {
+        "windows_x64": 4814.5375
+      },
+      "r6": false,
+      "sets": {
+        "b0": false,
+        "b7": false
+      },
+      "r8Family": null,
+      "r6Family": null,
+      "note": "R8 三平台工件均未出现（转绿或退役）"
+    }
+  ]
+}
