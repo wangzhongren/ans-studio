@@ -177,7 +177,7 @@ for (const branch of ["read-only", "authorized-write", "bundled-b"] as const) te
   const staleSelection = await handle.startViaChief({ projectRoot, ...definition, expectedDigest: "0".repeat(64), enabled: true,
     requestId: "w5-no-stale-selection", summary: "A stale selection cannot start a new instance" });
   assert.equal(staleSelection.ok, false, JSON.stringify(staleSelection));
-  if (!staleSelection.ok) assert.equal(staleSelection.code, "definition-digest-changed");
+  if (!staleSelection.ok) assert.equal(staleSelection.code, "workflow-start-definition-changed");
   assert.equal((await readTaskState(f.root)).records.size, 0);
   log("external-stale-selection-rejected", staleSelection);
   const started = unwrap(await handle.startViaChief({ projectRoot, ...definition, enabled: true,
@@ -334,8 +334,9 @@ test("Windows verified stop releases the original v2 owner for a different saved
     requestId: "w5-after-verified-stop", enabled: true, summary: "Begin a separate review after the earlier operation has come to a verified stop" });
   await until("actual stop-verification role before report submission", async () => atStop ? true : undefined, scenario.model.errors);
   const refused = await startAlternative();
+  log("alternative-refused-before-original-stop", refused);
   assert.equal(refused.ok, false);
-  if (!refused.ok) assert.equal(refused.code, "workflow-workspace-busy");
+  if (!refused.ok) assert.equal(refused.code, "workflow-owner-conflict");
   assert.deepEqual(await trackedAndBusinessState(projectRoot), initial);
   reporting.resolve();
   const stopped = await until("trusted operations report permits terminal stop", async () => {

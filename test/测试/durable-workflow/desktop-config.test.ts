@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
+import { legacyPathB } from "../../编排/durable-workflow/fixture.ts";
 import { analysis, app, fixture, git, modelFixture, resourceRoot, sqliteSnapshot, successful, target, until, unwrap, write,
   type Log, type PackagedRun, type runPackagedPathB } from "./fixture.ts";
 
@@ -122,7 +123,7 @@ for (const winner of ["project", "preset"] as const) test(`Windows active ${winn
   skip: !resourceRoot && "Set ANS_W5_DAPR_ROOT to the verified Windows bundle resources",
   timeout: 120_000,
 }, async t => {
-  const f = await fixture();
+  const f = await fixture({ installLegacyPathB: winner === "project" });
   const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
   const activeModel = modelFixture(async turn => { assert.equal(turn.roleId, "chief"); }, log);
   const active = await app(f, activeModel, log);
@@ -136,6 +137,8 @@ for (const winner of ["project", "preset"] as const) test(`Windows active ${winn
     if (view.instance?.engine === "healthy") return view.instance;
   }, activeModel.errors);
   assert.equal(ready.definitionVersion, winner === "project" ? 1 : 2);
+  if (winner === "project") await unlink(path.join(f.root, "docs/workflows/path-b.yaml"));
+  else await write(f.root, "docs/workflows/path-b.yaml", legacyPathB);
   const before = { oid: git(f.root, "rev-parse", "HEAD"), refs: git(f.root, "show-ref"), tasks: (await readTaskState(f.root)).events };
   const contenderDirectory = path.join(f.directory, "other-executor");
   await mkdir(contenderDirectory);
@@ -145,6 +148,7 @@ for (const winner of ["project", "preset"] as const) test(`Windows active ${winn
   const result = await contender.startViaChief({ ...selection, source: winner === "project" ? "preset" : "project",
     requestId: "w5-different-executor", summary: "This second executor must respect the original owner" });
   assert.equal(result.ok, false, JSON.stringify(result));
+  if (!result.ok) assert.equal(result.code, "workflow-owner-conflict");
   const contenderStore = await contender.durable.store();
   const owner = await contenderStore.owner(f.root);
   assert.equal(owner?.instanceId, winningInstance.instanceId);
@@ -175,7 +179,7 @@ test("Actual Windows ZIP binaries and bundled Desktop modules resume the same pe
   assert.notEqual(path.resolve(oldPackage!), path.resolve(newPackage!));
   const readBundledDefinition = (resource: string, id: string) => readFile(path.join(resource, "app", "docs", "workflows", id + ".yaml"), "utf8");
   const oldDefinition = await readBundledDefinition(oldResource, "path-b");
-  assert.match(oldDefinition, /^schema: 1$/m);
+  assert.match(oldDefinition, /^schema: 2$/m);
   assert.match(await readBundledDefinition(newResource, "path-b"), /^schema: 2$/m);
   assert.match(await readBundledDefinition(newResource, "path-a"), /^schema: 2$/m);
   const verifyPackage = async (extracted: string, zip: string) => Object.fromEntries(await Promise.all([
@@ -186,12 +190,12 @@ test("Actual Windows ZIP binaries and bundled Desktop modules resume the same pe
     ["schedulerSha256", path.join(extracted, "resources/dapr-runtime/scheduler.exe")],
   ].map(async ([label, filename]) => [label, await sha256File(filename)])));
   const [original, candidate] = await Promise.all([verifyPackage(oldPackage!, oldZip!), verifyPackage(newPackage!, newZip!)]);
-  assert.equal(original.zipSha256, "3d39ff874033e953067b024f027c84c29f39c50536621ff68c01e058f20f10a8");
+  assert.equal(original.zipSha256, "3468589777c5251739b52f5c97a45aa56ee6735020002b49ad8c64ee33d8269d");
   assert.notEqual(original.zipSha256, candidate.zipSha256);
   t.diagnostic(JSON.stringify({ event: "packaged-binary-and-module-provenance", original, candidate }));
 
   const f = await fixture();
-  await write(f.root, "docs/workflows/path-b.yaml", oldDefinition);
+  assert.match(await readFile(path.join(f.root, "docs", "workflows", "path-b.yaml"), "utf8"), /^schema: 1$/m);
   const script = `
     import { runPackagedPathB } from ${JSON.stringify(new URL("./fixture.ts", import.meta.url).href)};
     const log = (event,value) => process.stdout.write(JSON.stringify({ at: new Date().toISOString(), event, value }) + "\\n");

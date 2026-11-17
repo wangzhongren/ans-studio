@@ -119,7 +119,8 @@ export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Lo
           const toolNames = options.tools.map(tool => tool.name);
           log("model-turn", { roleId, turnId, text, tools: toolNames });
           try {
-            const next = roleId === "chief" ? ordinaryChiefTurns.get(text) ?? script : script;
+            const originalRequest = text.startsWith("【系统通知·会话重建】") ? text.slice(text.indexOf("\n\n") + 2) : text;
+            const next = roleId === "chief" ? ordinaryChiefTurns.get(originalRequest) ?? script : script;
             await next({ roleId, text, turnId, signal: abort.signal, toolNames, async call(name, args) {
               const tool = options.tools.find(candidate => candidate.name === name);
               assert.ok(tool, `${roleId} missing actual ${name} capability`);
@@ -207,6 +208,7 @@ export function pathBModel(f: Fixture, instanceId: () => string, log: Log, hooks
 type AppFixtureOptions = {
   pickWorkflowDefinition?: () => Promise<string | null>;
   bundleResources?: string;
+  chooseProjectRoot?: () => Promise<string>;
 };
 type ChiefStartInput = {
   projectRoot?: string;
@@ -219,7 +221,7 @@ type ChiefStartInput = {
 };
 
 export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFixture>, log: Log, options: AppFixtureOptions = {}) {
-  const { bundleResources, pickWorkflowDefinition } = options;
+  const { bundleResources, pickWorkflowDefinition, chooseProjectRoot } = options;
   const presetRoot = bundleResources ? path.join(bundleResources, "app") : sourceAppRoot;
   const moduleUrl = (file: string) => pathToFileURL(path.join(presetRoot, file)).href;
   const { DesktopDurableWorkflow: Controller } = bundleResources
@@ -249,7 +251,7 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
   });
   const desktop = desktopInterface({
     durableWorkflow: durable,
-    pickDirectory: async () => f.root,
+    pickDirectory: chooseProjectRoot ?? (async () => f.root),
     pickWorkflowDefinition,
     emitEvent: envelope => {
       if (["settled", "handback", "denied"].includes(envelope.event.kind)) log("desktop-event", envelope);
@@ -280,7 +282,10 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
     assert.ok(digest && definitionSource);
     const target = { ...project, roleId: "chief", runtime: "pi" as const };
     const opened = await desktop.openSession(target);
-    assert.equal(opened.ok, true, JSON.stringify(opened));
+    if (!opened.ok) {
+      const code = /^([a-z][a-z-]+):/.exec(opened.error ?? "")?.[1] ?? "workflow-start-open-refused";
+      return { ok: false, code, message: opened.error ?? "The ordinary Chief session was refused." };
+    }
     let receipt: ToolResult | undefined;
     assert.equal(model.ordinaryChiefTurns.has(summary), false, "one fixture should register one handler per live input");
     model.ordinaryChiefTurns.set(summary, async turn => {
@@ -290,7 +295,11 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
     });
     try {
       const sent = await desktop.sendSession({ text: summary, target, ...(requestId ? { metadata: { clientMessageId: requestId } } : {}) }, () => true);
-      assert.equal(sent.ok, true, JSON.stringify(sent));
+      if (!sent.ok) {
+        if (model.errors.length) throw model.errors[0];
+        const code = /^([a-z][a-z-]+):/.exec(sent.error ?? "")?.[1] ?? "workflow-start-send-refused";
+        return { ok: false, code, message: sent.error ?? "The ordinary Chief message was refused." };
+      }
       const reply = await until("the ordinary Chief's actual startup tool receipt", async () => receipt, model.errors);
       if (!reply.ok) {
         const code = /request_workflow_start：([a-z][a-z-]+) ·/.exec(reply.message ?? "")?.[1] ?? "workflow-start-tool-refused";
@@ -410,6 +419,12 @@ export async function runPackagedPathB({ f, bundleResources, resume }: PackagedR
         requestId: "w5-packaged-v1-path-b", summary: "Fix the existing threshold in the isolated Git project" }));
       assert.ok(started.instance);
       instanceId = started.instance.instanceId;
+    } else {
+      const bypass = await handle.desktop.startDurableWorkflow({ ...select, definitionId: "path-b", enabled: true,
+        requestId: "w5-bring-forward-must-use-confirmation", summary: "A bare direct request in the new application" });
+      assert.equal(bypass.ok, false);
+      if (!bypass.ok) assert.equal(bypass.code, "workflow-start-confirmation-required");
+      log("new-package-direct-entry-denied-before-old-resume", bypass);
     }
     const getProjection = () => handle.desktop.getDurableWorkflowProjection({ ...select, instanceId }).then(unwrap);
     const approval = await until("original real v1 merge card", async () => [...handle.cards.values()].find(card => card.request.cardKind === "merge-main"), model.errors);

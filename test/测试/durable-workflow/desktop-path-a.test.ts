@@ -56,7 +56,7 @@ async function exists(file: string) {
 }
 
 async function assertContenderBlocked(f: Awaited<ReturnType<typeof emptyFixture>>, log: Log, checkpoint: string,
-  expectedOwner: string, projectRoot = f.root) {
+  expectedOwner: string, projectRoot = f.root, expectedCode = "workflow-owner-conflict") {
   const before = await readTaskState(projectRoot);
   const directory = path.join(f.directory, `contender-${checkpoint}`);
   await mkdir(directory);
@@ -82,9 +82,14 @@ async function assertContenderBlocked(f: Awaited<ReturnType<typeof emptyFixture>
   assert.ok(result, stdout);
   const resultData = JSON.parse(result.slice("W5_CONTENDER ".length));
   assert.notEqual(resultData.pid, process.pid);
-  assert.equal(resultData.result.ok, false, JSON.stringify(resultData));
-  assert.equal(resultData.result.code, projectRoot === f.root ? "workflow-workspace-busy" : "workflow-git-protection-unavailable");
-  assert.equal(resultData.owner?.instanceId, expectedOwner);
+  const detail = JSON.stringify(resultData);
+  log("cross-process-contender-result", { checkpoint, expectedOwner, contender: resultData });
+  assert.equal(resultData.result.ok, false, detail);
+  assert.equal(resultData.result.code, expectedCode, detail);
+  if (expectedCode === "runtime-creation-admission-unproven") {
+    assert.match(resultData.result.message, /runtime-protection-scope-unknown,custom-provider-factory-unverified/);
+  }
+  assert.equal(resultData.owner?.instanceId, expectedOwner, detail);
   assert.equal(resultData.instances, 0);
   assert.deepEqual(resultData.turns, []);
   assert.deepEqual((await readTaskState(projectRoot)).events, before.events, "a blocked competing app must not add a task or approval");
@@ -313,7 +318,8 @@ for (const checkpoint of ["intent-reopen", "baseline-recovery", "linked-worktree
     const commonDir = git(f.root, "rev-parse", "--path-format=absolute", "--git-common-dir");
     assert.equal(git(otherWorktree, "rev-parse", "--path-format=absolute", "--git-common-dir"), commonDir);
     const refs = git(f.root, "show-ref");
-    await assertContenderBlocked(f, log, "same-common-dir-other-worktree", instanceId, otherWorktree);
+    await assertContenderBlocked(f, log, "same-common-dir-other-worktree", instanceId, otherWorktree,
+      "runtime-creation-admission-unproven");
     assert.equal(git(f.root, "show-ref"), refs);
     log("linked-worktree-common-directory", { commonDir, refs, expectedOwner: instanceId });
     return;
