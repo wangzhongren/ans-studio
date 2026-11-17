@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, mkdir, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { MERGE_MAIN_OPTION_IDS } from "../../../app/desktop/customer-input.ts";
 import { DEFAULT_APP_RUNTIME_FILES } from "../../../src/common/编排/shell-post-audit.ts";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
+import type { ToolResult } from "../../../src/model/runtime.ts";
 import { analysis, app, emptyFixture, fix, fixture, git, modelFixture, operatorReport, resourceRoot, sqliteSnapshot, successful, target,
   until, unwrap, write, type Log } from "./fixture.ts";
 
@@ -45,7 +46,8 @@ async function applicationRuntimeFiles(root: string) {
   })));
 }
 
-function externalModel(f: Awaited<ReturnType<typeof fixture>>, log: Log, scenario: "read-only" | "authorized-write" | "bundled-b") {
+function externalModel(f: Awaited<ReturnType<typeof fixture>>, log: Log, scenario: "read-only" | "authorized-write" | "bundled-b",
+  beforeStopReport?: () => Promise<void>) {
   const onlyRead = scenario === "read-only";
   let desktop: Awaited<ReturnType<typeof app>>;
   let instanceId = "";
@@ -82,6 +84,13 @@ function externalModel(f: Awaited<ReturnType<typeof fixture>>, log: Log, scenari
           workflowId: instanceId, stage: step, sideEffect: "read-only" });
         issued.add(step);
       }
+      return;
+    }
+    if (!task && turn.roleId === "convener" && beforeStopReport) {
+      const view = unwrap(await desktop.desktop.getDurableWorkflowProjection({ projectRoot: f.root, instanceId }));
+      assert.equal(view.instance?.action, "verify-stop");
+      await beforeStopReport();
+      await report("The actual inspection was closed and no project, Git or write effects remain outstanding.", [analysis]);
       return;
     }
     assert.ok(task && task.workflowId === instanceId, `Missing current task for ${turn.roleId}: ${turn.text}`);
@@ -289,4 +298,95 @@ test("Windows existing-change graph refuses a new empty project without creating
   assert.equal((await readTaskState(f.root)).records.size, 0);
   await assert.rejects(access(path.join(f.root, ".git")), { code: "ENOENT" });
   log("existing-change-refused-on-empty-root", { installed, rejected, projectEntries: await readdir(f.root) });
+});
+
+test("Windows verified stop releases the original v2 owner for a different saved definition", native, async t => {
+  const f = await fixture({ existingIndependentRoster: true });
+  const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
+  const projectRoot = f.root;
+  const yaml = await readFile(definitionPath, "utf8");
+  const firstId = "external-stop-after-inspection";
+  const nextId = "external-threshold-next-review";
+  const firstFile = path.join(f.directory, "stop-first.yaml");
+  const nextFile = path.join(f.directory, "new-definition.yaml");
+  await write(f.directory, "stop-first.yaml", yaml.replace(`id: ${definitionId}`, `id: ${firstId}`)
+    .replace("action: finish-readonly", "action: verify-stop").replace("terminal: completed", "terminal: stopped"));
+  await write(f.directory, "new-definition.yaml", yaml.replace(`id: ${definitionId}`, `id: ${nextId}`));
+  const reporting = Promise.withResolvers<void>();
+  let atStop = false;
+  const scenario = externalModel(f, log, "read-only", async () => { atStop = true; await reporting.promise; });
+  const handle = await app(f, scenario.model, log, { pickWorkflowDefinition: async () => firstFile });
+  t.after(() => { reporting.resolve(); return handle.close(); });
+  scenario.bind(handle);
+  const stopGraph = unwrap(await handle.desktop.importDurableWorkflow({ projectRoot }));
+  const newData = path.join(f.directory, "next-controller");
+  await mkdir(newData);
+  const nextModel = modelFixture(async turn => assert.equal(turn.roleId, "chief"), log);
+  const next = await app({ directory: newData, userDataRoot: path.join(newData, "data"), root: projectRoot }, nextModel, log,
+    { pickWorkflowDefinition: async () => nextFile });
+  t.after(() => next.close());
+  const alternative = unwrap(await next.desktop.importDurableWorkflow({ projectRoot }));
+  const initial = await trackedAndBusinessState(projectRoot);
+  const started = unwrap(await handle.desktop.startDurableWorkflow({ projectRoot, definitionId: firstId, source: "project", expectedDigest: stopGraph.digest,
+    requestId: "w5-stop-original", enabled: true, summary: "Inspect the existing threshold, then finish only after operations verifies no work remains" })).instance!;
+  scenario.bind(handle, started.instanceId, initial);
+  const startAlternative = () => next.desktop.startDurableWorkflow({ projectRoot, definitionId: nextId, source: "project", expectedDigest: alternative.digest,
+    requestId: "w5-after-verified-stop", enabled: true, summary: "Begin a separate review after the earlier operation has come to a verified stop" });
+  await until("actual stop-verification role before report submission", async () => atStop ? true : undefined, scenario.model.errors);
+  const refused = await startAlternative();
+  assert.equal(refused.ok, false);
+  if (!refused.ok) assert.equal(refused.code, "workflow-workspace-busy");
+  assert.deepEqual(await trackedAndBusinessState(projectRoot), initial);
+  reporting.resolve();
+  const stopped = await until("trusted operations report permits terminal stop", async () => {
+    const view = unwrap(await handle.desktop.getDurableWorkflowProjection({ projectRoot, instanceId: started.instanceId })).instance;
+    if (view?.status === "stopped" && !(await (await handle.durable.store()).owner(projectRoot))) return view;
+  }, scenario.model.errors);
+  const rows = sqliteSnapshot(f, started.instanceId);
+  assert.equal(rows.fact?.filter(row => String(row.business_key).startsWith("stop-verified:") && row.state === "consumed").length, 1);
+  const nextStart = unwrap(await startAlternative()).instance!;
+  assert.notEqual(nextStart.instanceId, started.instanceId);
+  assert.equal(nextStart.definitionId, nextId);
+  assert.equal(nextStart.action, "observe-existing");
+  assert.deepEqual(await trackedAndBusinessState(projectRoot), initial);
+  log("verified-stop-and-distinct-definition", { refused, stopped, rows, nextStart, alternative });
+});
+
+for (const deniedPurpose of ["new-work", "untracked-file"] as const) test(`Windows existing-change graph denies ${deniedPurpose} in an initialized repository`, native, async t => {
+  const f = await fixture({ existingIndependentRoster: true });
+  const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
+  let instanceId = "";
+  let refusal: ToolResult | undefined;
+  const model = modelFixture(async turn => {
+    assert.equal(turn.roleId, "chief");
+    const newWork = deniedPurpose === "new-work";
+    refusal = await turn.call("dispatch_task", {
+      roleId: "convener", task: newWork ? "Prepare an entirely new module" : "Check a file absent from the tracked tree",
+      flowId, workflowId: instanceId, stage: newWork ? "A1" : "B1", taskKind: "stage-request", workflowPath: newWork ? "A" : "B",
+      workflowAction: "advance", sideEffect: "read-only",
+      ...(newWork ? {} : { requestedEvidence: ["src/core/absent.ts"], reason: "Verify whether this claimed existing file is actually tracked" }),
+    });
+    assert.equal(refusal.ok, false, refusal.message);
+  }, log);
+  const handle = await app(f, model, log, { pickWorkflowDefinition: async () => definitionPath });
+  t.after(() => handle.close());
+  const projectRoot = f.root;
+  const definition = unwrap(await handle.desktop.importDurableWorkflow({ projectRoot }));
+  const before = await trackedAndBusinessState(projectRoot);
+  const started = unwrap(await handle.desktop.startDurableWorkflow({ projectRoot, definitionId, source: "project", expectedDigest: definition.digest,
+    requestId: `w5-existing-purpose-${deniedPurpose}`, enabled: true,
+    summary: deniedPurpose === "new-work" ? "Use the full new-work governance to create an unrelated new module" : "Review the purported current behavior in src/core/absent.ts" }));
+  assert.ok(started.instance);
+  instanceId = started.instance.instanceId;
+  const rejection = await until("the actual chief tool refusal", async () => refusal, model.errors);
+  assert.equal(rejection.ok, false);
+  if (deniedPurpose === "new-work") assert.match(rejection.message ?? "", /workflow-existing-purpose-unverified/);
+  const view = unwrap(await handle.desktop.getDurableWorkflowProjection({ projectRoot, instanceId }));
+  assert.equal(view.instance?.action, "observe-existing");
+  const snapshot = sqliteSnapshot(f, instanceId);
+  assert.equal(snapshot.fact?.some(row => String(row.business_key).startsWith("existing-purpose:")), false);
+  assert.equal(snapshot.effect?.some(row => String(row.business_key).startsWith("git:baseline")), false);
+  assert.equal((await readTaskState(projectRoot)).records.size, 0);
+  assert.deepEqual(await trackedAndBusinessState(projectRoot), before);
+  log("existing-purpose-tool-refused", { deniedPurpose, rejection, view, before, snapshot });
 });

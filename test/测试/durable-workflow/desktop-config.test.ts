@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
@@ -116,6 +116,43 @@ test("Desktop keeps an active read-only definition pinned when external YAML is 
     hold.resolve();
     log("final-observation", { projection: await projection(initial.instanceId), runs: [...runs], sqlite: sqliteSnapshot(f, initial.instanceId) });
   }
+});
+
+for (const winner of ["project", "preset"] as const) test(`Windows active ${winner === "project" ? "v1" : "v2"} Path B owner excludes the other executor`, {
+  skip: !resourceRoot && "Set ANS_W5_DAPR_ROOT to the verified Windows bundle resources",
+  timeout: 120_000,
+}, async t => {
+  const f = await fixture();
+  const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
+  const activeModel = modelFixture(async turn => { assert.equal(turn.roleId, "chief"); }, log);
+  const active = await app(f, activeModel, log);
+  t.after(() => active.close());
+  const selection = { projectRoot: f.root, definitionId: "path-b", enabled: true };
+  const winningInstance = unwrap(await active.desktop.startDurableWorkflow({ ...selection, source: winner,
+    requestId: "w5-active-owner", summary: "Review the applicable existing file" })).instance;
+  assert.ok(winningInstance);
+  const ready = await until("the winner's scheduled native Workflow", async () => {
+    const view = unwrap(await active.desktop.getDurableWorkflowProjection({ projectRoot: f.root, instanceId: winningInstance.instanceId }));
+    if (view.instance?.engine === "healthy") return view.instance;
+  }, activeModel.errors);
+  assert.equal(ready.definitionVersion, winner === "project" ? 1 : 2);
+  const before = { oid: git(f.root, "rev-parse", "HEAD"), refs: git(f.root, "show-ref"), tasks: (await readTaskState(f.root)).events };
+  const contenderDirectory = path.join(f.directory, "other-executor");
+  await mkdir(contenderDirectory);
+  const contenderModel = modelFixture(async () => assert.fail("A conflicting executor must stay outside role execution"), log);
+  const contender = await app({ directory: contenderDirectory, root: f.root, userDataRoot: path.join(contenderDirectory, "data") }, contenderModel, log);
+  t.after(() => contender.close());
+  const result = await contender.desktop.startDurableWorkflow({ ...selection, source: winner === "project" ? "preset" : "project",
+    requestId: "w5-different-executor", summary: "This second executor must respect the original owner" });
+  assert.equal(result.ok, false, JSON.stringify(result));
+  const contenderStore = await contender.durable.store();
+  const owner = await contenderStore.owner(f.root);
+  assert.equal(owner?.instanceId, winningInstance.instanceId);
+  assert.equal(owner?.ownedByThisDataDir, false);
+  assert.deepEqual(contenderStore.activeProjections(), []);
+  assert.deepEqual({ oid: git(f.root, "rev-parse", "HEAD"), refs: git(f.root, "show-ref"), tasks: (await readTaskState(f.root)).events }, before);
+  assert.deepEqual(contenderModel.errors, []);
+  log("old-and-new-executors-exclusive", { ready, owner, rejected: result, before });
 });
 
 const oldPackage = process.env.ANS_W5_OLD_PACKAGE_ROOT;
