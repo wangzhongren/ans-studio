@@ -7,8 +7,9 @@ test('release overlay preserves Chinese build paths and excludes private data an
     'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
   assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.equal(SOURCE_REF, 'v2.0.0');
-  assert.equal(SOURCE_SHA, '752953cf229ef9771fb574d0972b80e73ec7c27a');
+  // v2.1.0 pointer（随 release-policy 指针更新同步；冻结源 tag v2.1.0 打在 prepare 合并提交上）
+  assert.equal(SOURCE_REF, 'v2.1.0');
+  assert.equal(SOURCE_SHA, 'c289309883c7fd2529312519de16d86ccc69d7bb');
 });
 
 test('release overlay selects the v2.0.0 packaging surface', () => {
