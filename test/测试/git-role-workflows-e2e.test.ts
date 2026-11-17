@@ -1311,8 +1311,12 @@ const firstNewBusinessName = "Q2 P2 first new project: empty public chief -> for
 // 依据：R9 arm64/Windows 已在 90s 阶段预算内自然失败（258.1s/278.4s，Q2_TIMEOUT @ driver:740），
 // x64 300s 时仅到 persisted-child（251.7s）；R8 同链 arm64/Windows 214.0s/195.6s 通过。
 // #137 的 CLI 600s 被父测试显式 per-test timeout 与子进程 300s 看门狗覆盖，故三层必须一起改（不得只依赖 CLI）。
-const q2P2WholeTestBudgetMs = 600000;     // 父测试显式 timeout（node:test 选项）
-const q2P2ChildAbsoluteBudgetMs = 540000; // 子进程硬预算；父测试保留 60s 做结果核验/拆解
+// R9-E3（2026-11-17，最后一次预算调整）：子进程 540s→900s、父测试 600s→960s（仍保留 60s 结果核验/拆解余量）。
+// 依据收官轮 v2 attempt 2（run 43993937915，三平台同 SHA e437154）：arm64 218.2s / Windows 311.2s 通过，
+// x64 恰 540,046.2ms 触顶 child 绝对预算（纯超时，无断言失败）；x64 同链比 arm64/Windows 慢 2.5–3×。
+// 这是最后一次预算调整；若 x64 仍超 900s，必须拆测试或转产品候选，不得再抬。
+const q2P2WholeTestBudgetMs = 960000;     // 父测试显式 timeout（node:test 选项）= child 900s + 60s 结果核验/拆解
+const q2P2ChildAbsoluteBudgetMs = 900000; // 子进程硬预算；父测试保留 60s 做结果核验/拆解
 const q2P2StageBudgetMs = 240000;         // first-bootstrap 单阶段 bounded 预算（CI 子进程经 q26 闭锁实占 150s，默认分支 90s；两者均对齐到此值）；driver 同时把 timeoutMs 用作单回合 lastResort/首字节预算
 const firstNewBusinessTimeoutMs = () => process.env.ANS_Q39_CHILD === "1" ? q2P2WholeTestBudgetMs
   : continuousChangeChild ? 300000 // 连续阶段运行器受其共享绝对 deadline 约束，保留原 300s 单阶段口径
@@ -1420,8 +1424,9 @@ export async function runFirstNewBusinessCase() {
   const q21Business = process.env.ANS_Q21_BUSINESS === "1" || q23Business;
   const caseTag = process.env.ANS_Q39_CASE_TAG ?? (q39Business ? "q39" : q38Business ? "q38" : q36Business ? "q36" : q35Business ? "q35" : q34QueueDiagnostic ? "q34" : q33QueueDiagnostic ? "q33" : q32Business ? "q32" : q31Business ? "q31" : q30Business ? "q30" : q29Business ? "q29" : q28Business ? "q28" : q27Business ? "q27" : q26Business ? "q26" : q25Business ? "q25" : q24Business ? "q24" : q23Business ? "q23" : q21Business ? "q21" : q20Profile ? "q20" : q19Diagnostic ? "q19" : "q17");
   const timerDiagnostics = q19Diagnostic ? observeDiagnosticTimers() : undefined;
-  // Q17 none-isolation runner after exact current-parent blocked-report wait handling; one attempt: 192 HTTP/600s whole test/240s stage wait,
-  // no retry, expected <=144 through actual first pin/persisted child/worker open. R9 批次 E：阶段 90s→240s、子进程 300s→540s、父测试 300s→600s。
+  // Q17 none-isolation runner after exact current-parent blocked-report wait handling; one attempt: 192 HTTP/960s whole test/240s stage wait,
+  // no retry, expected <=144 through actual first pin/persisted child/worker open. R9 批次 E：阶段 90s→240s、子进程 300s→540s、父测试 300s→600s；
+  // R9-E3（最后一次）：子进程 540s→900s、父测试 600s→960s（依据见上方预算常量注释）。
   const diagnosticOnly = false;
   let handoffReply: string | undefined, initReply: string | undefined;
   let actualSource: unknown;
@@ -2234,13 +2239,15 @@ export async function runFirstNewBusinessCase() {
     await driver.save(path.join(evidence, `${caseTag}-first-pin-child-verified-proof.json`), { parent, child: actualChild, runRead, snapshot: runBytes.value, frozenRole: frozen });
     // R9 批次 E2（2026-11-17）：本 tail stage 受既有 case deadline 约束 + 子阶段标记，不新增预算。
     // 第九轮 x64 诊断（run 43911103883 / job 133452915507）：单段 bounded 在 240.005s 触顶（driver elapsed 469.4s），
-    // 但 case 仍剩 69.3s（child 540s 上限）；roleProgress 已推进到 chief-visible-controller-review-target，
+    // 但 case 仍剩 69.3s（当时 child 540s 上限）；roleProgress 已推进到 chief-visible-controller-review-target，
     // lastHttp=verifier roleStep 0（age 24.5s，已发 ans_git_query q25-verifier-criterion），inventory=verifier live +
     // activeDelivery 在途，errors/waits 空——链路正常推进，非回合停滞。该阶段天然横跨 worker→集成→verifier→delivery
     //（controller-bounded-stop 只在 delivery 发布回执处产生），故按子阶段拆段：每段退出 = 原终态
     //（controller-bounded-stop 或 worker-candidate-source-gap）或该段推进标记；原失败检查逐段保留，总等待语义不变。
-    // 裁决（协调者已批准方案 (i)）：不新增预算，各段以 { remainingCase: true } 受既有 case deadline（child 540s/父 600s）约束；
-    // 若收官轮仍撞 Q_CASE_ABSOLUTE_BUDGET，按既定规则拆 Q2 P2 测试/转产品候选，不再抬预算。
+    // 裁决（协调者已批准方案 (i)）：不新增预算，各段以 { remainingCase: true } 受既有 case deadline 约束。
+    // R9-E3（2026-11-17，最后一次预算调整）：收官轮 x64 仍在 540,046.2ms 触顶 child 绝对预算，协调者裁定
+    // 最后一次有界调整——child 540s→900s、父 600s→960s（见预算常量注释）；现各段受 case deadline
+    //（child 900s/父 960s）约束。若 x64 仍超 900s，必须拆 Q2 P2 测试或转产品候选，不得再抬预算。
     await driver.bounded("actual worker surface / scoped write", async signal => {
       while (!roleProgress.some(item => item.stage === "controller-bounded-stop" || item.stage === "worker-candidate-source-gap")
         && !roleProgress.some(item => item.stage === "worker-candidate-result")) {

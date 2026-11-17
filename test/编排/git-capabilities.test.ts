@@ -518,8 +518,12 @@ test("Git initialization Service effect: storage fixture rechecks bytes, rejects
 // （test timed out after 180000ms），为该 job 唯一残差（fail 0 / cancelled 1）；
 // 本机快机实测 115–136s（KR-29 §5 记录约 117s），Windows runner 同链路慢化约 1.4–1.7×
 // （R9 Q2 P2 观测比例；W-J5 同轮 2.2–2.5×），180s 已无余量。
-// 若 300s 仍触顶：拆测试并报告 owner，不再抬预算。
-test("Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority", { timeout: 300000 }, async () => {
+// R9-E3（2026-11-17，最后一次预算调整）：per-test 300s→600s；仅慢 runner 预算适配，
+// 零断言/零语义改动。依据收官轮 v2 attempt 2（run 43993937915，三平台同 SHA e437154）：
+// arm64 133.8s / Windows 186.9s 通过，x64 恰 300,001.6ms 触顶（纯超时，无断言失败）；
+// x64 同链比 arm64/Windows 慢 2.5–3×。这是最后一次预算调整；若 x64 仍超 600s，必须拆测试
+// 或转产品候选，不得再抬。
+test("Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority", { timeout: 600000 }, async () => {
   const project = await createTrunkProject({ withRun: false }), fsStore = createFsTrunkStore(project.root), documents = project.snapshot().documents;
   const snapshot = await fsStore.captureSnapshot!({ snapshotId: "o7-real-planning-basis", createdAt: at, files: Object.values(documents) });
   assert.ok(snapshot.ok); if (!snapshot.ok) return;
