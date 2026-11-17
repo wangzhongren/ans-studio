@@ -462,6 +462,7 @@ import {
   durableFailure,
   durableIdentifier,
   durableRequest,
+  durableSelection,
   type DesktopDurableDefinition,
   type DesktopDurableDeliverySummary,
   type DesktopDurableDeliveryView,
@@ -473,6 +474,7 @@ import { MERGE_MAIN_OPTION_IDS } from "./customer-input.ts";
 
 export interface DesktopDeps {
   durableWorkflow?: DesktopDurableWorkflow;
+  pickWorkflowDefinition?: () => Promise<string | null>;
   /** 系统文件夹选择器（由主进程用 electron dialog 注入；测试可注入假实现）。 */
   pickDirectory: () => Promise<string | null>;
   /** 会话事件外推（主进程用它 webContents.send; 测试可注入收集器）。**入参为带 `roleId` 信封的
@@ -769,6 +771,8 @@ export interface DesktopInterface {
   readProjectDocument(input: unknown): Promise<ReadProjectDocumentResult>;
   listDurableWorkflows(input: unknown): Promise<DurableResult<{ definitions: DesktopDurableDefinition[]; controlPlane: DesktopDurableView["controlPlane"] }>>;
   validateDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
+  copyDurableWorkflowPreset(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
+  importDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
   startDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableView>>;
   getDurableWorkflowProjection(input: unknown): Promise<DurableResult<DesktopDurableView>>;
   readDurableWorkflowDelivery(input: unknown): Promise<DurableResult<DesktopDurableDeliveryView>>;
@@ -2505,13 +2509,27 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }),
     validateDurableWorkflow: input => durableCall(input, async (durable, projectRoot, request) => {
       if (!durableIdentifier(request.definitionId)) return durableFailure("workflow-definition-invalid", "Select a workflow definition.");
-      return durable.validateDefinition(projectRoot, request.definitionId);
+      const selection = durableSelection(request);
+      return selection.ok ? durable.validateDefinition(projectRoot, request.definitionId, selection.value) : selection;
     }),
-    startDurableWorkflow: input => durableCall(input, async (durable, projectRoot, request) => {
+    copyDurableWorkflowPreset: input => durableCall(input, async (durable, projectRoot, request) => {
+      if (!durableIdentifier(request.definitionId)) return durableFailure("workflow-definition-invalid", "Select a workflow preset.");
+      return durable.copyPreset(projectRoot, request.definitionId);
+    }),
+    importDurableWorkflow: input => durableCall(input, async (durable, projectRoot, _request, isCurrent) => {
+      if (!deps.pickWorkflowDefinition) return durableFailure("workflow-import-unavailable", "The file picker is unavailable.");
+      const selectedFile = await deps.pickWorkflowDefinition();
+      if (selectedFile === null) return durableFailure("workflow-import-cancelled", "No workflow file was selected.");
+      if (!isCurrent()) return durableFailure("workflow-project-unselected", "The selected project changed.");
+      return durable.importDefinition(projectRoot, selectedFile);
+    }),
+    startDurableWorkflow: input => durableCall(input, async (durable, projectRoot, request, isCurrent) => {
       if (request.enabled !== true || !durableIdentifier(request.definitionId) || !durableIdentifier(request.requestId)
         || typeof request.summary !== "string" || !request.summary.trim() || request.summary.length > 12_000) {
         return durableFailure("workflow-start-invalid", "Enable the prototype, select a workflow, and enter a change request.");
       }
+      const selection = durableSelection(request);
+      if (!selection.ok) return selection;
       if (registeredProjectLifecycle?.projectRoot !== projectRoot) {
         return durableFailure("workflow-project-unselected", "The selected project changed.");
       }
@@ -2527,8 +2545,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           return durableFailure("workflow-existing-run", "The project's active execution could not be cleared for a new workflow.");
         }
       }
-      return durable.start(projectRoot, request.definitionId, request.requestId, request.summary.trim(),
-        await resolveNoteRuntime(projectRoot) ?? "pi");
+      const runtime = await resolveNoteRuntime(projectRoot) ?? "pi";
+      if (!isCurrent()) return durableFailure("workflow-project-unselected", "The selected project changed.");
+      return durable.start(projectRoot, request.definitionId, request.requestId, request.summary.trim(), runtime, selection.value);
     }),
     getDurableWorkflowProjection: input => durableCall(input, async (durable, projectRoot, request) => {
       if (request.instanceId !== undefined && !durableIdentifier(request.instanceId)) {

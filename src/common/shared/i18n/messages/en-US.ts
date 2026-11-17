@@ -2338,6 +2338,15 @@ export const enUS = {
   "ui.durableWorkflow.deliveryFiles": "Delivered files",
   "ui.durableWorkflow.diffDigest": "Diff digest",
   "ui.durableWorkflow.runtimeUnverified": "Runtime behavior has not been independently verified.",
+  "ui.durableWorkflow.definitionSource": "Definition source",
+  "ui.durableWorkflow.sourcePreset": "Bundled preset",
+  "ui.durableWorkflow.sourceProject": "Project YAML",
+  "ui.durableWorkflow.copyPreset": "Copy preset to project",
+  "ui.durableWorkflow.importDefinition": "Import YAML",
+  "ui.durableWorkflow.schema": "Definition schema version",
+  "ui.durableWorkflow.pendingTasks": "Workflow tasks",
+  "ui.durableWorkflow.definitionMissing": "The selected definition is unavailable. Restore the file and refresh, or select another definition.",
+  "ui.durableWorkflow.taskReported": "Report submitted",
 
   // ---- Global task state and version decision (2026-11-02 global-task-state; A3; frozen in P1 review §6) ----
   // ui.projectState.*: project-state panel (62)

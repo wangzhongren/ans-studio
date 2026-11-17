@@ -29,6 +29,8 @@ export interface DesktopDurableControlPlane {
 
 export interface DesktopDurableDefinition {
   id: string;
+  name?: string;
+  source: "project" | "preset";
   version?: number;
   digest?: string;
   file: string;
@@ -43,6 +45,10 @@ export interface DesktopDurableInstance {
   definitionDigest: string;
   owner: "dapr";
   definitionName: string;
+  definitionSource?: "project" | "preset";
+  schema?: 1 | 2;
+  flowId?: string;
+  pendingTasks?: readonly { taskId: string; roleId: string; stepId: string; attempt: number; state: string }[];
   action?: string;
   engine: DurableProjection["engine"];
   runtime?: RuntimeKind;
@@ -70,6 +76,17 @@ export interface DesktopDurableView {
   instance?: DesktopDurableInstance;
 }
 
+export type DesktopDurableSelection = { source?: "project" | "preset"; expectedDigest?: string };
+
+export function durableSelection(request: Record<string, unknown>): DurableResult<DesktopDurableSelection> {
+  const { source, expectedDigest } = request;
+  if (source !== undefined && source !== "project" && source !== "preset"
+    || expectedDigest !== undefined && (typeof expectedDigest !== "string" || !/^[0-9a-f]{64}$/.test(expectedDigest))) {
+    return durableFailure("workflow-selection-invalid", "The definition source or digest is invalid.");
+  }
+  return { ok: true, value: { source, expectedDigest } };
+}
+
 export function durableFailure(code: string, message: string): DurableResult<never> {
   return { ok: false, code, message };
 }
@@ -89,6 +106,10 @@ export function durableInstanceView(projection: DurableProjection): DesktopDurab
     definitionDigest: ref.definitionDigest,
     owner: "dapr",
     definitionName: projection.definitionName,
+    definitionSource: projection.definitionSource,
+    schema: projection.schema,
+    flowId: projection.flowId,
+    pendingTasks: projection.pendingTasks?.map(({ taskId, roleId, stepId, attempt, state }) => ({ taskId, roleId, stepId, attempt, state })),
     action: projection.action,
     engine: projection.engine,
     ...(isRuntimeKind(projection.metadata.runtime) ? { runtime: projection.metadata.runtime } : {}),
@@ -136,6 +157,7 @@ interface DurableDelivery {
 
 export class DesktopDurableWorkflow {
   private readonly dataDir: string;
+  private readonly presetRoot?: string;
   private readonly host: DaprHost;
   private storePromise?: Promise<WorkflowStore>;
   private recovery?: ReturnType<typeof setInterval>;
@@ -149,13 +171,14 @@ export class DesktopDurableWorkflow {
   private readonly deliveries = new Map<string, DurableDelivery>();
   private readonly sessions = new WeakSet<object>();
 
-  constructor(options: { userDataRoot: string; resourceRoot: string }) {
+  constructor(options: { userDataRoot: string; resourceRoot: string; presetRoot?: string }) {
     this.dataDir = path.join(options.userDataRoot, "business");
+    this.presetRoot = options.presetRoot;
     this.host = createDaprHost(options);
   }
 
   store(): Promise<WorkflowStore> {
-    this.storePromise ??= Promise.resolve().then(() => openDurableWorkflow({ dataDir: this.dataDir })).catch(error => {
+    this.storePromise ??= Promise.resolve().then(() => openDurableWorkflow({ dataDir: this.dataDir, presetRoot: this.presetRoot })).catch(error => {
       this.storePromise = undefined;
       throw error;
     });
@@ -244,28 +267,43 @@ export class DesktopDurableWorkflow {
 
   async listDefinitions(projectRoot: string): Promise<DesktopDurableDefinition[]> {
     const entries = await (await this.store()).listDefinitions(projectRoot);
-    return entries.map(({ file, definition, code, message, path: field }) => ({
+    return entries.map(({ file, source, definition, code, message, path: field }) => ({
       id: definition?.id ?? path.basename(file, path.extname(file)),
       file: path.basename(file),
-      ...(definition ? { version: definition.version, digest: definition.digest } : {
+      source,
+      ...(definition ? { name: definition.name, version: definition.version, digest: definition.digest } : {
         error: { code: code ?? "workflow-definition-invalid", message: message ?? "The workflow definition could not be read.",
           ...(field ? { path: field } : {}) },
       }),
     }));
   }
 
-  async validateDefinition(projectRoot: string, definitionId: string): Promise<DurableResult<DesktopDurableDefinition>> {
+  async validateDefinition(projectRoot: string, definitionId: string, selection: DesktopDurableSelection = {}): Promise<DurableResult<DesktopDurableDefinition>> {
     const store = await this.store();
-    const validated = await store.validateDefinition(projectRoot, definitionId);
+    const validated = await store.validateDefinition(projectRoot, definitionId, selection);
     if (!validated.ok) return validated;
-    const { id, version, digest } = validated.value;
+    const { id, name, version, digest } = validated.value;
     const entries = await store.listDefinitions(projectRoot);
-    const file = entries.find(entry => entry.definition?.id === id && entry.definition.digest === digest)?.file;
-    return { ok: true, value: { id, version, digest, file: file ? path.basename(file) : `${id}.yaml` } };
+    const entry = entries.find(entry => entry.definition?.id === id && entry.definition.digest === digest
+      && (selection.source === undefined || selection.source === entry.source));
+    return { ok: true, value: { id, name, version, digest, source: entry?.source ?? selection.source ?? "project",
+      file: entry ? path.basename(entry.file) : `${id}.yaml` } };
   }
 
-  async start(projectRoot: string, definitionId: string, requestId: string, summary: string, runtime: RuntimeKind): Promise<DurableResult<DesktopDurableView>> {
-    const result = await (await this.store()).start({ projectRoot, definitionId, requestId, metadata: { summary, runtime } });
+  async copyPreset(projectRoot: string, definitionId: string): Promise<DurableResult<DesktopDurableDefinition>> {
+    const saved = await (await this.store()).copyPreset(projectRoot, definitionId);
+    if (!saved.ok) return saved;
+    return this.validateDefinition(projectRoot, saved.value.definition.id, { source: "project", expectedDigest: saved.value.definition.digest });
+  }
+
+  async importDefinition(projectRoot: string, selectedFile: string): Promise<DurableResult<DesktopDurableDefinition>> {
+    const saved = await (await this.store()).importDefinition(projectRoot, selectedFile);
+    if (!saved.ok) return saved;
+    return this.validateDefinition(projectRoot, saved.value.definition.id, { source: "project", expectedDigest: saved.value.definition.digest });
+  }
+
+  async start(projectRoot: string, definitionId: string, requestId: string, summary: string, runtime: RuntimeKind, selection: DesktopDurableSelection = {}): Promise<DurableResult<DesktopDurableView>> {
+    const result = await (await this.store()).start({ projectRoot, definitionId, requestId, ...selection, metadata: { summary, runtime } });
     if (!result.ok) return result;
     if (result.value.status === "waiting") this.activate();
     return { ok: true, value: this.view(result.value) };
@@ -322,17 +360,28 @@ export class DesktopDurableWorkflow {
     const claimTaskGit: ClaimDurableTaskGit = async input => {
       const delivery = currentDelivery();
       const task = delivery?.intent.task;
-      if (!delivery || task?.stage !== "B3" || task.taskId !== session.taskId || task.roleId !== session.roleId) {
-        return durableFailure("workflow-task-write-forbidden", "The current session does not hold the authorized implementation task.");
+      if (!delivery || delivery.roleId !== session.roleId || task?.taskId !== session.taskId || task && task.roleId !== session.roleId) {
+        return durableFailure("workflow-task-write-forbidden", "The current session does not hold the authorized role turn or task.");
       }
       const store = await this.store();
       const projection = await this.lookup(delivery.ref);
-      if (!projection || projection.task?.taskId !== task.taskId || currentDelivery() !== delivery ||
+      if (!projection || currentDelivery() !== delivery ||
         (input.expected.branch !== undefined && input.expected.branch !== projection.baseline?.branch)) {
         return durableFailure("workflow-task-write-stale", "The original task or task branch changed.");
       }
+      const current = delivery.intent.stepId === projection.stepId && delivery.intent.attempt === projection.attempt;
+      const pending = projection.pendingTasks?.find(item => item.taskId === task?.taskId && item.roleId === session.roleId
+        && item.stepId === delivery.intent.stepId && item.attempt === delivery.intent.attempt && item.state === "pending");
+      const preparation = current && (projection.action === "confirm-intent" && !task && session.roleId === "chief" ||
+        projection.action === "team-baseline" && task?.stage === "A9" && session.roleId === "convener");
+      const allowed = projection.schema === 2 && projection.pendingTasks !== undefined
+        ? Boolean(pending && (current || pending.capability === "independent-standard") || preparation)
+          || Boolean(task?.stage === "B3" && projection.task?.taskId === task.taskId)
+        : Boolean(task?.stage === "B3" && projection.task?.taskId === task.taskId) || Boolean(projection.schema === 2 && preparation);
+      if (!allowed) return durableFailure("workflow-task-write-forbidden", "The current capability has no matching write scope.");
       const claim = await store.claimEffect(delivery.ref, {
         ...input, stepId: delivery.intent.stepId, attempt: delivery.intent.attempt, task,
+        ...(projection.schema === 2 && !task ? { expected: { ...input.expected, roleId: session.roleId } } : {}),
       });
       if (!claim.ok) return claim;
       if (!claim.value.execute && claim.value.state !== "succeeded") {

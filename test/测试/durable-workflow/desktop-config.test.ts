@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
-import { analysis, app, fixture, git, modelFixture, resourceRoot, sqliteSnapshot, successful, target, until, unwrap, write, type Log } from "./fixture.ts";
+import { analysis, app, fixture, git, modelFixture, resourceRoot, sqliteSnapshot, successful, target, until, unwrap, write,
+  type Log, type PackagedRun, type runPackagedPathB } from "./fixture.ts";
 
 test("Desktop keeps an active read-only definition pinned when external YAML is invalid or upgraded", {
   skip: !resourceRoot && "Set ANS_W5_DAPR_ROOT to the verified bundle resource directory",
@@ -111,4 +116,86 @@ test("Desktop keeps an active read-only definition pinned when external YAML is 
     hold.resolve();
     log("final-observation", { projection: await projection(initial.instanceId), runs: [...runs], sqlite: sqliteSnapshot(f, initial.instanceId) });
   }
+});
+
+const oldPackage = process.env.ANS_W5_OLD_PACKAGE_ROOT;
+const newPackage = process.env.ANS_W5_NEW_PACKAGE_ROOT;
+const oldZip = process.env.ANS_W5_OLD_PACKAGE_ZIP;
+const newZip = process.env.ANS_W5_NEW_PACKAGE_ZIP;
+
+async function sha256File(filename: string) {
+  const sha = createHash("sha256");
+  for await (const chunk of createReadStream(filename)) sha.update(chunk);
+  return sha.digest("hex");
+}
+
+test("Actual Windows ZIP binaries and bundled Desktop modules resume the same pending v1 Path B without role replay", {
+  skip: !(oldPackage && newPackage && oldZip && newZip) && "Set both independently extracted Windows package roots and their ZIP paths",
+  timeout: 240_000,
+}, async t => {
+  const oldResource = path.join(oldPackage!, "resources");
+  const newResource = path.join(newPackage!, "resources");
+  assert.notEqual(path.resolve(oldPackage!), path.resolve(newPackage!));
+  const readBundledDefinition = (resource: string, id: string) => readFile(path.join(resource, "app", "docs", "workflows", id + ".yaml"), "utf8");
+  const oldDefinition = await readBundledDefinition(oldResource, "path-b");
+  assert.match(oldDefinition, /^schema: 1$/m);
+  assert.match(await readBundledDefinition(newResource, "path-b"), /^schema: 2$/m);
+  assert.match(await readBundledDefinition(newResource, "path-a"), /^schema: 2$/m);
+  const verifyPackage = async (extracted: string, zip: string) => Object.fromEntries(await Promise.all([
+    ["zipSha256", zip], ["electronSha256", path.join(extracted, "ANS Studio.exe")],
+    ["desktopSha256", path.join(extracted, "resources/app/app/desktop/interface.ts")],
+    ["workflowSha256", path.join(extracted, "resources/app/app/desktop/durable-workflow.ts")],
+    ["daprdSha256", path.join(extracted, "resources/dapr-runtime/daprd.exe")],
+    ["schedulerSha256", path.join(extracted, "resources/dapr-runtime/scheduler.exe")],
+  ].map(async ([label, filename]) => [label, await sha256File(filename)])));
+  const [original, candidate] = await Promise.all([verifyPackage(oldPackage!, oldZip!), verifyPackage(newPackage!, newZip!)]);
+  assert.equal(original.zipSha256, "3d39ff874033e953067b024f027c84c29f39c50536621ff68c01e058f20f10a8");
+  assert.notEqual(original.zipSha256, candidate.zipSha256);
+  t.diagnostic(JSON.stringify({ event: "packaged-binary-and-module-provenance", original, candidate }));
+
+  const f = await fixture();
+  await write(f.root, "docs/workflows/path-b.yaml", oldDefinition);
+  const script = `
+    import { runPackagedPathB } from ${JSON.stringify(new URL("./fixture.ts", import.meta.url).href)};
+    const log = (event,value) => process.stdout.write(JSON.stringify({ at: new Date().toISOString(), event, value }) + "\\n");
+    const finished = await runPackagedPathB(JSON.parse(process.argv[1]), log);
+    process.stdout.write("PACKAGED_W5_RESULT " + JSON.stringify(finished) + "\\n");
+  `;
+  const run = async (extracted: string, input: PackagedRun) => {
+    const executable = path.join(extracted, "ANS Studio.exe");
+    const result = await promisify(execFile)(executable, ["--input-type=module", "-e", script, JSON.stringify(input)], {
+      windowsHide: true, timeout: 110_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+    }).catch(error => {
+      t.diagnostic(error.stdout ?? "");
+      t.diagnostic(error.stderr ?? "");
+      throw error;
+    });
+    if (result.stderr) t.diagnostic(result.stderr);
+    t.diagnostic(result.stdout);
+    const line = result.stdout.split(/\r?\n/).find(row => row.startsWith("PACKAGED_W5_RESULT "));
+    assert.ok(line, "Expected the actual packaged Electron process to complete its requested phase");
+    return JSON.parse(line.slice("PACKAGED_W5_RESULT ".length)) as Awaited<ReturnType<typeof runPackagedPathB>>;
+  };
+
+  const pending = await run(oldPackage!, { f, bundleResources: oldResource });
+  assert.equal(path.normalize(pending.child.executable), path.normalize(path.join(oldPackage!, "ANS Studio.exe")));
+  assert.ok(pending.child.electron);
+  const processActive = (pid: number) => {
+    try { process.kill(pid, 0); return true; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+      throw error;
+    }
+  };
+  assert.equal(processActive(pending.child.pid), false);
+  assert.equal(processActive(pending.child.worker.pid), false);
+  const finished = await run(newPackage!, { f, bundleResources: newResource, resume: pending.wait });
+  assert.equal(path.normalize(finished.child.executable), path.normalize(path.join(newPackage!, "ANS Studio.exe")));
+  assert.ok(finished.child.electron);
+  assert.notEqual(finished.child.pid, pending.child.pid);
+  assert.notEqual(finished.child.worker.pid, pending.child.worker.pid);
+  assert.deepEqual(finished.wait, pending.wait);
+  assert.equal(finished.receipt?.state, "delivered");
+  assert.notEqual(finished.mergedHead, f.baselineOid);
+  t.diagnostic(JSON.stringify({ event: "actual-packaged-hosts-v1-handoff", pending, finished }));
 });

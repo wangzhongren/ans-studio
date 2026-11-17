@@ -24,6 +24,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
@@ -427,10 +428,19 @@ function parsePorcelainZ(raw: string): PorcelainEntry[] {
   return entries;
 }
 
-async function statusEntriesOf(projectRoot: string): Promise<PorcelainEntry[] | undefined> {
-  const result = await runGit(projectRoot, ["status", "--porcelain=v1", "-z", "--untracked-files=normal"]);
+async function statusEntriesOf(projectRoot: string, definitionFile?: string): Promise<PorcelainEntry[] | undefined> {
+  let selectedDefinition: string | undefined;
+  if (definitionFile && /^docs\/workflows\/[\w][\w.-]*\.ya?ml$/i.test(definitionFile)) {
+    const abs = path.join(projectRoot, definitionFile);
+    const definition = await fs.lstat(abs).catch(() => undefined);
+    const actualPath = definition?.isFile() && await fs.realpath(abs).catch(() => undefined);
+    const expectedPath = path.join(await fs.realpath(projectRoot), definitionFile);
+    if (actualPath && path.relative(expectedPath, actualPath) === "") selectedDefinition = definitionFile;
+  }
+  const result = await runGit(projectRoot, ["status", "--porcelain=v1", "-z",
+    selectedDefinition ? "--untracked-files=all" : "--untracked-files=normal"]);
   if (!result.ok) return undefined;
-  return parsePorcelainZ(result.stdout);
+  return parsePorcelainZ(result.stdout).filter(entry => entry.status !== "??" || entry.path !== selectedDefinition);
 }
 
 async function readGitignoreSha256(projectRoot: string): Promise<string | null> {
@@ -454,14 +464,14 @@ async function gitignoreWorktreeDirty(projectRoot: string): Promise<boolean> {
 }
 
 /** 只读仓库事实（发布前置与端口的共同来源）。 */
-async function inspectRepositoryFacts(projectRoot: string): Promise<
+async function inspectRepositoryFacts(projectRoot: string, definitionFile?: string): Promise<
   { ok: true; facts: WorkflowGitRepositoryFacts } | WorkflowServiceFailure
 > {
   const headOid = await revParseOid(projectRoot, "HEAD");
   if (headOid === undefined) {
     return portFailure("release-workflow-not-ready", "当前工作区没有提交（HEAD 不可解析），无法发布。", ["head-oid"]);
   }
-  const entries = await statusEntriesOf(projectRoot);
+  const entries = await statusEntriesOf(projectRoot, definitionFile);
   if (entries === undefined) {
     return portFailure("release-workflow-not-ready", "git status 读取失败（fail-closed）。");
   }
@@ -572,6 +582,7 @@ async function mergeMainReal(request: {
   durable?: {
     snapshot: DurableReleaseSnapshot;
     marker: string;
+    definitionFile?: string;
     claim(): Promise<{ ok: true } | ({ ok: false } & DurableProblem)>;
   };
 }): Promise<
@@ -591,7 +602,7 @@ async function mergeMainReal(request: {
     return portFailure("release-main-busy", "项目级 Git 临界区被占用（并发合并/提交）；未合并。");
   }
   try {
-    const factsResult = await inspectRepositoryFacts(request.projectRoot);
+    const factsResult = await inspectRepositoryFacts(request.projectRoot, request.durable?.definitionFile);
     if (!factsResult.ok) return factsResult;
     const facts = factsResult.facts;
     if (facts.branch !== request.branch) {
@@ -718,7 +729,7 @@ async function findParentRepository(projectRoot: string): Promise<string | undef
 async function ensureRepositoryReal(request: {
   projectRoot: string;
   allowInit: boolean;
-}): Promise<{ ok: true; repository: BaselineGitRepositoryState } | WorkflowServiceFailure> {
+}, durableMarker?: string, expectOwnedRepository = false): Promise<{ ok: true; repository: BaselineGitRepositoryState } | WorkflowServiceFailure> {
   const root = request.projectRoot;
   let gitEntry: Awaited<ReturnType<typeof fs.lstat>> | undefined;
   try {
@@ -736,7 +747,8 @@ async function ensureRepositoryReal(request: {
     if (parent !== undefined) {
       return portFailure("baseline-parent-repository-detected", `项目根位于其他仓库工作树内（${parent}）；不自动嵌套初始化。`);
     }
-    const initialized = await runGit(root, ["init", "-b", "main"]);
+    const initialized = durableMarker ? await initializeDurableRepository(root, durableMarker) : await runGit(root, ["init", "-b", "main"]);
+    if (durableMarker && !initialized.ok) return portFailure("baseline-git-init-failed", asMessage(initialized));
     if (!initialized.ok) {
       // 旧 git 不支持 `-b`：`git init` + `git symbolic-ref HEAD refs/heads/main`（G-9：初始分支钉死 main）。
       const plain = await runGit(root, ["init"]);
@@ -765,6 +777,9 @@ async function ensureRepositoryReal(request: {
     };
   }
   // 既有仓库（目录或 worktree `.git` 文件）：原样保留，只补仓库本地身份缺省。
+  if (durableMarker && expectOwnedRepository && !await hasDurableInitializationMarker(root, durableMarker)) {
+    return portFailure("workflow-baseline-reconciliation-required", "The newly present repository has no marker for this baseline operation.");
+  }
   const identityDefaultsApplied = await ensureIdentityDefaults(root);
   const mainOid = await revParseOid(root, "refs/heads/main");
   const branch = await currentBranchOf(root);
@@ -786,7 +801,7 @@ async function ensureRepositoryReal(request: {
  * `.gitignore` ans-managed 块 + 仅 `.gitignore` 的 baseline commit。
  * 被跟踪且有未提交修改 ⇒ `baseline-gitignore-dirty`（不覆盖用户改动）；提交只含 `.gitignore`。
  */
-async function ensureGitignoreReal(request: { projectRoot: string }): Promise<
+async function ensureGitignoreReal(request: { projectRoot: string }, durableMarker?: string): Promise<
   { ok: true; changed: boolean; committed: boolean; sha256: string } | WorkflowServiceFailure
 > {
   const root = request.projectRoot;
@@ -803,7 +818,8 @@ async function ensureGitignoreReal(request: { projectRoot: string }): Promise<
     if (!added.ok) {
       return portFailure("baseline-gitignore-write-failed", `git add .gitignore 失败：${asMessage(added)}`);
     }
-    const commit = await runGit(root, ["commit", "-m", "ANS baseline: ans-managed .gitignore", "--", ".gitignore"]);
+    const commit = await runGit(root, ["commit", "-m", "ANS baseline: ans-managed .gitignore",
+      ...(durableMarker ? ["-m", `ANS durable baseline ${durableMarker}`] : []), "--", ".gitignore"]);
     if (!commit.ok) {
       const stillDirty = await gitignoreWorktreeDirty(root);
       if (stillDirty) {
@@ -817,10 +833,10 @@ async function ensureGitignoreReal(request: { projectRoot: string }): Promise<
   return { ok: true, changed: ensured.changed, committed, sha256: ensured.sha256 };
 }
 
-async function inspectWorktreeReal(request: { projectRoot: string; branch?: string }): Promise<
+async function inspectWorktreeReal(request: { projectRoot: string; branch?: string }, definitionFile?: string): Promise<
   { ok: true; branch: string; trackedChanges: number; untracked: string[] } | WorkflowServiceFailure
 > {
-  const entries = await statusEntriesOf(request.projectRoot);
+  const entries = await statusEntriesOf(request.projectRoot, definitionFile);
   if (entries === undefined) {
     return portFailure("baseline-git-init-failed", "git status 读取失败（fail-closed）。");
   }
@@ -901,6 +917,7 @@ export async function previewDurableMerge(input: {
   projectRoot: string;
   branch: string;
   baselineOid: string;
+  definitionFile?: string;
 }): Promise<DurableResult<{
   mainOid: string;
   tipOid: string;
@@ -908,7 +925,7 @@ export async function previewDurableMerge(input: {
   diffDigest: string;
   diffStat: string;
 }>> {
-  const facts = await inspectRepositoryFacts(input.projectRoot);
+  const facts = await inspectRepositoryFacts(input.projectRoot, input.definitionFile);
   if (!facts.ok) return facts;
   const { branch, headOid, mainOid, trackedChanges, untracked } = facts.facts;
   if (mainOid === null || branch !== input.branch || trackedChanges || untracked.length) {
@@ -945,6 +962,7 @@ export async function mergeDurableMain(input: {
   flowId: string;
   requestId: string;
   snapshot: DurableReleaseSnapshot;
+  definitionFile?: string;
   confirmation: MergeMainConfirmation;
   claim: NonNullable<Parameters<typeof mergeMainReal>[0]["durable"]>["claim"];
 }): ReturnType<typeof mergeMainReal> {
@@ -962,6 +980,7 @@ export async function mergeDurableMain(input: {
     durable: {
       snapshot: input.snapshot,
       marker: durableMergeMarker(input.workflowId, input.requestId),
+      definitionFile: input.definitionFile,
       claim: input.claim,
     },
   });
@@ -973,9 +992,10 @@ export async function verifyDurableMerge(input: {
   requestId: string;
   snapshot: DurableReleaseSnapshot;
   writePaths: readonly string[];
+  definitionFile?: string;
 }): Promise<DurableResult<{ mainOid: string; files: string[]; diffDigest: string }>> {
   const { projectRoot, workflowId, requestId, snapshot } = input;
-  const facts = await inspectRepositoryFacts(projectRoot);
+  const facts = await inspectRepositoryFacts(projectRoot, input.definitionFile);
   if (!facts.ok) return facts;
   const { branch, headOid, mainOid, trackedChanges, untracked } = facts.facts;
   if (branch !== "main" || mainOid?.hex !== headOid.hex || trackedChanges || untracked.length) {
@@ -1003,13 +1023,126 @@ export async function verifyDurableMerge(input: {
  * 构造**真实** `BaselineGitPort`（桌面 B3 注入 `completeTeamPlanFixed`/`preparePathBStart`）：
  * A9 `git init -b main`（allowInit=true）；路径 B 无仓库 ⇒ `b-repository-required`（不自动 init）。
  */
-export function createDesktopBaselineGitPort(): BaselineGitPort {
+export function createDesktopBaselineGitPort(definitionFile?: string): BaselineGitPort {
   return {
     ensureRepository: async (request) => ensureRepositoryReal(request),
     ensureGitignore: async (request) => ensureGitignoreReal(request),
-    inspectWorktree: async (request) => inspectWorktreeReal(request),
+    inspectWorktree: async (request) => inspectWorktreeReal(request, definitionFile),
     prepareTaskBranch: async (request) => prepareTaskBranchReal(request),
   };
+}
+
+const durableBaselineMarkerFile = "ans-baseline-operation";
+
+async function initializeDurableRepository(projectRoot: string, marker: string) {
+  const template = await fs.mkdtemp(path.join(tmpdir(), "ans-baseline-template-"));
+  try {
+    await fs.writeFile(path.join(template, durableBaselineMarkerFile), marker, { flag: "wx", mode: 0o600 });
+    return await runGit(projectRoot, ["init", "-b", "main", `--template=${template}`]);
+  } finally {
+    await fs.unlink(path.join(template, durableBaselineMarkerFile)).catch(() => undefined);
+    await fs.rmdir(template).catch(() => undefined);
+  }
+}
+
+export interface DurableBaselineOrigin {
+  repositoryBefore: "absent" | "existing";
+  mainBefore: string;
+}
+
+export async function durableBaselineOrigin(projectRoot: string, workflowId: string): Promise<DurableResult<DurableBaselineOrigin>> {
+  const git = await fs.lstat(path.join(projectRoot, ".git")).catch(error => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!git) return { ok: true, value: { repositoryBefore: "absent", mainBefore: "" } };
+  const main = await revParseOid(projectRoot, "refs/heads/main");
+  const oldTaskBranch = await revParseOid(projectRoot, `refs/heads/${taskBranchName(workflowId)}`);
+  if ((!git.isDirectory() && !git.isFile()) || await currentBranchOf(projectRoot) !== "main" || oldTaskBranch) {
+    return portFailure("workflow-baseline-reconciliation-required", "The existing workspace must be on main with no branch for the pending operation.");
+  }
+  return { ok: true, value: { repositoryBefore: "existing", mainBefore: main?.hex ?? "" } };
+}
+
+async function proveDurableBaselineState(
+  projectRoot: string, workflowId: string, marker: string, origin: DurableBaselineOrigin,
+): Promise<DurableResult<{ reuseBranch?: GitOid; mainOid?: GitOid; onTaskBranch?: boolean }>> {
+  const git = await fs.lstat(path.join(projectRoot, ".git")).catch(error => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  });
+  const fail = () => portFailure("workflow-baseline-reconciliation-required", "Git does not prove the original baseline operation. Keep the current worktree and inspect it.");
+  if (!git) return origin.repositoryBefore === "absent" ? { ok: true, value: {} } : fail();
+  if (!git.isDirectory() && !git.isFile()) return fail();
+  if (origin.repositoryBefore === "absent") {
+    if (!git.isDirectory() || !await hasDurableInitializationMarker(projectRoot, marker)) return fail();
+  }
+  const mainOid = await revParseOid(projectRoot, "refs/heads/main");
+  const branch = taskBranchName(workflowId);
+  const prepared = await revParseOid(projectRoot, `refs/heads/${branch}`);
+  const current = await currentBranchOf(projectRoot);
+  if ((current !== "main" && current !== branch) || prepared && prepared.hex !== mainOid?.hex) return fail();
+  if (prepared) {
+    const reflog = await runGit(projectRoot, ["reflog", "-1", "--format=%gs", `refs/heads/${branch}`]);
+    if (!reflog.ok || reflog.stdout.trim() !== `ANS durable baseline ${marker}`) return fail();
+  }
+  if ((mainOid?.hex ?? "") !== origin.mainBefore) {
+    if (!mainOid) return fail();
+    const commit = await runGit(projectRoot, ["show", "-s", "--format=%P%n%B", mainOid.hex]);
+    const content = commit.stdout.trimEnd().replace(/\r\n/g, "\n").split("\n");
+    const changed = await runGit(projectRoot, ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", mainOid.hex]);
+    if (!commit.ok || (content[0] ?? "") !== origin.mainBefore || !content.includes(`ANS durable baseline ${marker}`)
+      || !changed.ok || changed.stdout.trim() !== ".gitignore") return fail();
+  }
+  return { ok: true, value: { reuseBranch: prepared, mainOid, onTaskBranch: current === branch } };
+}
+
+async function hasDurableInitializationMarker(projectRoot: string, marker: string): Promise<boolean> {
+  const markerFile = path.join(projectRoot, ".git", durableBaselineMarkerFile);
+  const stat = await fs.lstat(markerFile).catch(() => undefined);
+  return !!stat?.isFile() && stat.size === marker.length && await fs.readFile(markerFile, "utf8").catch(() => undefined) === marker;
+}
+
+export async function createDurableGraphBaselineGitPort(input: {
+  projectRoot: string; workflowId: string; token: string; origin: DurableBaselineOrigin; definitionFile?: string;
+}): Promise<DurableResult<BaselineGitPort>> {
+  const { projectRoot, workflowId, origin, definitionFile } = input;
+  const marker = hashSha256(`${workflowId}\0${input.token}`);
+  const proof = await proveDurableBaselineState(projectRoot, workflowId, marker, origin);
+  if (!proof.ok) return proof;
+  return { ok: true, value: {
+    ensureRepository: request => ensureRepositoryReal(request, marker, origin.repositoryBefore === "absent"),
+    ensureGitignore: request => ensureGitignoreReal(request, marker),
+    inspectWorktree: request => inspectWorktreeReal(request, definitionFile),
+    prepareTaskBranch: async request => {
+      const fresh = await proveDurableBaselineState(projectRoot, workflowId, marker, origin);
+      if (!fresh.ok) return fresh;
+      const branch = taskBranchName(workflowId);
+      const baseOid = fresh.value.mainOid;
+      if (!baseOid || request.base !== "main") return portFailure("baseline-git-init-failed", "The original main baseline is missing.");
+      if (!fresh.value.reuseBranch) {
+        const created = await runGit(projectRoot, ["update-ref", "--create-reflog", "-m", `ANS durable baseline ${marker}`,
+          `refs/heads/${branch}`, baseOid.hex, "0".repeat(baseOid.hex.length)]);
+        if (!created.ok) return portFailure("baseline-branch-exists", asMessage(created));
+      }
+      if (!fresh.value.onTaskBranch) {
+        const switched = await runGit(projectRoot, ["switch", branch]);
+        if (!switched.ok) return portFailure("baseline-repository-dirty", asMessage(switched));
+      }
+      return { ok: true, branch, baseOid, reused: fresh.value.reuseBranch !== undefined };
+    },
+  } };
+}
+
+export async function verifyDurableGraphBaseline(
+  projectRoot: string, workflowId: string, token: string, origin: DurableBaselineOrigin,
+): Promise<DurableResult<{ branch: string; oid: string }>> {
+  const marker = hashSha256(`${workflowId}\0${token}`);
+  const proof = await proveDurableBaselineState(projectRoot, workflowId, marker, origin);
+  if (!proof.ok) return proof;
+  return proof.value.reuseBranch && proof.value.onTaskBranch
+    ? { ok: true, value: { branch: taskBranchName(workflowId), oid: proof.value.reuseBranch.hex } }
+    : portFailure("workflow-baseline-reconciliation-required", "The original task branch has not been established.");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════

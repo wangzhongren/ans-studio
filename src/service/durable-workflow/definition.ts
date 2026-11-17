@@ -1,6 +1,7 @@
 import { parseDocument, visit } from 'yaml';
-import type { DurableAction, DurableDefinition, DurableResult, DurableStep, DurableTerminal } from '../../model/durable-workflow.ts';
+import type { DurableAction, DurableDefinitionSnapshot, DurableResult, DurableStep, DurableTerminal } from '../../model/durable-workflow.ts';
 import { digest, stableJson } from '../../provider/durable-workflow/public.ts';
+import { parseGraphDefinition } from './capabilities.ts';
 
 const idPattern = /^[a-z][a-z0-9-]{0,63}$/;
 const terminals = new Set<DurableTerminal>(['blocked', 'stopped', 'delivered', 'completed']);
@@ -26,7 +27,7 @@ function shape(object: Record<string, unknown>, allowed: readonly string[]): str
   return Object.keys(object).find(key => !allowed.includes(key));
 }
 
-export function parseDefinition(text: string): DurableResult<DurableDefinition> {
+export function parseDefinition(text: string): DurableResult<DurableDefinitionSnapshot> {
   const doc = parseDocument(text, { version: '1.2', strict: true, uniqueKeys: true, merge: false });
   if (doc.errors.length || doc.warnings.length) {
     return invalid((doc.errors[0] ?? doc.warnings[0])!.message, '$');
@@ -45,9 +46,10 @@ export function parseDefinition(text: string): DurableResult<DurableDefinition> 
 
   const input: unknown = doc.toJS({ maxAliasCount: 0 });
   if (!mapping(input)) return invalid('配置须是单个 YAML 映射。', '$');
+  if (input.schema === 2) return parseGraphDefinition(input);
   const unknown = shape(input, ['schema', 'id', 'version', 'name', 'start', 'steps']);
   if (unknown !== undefined) return invalid('未知配置字段。', unknown);
-  if (input.schema !== 1) return invalid('schema 必须为 1。', 'schema');
+  if (input.schema !== 1) return invalid('schema 必须为 1 或 2。', 'schema');
   if (!identifier(input.id)) return invalid('id 须为小写标识。', 'id');
   if (!Number.isSafeInteger(input.version) || Number(input.version) < 1) return invalid('version 须为正整数。', 'version');
   if (input.name !== undefined && (typeof input.name !== 'string' || input.name.trim().length === 0 || input.name.length > 120)) {

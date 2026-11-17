@@ -43,9 +43,10 @@ import { isWorkflowPath, isWorkflowStage } from "../../../../src/model/runtime.t
 import type { BasisEvent, DispatchReceipt, DispatchTaskPayload, TaskStateEvent, WorkflowEvent, WorkflowStage } from "../../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
 import type { RoleDispatchPurpose } from "../../../../src/model/role.ts";
-import type { DurableDispatchDetails, DurableEvidenceRef, DurableFact, DurableProjection, DurableTaskBinding } from "../../../../src/model/durable-workflow.ts";
+import type { DurableCapabilityEvent, DurableDispatchDetails, DurableEvidenceRef, DurableFact, DurableProjection, DurableTaskBinding } from "../../../../src/model/durable-workflow.ts";
 import { isRuntimeKind } from "../../runtime-config.ts";
 import { durableHash, durableTaskId } from "../../durable-workflow.ts";
+import { closeDesktopGraphCard, graphCardProfile, graphEventAddress, graphTaskProfile, resumeDesktopGraphCard, resumeGraphBaseline, syncGraphArchive } from "../../durable-workflow-a.ts";
 import { mainT } from "../../i18n.ts";
 import {
   recordFixedPathBScopeDecisionForDispatch,
@@ -174,6 +175,7 @@ export class FixedWorkflowRoute {
     });
     return () => {
       unobserve?.();
+      if (this.deps.durableWorkflow) closeDesktopGraphCard(this.deps.durableWorkflow, projectRoot);
       ports.closeRelease();
     };
   }
@@ -186,6 +188,8 @@ export class FixedWorkflowRoute {
     const convener = this.handbackOwnerRoleId(projectRoot);
     const chief = this.chiefTaskRoleIdOf(projectRoot);
     if (!chief || !convener) return;
+    if (projection.schema === 2) await this.syncGraphTasks(projection, chief, convener);
+    if (graphTaskProfile(projection)) return;
     const address = { stepId, attempt };
     const facts = store.listFacts(ref);
     const currentTask = projection.task;
@@ -204,9 +208,13 @@ export class FixedWorkflowRoute {
       }
     }
     if (action === "accept-b3-advance-with-b2-scope" && projection.analysisReport) {
-      const b1Attempt = projection.analysisReport.attempt;
-      const parent = durableTaskId(ref, convener, "B1", b1Attempt);
-      const report = facts.find(row => row.fact.kind === "operator-report" && row.fact.parentTaskId === parent)?.fact;
+      const analysis = projection.analysisReport;
+      const disposition = projection.schema === 2 ? facts.find(({ fact, receipt }) =>
+        fact.kind === "analysis-disposition" && fact.outcome === "usable" && fact.reportKey === analysis.key
+        && fact.task.stageAttempt === analysis.attempt && receipt.state === "consumed")?.fact : undefined;
+      const parent = projection.schema === 2 ? (disposition?.kind === "analysis-disposition" ? disposition.task.parentTaskId : undefined)
+        : durableTaskId(ref, convener, "B1", analysis.attempt);
+      const report = parent ? facts.find(row => row.fact.kind === "operator-report" && row.fact.parentTaskId === parent)?.fact : undefined;
       if (report?.kind === "operator-report") {
         const recorded = store.getEvidence(ref, report.evidence) as { handback?: TaskHandback } | undefined;
         if (recorded?.handback) {
@@ -216,27 +224,51 @@ export class FixedWorkflowRoute {
         }
       }
     }
-    const stageRequest = facts.find(row => row.fact.kind === "stage-request" && row.fact.attempt === attempt
-      && row.fact.stepId === stepId && row.receipt.state === "consumed")?.fact;
+    const requestForStep = facts.find(row => row.fact.kind === "stage-request" && row.fact.attempt === attempt
+      && row.fact.stepId === stepId && row.receipt.state !== "ignored");
+    const stageRequest = requestForStep?.receipt.state === "consumed" ? requestForStep.fact : undefined;
     if ((action === "b1-impact-readonly" || action === "readonly-report") && !stageRequest) {
+      if (projection.schema === 2 && requestForStep) return;
       const task = `客户已从桌面启动持久工作流 ${ref.instanceId}。需求：${projection.metadata.summary ?? ""}\n`
         + `请使用 dispatch_task 向运营 ${convener} 发真实路径 B 的 B1 advance 阶段请求。为本次工作选择一个 flowId、指明需核对的模块和问题，要求运营只读派发给现有模块属主。当前轮是第 ${attempt} 次影响面分析。`;
       await this.queueDurablePrompt(projection, chief, "application", task, this.durableRuntime(projection), `chief-intake:${stepId}:${attempt}`);
       return;
     }
-    if (action === "b1-impact-readonly" && !projection.baseline) {
+    if ((action === "prepare-existing-branch" || action === "b1-impact-readonly" && projection.schema !== 2) && !projection.baseline) {
       const claimed = await store.claimEffect(ref, {
         ...address, key: "git:baseline", kind: "baseline", expected: { workflowId: ref.instanceId },
       });
-      if (!claimed.ok || !claimed.value.execute) return;
-      const prepared = await prepareDurablePathBBaseline({ projectRoot, workflowId: ref.instanceId, port: createDesktopBaselineGitPort() });
-      await store.settleEffect(ref, prepared.ok && prepared.repo.baseOid ? {
+      if (!claimed.ok) {
+        if (projection.schema === 2) store.block(ref, claimed.code, claimed.message);
+        return;
+      }
+      if (!claimed.value.execute) {
+        if (projection.schema === 2 && (claimed.value.state === "claimed" || claimed.value.state === "unknown")) {
+          store.block(ref, "workflow-existing-baseline-reconciliation-required",
+            claimed.value.result?.evidence ?? "An earlier attempt to prepare the existing task branch requires reconciliation.");
+        }
+        return;
+      }
+      if (projection.schema === 2) {
+        const checked = await store.checkExistingBaseline(ref);
+        if (!checked.ok) {
+          await store.settleEffect(ref, { key: claimed.value.key, token: claimed.value.token,
+            outcome: "not-started", evidence: checked.message });
+          store.block(ref, checked.code, checked.message);
+          return;
+        }
+      }
+      const prepared = await prepareDurablePathBBaseline({ projectRoot, workflowId: ref.instanceId,
+        port: createDesktopBaselineGitPort(projection.definitionSource === "project" ? projection.definitionFile : undefined) });
+      const settled = await store.settleEffect(ref, prepared.ok && prepared.repo.baseOid ? {
         key: claimed.value.key, token: claimed.value.token, outcome: "succeeded", evidence: "baseline-branch-prepared",
         result: { branch: prepared.repo.branch, oid: prepared.repo.baseOid },
       } : {
         key: claimed.value.key, token: claimed.value.token, outcome: "unknown",
         evidence: prepared.ok ? "baseline-oid-missing" : `${prepared.code}: ${prepared.message}`,
       });
+      if (projection.schema === 2 && !settled.ok) store.block(ref, settled.code, settled.message);
+      else if (projection.schema === 2 && !prepared.ok) store.block(ref, prepared.code, prepared.message);
       return;
     }
     const dispatch = stageRequest?.kind === "stage-request" ? stageRequest.dispatch
@@ -273,7 +305,8 @@ export class FixedWorkflowRoute {
           ? "核对实现报告与任务分支的提交；接受时调用 close_created_task accepted，并在本轮使用 submit_report 提交运营报告。"
           : "核对本次只读报告；依据可用用 close_created_task accepted，需要补查用 rework，阻塞用 rejected。请在本轮使用 submit_report 将处置依据回交幕僚。";
         const firstRequest = facts.find(row => row.fact.kind === "stage-request" && row.fact.attempt === attempt)?.fact;
-        const parent = firstRequest?.kind === "stage-request" ? firstRequest.sourceTaskId : projection.scope?.sourceTaskId;
+        const parent = projection.schema === 2 && binding.stage === "B3" ? projection.scope?.sourceTaskId
+          : firstRequest?.kind === "stage-request" ? firstRequest.sourceTaskId : projection.scope?.sourceTaskId;
         const operator = parent ? { stage: binding.stage, stageAttempt: attempt, executionAttempt: 1,
           parentTaskId: parent, taskId: binding.parentTaskId, roleId: convener } : undefined;
         await this.queueDurablePrompt(projection, convener, binding.roleId, `${renderWorkReportPrompt(recorded.handback)}\n${finish}`,
@@ -282,9 +315,86 @@ export class FixedWorkflowRoute {
     }
   }
 
+  private async syncGraphTasks(view: DurableProjection, chief: string, convener: string): Promise<void> {
+    const store = await this.deps.durableWorkflow!.store();
+    const profile = graphTaskProfile(view);
+    const events = store.listCapabilityEvents(view.ref).filter(row => row.receipt.state === "consumed");
+    const currentRequest = events.find(({ event }) => event.input.kind === "stage-request" &&
+      event.stepId === view.stepId && event.attempt === view.attempt)?.event;
+    const runtime = this.durableRuntime(view);
+    if (view.action === "archive-acceptance") await syncGraphArchive(this.deps.durableWorkflow!, view);
+    if (view.action === "team-baseline" && ![...this.sessions.values()].some(entry => entry.projectRoot === view.projectRoot
+      && entry.roleId === convener && entry.busy)) await resumeGraphBaseline(this.deps.durableWorkflow!, view);
+    const card = graphCardProfile(view);
+    if (card && this.deps.customerInput && !await resumeDesktopGraphCard(this.deps.durableWorkflow!, view, {
+      customer: this.deps.customerInput, isRegistered: () => !!this.deps.getRegisteredProjectLifecycle?.(view.projectRoot),
+    })) {
+      await this.queueDurablePrompt(view, chief, "application",
+        `工作流 ${view.ref.instanceId}，flowId ${view.flowId ?? ""}。请使用原有 ${card.kind} 客户卡入口提交当前 ${card.stage} 文档，以应用校验的证据等待决定。`,
+        runtime, `chief-intake:${view.stepId}:${view.attempt}`);
+    }
+    if (view.action === "observe-existing" && !currentRequest) {
+      await this.queueDurablePrompt(view, chief, "application",
+        `客户请求：${view.metadata.summary ?? ""}\n核定客户要求是否是可定位的现有实现变更。仅当有依据时，向运营 ${convener} 发工作流 ${view.ref.instanceId} 的路径 B B1 advance，并提供 flowId、requestedEvidence（现有模块真实文件）和 reason（对应客户请求的现有行为及改动理由）。`,
+        runtime, `chief-intake:${view.stepId}:${view.attempt}`);
+    }
+    if (view.action === "verify-stop") {
+      await this.queueDurablePrompt(view, convener, "application",
+        `核对工作流 ${view.ref.instanceId} 已无在途任务、未确认写入或待核对 Git 作用。仅在确认停稳后使用 submit_report 提交 completed 报告与依据。`,
+        runtime, `stop:${view.stepId}:${view.attempt}`, undefined, undefined, undefined, true);
+    }
+    const independent = profile?.target === "independent-reviewer";
+    const active = view.pendingTasks?.some(task => task.stepId === view.stepId && task.attempt === view.attempt);
+    if (profile && !currentRequest && !active) {
+      const instruction = independent ? profile.prompt
+        : `请通过 dispatch_task 向运营 ${convener} 提交路径 A 的 ${profile.stage} advance。审批或派工由本次实际能力处理。`;
+      await this.queueDurablePrompt(view, chief, "application",
+        `客户请求：${view.metadata.summary ?? ""}\n工作流 ${view.ref.instanceId}${view.flowId ? `，flowId ${view.flowId}` : ""}。\n${instruction}`,
+        runtime, `chief-intake:${view.stepId}:${view.attempt}`);
+    }
+    if (profile && currentRequest?.input.kind === "stage-request" && !independent) {
+      const taskId = durableTaskId(view.ref, convener, view.stepId, view.attempt);
+      await this.materializeDurableTask(view, {
+        taskId, sourceRoleId: chief, roleId: convener, stage: profile.stage, stageRequest: true,
+        details: { ...currentRequest.input.dispatch, text: `${currentRequest.input.dispatch.text}\n${profile.prompt}` },
+        binding: { stage: profile.stage, stageAttempt: view.attempt, executionAttempt: 1,
+          parentTaskId: currentRequest.source.originId, taskId, roleId: convener },
+      });
+    }
+    for (const pending of view.pendingTasks ?? []) {
+      if (pending.state !== "pending" && pending.state !== "reported") continue;
+      if (pending.task.stage === "readonly") continue;
+      const address = { ...view, stepId: pending.stepId, attempt: pending.attempt };
+      const binding = events.find(({ event }) => event.input.kind === "task-bound" &&
+        event.input.task.taskId === pending.taskId)?.event;
+      if (!binding) continue;
+      const creator = binding.source.roleId;
+      if (creator !== "chief" && creator !== "convener") continue;
+      if (pending.state === "pending") {
+        await this.materializeDurableTask(address, {
+          taskId: pending.taskId, sourceRoleId: creator, creator,
+          roleId: pending.roleId, stage: pending.task.stage, details: pending.dispatch, binding: pending.task,
+          modulePaths: pending.modulePaths, sideEffect: pending.task.stage === "A11" ? "code" : "docs",
+        });
+      }
+      const report = pending.report && store.getEvidence(view.ref, pending.report.evidence) as { handback?: TaskHandback } | undefined;
+      if (report?.handback && pending.report) {
+        if (pending.task.stage === "A1" || pending.task.stage === "A4" || pending.task.stage === "A7") continue;
+        const reviewerTask: DurableTaskBinding = {
+          stage: pending.task.stage, stageAttempt: pending.attempt, executionAttempt: pending.task.executionAttempt,
+          parentTaskId: pending.task.taskId, taskId: pending.task.parentTaskId, roleId: creator,
+        };
+        await this.queueDurablePrompt(address, creator, pending.roleId,
+          `${renderWorkReportPrompt(report.handback)}\n请核对真实证据后使用 close_created_task。若运营完成实施核验，请用 submit_report 回交实施依据。`,
+          runtime, `graph-report:${pending.taskId}:${pending.report.key}`, undefined, reviewerTask,
+          creator === convener ? pending.task.parentTaskId : undefined);
+      }
+    }
+  }
+
   private async queueDurablePrompt(
     projection: DurableProjection, roleId: string, sourceRoleId: string, text: string, runtime: RuntimeKind,
-    key: string, taskId?: string, task?: DurableTaskBinding, assignmentTaskId?: string,
+    key: string, taskId?: string, task?: DurableTaskBinding, assignmentTaskId?: string, unassigned = false,
   ): Promise<void> {
     const durable = this.deps.durableWorkflow!;
     const store = await durable.store();
@@ -303,7 +413,8 @@ export class FixedWorkflowRoute {
     });
     const existingSession = this.sessions.get(this.sessionKey(projectRoot, roleId, runtime));
     if (!taskId && (existingSession?.sessionWorkflowMode !== "fixed" || !durable.isSession(existingSession.handle) ||
-        (assignmentTaskId !== undefined && existingSession.assignedTaskId !== assignmentTaskId))) {
+        (assignmentTaskId !== undefined && existingSession.assignedTaskId !== assignmentTaskId)
+        || unassigned && existingSession.assignedTaskId !== undefined)) {
       if (existingSession?.busy || existingSession?.origins.running) return;
       const opened = await this.openInternal({ projectRoot, roleId, runtime, forcedWorkflowMode: "fixed",
         ...(assignmentTaskId ? { taskId: assignmentTaskId } : {}) }, false);
@@ -317,34 +428,41 @@ export class FixedWorkflowRoute {
   }
 
   private async materializeDurableTask(projection: DurableProjection, input: {
-    taskId: string; sourceRoleId: string; roleId: string; stage: "B1" | "B3"; details: DurableDispatchDetails;
+    taskId: string; sourceRoleId: string; roleId: string; stage: WorkflowStage; details: DurableDispatchDetails;
     stageRequest?: true; binding?: DurableTaskBinding; modulePaths?: readonly string[];
+    creator?: "chief" | "convener"; sideEffect?: "read-only" | "docs" | "code";
   }): Promise<void> {
     const { projectRoot, ref } = projection;
     const key = `durable-task:${input.taskId}`;
     const state = await this.readTasks(projectRoot);
     const current = state.records.get(input.taskId)?.created;
+    const creator = input.creator ?? (input.stageRequest ? "chief" : "convener");
     if (!current) {
       // The SQLite fact already exists. This journal row is a replayable projection for existing role tools.
       const result = await appendTaskEvent(projectRoot, taskEvent("task.created", {
         taskId: input.taskId,
-        from: input.stageRequest ? "chief" : "convener",
+        from: creator,
         to: input.roleId,
         flowId: input.details.flowId,
         workflowId: ref.instanceId,
         stage: input.stage,
         ...(input.stageRequest ? { taskKind: "stage-request" as const } : {}),
         text: input.details.text,
-        sideEffect: input.stage === "B3" && !input.stageRequest ? "code" : "read-only",
+        sideEffect: input.stageRequest ? "read-only" : input.sideEffect ?? (input.stage === "B3" ? "code" : "read-only"),
         idempotencyKey: key,
         ...(input.modulePaths?.length ? { modulePaths: [...input.modulePaths] } : {}),
       }, () => new Date(this.now())));
-      if (!result.ok) return;
+      if (!result.ok) {
+        const store = await this.deps.durableWorkflow!.store();
+        store.block(ref, result.code ?? "workflow-task-materialization-failed",
+          result.message ?? "The saved workflow task could not be recorded for the assigned role.");
+        return;
+      }
     } else if (current.idempotencyKey !== key || current.to !== input.roleId || current.workflowId !== ref.instanceId) {
       return;
     }
     this.starTaskIds.add(input.taskId);
-    taskCreators.set(input.taskId, input.stageRequest ? "chief" : "convener");
+    taskCreators.set(input.taskId, creator);
     const probes = new Map<string, string | undefined>();
     for (const readPath of extractDispatchReadPaths(input.details.text)) {
       probes.set(readPath, await filePrint(path.join(projectRoot, readPath)));
@@ -375,6 +493,24 @@ export class FixedWorkflowRoute {
     const chief = this.chiefTaskRoleIdOf(projectRoot);
     if (!convener || !chief || (d.workflowId !== undefined && d.workflowId !== ref.instanceId)) {
       return reject("stage-request-invalid", "The request does not match the registered workflow.");
+    }
+    const profile = graphTaskProfile(projection);
+    if (profile) return this.routeGraphDispatch(projection, profile, runtime, fromRoleId, targetRoleId, text, d, source, current, chief, convener);
+    if (projection.schema === 2 && action === "observe-existing") {
+      if (fromRoleId !== chief || targetRoleId !== convener || d.taskKind !== "stage-request" || d.stage !== "B1"
+        || d.workflowId !== ref.instanceId || d.workflowPath !== "B" || d.workflowAction !== "advance"
+        || !d.flowId || !d.reason?.trim() || !d.requestedEvidence?.length || d.reworkOf || d.moduleId || d.modulePaths?.length) {
+        return reject("workflow-existing-purpose-unverified", "The actual chief verification request must identify a tracked existing module and reason.");
+      }
+      const existingPaths = [...new Set(d.requestedEvidence.map(file => file.trim().replace(/\\/g, "/")))];
+      if (!current()) return reject("dispatch-source-changed", "The originating turn changed during validation.");
+      const saved = await store.submitCapability(ref, {
+        ...graphEventAddress(projection), key: `existing-purpose:${stepId}:${attempt}`, flowId: d.flowId,
+        source: { roleId: fromRoleId, originId: source.origin.turnId },
+        input: { kind: "stage-request", stage: "B1", workflowPath: "B", requestDigest: durableHash(text),
+          dispatch: { text, runtime, flowId: d.flowId, actor: fromRoleId }, existingPaths, reason: d.reason.trim() },
+      }, current);
+      return saved.ok ? { ok: true, message: `已保存现有实现资格核对请求（${saved.value.key}）。` } : reject(saved.code, saved.message);
     }
     const address = { stepId, attempt };
     const requestedFlow = typeof d.flowId === "string" && /^[a-z0-9][a-z0-9-]{0,79}$/.test(d.flowId) ? d.flowId : undefined;
@@ -453,6 +589,70 @@ export class FixedWorkflowRoute {
     const saved = await store.submit(ref, fact);
     if (!saved.ok) return reject(saved.code, saved.message);
     return { ok: true, message: `已保存本次请求（${saved.value.key}）。工作流消费后将按相同业务键投递。` };
+  }
+
+  private async routeGraphDispatch(
+    view: DurableProjection, profile: NonNullable<ReturnType<typeof graphTaskProfile>>, runtime: RuntimeKind,
+    from: string, target: string, text: string, request: DispatchTaskPayload, source: ActualDispatchSource,
+    current: () => boolean, chief: string, convener: string,
+  ): Promise<DispatchReceipt> {
+    const deny = (message: string): DispatchReceipt => ({ ok: false, message: `stage-request-invalid: ${message}` });
+    const { ref, projectRoot, stepId, attempt } = view;
+    const flowId = request.flowId;
+    const originId = source.origin.turnId;
+    if (!originId || !flowId || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(flowId) || view.flowId && view.flowId !== flowId
+      || request.workflowId !== ref.instanceId || request.stage !== profile.stage || request.reworkOf !== undefined) {
+      return deny("当前实例、flow 与能力必须匹配。");
+    }
+    const dispatch = { text, runtime, flowId, actor: from };
+    const store = await this.deps.durableWorkflow!.store();
+    const independent = profile.target === "independent-reviewer";
+    const address = graphEventAddress(view);
+    let event: DurableCapabilityEvent;
+    if (request.taskKind === "stage-request") {
+      if (independent || from !== chief || target !== convener || request.workflowPath !== "A"
+        || request.workflowAction !== "advance" || request.moduleId || request.modulePaths?.length) {
+        return deny("仅幕僚可以向运营请求当前能力的阶段。");
+      }
+      event = { ...address, key: `stage-request:${stepId}:${attempt}`, flowId, source: { roleId: from, originId },
+        input: { kind: "stage-request", stage: profile.stage, workflowPath: "A", requestDigest: durableHash(text), dispatch } };
+    } else {
+      const operatorTask = durableTaskId(ref, convener, stepId, attempt);
+      const parentTaskId = independent ? originId : operatorTask;
+      const expectedSource = independent ? chief : convener;
+      const authorizedRequest = store.listCapabilityEvents(ref).some(row => row.receipt.state === "consumed" &&
+        row.event.stepId === stepId && row.event.attempt === attempt && row.event.input.kind === "stage-request");
+      if (!profile.target || from !== expectedSource || request.workflowPath !== undefined ||
+        !independent && (!authorizedRequest || source.entry.assignedTaskId !== operatorTask || source.origin.taskId !== operatorTask)) {
+        return deny("派发需要当前能力的实际创建者与已受派任务。");
+      }
+      let modulePaths: readonly string[] | undefined;
+      if (independent || profile.target === "module-owner") {
+        const roster = await loadLatestWorkflowRoster({ projectRoot, flowId });
+        if (!roster.ok) return deny(roster.reason);
+        if (independent) {
+          if (target !== reviewRoleIdOfRoster(roster.roster) || request.moduleId || request.modulePaths?.length) return deny("需要名单指定的独立验收角色。");
+        } else {
+          if (!request.moduleId || !roster.roster.roles.some(role => role.id === target && role.modules.includes(request.moduleId!))) {
+            return deny("仅可向名单中的实际模块属主派发。");
+          }
+          const wanted = [...new Set((request.modulePaths ?? []).map(file => file.trim().replace(/\\/g, "/")))];
+          const writeSet = deriveFixedModuleWriteSet(roster.roster, request.moduleId, wanted);
+          if (!writeSet.ok) return deny(writeSet.message);
+          modulePaths = wanted.length ? wanted : writeSet.paths;
+        }
+      } else if (profile.target !== target || request.moduleId || request.modulePaths?.length) {
+        return deny("目标角色不符合当前能力。");
+      }
+      const taskId = durableTaskId(ref, target, stepId + (request.moduleId ? `:${request.moduleId}` : ""), attempt);
+      const task: DurableTaskBinding = { stage: profile.stage, stageAttempt: attempt, executionAttempt: 1, parentTaskId, taskId, roleId: target };
+      event = { ...address, key: `task-bound:${taskId}`, flowId, source: { roleId: from, originId, parentTaskId },
+        input: { kind: "task-bound", task, dispatch, modulePaths } };
+    }
+    if (!current()) return deny("核验期间真实发起回合已变化。");
+    const saved = await store.submitCapability(ref, event, current);
+    return saved.ok ? { ok: true, message: `已保存本次请求（${saved.value.key}）。` }
+      : { ok: false, message: `${saved.code}: ${saved.message}` };
   }
 
   // —— routeFixedPathDispatch（B6 自 session.ts 逐字搬移）——

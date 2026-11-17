@@ -2070,6 +2070,15 @@ export const zhCN = {
   "ui.durableWorkflow.deliveryFiles": "交付文件",
   "ui.durableWorkflow.diffDigest": "差异摘要",
   "ui.durableWorkflow.runtimeUnverified": "运行期行为未经独立验证。",
+  "ui.durableWorkflow.definitionSource": "定义来源",
+  "ui.durableWorkflow.sourcePreset": "随包预设",
+  "ui.durableWorkflow.sourceProject": "项目 YAML",
+  "ui.durableWorkflow.copyPreset": "复制预设到项目",
+  "ui.durableWorkflow.importDefinition": "导入 YAML",
+  "ui.durableWorkflow.schema": "定义格式版本",
+  "ui.durableWorkflow.pendingTasks": "工作流待办",
+  "ui.durableWorkflow.definitionMissing": "已选定义已无法读取。请恢复文件后刷新，或选择其他定义。",
+  "ui.durableWorkflow.taskReported": "已提交报告",
 
   // ---- 全局任务状态与版本决策（2026-11-02 global-task-state；A3；P1 审核 §六 冻结）----
   // ui.projectState.*：项目状态面板（62）

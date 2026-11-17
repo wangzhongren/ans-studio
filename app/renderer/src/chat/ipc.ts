@@ -39,13 +39,6 @@ import {
 import { isRuntimeId } from "@/chat/runtime-config";
 import { useDirectiveStore, type DirectiveBridge } from "@/stores/directive-store";
 import { useVersionChangeStore } from "@/stores/version-change-store";
-import type {
-  DurableDelivery,
-  DurableProblem,
-  DurableProjection,
-  DurableResult,
-  DurableScopeDecision,
-} from "../../../../src/model/durable-workflow.ts";
 
 export type { DirectiveBridge } from "@/stores/directive-store";
 
@@ -94,12 +87,38 @@ export function directiveBridgeOf(value: unknown): DirectiveBridge | null {
 
 type DurableProjectRequest = { projectRoot: string };
 type DurableDefinitionRequest = DurableProjectRequest & { definitionId: string };
-type DurableStartDraft = DurableDefinitionRequest & { summary: string };
+type DurableDefinitionSelection = { source?: DesktopDurableDefinition["source"]; expectedDigest?: string };
+type DurableStartDraft = DurableDefinitionRequest & DurableDefinitionSelection & { summary: string };
 type DurableStartRequest = DurableStartDraft & { requestId: string; enabled: true };
 
 // Wire DTOs exposed by preload. Keep renderer compilation independent of Node and Dapr.
+export interface DurableProblem {
+  code: string;
+  message: string;
+  path?: string;
+}
+
+export type DurableResult<T> = { ok: true; value: T } | ({ ok: false } & DurableProblem);
+
+type DurableEvidenceRef = { path: string; sha256: string };
+
+export interface DurableScopeDecision {
+  kind: "change.scope-decided";
+  id: string;
+  b3Request: { key: string; sourceTaskId: string; digest: string };
+  b1Report: DurableEvidenceRef & { key: string; attempt: number };
+  baseline: { oid: string; branch: string };
+  candidateSource: "requestedEvidence" | "modulePaths";
+  candidates: readonly string[];
+  writeSets: readonly { roleId: string; paths: readonly string[] }[];
+  reason: string;
+  recordedAt: string;
+}
+
 export interface DesktopDurableDefinition {
   id: string;
+  name?: string;
+  source: "project" | "preset";
   file: string;
   version?: number;
   digest?: string;
@@ -111,10 +130,16 @@ export interface DesktopDurableInstance {
   instanceId: string;
   definitionId: string;
   definitionName: string;
+  definitionSource?: DesktopDurableDefinition["source"];
+  schema?: 1 | 2;
+  flowId?: string;
+  pendingTasks?: readonly {
+    taskId: string; roleId: string; stepId: string; attempt: number; state: string;
+  }[];
   definitionVersion: number;
   definitionDigest: string;
   action?: string;
-  engine: DurableProjection["engine"];
+  engine: "pending" | "healthy" | "offline" | "incompatible" | "history-missing";
   runtime?: string;
   status: string;
   stepId: string;
@@ -129,7 +154,23 @@ export interface DesktopDurableInstance {
 }
 
 type DurableDeliveryRequest = DurableProjectRequest & { instanceId: string; deliveryId: string };
-export type DurableDeliverySummary = Pick<DurableDelivery, "id" | "state" | "releaseRequestId" | "createdAt" | "deliveredAt">;
+export interface DurableDeliverySummary {
+  id: string;
+  state: "pending" | "delivered";
+  releaseRequestId: string;
+  createdAt: string;
+  deliveredAt?: string;
+}
+
+type DurableDelivery = DurableDeliverySummary & {
+  mergeOid: string;
+  files: readonly string[];
+  diffDigest: string;
+  operatorReport: DurableEvidenceRef;
+  operatorReportArtifacts?: readonly DurableEvidenceRef[];
+  runtimeVerification: "not-independently-verified";
+};
+
 export type DurableDeliveryView = { delivery: DurableDelivery; viewToken: string };
 
 export interface DesktopDurableView {
@@ -142,7 +183,9 @@ export interface DurableWorkflowBridge {
     definitions: DesktopDurableDefinition[];
     controlPlane: DesktopDurableView["controlPlane"];
   }>>;
-  validateDurableWorkflow(input: DurableDefinitionRequest): Promise<DurableResult<DesktopDurableDefinition>>;
+  validateDurableWorkflow(input: DurableDefinitionRequest & DurableDefinitionSelection): Promise<DurableResult<DesktopDurableDefinition>>;
+  copyDurableWorkflowPreset(input: DurableDefinitionRequest): Promise<DurableResult<DesktopDurableDefinition>>;
+  importDurableWorkflow(input: DurableProjectRequest): Promise<DurableResult<DesktopDurableDefinition>>;
   startDurableWorkflow(input: DurableStartRequest): Promise<DurableResult<DesktopDurableView>>;
   getDurableWorkflowProjection(input: DurableProjectRequest & {
     instanceId?: string;
@@ -156,6 +199,8 @@ export interface DurableWorkflowBridge {
 const DURABLE_METHODS = [
   "listDurableWorkflows",
   "validateDurableWorkflow",
+  "copyDurableWorkflowPreset",
+  "importDurableWorkflow",
   "startDurableWorkflow",
   "getDurableWorkflowProjection",
   "readDurableWorkflowDelivery",

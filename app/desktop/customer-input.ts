@@ -852,6 +852,15 @@ export type PersistReleaseDecision = (choice: "approve" | "reject") => Promise<
   { ok: true; decisionId: string } | { ok: false; message: string; stale?: boolean }
 >;
 
+export type DurableCustomerAnswer =
+  | { kind: "confirm"; confirmed: boolean; acknowledged?: string[] }
+  | { kind: "choice"; selected: string[]; acknowledged?: string[] };
+
+export type PersistDurableCustomerAnswer = (answer: DurableCustomerAnswer, delegated?: {
+  source: Extract<DirectActionSource, { kind: "chief-delegated" }>;
+  isCurrent(): boolean;
+}) => ReturnType<PersistReleaseDecision>;
+
 /**
  * 桌面侧的客户通道（**带角色上下文**）：与冻结家 `CustomerInputFn` 同形，但多一个 `ctx.roleId`——
  * 请求本体不携带角色标识，桌面经**每会话闭包**绑定（`SessionManager.open` 装配），
@@ -896,6 +905,7 @@ export type DesktopCustomerInputFn = (
     onPresented?: () => void;
     /** Application-owned merge card. The response is acknowledged only after durable storage. */
     persistReleaseDecision?: PersistReleaseDecision;
+    persistWorkflowDecision?: PersistDurableCustomerAnswer;
   },
   metadata?: CustomerInputMetadata,
 ) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
@@ -1033,6 +1043,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     appCard?: AppCardState;
   }
   const durableChoices = new Map<string, { persist: PersistReleaseDecision; accepted: boolean }>();
+  const workflowChoices = new Map<string, { request: CustomerInputRequest; persist: PersistDurableCustomerAnswer; accepted: boolean }>();
 
   /** 应用自有 choice 卡（分诊卡）的通道状态：不是角色工具请求、不写账本、不推导下一步。 */
   interface AppCardState {
@@ -2017,6 +2028,14 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
             requestId: request.requestId, baseDigest: request.baseDigest, delegationRevision: mode.revision,
             disposition, ...(selected !== undefined ? { selected } : {}), reason: input.reason, at: new Date().toISOString(),
           };
+          const workflowChoice = workflowChoices.get(entry.payload.id);
+          if (workflowChoice) {
+            const answer: DurableCustomerAnswer = entry.request.kind === "choice" ? { kind: "choice", selected: selected ?? [] }
+              : { kind: "confirm", confirmed: selected?.[0] === "confirm" };
+            const saved = await workflowChoice.persist(answer, { source: actionSource, isCurrent: valid });
+            if (!saved.ok) return fail("chief-stale", saved.message);
+            workflowChoice.accepted = true;
+          }
           const declined = input.disposition === "reject" || input.disposition === "revise" || (entry.request.kind === "confirm" && selected?.[0] === "reject");
           settleEntry(entry, declined
             ? { outcome: "declined", operatorId: "chief", actionSource, reason: disposition === "revise" ? `${input.reason} ${mainT("main.customerInput.chief.revisionRequested")}` : input.reason }
@@ -2053,7 +2072,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       }
     }
     if (delegationState().enabled) {
-      for (const entry of [...pending.values()]) if (isChiefBusinessCard(entry)) tryChiefDecision(entry);
+      for (const entry of [...pending.values()]) {
+        if (isChiefBusinessCard(entry) && (!workflowChoices.has(entry.payload.id) || entry.ctx.chiefDecision)) tryChiefDecision(entry);
+      }
     }
   });
 
@@ -2210,6 +2231,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   /** 既有呈现路径（判断门 → judging / 直接呈现）；**不分诊**——分诊前闸在 `presentEntry`。 */
   const presentEntryNow = (entry: ChannelEntry): void => {
+    if (workflowChoices.has(entry.payload.id)) {
+      if (entry.ctx.chiefDecision && tryChiefDecision(entry)) return;
+      presentNow(entry);
+      return;
+    }
     // 客户指令消费者最优先（C1）：命中即不进入幕僚代决策/默认推荐/客户卡；未命中/冲突/失败按
     // B1 冻结规则回落。**必须位于 `isChiefBusinessCard` 分支之前**——该分支（tryChiefDecision/
     // presentNow）不消费指令；若后置，非主权 decision 卡的 `@决策` 指令即为死代码
@@ -2512,6 +2538,10 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
     req = structuredClone(req);
+    if (ctx.persistWorkflowDecision && (!ctx.requestId ||
+      (req.cardKind !== "intent-confirm" && req.cardKind !== "proposal" && req.cardKind !== "appointment"))) {
+      return { outcome: "unavailable", reason: "Invalid durable workflow card." };
+    }
     if (ctx.persistReleaseDecision !== undefined && (
       !ctx.requestId || req.kind !== "choice" || !req.application || req.cardKind !== MERGE_MAIN_CARD_KIND
     )) {
@@ -2555,6 +2585,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       }
       const id = ctx.requestId ?? (opts.nextId ? opts.nextId() : `op-${++seq}`);
       if (ctx.persistReleaseDecision) durableChoices.set(id, { persist: ctx.persistReleaseDecision, accepted: false });
+      if (ctx.persistWorkflowDecision) workflowChoices.set(id, { request: req, persist: ctx.persistWorkflowDecision, accepted: false });
       const payload: OperatorRequestPayload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
       // 镜像面（四角色评审 §6.1）：由 SessionManager 计算并给出；仅非空字符串进入载荷。
       // 同一请求仍只登记一条 pending、只结算一次——本字段不改变任何校验/账本/下一步推导。
@@ -2648,6 +2679,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       if (ctx.persistReleaseDecision && ctx.requestId && outcome.outcome !== "answered") {
         requestResults.delete(ctx.requestId);
       }
+      if (ctx.persistWorkflowDecision && ctx.requestId && !workflowChoices.get(ctx.requestId)?.accepted) {
+        requestResults.delete(ctx.requestId);
+      }
       result.resolve(outcome);
     }, result.reject);
     return result.promise;
@@ -2678,7 +2712,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   function respondUnsafe(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
     const id = input && typeof input.id === "string" ? input.id : "";
-    if (durableChoices.has(id)) return { ok: false, error: "This release decision requires durable storage." };
+    if (durableChoices.has(id) || workflowChoices.has(id)) return { ok: false, error: "This workflow decision requires durable storage." };
     diagnostic.record("interaction.response", { requestId: id });
     const entry = pending.get(id);
     if (!entry) {
@@ -2801,6 +2835,47 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   async function respondDurable(input: { id?: unknown; decision?: unknown }): Promise<{ ok: boolean; error?: string; expired?: boolean } | undefined> {
     if (typeof input.id !== "string") return undefined;
+    const workflow = workflowChoices.get(input.id);
+    if (workflow) {
+      const entry = pending.get(input.id);
+      if (!workflow.accepted && !entry?.presented) {
+        return { ok: false, error: mainT("main.customerInput.noPendingRequest"), expired: true };
+      }
+      const decision = input.decision as OperatorDecisionPayload | undefined;
+      const invalid = { ok: false, error: "Choose an explicit decision offered by this workflow card." };
+      let answer: DurableCustomerAnswer;
+      if (workflow.request.kind === "confirm" && decision?.kind === "confirm" && typeof decision.confirmed === "boolean") {
+        const ack = decision.confirmed ? settleAcknowledgements(workflow.request, decision.acknowledged) : { ok: true as const };
+        if (!ack.ok) return { ok: false, error: ack.error };
+        answer = { kind: "confirm", confirmed: decision.confirmed, acknowledged: ack.acknowledged };
+      } else if (workflow.request.kind === "choice" && decision?.kind === "choice" && !decision.cancelled
+        && Array.isArray(decision.selected)) {
+        const options = new Set(workflow.request.options.map(option => option.id));
+        const selected = [...new Set(decision.selected)];
+        if (selected.length === 0 || (workflow.request.multiple !== true && selected.length !== 1)
+          || selected.length !== decision.selected.length || selected.some(id => !options.has(id))) return invalid;
+        const ack = settleAcknowledgements(workflow.request, decision.acknowledged);
+        if (!ack.ok) return { ok: false, error: ack.error };
+        answer = { kind: "choice", selected, acknowledged: ack.acknowledged };
+      } else {
+        return invalid;
+      }
+      try {
+        const saved = await workflow.persist(answer);
+        if (!saved.ok) return { ok: false, error: saved.message, expired: saved.stale };
+        workflow.accepted = true;
+        if (entry && pending.get(input.id) === entry) {
+          settleActive(entry, answer.kind === "confirm" && !answer.confirmed
+            ? { outcome: "declined", operatorId, reason: mainT("main.customerInput.customerDeclined") }
+            : { outcome: "answered", value: answer.kind === "choice" ? { selected: answer.selected } : { confirmed: true },
+              acknowledged: answer.acknowledged, decisionId: saved.decisionId, operatorId });
+        }
+        return { ok: true };
+      } catch (error) {
+        diagnostic.error("interaction.durable.response.failed", error, { requestId: input.id });
+        return { ok: false, error: "The workflow decision could not be saved. Retry the same choice." };
+      }
+    }
     const choice = durableChoices.get(input.id);
     if (!choice) return undefined;
     const entry = pending.get(input.id);

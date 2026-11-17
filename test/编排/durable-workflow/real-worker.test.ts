@@ -22,7 +22,7 @@ test('actual Dapr continues a pinned instance and overdue timer after control pl
     const resourceRoot = process.cwd();
     const { project, dataDir, hostDir, definitions } = await fixture(t, join(resourceRoot, 'release-output'));
     const host = createDaprHost({ userDataRoot: hostDir, resourceRoot });
-    let workflow = openDurableWorkflow({ dataDir });
+    let workflow = openDurableWorkflow({ dataDir, presetRoot: resourceRoot });
     try {
       const attach = async () => {
         const ready = await host.start();
@@ -41,6 +41,9 @@ test('actual Dapr continues a pinned instance and overdue timer after control pl
 
       await attach();
       const ref = unwrap(await workflow.start({ projectRoot: project, definitionId: 'read-only-example', requestId: 'real-1' })).ref;
+      const graphRef = unwrap(await workflow.start({ projectRoot: project, definitionId: 'path-a',
+        requestId: 'real-graph-2', source: 'preset' })).ref;
+      await until(() => workflow.lookup(graphRef)?.engine === 'healthy', 'second executor registered alongside legacy history');
       const request = { kind: 'stage-request' as const, source: 'chief' as const, key: 'stage-b1', stepId: 'inspect', attempt: 1,
         sourceTaskId: 'customer', requestDigest: hash('inspect'), dispatch: { text: 'inspect' } };
       unwrap(await workflow.submit(ref, request));
@@ -58,7 +61,7 @@ test('actual Dapr continues a pinned instance and overdue timer after control pl
       assert.equal(returned.state, 'incompatible');
       assert.equal(workflow.lookup(ref)?.engine, 'incompatible');
       await workflow.close();
-      workflow = openDurableWorkflow({ dataDir });
+      workflow = openDurableWorkflow({ dataDir, presetRoot: resourceRoot });
       await attach();
       assert.notEqual(host.status().processIds?.scheduler, before.scheduler);
       assert.notEqual(host.status().processIds?.daprd, before.daprd);
@@ -72,6 +75,9 @@ test('actual Dapr continues a pinned instance and overdue timer after control pl
       };
       await until(hasFiredTimer, 'persisted overdue timer activity');
       assert.equal(workflow.lookup(ref)?.ref.definitionVersion, 1);
+      await until(() => workflow.lookup(graphRef)?.engine === 'healthy', 'same graph executor resumes');
+      assert.equal(workflow.lookup(graphRef)?.ref.activityContract, 2);
+      assert.equal(workflow.lookup(graphRef)?.action, 'product-prepare');
       assert.equal(unwrap(await workflow.validateDefinition(project, 'read-only-example')).version, 2);
       const task = { stage: 'readonly' as const, stageAttempt: 1, executionAttempt: 1, parentTaskId: 'parent', taskId: 'owner-1', roleId: 'owner' };
       const evidence = unwrap(workflow.storeEvidence(ref, { report: 'verified' }));

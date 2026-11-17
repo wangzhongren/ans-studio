@@ -1,4 +1,6 @@
-export { definitionFiles, digest, gitRead, readProjectFile, repositoryIdentity, stableJson } from './files.ts';
-export type { RepositoryIdentity } from './files.ts';
-export { DurableLedger, pinRepositoryDefinition, releaseOwner, repositoryOwner, reserveOwner, reserveOwnerState } from './ledger.ts';
-export type { OutboxItem, StoredEffect, StoredFact, StoredInstance } from './ledger.ts';
+export { definitionFiles, digest, ensureManagedDirectory, gitRead, readImportedDefinition, readProjectFile, repositoryIdentity,
+  saveDefinitionFile, stableJson, workspaceIdentity } from './files.ts';
+export type { RepositoryIdentity, WorkspaceIdentity } from './files.ts';
+export { changeWorkspaceOwner, DurableLedger, pinRepositoryDefinition, releaseOwner, repositoryOwner, reserveOwner,
+  reserveOwnerState, reserveWorkspace, workspaceOwner } from './ledger.ts';
+export type { OutboxItem, StoredEffect, StoredFact, StoredInstance, WorkspaceReservation } from './ledger.ts';

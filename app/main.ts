@@ -835,6 +835,13 @@ function registerIpc(win: BrowserWindow): void {
       if (result.canceled || result.filePaths.length === 0) return null;
       return result.filePaths[0];
     },
+    pickWorkflowDefinition: async () => {
+      const result = await dialog.showOpenDialog(win, {
+        properties: ["openFile"],
+        filters: [{ name: "YAML", extensions: ["yaml", "yml"] }],
+      });
+      return result.canceled ? null : result.filePaths[0] ?? null;
+    },
     emitEvent,
     // L-1 + 状态准确性 + 右栏「待办 / 队列」（2026-10-12 追加）：真实状态快照（busy × 队列[结构化] × 进行中，
     // 变化时）原样透传渲染侧——徽标「工作中 · N 待办」、队列行与右栏待办组都只信它（同一通道，不造第二套）。
@@ -981,6 +988,10 @@ function registerIpc(win: BrowserWindow): void {
     event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.listDurableWorkflows(input) : workflowSourceError());
   registerHandler("durable-workflow:validate", (event, input) =>
     event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.validateDurableWorkflow(input) : workflowSourceError());
+  registerHandler("durable-workflow:preset-copy", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.copyDurableWorkflowPreset(input) : workflowSourceError());
+  registerHandler("durable-workflow:import", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.importDurableWorkflow(input) : workflowSourceError());
   registerHandler("durable-workflow:start", (event, input) =>
     event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.startDurableWorkflow(input) : workflowSourceError());
   registerHandler("durable-workflow:projection", (event, input) =>
@@ -1219,6 +1230,7 @@ app.whenReady().then(async () => {
   durableWorkflow = new DesktopDurableWorkflow({
     userDataRoot: path.join(userDataPath, "ans", "durable-workflow"),
     resourceRoot: app.isPackaged ? process.resourcesPath : app.getAppPath(),
+    presetRoot: app.getAppPath(),
   });
   void durableWorkflow.resume().catch(error => mainDiagnostic.error("workflow.recovery.failed", error));
   // i18n B0（2026-10-23）：建窗前**尽早**读取应用级语言偏好（`<userData>/ans/preferences.json`）。

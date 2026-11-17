@@ -77,6 +77,7 @@ import {
   canCompleteStage,
   canDispatchStage,
   canRequestStage,
+  currentWorkflowValidation,
   deriveWorkflowView,
   type WorkflowView,
 } from "./workflow-state.ts";
@@ -97,7 +98,8 @@ import {
   verifyBasisDocuments,
 } from "./basis-guard.ts";
 import { stageRequestIdempotencyKey, stageStopIdempotencyKey } from "./workflow-dispatch.ts";
-import { releaseOwner, repositoryIdentity, repositoryOwner, reserveOwner } from "../../provider/durable-workflow/public.ts";
+import { changeWorkspaceOwner, releaseOwner, repositoryIdentity, repositoryOwner, reserveOwner, reserveWorkspace,
+  workspaceIdentity, workspaceOwner } from "../../provider/durable-workflow/public.ts";
 import type { RepositoryIdentity } from "../../provider/durable-workflow/public.ts";
 
 // —————————————— 账本路径 / schema / 轮转 ——————————————
@@ -214,6 +216,8 @@ function appendFixedLedgerEvent<T extends { idempotencyKey: string }>(
 
 /** `ans-workflow/v1`（`.ans/state/workflows.jsonl`）读取；坏行计数不阻塞。 */
 export function readWorkflowLedger(projectRoot: string): Promise<FixedLedgerReadResult<WorkflowEvent>> {
+  const context = currentWorkflowValidation(projectRoot);
+  if (context) return Promise.resolve({ files: [], events: [...context.events], errors: [], badLines: 0, ignoredLines: 0 });
   return readFixedLedger(workflowsStatePath(projectRoot), isWorkflowEvent);
 }
 
@@ -232,12 +236,32 @@ export async function appendWorkflowEvent(
   projectRoot: string,
   event: WorkflowEvent,
 ): Promise<FixedLedgerAppendResult<WorkflowEvent>> {
+  const context = currentWorkflowValidation(projectRoot);
+  if (context) {
+    if (!isWorkflowEvent(event) || context.view.workflowId !== event.workflowId || context.view.flowId !== event.flowId) {
+      return { ok: false, code: 'workflow-domain-scope-mismatch', message: '兼容校验的事件与当前持久实例不匹配。' };
+    }
+    const previous = context.events.find(item => item.idempotencyKey === event.idempotencyKey);
+    if (!previous) {
+      context.events.push(event);
+      if (event.kind === 'stage.requested' || event.kind === 'stage.completed') {
+        context.view.stage = event.stage;
+        const stage = context.view.stages[event.stage];
+        stage.status = event.kind === 'stage.requested' ? 'requested' : 'completed';
+        context.view.status = stage.status;
+      }
+    }
+    return { ok: true, path: 'durable-domain-validation', replay: previous !== undefined, event: previous ?? event };
+  }
   const result = await appendFixedLedgerEvent(workflowsStatePath(projectRoot), event, isWorkflowEvent, "ans-workflow/v1");
   if (result.ok && result.event.kind === "workflow.closed") {
     const repo = await legacyRepository(projectRoot);
     if (repo && repositoryOwner(repo)?.engine === "legacy") {
       releaseOwner(repo, { engine: "legacy", instanceId: result.event.workflowId, dataDir: repo.root });
     }
+    const workspace = await workspaceIdentity(projectRoot).catch(() => undefined);
+    const owner = workspace ? workspaceOwner(workspace.root) : undefined;
+    if (workspace && owner?.engine === 'legacy' && owner.instanceId === result.event.workflowId) changeWorkspaceOwner(workspace.root, owner, false);
   }
   return result;
 }
@@ -252,6 +276,13 @@ async function legacyRepository(projectRoot: string): Promise<RepositoryIdentity
 }
 
 export async function legacyWorkflowHasPrototypeOwner(projectRoot: string): Promise<boolean> {
+  if (currentWorkflowValidation(projectRoot)) return false;
+  const workspace = await workspaceIdentity(projectRoot).catch(() => undefined);
+  if (workspace) {
+    const direct = workspaceOwner(workspace.root);
+    const primary = workspace.repository ? workspaceOwner(path.dirname(workspace.repository.commonDir)) : undefined;
+    if (direct?.engine === 'dapr' || primary?.engine === 'dapr') return true;
+  }
   const repo = await legacyRepository(projectRoot);
   return repo !== undefined && repositoryOwner(repo)?.engine === "dapr";
 }
@@ -976,6 +1007,15 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   // 1) workflow 账本事件（先记请求，再创建任务；任务失败如实上抛）。
   if (startingNew) {
     const legacy = await detectLegacyStateIgnored(input.projectRoot);
+    const workspace = await workspaceIdentity(input.projectRoot).catch(() => undefined);
+    if (workspace) {
+      const held = reserveWorkspace(workspace.root, { engine: 'legacy', instanceId: resolvedWorkflowId,
+        dataDir: workspace.root, projectId: workspace.projectId, requestId: input.sourceTaskId,
+        fingerprint: input.requestDigest, state: 'active' });
+      if (held.engine !== 'legacy' || held.instanceId !== resolvedWorkflowId) {
+        return serviceFailure('workflow-owner-conflict', '其他流程已独占此工作区，旧引擎无法启动。');
+      }
+    }
     const repo = await legacyRepository(input.projectRoot);
     if (repo && !reserveOwner(repo, { engine: "legacy", instanceId: resolvedWorkflowId, dataDir: repo.root })) {
       return serviceFailure("workflow-owner-conflict", "其他工作流已独占此 Git 仓库，旧引擎无法启动。");
@@ -3935,7 +3975,8 @@ async function prepareBaselineGit(input: {
     allowInit: input.reason === "baseline",
   });
   if (!repository.ok) return repository;
-  if (input.durable !== true) {
+  const graphContext = currentWorkflowValidation(input.projectRoot);
+  if (input.durable !== true && !(graphContext?.operation === 'team-baseline' && graphContext.view.workflowId === input.workflowId)) {
     const repo = await legacyRepository(input.projectRoot);
     if (repo && !reserveOwner(repo, { engine: "legacy", instanceId: input.workflowId, dataDir: repo.root })) {
       return serviceFailure("workflow-owner-conflict", "其他工作流已独占此 Git 仓库，旧引擎无法准备基线。");

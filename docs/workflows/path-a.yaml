@@ -1,0 +1,75 @@
+schema: 2
+id: path-a
+version: 1
+name: 路径 A
+start: prepare-product
+steps:
+  prepare-product:
+    action: product-prepare
+    next: write-intent
+  write-intent:
+    action: author-intent
+    next: confirm-intent
+  confirm-intent:
+    action: confirm-intent
+    on: { approved: prepare-planning, revise: revise-intent, rejected: verify-stop }
+  revise-intent:
+    action: retry-intent
+    maxVisits: 2
+    next: write-intent
+    onLimit: stopped
+  prepare-planning:
+    action: planning-prepare
+    next: write-proposal
+  write-proposal:
+    action: author-proposal
+    next: confirm-proposal
+  confirm-proposal:
+    action: confirm-proposal
+    on: { approved: prepare-personnel, revise: revise-proposal, rejected: blocked }
+  revise-proposal:
+    action: retry-proposal
+    maxVisits: 2
+    next: write-proposal
+    onLimit: stopped
+  prepare-personnel:
+    action: personnel-prepare
+    next: activate-roles
+  activate-roles:
+    action: activate-roles
+    next: establish-team-baseline
+  establish-team-baseline:
+    action: team-baseline
+    next: confirm-appointment
+  confirm-appointment:
+    action: confirm-appointment
+    on: { approved: open-standard, revise: blocked, rejected: blocked }
+  open-standard:
+    action: independent-standard
+    role: independent-reviewer
+    next: implement
+  implement:
+    action: governed-implementation
+    role: module-owner
+    next: assess
+  assess:
+    action: independent-assessment
+    role: independent-reviewer
+    on: { accepted: archive, rework: revise-implementation, blocked: blocked }
+  revise-implementation:
+    action: retry-implementation
+    maxVisits: 2
+    next: implement
+    onLimit: blocked
+  archive:
+    action: archive-acceptance
+    next: publish
+  publish:
+    action: customer-publish
+    on: { merged: delivered, rejected: stopped }
+  verify-stop:
+    action: verify-stop
+    next: stopped
+  delivered: { terminal: delivered }
+  stopped: { terminal: stopped }
+  blocked: { terminal: blocked }

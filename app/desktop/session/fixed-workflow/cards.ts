@@ -35,9 +35,12 @@ import { loadLatestRoster as loadLatestWorkflowRoster } from "../../../../src/co
 import type { CompleteTeamPlanFn, CustomerInputRequest, TaskStateEvent, WorkflowDocumentRef, WorkflowEvent } from "../../../../src/model/runtime.ts";
 import { WORKFLOW_LEDGER_SCHEMA } from "../../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
-import type { DurableFact } from "../../../../src/model/durable-workflow.ts";
+import type { DurableFact, DurablePendingTask, DurableProjection } from "../../../../src/model/durable-workflow.ts";
 import type { RoleSessionHandle } from "../../../../src/pipeline/orchestration/run-role.ts";
 import { isFixedReleaseTriggerStage, type FixedReleaseTriggerStage } from "../../workflow.ts";
+import { completeGraphBaseline, graphTurn } from "../../durable-workflow-a.ts";
+import { durableHash } from "../../durable-workflow.ts";
+import { appendTaskEvent, taskEvent } from "../../../../src/common/编排/task-state.ts";
 import type { SessionManagerDeps } from "../contracts/deps.ts";
 import type { LiveSession } from "../contracts/session-types.ts";
 import { createDesktopBaselineGitPort } from "../git-ports.ts";
@@ -192,17 +195,24 @@ export class FixedWorkflowCards {
     if (!current() || signal?.aborted) {
       return blocked("plan-task-changed", "核验期间真实受派回合已变化，未登记团队计划。");
     }
-    const completed = await completeTeamPlanFixed({
+    const planInput = {
       projectRoot,
       flowId: request.flowId,
       workflowId: assigned.task.workflowId,
       operationId: request.operationId,
       plan: request.plan,
       port: createDesktopBaselineGitPort(),
-      actorRoleId: "convener",
+      actorRoleId: "convener" as const,
       ...(request.runId !== undefined ? { runId: request.runId } : {}),
       ...(request.baseDigest !== undefined ? { baseDigest: request.baseDigest } : {}),
-    });
+    };
+    const durable = this.deps.durableWorkflow;
+    if (durable && await durable.owns(projectRoot, assigned.task.workflowId)) {
+      const live = await graphTurn(durable, () => this.sessions.get(key))();
+      if (!live || live.entry.handle !== handle || signal?.aborted) return blocked("plan-task-unavailable", "缺少当前实际工作流的运营基线任务。");
+      return completeGraphBaseline(durable, live, planInput);
+    }
+    const completed = await completeTeamPlanFixed(planInput);
     // B29：成功/失败都**原样返回 fixed 服务形状**——成功 `{ok:true,operationId,flowId,workflowId,
     // basisId,plan,documents,replay,stageCompleted}`；失败 `{ok:false,code,message[,missing]}`。
     // 不再包装成 legacy `DirectActionReceipt`（工具层 B25 校验要求 fixed 形状；包装后的 `bas-…`
@@ -226,6 +236,11 @@ export class FixedWorkflowCards {
     }
     const durable = this.deps.durableWorkflow;
     if (durable && (input.taskId.startsWith("dw-") || await durable.owns(projectRoot))) {
+      const store = await durable.store();
+      for (const view of await store.listProjections(projectRoot)) {
+        const pending = view.schema === 2 && view.pendingTasks?.find(task => task.taskId === input.taskId);
+        if (pending) return this.closeGraphTask(view, pending, actorRoleId, input, signal);
+      }
       return this.closeDurableTask(projectRoot, actorRoleId, input, signal);
     }
     // T3 B2.1（AC-19/T-08；MF-B2-02）：fixed verifier 的 A12a/A12b accepted 收口（criteria/report
@@ -271,6 +286,61 @@ export class FixedWorkflowCards {
       }
     }
     return closed;
+  }
+
+  private async closeGraphTask(
+    view: DurableProjection, pending: DurablePendingTask, actorRoleId: string,
+    input: FixedCloseCreatedTaskToolInput, signal?: AbortSignal,
+  ): Promise<Awaited<ReturnType<typeof closeFixedWorkflowTask>>> {
+    const fail = (code: string, message: string) => ({ ok: false as const, code, message });
+    const { ref, projectRoot } = view;
+    const { task, report, stepId, attempt, flowId } = pending;
+    const durable = this.deps.durableWorkflow!;
+    const store = await durable.store();
+    if (view.status !== "waiting" || view.engine !== "healthy" || !report || task.stage === "readonly"
+      || (actorRoleId !== "convener" && actorRoleId !== "chief")) {
+      return fail("close-task-invalid", "The workflow needs the assigned role's saved report and its actual creator.");
+    }
+    const entry = [...this.sessions.values()].find(session => session.projectRoot === projectRoot &&
+      session.roleId === actorRoleId && session.origins.running?.turnId &&
+      durable.delivery(projectRoot, session.origins.running.clientMessageId)?.intent.key === `model:graph-report:${task.taskId}:${report.key}`);
+    const origin = entry?.origins.running;
+    const isCurrent = () => !!entry && !!origin && entry.busy && entry.origins.running === origin && !origin.settled
+      && !signal?.aborted && !entry.interactionState.turn.signal.aborted && !entry.interactionState.lifetime.signal.aborted;
+    if (!isCurrent() || !origin?.turnId) return fail("close-task-invalid", "This decision requires the actual creator's report review turn.");
+    const snapshot = store.getEvidence(ref, report.evidence) as { handback?: TaskHandback; artifacts?: { path: string; sha256: string }[] } | undefined;
+    const lightweight = task.stage === "A12b" && snapshot?.handback?.status === "blocked" && !!input.note?.trim();
+    if (!snapshot?.handback || input.outcome === "accepted" && snapshot.handback.status !== "completed" && !lightweight) {
+      return fail("close-report-missing", "The report does not support that disposition.");
+    }
+    const key = `close:${task.taskId}:${input.operationId}`;
+    const replay = store.listCapabilityEvents(ref).some(row => row.event.key === key);
+    const evidence = input.outcome === "accepted" && task.stage !== "A12b"
+      ? await this.buildFixedCloseEvidence(projectRoot, task.taskId, input.note) : { ok: true as const, evidence: undefined };
+    if (!evidence.ok) return evidence;
+    const documents = evidence.evidence?.artifacts?.flatMap(({ path, sha256 }) => sha256 ? [{ path, sha256 }] : []) ?? snapshot.artifacts;
+    if (!isCurrent()) return fail("close-task-invalid", "The creator's role turn changed during verification.");
+    const event = await store.submitCapability(ref, { key, stepId, attempt, flowId,
+      source: { roleId: actorRoleId, originId: origin.turnId, parentTaskId: task.parentTaskId },
+      input: { kind: "task-closed", task, reportKey: report.key, outcome: input.outcome,
+        ...(documents ? { documents } : {}), ...(evidence.evidence?.branchTipOid ? { tipOid: evidence.evidence.branchTipOid } : {}) } }, isCurrent);
+    if (!event.ok) return event;
+    if (event.value.state === "ignored") return fail("close-task-invalid", event.value.reason ?? "The original task was retired.");
+    const state = await readTaskState(projectRoot);
+    if (!state.records.get(task.taskId)?.closed) {
+      const at = new Date(this.now()).toISOString();
+      const mirrored = await appendTaskEvent(projectRoot, taskEvent("task.closed", { taskId: task.taskId, by: actorRoleId,
+        outcome: input.outcome, operationId: input.operationId, eventId: key,
+        actionSource: { kind: "role-direct", actorRoleId, action: "close-created-task", operationId: input.operationId,
+          applicationId: "ans-durable-workflow", baseDigest: report.evidence.sha256,
+          targetDigest: durableHash(JSON.stringify([task.taskId, report.key, input.outcome, input.note ?? ""])), at },
+        ...(input.note ? { note: input.note } : {}),
+      }, () => new Date(at)));
+      if (!mirrored.ok) return fail(mirrored.code ?? "close-task-write-failed", mirrored.message ?? "The task receipt could not be written.");
+    }
+    void this.drainAllQueuesFor(projectRoot);
+    return { ok: true, taskId: task.taskId, workflowId: ref.instanceId, stage: task.stage,
+      operationId: input.operationId, outcome: input.outcome, eventId: event.value.key, replay, stageCompleted: event.value.state === "consumed" };
   }
 
   private async closeDurableTask(

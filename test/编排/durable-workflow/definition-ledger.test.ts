@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { access, readFile, writeFile } from 'node:fs/promises';
+import { access, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 import type { DurableResult } from '../../../src/model/durable-workflow.ts';
 import { requestStage } from '../../../src/common/编排/workflow-service.ts';
 import { DurableWorkflowService, parseDefinition } from '../../../src/service/durable-workflow/public.ts';
-import { fixture, git } from './fixture.ts';
+import { fixture, git, legacyPathB } from './fixture.ts';
 
-const sample = new URL('../../../docs/workflows/path-b.yaml', import.meta.url);
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 function unwrap<T>(result: DurableResult<T>): T {
   if (!result.ok) assert.fail(result.code + ': ' + result.message);
@@ -16,7 +15,7 @@ function unwrap<T>(result: DurableResult<T>): T {
 }
 
 test('strict YAML rejects unsafe fields, unauthorized jumps, aliases and unreachable steps', async () => {
-  const source = await readFile(sample, 'utf8');
+  const source = legacyPathB;
   assert.equal(parseDefinition(source).ok, true);
   for (const malformed of [
     source.replace('version: 1', 'version: 1\nversion: 2'),
@@ -56,7 +55,7 @@ test('repository owner is exclusive across data roots and worktrees; snapshots a
 
   const alternative = unwrap(await first.start({ projectRoot: project, definitionId: 'read-only-example', requestId: 'read-1' }));
   assert.notEqual(alternative.ref.instanceId, started.ref.instanceId);
-  const original = await readFile(sample, 'utf8');
+  const original = legacyPathB;
   await writeFile(join(definitions, 'path-b.yaml'), original.replace('version: 1', 'version: 2'));
   assert.equal(first.lookup(started.ref)?.ref.definitionVersion, 1);
   assert.equal(unwrap(await first.validateDefinition(project, 'path-b')).version, 2);

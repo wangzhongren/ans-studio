@@ -65,6 +65,33 @@ export interface WorkflowView {
   skippedEvents?: { invalid: number; duplicate: number };
 }
 
+export interface WorkflowValidationContext {
+  projectRoot: string;
+  operation: DurableDomainOperation;
+  view: WorkflowView;
+  events: WorkflowEvent[];
+}
+
+const workflowValidation = new AsyncLocalStorage<WorkflowValidationContext>();
+
+export function withWorkflowValidation<T>(context: WorkflowValidationContext, operation: () => T): T {
+  return workflowValidation.run(context, operation);
+}
+
+export function currentWorkflowValidation(projectRoot: string): WorkflowValidationContext | undefined {
+  const scope = workflowValidation.getStore();
+  return scope && path.relative(scope.projectRoot, projectRoot) === '' ? scope : undefined;
+}
+
+export function domainWorkflowView(workflowId: string, flowId: string, stage: WorkflowStage, attempt: number,
+  completed: readonly WorkflowStage[], status: WorkflowStageState['status']): WorkflowView {
+  const view = baseView(workflowId, flowId, stage.startsWith('B') ? 'B' : 'A', stage);
+  for (const item of completed) view.stages[item] = { status: 'completed', attempt };
+  view.stages[stage] = { status, attempt };
+  view.status = status;
+  return view;
+}
+
 /**
  * 阶段 → 合法下一阶段（v1.3 §4.4）。
  * 返工边（A3→A2、A6→A5、A12b→A11、B2→B1）由 `stage.reworked` 表达（`stage`=回落目标、
@@ -362,6 +389,8 @@ export function deriveWorkflowView(
   events: readonly WorkflowEvent[],
   tasks: readonly TaskStateEvent[] = [],
 ): WorkflowView {
+  const domain = workflowValidation.getStore();
+  if (domain && events.length && events[0]?.workflowId === domain.view.workflowId) return structuredClone(domain.view);
   const skipped = { invalid: 0, duplicate: 0 };
   const valid: WorkflowEvent[] = [];
   const seen = new Set<string>();
@@ -440,3 +469,6 @@ export function canDispatchStage(view: WorkflowView, stage: WorkflowStage): bool
 export function canCompleteStage(view: WorkflowView, stage: WorkflowStage): boolean {
   return canComplete(view, stage);
 }
+import { AsyncLocalStorage } from 'node:async_hooks';
+import path from 'node:path';
+import type { DurableDomainOperation } from '../../model/durable-workflow.ts';

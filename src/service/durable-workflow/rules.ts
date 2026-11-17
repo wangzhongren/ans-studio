@@ -1,4 +1,4 @@
-import type { DurableAction, DurableFact, DurableInstanceRef, DurableProjection, DurableResult, DurableStep, DurableTaskBinding, DurableTerminal } from '../../model/durable-workflow.ts';
+import type { DurableAction, DurableCapability, DurableFact, DurableGraphStep, DurableInstanceRef, DurableProjection, DurableResult, DurableStep, DurableTaskBinding, DurableTerminal } from '../../model/durable-workflow.ts';
 import type { DurableLedger, StoredFact, StoredInstance } from '../../provider/durable-workflow/public.ts';
 import { digest, stableJson } from '../../provider/durable-workflow/public.ts';
 
@@ -11,8 +11,8 @@ export const equal = (first: unknown, second: unknown): boolean => stableJson(fi
 export const sameInstance = (first: DurableInstanceRef, second: DurableInstanceRef): boolean => equal(first, second);
 export const sameTask = (first: DurableTaskBinding | undefined, second: DurableTaskBinding): boolean => first !== undefined && equal(first, second);
 export const liveEffect = (state: string): boolean => state === 'claimed' || state === 'unknown';
-export const actionOf = (step: DurableStep): DurableAction | undefined => 'action' in step ? step.action : undefined;
-export const activeAction = (value: StoredInstance): DurableAction | undefined => actionOf(value.definition.steps[value.stepId]!);
+export const actionOf = (step: DurableStep | DurableGraphStep): DurableCapability | undefined => 'action' in step ? step.action : undefined;
+export const activeAction = (value: StoredInstance): DurableCapability | undefined => actionOf(value.definition.steps[value.stepId]!);
 
 export function safePath(path: string): boolean {
   return typeof path === 'string' && path.length > 0 && path.length <= 4096
@@ -26,14 +26,16 @@ const sources: Readonly<Record<DurableFact['kind'], DurableFact['source']>> = {
   'operator-report': 'host', 'implementation-accepted': 'convener',
   'release-preview': 'host', 'release-decision': 'customer', 'release-merged': 'host', 'readonly-review': 'convener',
   'effect-settled': 'host',
+  'capability-event': 'host',
 };
 
-const factsForAction: Readonly<Record<DurableAction, readonly DurableFact['kind'][]>> = {
+const factsForAction: Readonly<Partial<Record<DurableCapability, readonly DurableFact['kind'][]>>> = {
   'b1-impact-readonly': ['stage-request', 'task-bound', 'task-report', 'analysis-disposition', 'operator-report'],
   'b1-open-followup-attempt': [],
   'accept-b3-advance-with-b2-scope': ['b3-advance'],
   'b3-implement-and-accept': ['task-bound', 'task-report', 'implementation-close', 'operator-report', 'implementation-accepted'],
   'b4-customer-merge-main': ['release-preview', 'release-decision', 'release-merged'],
+  'customer-publish': ['release-preview', 'release-decision', 'release-merged'],
   'readonly-report': ['stage-request', 'task-bound', 'task-report'],
   'wait-for-review': ['readonly-review'],
 };
@@ -57,7 +59,7 @@ export function project(ledger: DurableLedger, value: StoredInstance): DurablePr
     stepId: value.stepId, stepName: value.stepId, attempt: value.attempt, status: value.status, engine: value.engine,
     action, waitingFor: action === undefined ? undefined : value.release
       ? (value.release.decision?.action === 'approve' ? '等待应用核对并执行已批准的本地合并' : '等待客户决定')
-      : waitFor[action],
+      : waitFor[action as DurableAction] ?? action,
     blockedReason: value.engineReason ?? value.businessReason,
     pendingFacts: ledger.facts(value.ref.instanceId, true).length,
     task: value.task, actionIntent: value.actionIntent, baseline: value.baseline,
@@ -72,7 +74,7 @@ export function factShape(value: StoredInstance, fact: DurableFact): DurableResu
   if (!Object.hasOwn(sources, fact.kind) || sources[fact.kind] !== fact.source) return fail('fact-source-invalid', '事实来源无效。');
   if (!Object.hasOwn(value.definition.steps, fact.stepId)) return fail('fact-step-invalid', '事实步骤不属于固定定义。');
   const action = actionOf(value.definition.steps[fact.stepId]!);
-  if (action === undefined || !factsForAction[action].includes(fact.kind)) {
+  if (action === undefined || !factsForAction[action]?.includes(fact.kind)) {
     return fail('fact-step-invalid', '该步骤不接受此业务事实。');
   }
   if ('task' in fact) {
@@ -100,7 +102,7 @@ export interface ActivityOutcome {
   terminal?: DurableTerminal;
 }
 
-function changeStep(value: StoredInstance, next: string, sourceKey?: string): void {
+export function changeStep(value: StoredInstance, next: string, sourceKey?: string): void {
   value.stepId = next;
   value.entry++;
   const step = value.definition.steps[next]!;
@@ -135,7 +137,7 @@ export function applyStep(ledger: DurableLedger, value: StoredInstance, input: A
     && (key === undefined || item.fact.key === key) && item.receipt.state !== 'ignored'
     && item.fact.stepId === stepId && sameTask(value.task, item.fact.task));
   const live = () => ledger.effects(value.ref.instanceId).some(effect =>
-    effect.intent.attempt === value.attempt && liveEffect(effect.state));
+    effect.intent.attempt === value.attempt && (value.definition.schema === 1 || effect.intent.stepId === stepId) && liveEffect(effect.state));
   for (const item of pending) {
     if (item.fact.attempt < value.attempt) consume(ledger, value, item, 'attempt-retired');
     else if (item.fact.kind === 'effect-settled') consume(ledger, value, item);
@@ -226,6 +228,7 @@ export function applyStep(ledger: DurableLedger, value: StoredInstance, input: A
       advancedBy = accepted ?? close;
       break;
     }
+    case 'customer-publish':
     case 'b4-customer-merge-main': {
       for (const item of current) if (item.fact.kind === 'release-preview' || item.fact.kind === 'release-decision') consume(ledger, value, item);
       const merged = candidate('release-merged');

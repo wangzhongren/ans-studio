@@ -28,7 +28,7 @@ export function admitFact(ledger: DurableLedger, instance: StoredInstance, fact:
       if (!atCurrentStep) return obsolete('step-not-active');
       if (instance.task && !sameTask(instance.task, fact.task)) return fail('task-already-bound', '当前尝试已绑定另一生产任务。');
       if (fact.modulePaths?.some(path => !safePath(path))) return fail('task-invalid', '任务模块路径无效。');
-      if (action === 'b1-impact-readonly' && (!instance.baseline || !facts('stage-request').some(item => item.receipt.state === 'consumed')
+      if (action === 'b1-impact-readonly' && ((!instance.baseline && instance.definition.schema === 1) || !facts('stage-request').some(item => item.receipt.state === 'consumed')
         && instance.attempt === 1)) {
         return fail('task-prerequisite-missing', 'B1 尚缺已核对基线或阶段请求。');
       }
@@ -88,12 +88,16 @@ export function admitFact(ledger: DurableLedger, instance: StoredInstance, fact:
       const snapshot = fact.snapshot;
       const commit = ledger.effects(id).filter(effect => effect.intent.kind === 'task-commit' && effect.state === 'succeeded'
         && sameTask(effect.intent.task, instance.implementation!.task)).at(-1);
+      const writeSets = instance.scope?.writeSets ?? instance.graph?.writeSets;
+      const allowedFile = (path: string) => writeSets?.some(set => set.paths.some(prefix => path === prefix
+        || action === 'customer-publish' && prefix.endsWith('/') && path.startsWith(prefix)));
       if (![snapshot.mainOid, snapshot.tipOid, snapshot.baselineOid].every(oidValid)
         || !hashValid(snapshot.diffDigest) || snapshot.branch !== instance.baseline.branch || snapshot.baselineOid !== instance.baseline.oid
         || snapshot.tipOid !== commit?.result?.result?.oid
         || snapshot.b3CloseKey !== instance.implementation.key || !equal(snapshot.operatorReport, instance.implementation.operatorReport)
-        || !snapshot.files.length || snapshot.files.some(file => !safePath(file)
-          || !instance.scope?.writeSets.some(set => set.paths.includes(file)))) {
+        || !snapshot.files.length || snapshot.files.some(file => !safePath(file) || !allowedFile(file))
+        || action === 'customer-publish' && (!instance.graph?.acceptanceArchive
+          || !equal(instance.graph.acceptanceArchive, snapshot.acceptanceArchive))) {
         return fail('release-preview-invalid', '预览未绑定已确认的 B3、基线及有效改动。');
       }
       const snapshotDigest = digest(stableJson({ ref: instance.ref, attempt: fact.attempt, snapshot }));
@@ -225,16 +229,17 @@ export function deliveryFor(ledger: DurableLedger, instance: StoredInstance, sou
   if (!Array.isArray(files) || files.length === 0 || new Set(files).size !== files.length
     || !files.every(file => safePath(file) && snapshot.files.includes(file))) return undefined;
 
-  const { operatorReport, operatorReportArtifacts } = snapshot;
+  const { operatorReport, operatorReportArtifacts, acceptanceArchive } = snapshot;
   if (!instance.implementation || instance.implementation.key !== snapshot.b3CloseKey
     || !equal(instance.implementation.operatorReport, operatorReport)
     || !hasEvidence(ledger, id, operatorReport)
-    || operatorReportArtifacts?.some(artifact => !hasEvidence(ledger, id, artifact))) return undefined;
+    || operatorReportArtifacts?.some(artifact => !hasEvidence(ledger, id, artifact))
+    || acceptanceArchive && (!equal(instance.graph?.acceptanceArchive, acceptanceArchive) || !hasEvidence(ledger, id, acceptanceArchive))) return undefined;
   return {
     id: 'delivery:' + digest(stableJson([instance.ref.projectId, id, release.requestId, merge.effectKey])),
     state: 'pending', releaseRequestId: release.requestId, mergeOid: merge.mainOid, files,
     diffDigest: verified.diffDigest, operatorReport, ...(operatorReportArtifacts ? { operatorReportArtifacts } : {}),
-    // A role's report is retained as evidence. No independent runtime-verification fact exists in this workflow.
+    ...(acceptanceArchive ? { acceptanceArchive } : {}),
     runtimeVerification: 'not-independently-verified', createdAt,
   };
 }

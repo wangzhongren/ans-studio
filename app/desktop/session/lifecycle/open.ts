@@ -29,6 +29,7 @@ import type {
   DownloadRequestRuntime,
 } from "../../../../src/pipeline/orchestration/download-request.ts";
 import { buildDownloadCardRequest, createRequestDownloadCapability, toDownloadApprovalOutcome } from "../../download-request.ts";
+import { graphRolePorts } from "../../durable-workflow-a.ts";
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
 import {
   appendWorkflowEvent,
@@ -314,8 +315,10 @@ export class LifecycleOpen {
       && forcedExisting !== undefined && forcedExisting.projectRoot === req.projectRoot
       && forcedExisting.sessionWorkflowMode === "fixed"
       && forcedExisting.assignedTaskId !== req.taskId;
+    const durableUnboundRebind = durableOwned && req.forcedWorkflowMode === "fixed" && !internalReopen
+      && req.taskId === undefined && forcedExisting?.assignedTaskId !== undefined;
     if (forcedSessionWorkflowMode === "fixed" && forcedExisting && forcedExisting.projectRoot === req.projectRoot
-        && (forcedExisting.sessionWorkflowMode !== "fixed" || fixedTaskRebindPending
+        && (forcedExisting.sessionWorkflowMode !== "fixed" || fixedTaskRebindPending || durableUnboundRebind
           || durableOwned && !durable?.isSession(forcedExisting.handle))) {
       const rebindDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId });
       if (forcedExisting.busy || forcedExisting.origins.running !== undefined) {
@@ -1137,6 +1140,12 @@ export class LifecycleOpen {
       if (stopped()) return stoppedResult();
       const durable = this.deps.durableWorkflow;
       const durableOwned = durable ? await durable.owns(req.projectRoot) : false;
+      const graph = durable && durableOwned && (await durable.find(req.projectRoot))?.schema === 2 ? graphRolePorts({
+        durable, customer: customerInput, chiefDecision, isRegistered: () => !!this.deps.getRegisteredProjectLifecycle?.(req.projectRoot), session: () => {
+          const entry = this.sessions.get(key);
+          return entry?.handle === gitBinding.handle ? entry : undefined;
+        },
+      }) : undefined;
       const effectClaims = durableOwned ? durable?.taskEffectClaims(req, () => {
         const entry = this.sessions.get(key);
         const origin = entry?.origins.running;
@@ -1173,10 +1182,15 @@ export class LifecycleOpen {
                   const projection = await durable.find(req.projectRoot);
                   return projection ? (await durable.store()).taskGitScope(projection.ref, taskId, roleId) : undefined;
                 },
+                ...(graph ? { durableWriteScope: async ({ taskId, roleId }: { taskId: string; roleId: string }) => {
+                  const projection = await durable.find(req.projectRoot);
+                  return projection ? (await durable.store()).taskWriteScope(projection.ref, taskId, roleId) : undefined;
+                } } : {}),
               } : {}),
             } }
             : {}),
           ...(effectClaims ? { claimFileWrite: effectClaims.claimFileWrite } : {}),
+          ...(graph ? { workflowDomain: graph.workflowDomain } : {}),
           ...(routineShellPolicy ? { routineShellPolicy } : {}),
           // 客户交互通道（A-5）：仅内置治理角色（su / trio 三人）会话注入；Liaison 不注入（§4.3）。
           // **每会话闭包绑定 roleId**（请求本体不带角色标识——渲染侧据它把交互卡落到该角色的聊天流、
@@ -1185,6 +1199,7 @@ export class LifecycleOpen {
           ...(customerInput
             ? {
                 customerInput: async (r: CustomerInputRequest, metadata?: CustomerInputMetadata) => {
+                  if (graph && (r.cardKind === "intent-confirm" || r.cardKind === "proposal" || r.cardKind === "appointment")) return graph.customerInput(r, metadata);
                   // AC-13（D2）：stable boundary 确认卡——用 S7 API 检测 preview 正文扩大；
                   // 扩大 ⇒ 卡面横幅 + required acknowledgments；不可解析 ⇒ 不呈现、结构化拒绝。
                   let effectiveRequest = r;
@@ -1253,13 +1268,14 @@ export class LifecycleOpen {
           // B29（2026-11-11）：fixed 注入实现返回 **fixed 服务形状**（工具层按入参 workflowId+plan 分流到
           // B25 `fixedCompleteTeamPlanReceiptResult`）；注入位类型仍是 legacy `CompleteTeamPlanFn`（共享
           // 同一能力位），运行时形状由工具层校验——故此处显式断言，legacy 分支零改动。
-          ...(!durableOwned && direct !== undefined && req.roleId === "convener" ? {
+          ...((!durableOwned || graph) && direct !== undefined && req.roleId === "convener" ? {
             completeTeamPlan: sessionWorkflowMode === "fixed"
               ? ((input: Parameters<CompleteTeamPlanFn>[0], planSignal?: AbortSignal) =>
                   this.completeTeamPlanFixedForHandle(req.projectRoot, req.runtime, planBinding.handle, input, planSignal)) as unknown as CompleteTeamPlanFn
               : (input, signal) => this.completeTeamPlanForHandle(req.projectRoot, req.runtime, planBinding.handle, input, direct, signal),
           } : {}),
           ...(!durableOwned && direct !== undefined && req.roleId === "nominator" ? { activateRoleDocuments: direct.activateRoleDocuments } : {}),
+          ...(graph && req.roleId === "nominator" ? { activateRoleDocumentsFixed: graph.activateRoleDocumentsFixed } : {}),
           ...(!durableOwned && closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
           // T3 B3（AC-18/AC-20）：fixed 会话的 `close_created_task` v2 应用实现（补 artifacts/branchTipOid/
           // acceptanceArchive 证据；A12b accepted 时应用生成 `docs/acceptance/*`）；legacy 不注入本键。

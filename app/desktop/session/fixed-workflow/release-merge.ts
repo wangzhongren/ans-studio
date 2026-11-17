@@ -84,14 +84,16 @@ export class FixedWorkflowRelease {
   }
 
   async syncDurableRelease(projection: DurableProjection): Promise<void> {
-    if (projection.action !== "b4-customer-merge-main" || projection.engine !== "healthy"
-      || !projection.baseline || !projection.implementation || !projection.scope) return;
+    if ((projection.action !== "b4-customer-merge-main" && projection.action !== "customer-publish") || projection.engine !== "healthy"
+      || !projection.baseline || !projection.implementation || !(projection.scope || projection.writeSets?.length)) return;
     const durable = this.deps.durableWorkflow;
     if (!durable || !this.deps.getRegisteredProjectLifecycle?.(projection.projectRoot)) return;
     const store = await durable.store();
     const { ref, projectRoot, stepId, attempt, release } = projection;
+    const definitionFile = projection.schema === 2 && projection.definitionSource === "project" ? projection.definitionFile : undefined;
     const address = { stepId, attempt };
-    const writePaths = projection.scope.writeSets.flatMap(set => set.paths);
+    const writePaths = projection.scope?.writeSets.flatMap(set => set.paths)
+      ?? release?.snapshot.files.filter(file => this.inDurableWriteSet(projection, file)) ?? [];
     const tried = store.listEffects(ref, "release-merge").find(effect =>
       effect.intent.requestId === release?.requestId && effect.state !== "not-started");
     if (release && tried) {
@@ -99,7 +101,7 @@ export class FixedWorkflowRelease {
       let mainOid = tried.state === "succeeded" ? tried.result?.result?.mainOid : undefined;
       if (typeof mainOid !== "string") {
         const result = await verifyDurableMerge({ projectRoot, workflowId: ref.instanceId, requestId: release.requestId,
-          snapshot: release.snapshot, writePaths });
+          snapshot: release.snapshot, writePaths, definitionFile });
         if (!result.ok) {
           store.block(ref, "workflow-merge-reconciliation-required", tried.result?.evidence ?? result.message);
           return;
@@ -152,8 +154,8 @@ export class FixedWorkflowRelease {
     const effectKey = `release-merge:${release.requestId}`;
     let token: string | undefined;
     const merged = await mergeDurableMain({
-      projectRoot, workflowId: ref.instanceId, flowId: projection.scope.dispatch?.flowId ?? ref.definitionId,
-      requestId: release.requestId, snapshot, confirmation: { by: "customer", decisionId: release.decision.id },
+      projectRoot, workflowId: ref.instanceId, flowId: projection.flowId ?? projection.scope?.dispatch?.flowId ?? ref.definitionId,
+      requestId: release.requestId, snapshot, definitionFile, confirmation: { by: "customer", decisionId: release.decision.id },
       claim: async () => {
         const fresh = await this.durablePreview(projection);
         if (!fresh.ok) return fresh;
@@ -176,11 +178,16 @@ export class FixedWorkflowRelease {
     // The same verification path handles normal completion and a crash before writing the Git receipt.
   }
 
+  private inDurableWriteSet(view: DurableProjection, file: string): boolean {
+    const paths = (view.scope?.writeSets ?? view.writeSets ?? []).flatMap(set => set.paths);
+    return paths.some(scope => file === scope || (!view.scope && scope.endsWith("/") && file.startsWith(scope)));
+  }
+
   private async durablePreview(projection: DurableProjection): Promise<
     { ok: true; snapshot: DurableReleaseSnapshot; diffStat: string } | WorkflowServiceFailure
   > {
-    const { projectRoot, baseline, implementation, scope, ref } = projection;
-    if (!baseline || !implementation || !scope) return { ok: false, code: "release-workflow-not-ready", message: "Release prerequisites are missing." };
+    const { projectRoot, baseline, implementation, ref } = projection;
+    if (!baseline || !implementation) return { ok: false, code: "release-workflow-not-ready", message: "Release prerequisites are missing." };
     const store = await this.deps.durableWorkflow!.store();
     const latest = store.listEffects(ref, "task-commit").filter(effect =>
       effect.state === "succeeded" && effect.intent.task?.taskId === implementation.task.taskId).at(-1);
@@ -189,11 +196,11 @@ export class FixedWorkflowRelease {
     if (typeof expectedTip !== "string" || !report) {
       return { ok: false, code: "release-evidence-missing", message: "The actual implementation commit and operator report must be available." };
     }
-    const preview = await previewDurableMerge({ projectRoot, branch: baseline.branch, baselineOid: baseline.oid });
+    const preview = await previewDurableMerge({ projectRoot, branch: baseline.branch, baselineOid: baseline.oid,
+      definitionFile: projection.schema === 2 && projection.definitionSource === "project" ? projection.definitionFile : undefined });
     if (!preview.ok) return preview;
     const { tipOid, mainOid, diffDigest, files, diffStat } = preview.value;
-    const writePaths = new Set(scope.writeSets.flatMap(set => set.paths));
-    if (tipOid !== expectedTip || files.length === 0 || files.some(file => !writePaths.has(file))) {
+    if (tipOid !== expectedTip || files.length === 0 || files.some(file => !this.inDurableWriteSet(projection, file))) {
       return { ok: false, code: "release-preview-drift", message: "The actual task tip or release files do not match the accepted implementation." };
     }
     const operatorReportArtifacts: DurableEvidenceRef[] = [];
@@ -202,16 +209,33 @@ export class FixedWorkflowRelease {
       if (!current.ok) return current;
       operatorReportArtifacts.push(current.value);
     }
+    let acceptanceArchive: DurableEvidenceRef | undefined;
+    if (projection.action === "customer-publish") {
+      const archived = store.listCapabilityEvents(ref).findLast(row => row.receipt.state === "consumed"
+        && row.event.input.kind === "archive-verified" && row.event.input.tipOid === tipOid)?.event.input;
+      if (archived?.kind !== "archive-verified") {
+        return { ok: false, code: "release-archive-missing", message: "The accepted candidate requires an independent archive." };
+      }
+      for (const reference of [archived.criteria, archived.report, archived.archive]) {
+        const actual = await store.readEvidence(projectRoot, reference.path);
+        if (!actual.ok || actual.value.sha256 !== reference.sha256) {
+          return { ok: false, code: "release-archive-drift", message: "Independent acceptance evidence has changed." };
+        }
+      }
+      acceptanceArchive = archived.archive;
+    }
     return { ok: true, snapshot: { mainOid, branch: baseline.branch, tipOid, baselineOid: baseline.oid,
       files, diffDigest, b3CloseKey: implementation.key, operatorReport: implementation.operatorReport,
-      ...(operatorReportArtifacts.length ? { operatorReportArtifacts } : {}) }, diffStat };
+      ...(operatorReportArtifacts.length ? { operatorReportArtifacts } : {}),
+      ...(acceptanceArchive ? { acceptanceArchive } : {}) }, diffStat };
   }
 
   private sameDurableSnapshot(a: DurableReleaseSnapshot, b: DurableReleaseSnapshot): boolean {
     return a.mainOid === b.mainOid && a.branch === b.branch && a.tipOid === b.tipOid && a.baselineOid === b.baselineOid
       && a.diffDigest === b.diffDigest && a.b3CloseKey === b.b3CloseKey && a.operatorReport.sha256 === b.operatorReport.sha256
       && a.operatorReport.path === b.operatorReport.path && JSON.stringify(a.files) === JSON.stringify(b.files)
-      && JSON.stringify(a.operatorReportArtifacts ?? []) === JSON.stringify(b.operatorReportArtifacts ?? []);
+      && JSON.stringify(a.operatorReportArtifacts ?? []) === JSON.stringify(b.operatorReportArtifacts ?? [])
+      && a.acceptanceArchive?.path === b.acceptanceArchive?.path && a.acceptanceArchive?.sha256 === b.acceptanceArchive?.sha256;
   }
 
   private presentDurableCard(projection: DurableProjection, release: DurableReleaseRequest, diffStat: string): void {
@@ -222,7 +246,7 @@ export class FixedWorkflowRelease {
     this.durableCards.set(projectRoot, { requestId: release.requestId, controller });
     const { snapshot } = release;
     const request = buildMergeMainCardRequest({
-      workflowId: ref.instanceId, flowId: projection.scope?.dispatch?.flowId ?? ref.definitionId, releaseId: release.releaseId,
+      workflowId: ref.instanceId, flowId: projection.flowId ?? projection.scope?.dispatch?.flowId ?? ref.definitionId, releaseId: release.releaseId,
       mainBaseOid: snapshot.mainOid, branchTipOid: snapshot.tipOid, branchBaseOid: snapshot.baselineOid,
       nonMainBaseline: snapshot.baselineOid !== snapshot.mainOid, fileCount: snapshot.files.length,
       diffStat, mergeKind: "merge", highRiskNotes: ["仅本地合并。请核对正式报告中未在运行期验证的内容。"],

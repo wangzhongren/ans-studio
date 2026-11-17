@@ -145,6 +145,7 @@ import type {
   WorkerRoleInput,
 } from "../../model/governance-matrix.ts";
 import { isChiefDecisionExecutionContext, isRuntimeSessionDrained } from "../../model/runtime.ts";
+import type { DurableDomainOperation } from "../../model/durable-workflow.ts";
 import type {
   RuntimeReplayEntry,
   RuntimeSessionRecord,
@@ -935,6 +936,7 @@ export interface TaskGitShellRuntimeInput {
   port?: TaskGitShellPort;
   /** Desktop-resolved prototype scope from the current, authoritative task binding. */
   durableScope?(input: { projectRoot: string; taskId: string; roleId: string }): TaskGitScope | undefined | Promise<TaskGitScope | undefined>;
+  durableWriteScope?(input: { projectRoot: string; taskId: string; roleId: string }): readonly string[] | undefined | Promise<readonly string[] | undefined>;
 }
 
 /** 任务级 Git 写集解析结果（稳定码复用 v5 `git-task-scope-*`；本层只做诊断/不注入）。 */
@@ -1463,6 +1465,7 @@ export async function openRoleSession(
     taskGit?: TaskGitShellRuntimeInput;
     /** Actual guarded-write claim for a task assigned by the durable workflow host. */
     claimFileWrite?: ClaimFileWriteFn;
+    workflowDomain?: <T>(operation: DurableDomainOperation, run: () => Promise<T>) => Promise<T>;
     /**
      * **R-1：审读结论工具的能力**（`report_shell_verdict`「注入才注册」）——审读会话专用，由
      * `pm-reviewer` 注入；一般调用方不传。
@@ -1683,8 +1686,11 @@ export async function openRoleSession(
     if (!assignedTaskWritePaths || !input.taskId) return;
     assignedTaskWritePaths.splice(0);
     if (input.taskGit?.durableScope) {
-      const scope = await input.taskGit.durableScope({ projectRoot: input.project.projectRoot, taskId: input.taskId, roleId: setup.role.id });
+      const request = { projectRoot: input.project.projectRoot, taskId: input.taskId, roleId: setup.role.id };
+      const scope = await input.taskGit.durableScope(request);
+      const documentPaths = await input.taskGit.durableWriteScope?.(request);
       if (scope?.taskId === input.taskId) assignedTaskWritePaths.push(...scope.paths);
+      else if (documentPaths) assignedTaskWritePaths.push(...documentPaths);
       return;
     }
     // B26（2026-11-11，RR23 失败修复）：fixed 任务（task.created.workflowId）的受派写集**不读 legacy trunk**
@@ -1804,7 +1810,7 @@ export async function openRoleSession(
     }
     // One immutable boundary/task intersection is used at all three genuine Provider stages.
     // Read preflight authorizes only the next bounded read, never a stable write or permit consumption.
-    const stageScope = input.claimFileWrite !== undefined
+    const stageScope = input.claimFileWrite !== undefined && !(input.workflowDomain && setup.role.kind === "built-in-governance")
       ? { writeSet: assignedTaskWritePaths ?? [], conditions: staticScope?.conditions ?? [] }
       : confirmationMode
       ? scopeWithPreauthorizedWrites({ writeSet: [...confinedWriteSet, ...issued], conditions }, p, input.project.projectRoot, preauthorization)
@@ -2012,11 +2018,20 @@ export async function openRoleSession(
                 options: roster.roster.roles.map((role) => ({ id: role.id, label: role.displayName, recommended: true })),
               };
               // A10 在办标记（stage.requested A10；幂等）；失败 fail-closed、不发卡。
-              const appointmentMarker = await markFixedAppointmentCardRequested({
+              const markAppointment = () => markFixedAppointmentCardRequested({
                 projectRoot: input.project.projectRoot,
                 flowId: appointmentFlowId.trim(),
                 rosterSha256: roster.sha256,
               });
+              let appointmentMarker: WorkflowServiceFailure | undefined;
+              try {
+                appointmentMarker = input.workflowDomain
+                  ? await input.workflowDomain("appointment-card", markAppointment)
+                  : await markAppointment();
+              } catch (error) {
+                if (!input.workflowDomain) throw error;
+                return rejectAppointment(error instanceof Error ? error.message : String(error));
+              }
               if (appointmentMarker !== undefined) {
                 log.record("governance.card.rejected", {
                   state: "not-presented",
@@ -2329,7 +2344,7 @@ export async function openRoleSession(
           let fixedIntentConfirmation: PreparedFixedIntent | undefined;
           // X-R6（E2 S2）：intent-confirm 卡种读 chief 模块卡数据（`CHIEF_INTENT_CONFIRM_CARD.cardKind`）；
           // 其余流程（prepareIntentConfirmation / 冻结 / 标记）仍按 Service 事务与真实客户回执。
-          if (isTrio && setup.role.id === "chief" && cardKind === CHIEF_INTENT_CONFIRM_CARD.cardKind && effectiveReq.kind === "choice") {
+          if (!input.workflowDomain && isTrio && setup.role.id === "chief" && cardKind === CHIEF_INTENT_CONFIRM_CARD.cardKind && effectiveReq.kind === "choice") {
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             if ((await matrixForFlow(flowId)) === "two-fixed-paths/v1") {
               // fixed：无 trunk/run。缺 flowId ⇒ 不发卡（无法定位最新意图；fail-closed）。

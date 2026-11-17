@@ -31,7 +31,7 @@ import type { RuntimeLiveReportViewV1, RuntimeReportSnapshotV1, TaskStateEvent }
 import type { GovernanceModel } from "../../../src/model/role.ts";
 import { mainT } from "../i18n.ts";
 import type { SessionManagerDeps } from "./contracts/deps.ts";
-import type { DurableEvidenceRef, DurableFact, DurableProjection } from "../../../src/model/durable-workflow.ts";
+import type { DurableEvidenceRef, DurableFact, DurablePendingTask, DurableProjection } from "../../../src/model/durable-workflow.ts";
 import { durableTaskId } from "../durable-workflow.ts";
 import { isRuntimeKind } from "../runtime-config.ts";
 import type { DeliveryItem, DesktopOrchestrationEvent, LiveSession } from "./contracts/session-types.ts";
@@ -407,7 +407,12 @@ export class Handback {
     const durable = this.deps.durableWorkflow!;
     const store = await durable.store();
     const convener = this.handbackOwnerRoleId(projectRoot);
-    const projection = (await store.listProjections(projectRoot)).find(view => view.status === "waiting" &&
+    const views = (await store.listProjections(projectRoot)).filter(view => view.status === "waiting");
+    const pendingFor = (view: DurableProjection) => view.pendingTasks?.find(task => task.taskId === report.taskId
+      && task.roleId === report.source.roleId && (task.state === "pending" || task.state === "reported"));
+    const graph = views.find(view => view.schema === 2 && (pendingFor(view) || this.graphOperatorBinding(view, report)));
+    if (graph) return this.commitGraphReport(graph, pendingFor(graph), report);
+    const projection = views.find(view =>
       (view.task?.taskId === report.taskId || view.task?.parentTaskId === report.taskId || (convener && [
         durableTaskId(view.ref, convener, "B1", view.attempt), durableTaskId(view.ref, convener, "B3", view.attempt),
       ].includes(report.taskId ?? ""))));
@@ -443,6 +448,52 @@ export class Handback {
     return result.ok && result.value.state !== "ignored";
   }
 
+  private graphOperatorBinding(view: DurableProjection, report: RuntimeReportSnapshotV1) {
+    if (report.source.roleId !== "convener" || view.action !== "governed-implementation") return undefined;
+    return view.pendingTasks?.find(pending => pending.stepId === view.stepId && pending.attempt === view.attempt
+      && pending.task.parentTaskId === report.taskId);
+  }
+
+  private async commitGraphReport(view: DurableProjection, pending: DurablePendingTask | undefined, report: RuntimeReportSnapshotV1): Promise<boolean> {
+    const durable = this.deps.durableWorkflow!;
+    const store = await durable.store();
+    const { ref, projectRoot } = view;
+    const operator = pending ? undefined : this.graphOperatorBinding(view, report);
+    const bound = pending ?? operator;
+    const taskId = report.taskId;
+    if (!bound || !taskId) return false;
+    const effects = store.listEffects(ref, "model-send").filter(effect =>
+      effect.intent.task?.taskId === taskId && effect.intent.task.roleId === report.source.roleId
+      && effect.intent.expected?.runtime === report.source.runtime && effect.state !== "not-started");
+    const effect = pending ? effects.find(row => row.intent.key === `model:${taskId}`)
+      : effects.find(row => row.intent.key.startsWith(`model:graph-report:${bound.taskId}:`));
+    if (!effect || (typeof effect.result?.result?.turnId === "string" && effect.result.result.turnId !== report.source.turnId)) return false;
+    const handback = this.durableHandbackOf(report);
+    const artifacts: DurableEvidenceRef[] = [];
+    for (const file of [...new Set(handback.evidence)].sort()) {
+      const artifact = await store.readEvidence(projectRoot, file);
+      if (artifact.ok) artifacts.push(artifact.value);
+    }
+    const evidence = store.storeEvidence(ref, { report, handback, artifacts });
+    if (!evidence.ok) return false;
+    const state = await this.readTasks(projectRoot);
+    if (!state.records.get(taskId)?.reports.some(item => item.turnId === report.source.turnId)) {
+      const mirrored = await this.appendTaskStateResult(projectRoot, taskEvent("task.reported", {
+        taskId, from: report.source.roleId, status: taskReportStatusOf(report.status), summary: shortenSummary(handback.summary),
+        evidence: handback.evidence, turnId: report.source.turnId,
+      }));
+      if (!mirrored.ok) return false;
+    }
+    const task = pending?.task ?? { ...bound.task, taskId, roleId: report.source.roleId, parentTaskId: bound.taskId };
+    const saved = await store.submitCapability(ref, {
+      key: `report:${report.reportId}`, stepId: bound.stepId, attempt: bound.attempt, flowId: bound.flowId,
+      source: { roleId: report.source.roleId, originId: report.source.turnId, parentTaskId: taskId },
+      input: pending ? { kind: "task-report", task, evidence: evidence.value }
+        : { kind: "operator-report", parentTaskId: taskId, evidence: evidence.value },
+    });
+    return saved.ok && saved.value.state !== "ignored";
+  }
+
   private durableHandbackOf(report: RuntimeReportSnapshotV1): TaskHandback {
     return { roleId: report.source.roleId, taskId: report.taskId ?? undefined, status: report.status,
       summary: report.summary.text, evidence: report.evidence.map(item => item.text), at: report.at,
@@ -453,8 +504,59 @@ export class Handback {
     const durable = this.deps.durableWorkflow;
     const read = this.deps.readDurableReports;
     const { ref, task, projectRoot, status } = projection;
-    if (!durable || !read || !task || status !== "waiting") return;
+    if (!durable || !read || status !== "waiting") return;
     const store = await durable.store();
+    if (projection.schema === 2) {
+      if (projection.action === "verify-stop" && projection.flowId) {
+        const effect = store.listEffects(ref, "model-send").find(item => item.intent.key === `model:stop:${projection.stepId}:${projection.attempt}`);
+        const runtime = effect?.intent.expected?.runtime;
+        const turnId = effect?.result?.result?.turnId;
+        if (effect?.state === "succeeded" && isRuntimeKind(runtime) && typeof turnId === "string" && !roleBusy("convener", runtime)) {
+          const report = (await read({ projectRoot, roleId: "convener", runtime })).find(item => item.source.turnId === turnId
+            && item.taskId === null && item.origin === "submitted-report" && item.status === "completed");
+          if (report) {
+            const evidence = store.storeEvidence(ref, { report, handback: this.durableHandbackOf(report) });
+            if (evidence.ok) {
+              const recorded = await store.submitCapability(ref, { stepId: projection.stepId, attempt: projection.attempt,
+                flowId: projection.flowId, key: `stop-verified:${report.reportId}`,
+                source: { roleId: "convener", originId: turnId },
+                input: { kind: "stop-verified", reportKey: report.reportId, evidence: evidence.value } }, () => !roleBusy("convener", runtime));
+              if (!recorded.ok) store.block(ref, recorded.code, recorded.message);
+            }
+          }
+        }
+      }
+      const pending = projection.pendingTasks?.filter(item => item.state === "pending") ?? [];
+      for (const item of pending) {
+        const effect = store.listEffects(ref, "model-send").find(row => row.intent.key === `model:${item.taskId}` && row.state !== "not-started");
+        const runtime = effect?.intent.expected?.runtime;
+        if (!effect || !isRuntimeKind(runtime) || roleBusy(item.roleId, runtime)) continue;
+        const turnId = effect.result?.result?.turnId;
+        const matches = (await read({ projectRoot, runtime, roleId: item.roleId })).filter(report => report.taskId === item.taskId
+          && report.origin === "submitted-report" && (typeof turnId !== "string" || turnId === report.source.turnId));
+        if (matches.length !== 1 || !await this.commitGraphReport(projection, item, matches[0]!)) continue;
+        if (effect.state === "unknown" || effect.state === "claimed") {
+          await store.settleEffect(ref, { key: effect.intent.key, token: effect.token, outcome: "succeeded",
+            evidence: "Recovered the bound runtime turn and submitted report.", result: { turnId: matches[0]!.source.turnId } });
+        }
+      }
+      if (projection.action === "governed-implementation"
+        && !store.listCapabilityEvents(ref).some(row => row.event.stepId === projection.stepId && row.event.attempt === projection.attempt
+          && row.event.input.kind === "operator-report" && row.receipt.state !== "ignored")) {
+        const effects = store.listEffects(ref, "model-send");
+        for (const item of projection.pendingTasks ?? []) {
+          if (item.stepId !== projection.stepId || item.attempt !== projection.attempt || item.state !== "accepted" || !item.report) continue;
+          const effect = effects.find(row => row.intent.key === `model:graph-report:${item.taskId}:${item.report!.key}`);
+          const turnId = effect?.result?.result?.turnId;
+          const runtime = effect?.intent.expected?.runtime;
+          if (!effect || !isRuntimeKind(runtime) || typeof turnId !== "string" || roleBusy("convener", runtime)) continue;
+          const report = (await read({ projectRoot, roleId: "convener", runtime })).find(saved =>
+            saved.taskId === item.task.parentTaskId && saved.source.turnId === turnId && saved.origin === "submitted-report");
+          if (report) await this.commitGraphReport(projection, undefined, report);
+        }
+      }
+    }
+    if (!task) return;
     const facts = store.listFacts(ref);
     const required = [
       !facts.some(({ fact }) => fact.kind === "task-report" && fact.task.taskId === task.taskId) ? task.taskId : undefined,

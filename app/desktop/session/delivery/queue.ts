@@ -1209,7 +1209,8 @@ export class Delivery {
       // 放回队首保留重试（失败重试仍允许）；回交保留 receipt 判据（providerMayHaveStarted）不变。
       // P0：settle 已记 `delivery.end` ⇒ 视为已处理（更不允许重投）。
       const acked = origin.turnId !== undefined || origin.inputAccepted === true || terminalRecorded;
-      const canRetry = terminalRecorded || sent.controllerResume && origin.assignmentRejectionCode ? false : cAttempt
+      const retiredDurable = origin.assignmentRejectionCode === "effect-attempt-retired";
+      const canRetry = terminalRecorded || retiredDurable || sent.controllerResume && origin.assignmentRejectionCode ? false : cAttempt
         ? !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed
         : !acked;
       const mayBeActive = terminalRecorded ? false : cAttempt && (!receipt || receipt.providerMayHaveStarted);
@@ -1238,6 +1239,10 @@ export class Delivery {
         this.rememberAppTaskDelivered(sent.clientMessageId);
       }
       this.persistDeliveryQueues();
+      if (retiredDurable) {
+        void this.drainQueue(projectRoot, resolvedTarget, runtime);
+        return;
+      }
       if (terminalRecorded) {
         // 回合已完成、终态已记账：不再向 pane 发「投递失败/保留重试」的错误口径系统行。
         return;

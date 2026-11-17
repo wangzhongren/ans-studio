@@ -1,9 +1,15 @@
-schema: 1
+schema: 2
 id: path-b
-version: 1
+version: 2
 name: 路径 B
-start: impact
+start: qualify-change
 steps:
+  qualify-change:
+    action: observe-existing
+    next: prepare-branch
+  prepare-branch:
+    action: prepare-existing-branch
+    next: impact
   impact:
     action: b1-impact-readonly
     role: module-owner

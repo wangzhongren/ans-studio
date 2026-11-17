@@ -12,6 +12,11 @@
 //  · 本模块不授予任何写权/派发权：fixed 路由的硬授权仍在 `workflow-dispatch.ts` 谓词与
 //    `app/desktop/session.ts::routeFixedPathDispatch`；本层只提供模式选择与注入形态。
 //  · legacy 注入集合/顺序由 `session.ts` 原样保留；本模块的常量只供 fixed 过滤消费。
+export { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
+export { loadLatestRoster, parseTeamPlan } from "../../src/common/编排/workflow-preconditions.ts";
+export { activateRoleDocumentsFixed, archiveAcceptance, completeTeamPlanFixed, finalizeIntent, prepareIntent, readBasisLedger, taskBranchName,
+  type CompleteTeamPlanFixedInput, type CompleteTeamPlanFixedResult, type FixedActivateRoleDocumentsDep } from "../../src/common/编排/workflow-service.ts";
+export type { TaskHandback } from "../../src/common/编排/handback.ts";
 
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";

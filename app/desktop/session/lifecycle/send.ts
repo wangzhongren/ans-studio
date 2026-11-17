@@ -13,6 +13,7 @@ import type { OrchestrationEvent, HandbackEvent } from "../../../../src/common/ç
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../../../src/common/shared/diagnostics.ts";
 import { mainT } from "../../i18n.ts";
 import { durableHash } from "../../durable-workflow.ts";
+import { DURABLE_GRAPH_EXECUTOR } from "../../../../src/model/durable-workflow.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage } from "../../../../src/model/runtime.ts";
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn, WorkflowEvent, WorkflowArtifactRef, BasisEvent } from "../../../../src/model/runtime.ts";
 import type {
@@ -322,7 +323,14 @@ export class LifecycleSend {
       }
       const store = await durable.store();
       const claim = await store.claimEffect(sent.ref, sent.intent);
-      if (!claim.ok) throw new Error(`${claim.code}: ${claim.message}`);
+      if (!claim.ok) {
+        if (sent.ref.executor === DURABLE_GRAPH_EXECUTOR && claim.code === "effect-attempt-retired") {
+          origin.assignmentRejectionCode = claim.code;
+          createDiagnosticLogger({ component: "desktop.delivery", projectRoot: entry.projectRoot, roleId: entry.roleId })
+            .record("delivery.durable.retired", { requestId: sent.intent.key, reasonCode: claim.code });
+        }
+        throw new Error(`${claim.code}: ${claim.message}`);
+      }
       if (!claim.value.execute) {
         if (claim.value.state === "succeeded") return;
         throw new Error("workflow-send-uncertain: An earlier execution must be reconciled.");
@@ -332,16 +340,27 @@ export class LifecycleSend {
         await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "not-started", evidence: "session changes before model send" });
         throw new Error("workflow-send-session-changed: The intended session is no longer current.");
       }
+      const graph = sent.ref.executor === DURABLE_GRAPH_EXECUTOR;
+      const writeAcknowledgement = (turnId: string) => store.settleEffect(sent.ref, { key: effectKey, token,
+        outcome: "succeeded", evidence: "The runtime acknowledged the exact delivered model turn.", result: { turnId } });
+      if (graph) {
+        const started = promptOptions.onTurnStarted;
+        promptOptions = { ...promptOptions, onTurnStarted: metadata => {
+          started?.(metadata);
+          if (origin.turnId === metadata.turnId && metadata.turnId) writeAcknowledgement(metadata.turnId);
+        } };
+      }
       try {
         await entry.handle.send(text, promptOptions);
       } catch (error) {
-        await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "unknown",
+        if (graph && origin.turnId) writeAcknowledgement(origin.turnId);
+        else await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "unknown",
           evidence: "model send failed after the host entered the effect boundary",
           ...(origin.turnId ? { result: { turnId: origin.turnId } } : {}) });
         throw error;
       }
       const turnId = origin.turnId;
-      const receipt = await store.settleEffect(sent.ref, {
+      const receipt = graph && turnId ? writeAcknowledgement(turnId) : await store.settleEffect(sent.ref, {
         key: effectKey, token, outcome: turnId ? "succeeded" : "unknown",
         evidence: turnId ? "runtime acknowledged the model turn and send returned" : "missing runtime turn receipt",
         ...(turnId ? { result: { turnId } } : {}),

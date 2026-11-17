@@ -1,16 +1,19 @@
-import { existsSync, mkdirSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type {
-  DurableActionIntent, DurableDefinition, DurableDelivery, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome,
-  DurableFact, DurableFactReceipt, DurableInstanceRef, DurableOwner, DurableProjection, DurableReleaseRequest,
-  DurableScopeDecision, DurableTaskBinding, DurableTerminal,
+  DurableActionIntent, DurableDefinitionSnapshot, DurableDelivery, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome,
+  DurableEvidenceRef, DurableFact, DurableFactReceipt, DurableInstanceRef, DurableOwner, DurableProjection, DurableReleaseRequest,
+  DurableGraphCard, DurablePendingTask, DurableScopeDecision, DurableTaskBinding, DurableTerminal, DurableWriteSet,
 } from '../../model/durable-workflow.ts';
 import type { RepositoryIdentity } from './files.ts';
 
 export interface StoredInstance {
   ref: DurableInstanceRef;
-  definition: DurableDefinition;
+  definition: DurableDefinitionSnapshot;
+  definitionSource?: 'project' | 'preset';
+  definitionFile?: string;
+  startupFingerprint?: string;
   projectRoot: string;
   commonDir: string;
   requestId: string;
@@ -33,6 +36,23 @@ export interface StoredInstance {
   release?: DurableReleaseRequest;
   actionIntent?: DurableActionIntent;
   baseline?: { branch: string; oid: string };
+  graph?: {
+    flowId?: string;
+    observedHead?: string;
+    observedStatus?: string;
+    customerPurpose?: 'new-work' | 'existing-change';
+    existingRequest?: import('../../model/durable-workflow.ts').DurableCapabilityEvent;
+    card?: DurableGraphCard;
+    tasks: DurablePendingTask[];
+    proofs: Record<string, string>;
+    writeSets?: readonly DurableWriteSet[];
+    activatedRoles?: string[];
+    expectedRoles?: readonly string[];
+    roleDocumentPaths?: readonly string[];
+    proposalRoster?: DurableEvidenceRef;
+    approvedProposalRequestId?: string;
+    acceptanceArchive?: DurableEvidenceRef;
+  };
 }
 
 export interface StoredFact { fact: DurableFact; receipt: DurableFactReceipt; fingerprint: string }
@@ -143,6 +163,11 @@ export class DurableLedger {
       .map(row => asJson<StoredInstance>(row)!);
   }
 
+  instancesForRoot(root: string): StoredInstance[] {
+    return this.#db.prepare("SELECT data FROM instance WHERE json_extract(data,'$.projectRoot')=? ORDER BY rowid DESC")
+      .all(root).map(row => asJson<StoredInstance>(row)!);
+  }
+
   missingBusinessRecords(): StoredInstance[] {
     return this.#db.prepare(`SELECT i.data FROM instance AS i
       LEFT JOIN scope_decision AS s ON s.instance_id=i.id
@@ -159,12 +184,12 @@ export class DurableLedger {
       .run(value.ref.instanceId, value.ref.projectId, value.requestId, value.status, JSON.stringify(value));
   }
 
-  definition(projectId: string, definitionId: string, version: number): DurableDefinition | undefined {
+  definition(projectId: string, definitionId: string, version: number): DurableDefinitionSnapshot | undefined {
     return asJson(this.#db.prepare('SELECT data FROM definition WHERE project_id=? AND definition_id=? AND version=?')
       .get(projectId, definitionId, version));
   }
 
-  pin(projectId: string, value: DurableDefinition): void {
+  pin(projectId: string, value: DurableDefinitionSnapshot): void {
     this.#db.prepare('INSERT OR IGNORE INTO definition(project_id,definition_id,version,digest,data) VALUES(?,?,?,?,?)')
       .run(projectId, value.id, value.version, value.digest, JSON.stringify(value));
   }
@@ -260,6 +285,70 @@ export class DurableLedger {
 }
 
 type OwnerRow = { engine: DurableOwner['engine']; instanceId: string; dataDir: string };
+
+export interface WorkspaceReservation extends OwnerRow {
+  projectId: string;
+  requestId: string;
+  fingerprint: string;
+  state: 'reserved' | 'active';
+  source?: 'project' | 'preset';
+  definitionFile?: string;
+  definition?: DurableDefinitionSnapshot;
+  initialHead?: string;
+  initialStatus?: string;
+}
+
+function workspaceOwnerDb(root: string, create: boolean): DatabaseSync | undefined {
+  const names = [join(root, '.ans'), join(root, '.ans', 'state')];
+  for (const name of names) {
+    if (!existsSync(name) && !create) return undefined;
+    if (create) {
+      try { mkdirSync(name, { mode: 0o700 }); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+    }
+    const info = lstatSync(name);
+    if (!info.isDirectory() || info.isSymbolicLink() || resolve(realpathSync(name)).toLowerCase() !== resolve(name).toLowerCase()) {
+      throw new Error('应用状态目录存在重定向。');
+    }
+  }
+  const file = join(names[1]!, 'ans-durable-owner.sqlite');
+  if (existsSync(file)) {
+    const info = lstatSync(file);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) throw new Error('项目占用账本存在重定向。');
+  } else if (!create) return undefined;
+  const db = open(file, false);
+  db.exec('CREATE TABLE IF NOT EXISTS workspace_owner (slot TEXT PRIMARY KEY, data TEXT NOT NULL)');
+  return db;
+}
+
+export function workspaceOwner(root: string): WorkspaceReservation | undefined {
+  const db = workspaceOwnerDb(root, false);
+  if (!db) return undefined;
+  try { return asJson(db.prepare("SELECT data FROM workspace_owner WHERE slot='workspace'").get()); }
+  finally { db.close(); }
+}
+
+export function reserveWorkspace(root: string, proposed: WorkspaceReservation): WorkspaceReservation {
+  const db = workspaceOwnerDb(root, true)!;
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    db.prepare("INSERT OR IGNORE INTO workspace_owner(slot,data) VALUES('workspace',?)").run(JSON.stringify(proposed));
+    const recorded = asJson<WorkspaceReservation>(db.prepare("SELECT data FROM workspace_owner WHERE slot='workspace'").get())!;
+    db.exec('COMMIT');
+    return recorded;
+  } finally { db.close(); }
+}
+
+export function changeWorkspaceOwner(root: string, previous: WorkspaceReservation, active: boolean): void {
+  const db = workspaceOwnerDb(root, false);
+  if (!db) return;
+  try {
+    const current = JSON.stringify(previous);
+    if (active) db.prepare("UPDATE workspace_owner SET data=? WHERE slot='workspace' AND data=?")
+      .run(JSON.stringify({ ...previous, state: 'active' }), current);
+    else db.prepare("DELETE FROM workspace_owner WHERE slot='workspace' AND data=?").run(current);
+  } finally { db.close(); }
+}
 function ownerDb(commonDir: string): DatabaseSync {
   const db = open(join(commonDir, 'ans-workflow-ownership.sqlite'), false);
   db.exec(`CREATE TABLE IF NOT EXISTS owner (
@@ -297,7 +386,7 @@ export function reserveOwnerState(repo: RepositoryIdentity, owner: OwnerRow, slo
   } finally { db.close(); }
 }
 
-export function pinRepositoryDefinition(repo: RepositoryIdentity, definition: DurableDefinition): boolean {
+export function pinRepositoryDefinition(repo: RepositoryIdentity, definition: DurableDefinitionSnapshot): boolean {
   const db = ownerDb(repo.commonDir);
   try {
     db.prepare('INSERT OR IGNORE INTO pinned_definition(definition_id,version,digest) VALUES(?,?,?)')

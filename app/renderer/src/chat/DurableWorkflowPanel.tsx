@@ -1,6 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import type { DurableProblem, DurableScopeDecision } from "../../../../src/model/durable-workflow.ts";
 import { useChatStore } from "@/chat/chat-store";
 import {
   getDurableWorkflowBridge,
@@ -11,6 +10,9 @@ import {
   type DesktopDurableView,
   type DurableDeliverySummary,
   type DurableDeliveryView,
+  type DurableProblem,
+  type DurableResult,
+  type DurableScopeDecision,
   type DurableWorkflowBridge,
 } from "@/chat/ipc";
 import { runtimeLabel } from "@/chat/runtime-config";
@@ -65,6 +67,16 @@ const evidenceKeys = {
   operator: "ui.durableWorkflow.evidence.operator",
   approval: "ui.durableWorkflow.evidence.approval",
 } satisfies Record<NonNullable<DesktopDurableInstance["evidence"]>[number]["kind"], MessageKey>;
+
+const sourceKeys = {
+  project: "ui.durableWorkflow.sourceProject",
+  preset: "ui.durableWorkflow.sourcePreset",
+} satisfies Record<DesktopDurableDefinition["source"], MessageKey>;
+
+const pendingTaskKeys: Readonly<Record<string, MessageKey>> = {
+  pending: "ui.work.pendingTitle",
+  reported: "ui.durableWorkflow.taskReported",
+};
 
 function detail(problem: Partial<DurableProblem>): string {
   return [problem.code, problem.path, problem.message].filter(Boolean).join(" · ");
@@ -257,6 +269,7 @@ function InstanceStatus({ instance, projectRoot, bridge, drawerOpen }: {
   const statusKey = statusKeys[instance.status];
   const phaseKey = instance.action ? actionKeys[instance.action] : undefined;
   const approvalKey = approval ? approvalKeys[approval.status] : undefined;
+  const pendingTasks = instance.pendingTasks?.filter(({ state }) => state === "pending" || state === "reported");
   return (
     <>
       <dl className="m-0 grid grid-cols-2 gap-1">
@@ -269,6 +282,8 @@ function InstanceStatus({ instance, projectRoot, bridge, drawerOpen }: {
             : instance.definitionId}
         />
         <Fact label={t("ui.durableWorkflow.version")} value={instance.definitionVersion} />
+        <Fact label={t("ui.durableWorkflow.definitionSource")} value={instance.definitionSource ? t(sourceKeys[instance.definitionSource]) : undefined} />
+        <Fact label={t("ui.durableWorkflow.schema")} value={instance.schema} />
         <Fact label={t("ui.durableWorkflow.digest")} value={instance.definitionDigest} wide />
         <Fact label={t("ui.durableWorkflow.phase")} value={phaseKey ? t(phaseKey) : instance.action} wide />
         <Fact
@@ -288,6 +303,23 @@ function InstanceStatus({ instance, projectRoot, bridge, drawerOpen }: {
           />
         ) : null}
       </dl>
+      {instance.flowId ? <p className="ps-focus">{t("ui.versionChange.flow", { flowId: instance.flowId })}</p> : null}
+      {pendingTasks?.length ? (
+        <section className="ps-section" aria-label={t("ui.durableWorkflow.pendingTasks")} data-durable-pending-tasks>
+          <h3 className="ps-heading">{t("ui.durableWorkflow.pendingTasks")}</h3>
+          <ul className="ps-list">
+            {pendingTasks.map((task) => (
+              <li className="ps-row" key={task.taskId}>
+                <span className="ps-primary">{t("ui.taskCenter.taskAria", {
+                  taskId: task.taskId,
+                  status: pendingTaskKeys[task.state] ? t(pendingTaskKeys[task.state]) : task.state,
+                })}</span>
+                <span className="ps-secondary">{task.roleId} · {task.stepId} · {t("ui.durableWorkflow.attempt")} {task.attempt}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {approval && canOpenApproval ? (
         <Button
           type="button"
@@ -326,6 +358,15 @@ function InstanceStatus({ instance, projectRoot, bridge, drawerOpen }: {
   );
 }
 
+function definitionKey(definition: DesktopDurableDefinition): string {
+  return `${definition.source}:${definition.file}`;
+}
+
+function projectOverride(definitions: readonly DesktopDurableDefinition[], preset: DesktopDurableDefinition) {
+  return definitions.find((definition) => definition.source === "project" &&
+    (definition.id === preset.id || definition.file === preset.file));
+}
+
 function WorkflowStartForm({
   bridge,
   projectRoot,
@@ -342,7 +383,7 @@ function WorkflowStartForm({
   const summaryLabelId = useId();
   const [definitions, setDefinitions] = useState<DesktopDurableDefinition[]>();
   const [listError, setListError] = useState<true | DurableProblem>();
-  const [selectedFile, setSelectedFile] = useState("");
+  const [selection, setSelection] = useState<DesktopDurableDefinition>();
   const [pending, setPending] = useState(() => pendingDurableStart(projectRoot));
   const [summary, setSummary] = useState(pending?.summary ?? "");
   const [validated, setValidated] = useState<DesktopDurableDefinition>();
@@ -351,7 +392,12 @@ function WorkflowStartForm({
   const mounted = useRef(false);
   const busyLock = useRef(false);
   const listRevision = useRef(0);
-  const selected = definitions?.find(({ file }) => file === selectedFile);
+  const selectedKey = selection && definitionKey(selection);
+  const selected = definitions?.find((definition) => definitionKey(definition) === selectedKey);
+  const missingSelection = Boolean(definitions && selection && !selected);
+  const choices = definitions?.filter((definition) => (
+    definition.source === "project" || !projectOverride(definitions, definition)
+  ));
 
   useEffect(() => {
     mounted.current = true;
@@ -360,17 +406,22 @@ function WorkflowStartForm({
 
   useEffect(() => {
     let current = true;
-    listRevision.current += 1;
+    const revision = ++listRevision.current;
     setDefinitions(undefined);
     setValidated(undefined);
     setListError(undefined);
-    setError(undefined);
+    if (!busyLock.current) setError(undefined);
     void bridge.listDurableWorkflows({ projectRoot }).then((result) => {
-      if (!current) return;
-      if (result.ok) setDefinitions(result.value.definitions);
-      else setListError(result);
+      if (!current || revision !== listRevision.current) return;
+      if (!result.ok) {
+        setListError(result);
+        return;
+      }
+      const listed = result.value.definitions;
+      setDefinitions(listed);
+      setSelection((previous) => previous?.source === "preset" ? projectOverride(listed, previous) ?? previous : previous);
     }).catch(() => {
-      if (current) setListError(true);
+      if (current && revision === listRevision.current) setListError(true);
     });
     return () => { current = false; };
   }, [bridge, projectRoot, refreshVersion]);
@@ -383,7 +434,9 @@ function WorkflowStartForm({
     setError(undefined);
     setValidated(undefined);
     try {
-      const result = await bridge.validateDurableWorkflow({ projectRoot, definitionId: selected.id });
+      const result = await bridge.validateDurableWorkflow({
+        projectRoot, definitionId: selected.id, source: selected.source, expectedDigest: selected.digest,
+      });
       if (!mounted.current || revision !== listRevision.current) return;
       if (!result.ok) setError(result);
       else if (result.value.error) setError(result.value.error);
@@ -396,9 +449,37 @@ function WorkflowStartForm({
     }
   };
 
+  const installDefinition = async (operation: () => Promise<DurableResult<DesktopDurableDefinition>>) => {
+    if (busyLock.current || pending) return;
+    busyLock.current = true;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const result = await operation();
+      if (!mounted.current) return;
+      if (!result.ok) {
+        if (result.code !== "workflow-import-cancelled") setError(result);
+        return;
+      }
+      const installed = result.value;
+      const key = definitionKey(installed);
+      listRevision.current += 1;
+      setDefinitions((previous) => [installed, ...(previous ?? []).filter((definition) => definitionKey(definition) !== key)]);
+      setListError(undefined);
+      setSelection(installed);
+      setValidated(installed);
+    } catch {
+      if (mounted.current) setError(true);
+    } finally {
+      busyLock.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  };
+
+  const startable = Boolean(validated?.digest && selected && definitionKey(validated) === selectedKey && !selected.error && summary.trim());
   const start = async () => {
-    const draft = pending ?? (validated && summary.trim()
-      ? { projectRoot, definitionId: validated.id, summary: summary.trim() }
+    const draft = pending ?? (startable && validated
+      ? { projectRoot, definitionId: validated.id, source: validated.source, expectedDigest: validated.digest, summary: summary.trim() }
       : undefined);
     if (!draft || busyLock.current) return;
     busyLock.current = true;
@@ -410,10 +491,11 @@ function WorkflowStartForm({
       if (result.ok) {
         setSummary("");
         setValidated(undefined);
-        setSelectedFile("");
+        setSelection(undefined);
         onStarted(result.value);
       } else {
         setError(result);
+        if (result.code.startsWith("definition-")) setValidated(undefined);
       }
     } catch {
       if (mounted.current) setError(true);
@@ -427,7 +509,7 @@ function WorkflowStartForm({
   };
 
   const issue = error || listError;
-  const definition = validated ?? selected;
+  const definition = selected && (validated ?? selected);
   return (
     <form
       className="ps-section"
@@ -450,38 +532,67 @@ function WorkflowStartForm({
         <p className="ps-note" role="status">{t("ui.durableWorkflow.loading")}</p>
       ) : null}
       {pending ? (
-        <dl className="ps-list"><Fact label={t("ui.durableWorkflow.definition")} value={pending.definitionId} /></dl>
-      ) : definitions?.length ? (
+        <dl className="ps-list">
+          <Fact label={t("ui.durableWorkflow.definition")} value={pending.definitionId} />
+          <Fact label={t("ui.durableWorkflow.definitionSource")} value={pending.source ? t(sourceKeys[pending.source]) : undefined} />
+          <Fact label={t("ui.durableWorkflow.digest")} value={pending.expectedDigest} />
+        </dl>
+      ) : choices?.length || missingSelection ? (
         <>
           <label className="ps-heading" htmlFor={definitionLabelId}>{t("ui.durableWorkflow.definition")}</label>
           <select
             id={definitionLabelId}
             className="role-log-select max-w-full"
-            value={selectedFile}
+            value={selectedKey ?? ""}
             disabled={busy}
             onChange={(event) => {
-              setSelectedFile(event.target.value);
+              setSelection(choices?.find((definition) => definitionKey(definition) === event.target.value));
               setValidated(undefined);
               setError(undefined);
             }}
           >
             <option value="">{t("ui.durableWorkflow.choose")}</option>
-            {definitions.map(({ id, file }) => <option key={file} value={file}>{id} · {file}</option>)}
+            {missingSelection && selection ? (
+              <option value={selectedKey} disabled>{selection.name || selection.id} · {t(sourceKeys[selection.source])}</option>
+            ) : null}
+            {choices?.map((entry) => (
+              <option key={definitionKey(entry)} value={definitionKey(entry)}>
+                {entry.name && entry.name !== entry.id ? `${entry.name} · ` : ""}{entry.id} · {t(sourceKeys[entry.source])}
+              </option>
+            ))}
           </select>
+          {missingSelection ? <p className="ps-error" role="alert">{t("ui.durableWorkflow.definitionMissing")}</p> : null}
           {definition?.error && !error ? (
             <p className="ps-error break-all" role="alert">{detail(definition.error)}</p>
           ) : null}
           {definition && !definition.error ? (
             <dl className="ps-list">
+              <Fact label={t("ui.durableWorkflow.definition")} value={`${definition.id} · ${definition.file}`} />
+              <Fact label={t("ui.durableWorkflow.definitionSource")} value={t(sourceKeys[definition.source])} />
               <Fact label={t("ui.durableWorkflow.version")} value={definition.version} />
               <Fact label={t("ui.durableWorkflow.digest")} value={definition.digest} />
             </dl>
           ) : null}
           {validated ? <p className="ps-note" role="status">{t("ui.durableWorkflow.validated")}</p> : null}
-          <Button type="button" variant="outline" size="sm" className="self-start" disabled={!selected || busy} onClick={() => void validate()}>
-            {t("ui.durableWorkflow.validate")}
-          </Button>
+          <div className="ps-tools">
+            <Button type="button" variant="outline" size="sm" disabled={!selected || busy} onClick={() => void validate()}>
+              {t("ui.durableWorkflow.validate")}
+            </Button>
+            {selected?.source === "preset" && !selected.error ? (
+              <Button type="button" variant="outline" size="sm" disabled={busy}
+                onClick={() => void installDefinition(() => bridge.copyDurableWorkflowPreset({ projectRoot, definitionId: selected.id }))}>
+                {t("ui.durableWorkflow.copyPreset")}
+              </Button>
+            ) : null}
+          </div>
         </>
+      ) : null}
+      {!pending ? (
+        <Button type="button" variant="outline" size="sm" className="self-start"
+          disabled={busy || (!definitions && !listError)}
+          onClick={() => void installDefinition(() => bridge.importDurableWorkflow({ projectRoot }))}>
+          {t("ui.durableWorkflow.importDefinition")}
+        </Button>
       ) : null}
       {pending || definitions?.length ? (
         <>
@@ -494,7 +605,7 @@ function WorkflowStartForm({
             maxLength={12_000}
             rows={3}
           />
-          <Button type="submit" size="sm" className="self-start" disabled={busy || (!pending && (!validated || !summary.trim()))}>
+          <Button type="submit" size="sm" className="self-start" disabled={busy || (!pending && !startable)}>
             {t(pending ? "ui.durableWorkflow.retryStart" : "ui.durableWorkflow.start")}
           </Button>
         </>
