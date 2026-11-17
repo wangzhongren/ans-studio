@@ -237,7 +237,7 @@ export interface TrustedToolPolicyInput {
 }
 
 /**
- * 角色模块可额外声明的工具稳定 id **闭集**（E0.2 §3.1 R-1 / §10.2 D1；14 项）。
+ * 角色模块可额外声明的工具稳定 id **闭集**（E0.2 §3.1 R-1 / §10.2 D1，含幕僚启动方案 v1.1 增补）。
  *
  * - 只列**角色专属额外注入**的工具；`projectState` 等内置治理角色共有工具由引擎按
  *   `builtInGovernance` 注入，不在此列。
@@ -263,10 +263,11 @@ export type RoleToolId =
   | "closeCreatedTask"
   | "submitRefactor"
   | "requestStableWrite"
-  | "decidePendingRequest";
+  | "decidePendingRequest"
+  | "requestWorkflowStart";
 
 /**
- * `RoleToolId` 对应的运行时注册工具名（snake_case；E0.2 §3.1 逐字，14 项）。
+ * `RoleToolId` 对应的运行时注册工具名（snake_case；E0.2 §3.1 与幕僚启动方案 v1.1）。
  *
  * 本类型只定义字面量闭集，**不承载映射值**：逐项映射只存在于门禁引擎私有装配表
  * （`role-tool-registry.ts::ROLE_TOOL_CATALOG`，单一来源），由契约测试逐项断言与 §3.1 表一致。
@@ -285,7 +286,8 @@ export type RoleToolName =
   | "close_created_task"
   | "submit_refactor"
   | "request_stable_write"
-  | "decide_pending_request";
+  | "decide_pending_request"
+  | "request_workflow_start";
 
 /** `tools()` 的输出：可用能力位 + 额外注入工具稳定 id + 结构化原因（纯数据）。 */
 export interface RoleToolPolicy {

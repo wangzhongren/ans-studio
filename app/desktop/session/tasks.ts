@@ -78,7 +78,7 @@ export interface TasksPorts {
 }
 
 /** tasks 方法读取的 deps 切片（原 `this.deps` 的两项只读查询）。 */
-type TasksDeps = Pick<SessionManagerDeps, "getListing" | "customerInput" | "now" | "emitEvent" | "durableWorkflow">;
+type TasksDeps = Pick<SessionManagerDeps, "getListing" | "customerInput" | "now" | "emitEvent" | "durableWorkflow" | "workflowChiefStart">;
 
 /** 任务账本业务/重派/终止/升级（原 `SessionManager` 17 方法的同签名实现）。 */
 export class Tasks {
@@ -216,13 +216,20 @@ export class Tasks {
   }
 
   /** `project_state` 工具能力：A1 文本摘要投影（同一 builder；工具层再做 8 KiB 硬截断）。 */
-  async projectStateTool(projectRoot: string, roleId: string, query: { flowId?: string }): Promise<ProjectStateToolResult> {
+  async projectStateTool(projectRoot: string, roleId: string, query: { flowId?: string; definitionId?: string }): Promise<ProjectStateToolResult> {
     try {
+      let directory = "";
+      const start = this.deps.workflowChiefStart;
+      if (roleId === "chief" && start?.mode(projectRoot)) {
+        directory = await start.catalog(projectRoot, query.definitionId).catch(() => "The workflow definition directory could not be read.");
+      }
+      if (query.definitionId && directory) return { ok: true, text: directory };
       const view = await buildProjectStateView(projectRoot, {
         roleId,
         ...(query.flowId !== undefined ? { flowId: query.flowId } : {}),
       });
-      return { ok: true, text: renderProjectStateSummary(view) };
+      const summary = renderProjectStateSummary(view);
+      return { ok: true, text: directory ? `${directory}\n\n${summary}` : summary };
     } catch (error) {
       return { ok: false, message: `project_state 读取失败：${error instanceof Error ? error.message : String(error)}` };
     }

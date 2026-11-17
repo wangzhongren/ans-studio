@@ -37,7 +37,7 @@ async function repository(t: TestContext) {
   return { root, baselineOid, branch };
 }
 
-test("durable IPC requires a directory chosen in the current window", async () => {
+test("old direct workflow IPC always requires a Chief proposal and customer confirmation", async () => {
   const desktop = createDesktopInterface({
     envFilePath: path.join(os.tmpdir(), "ans-unused-workflow-env"),
     pickDirectory: async () => null,
@@ -47,7 +47,7 @@ test("durable IPC requires a directory chosen in the current window", async () =
     projectRoot: os.tmpdir(), enabled: true, definitionId: "path-b", requestId: "id", summary: "Change",
   });
   assert.equal(response.ok, false);
-  if (!response.ok) assert.equal(response.code, "workflow-project-unselected");
+  if (!response.ok) assert.equal(response.code, "workflow-start-confirmation-required");
   desktop.disposeProjectDocuments();
 });
 

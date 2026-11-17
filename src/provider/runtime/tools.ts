@@ -95,7 +95,8 @@ import {
   VERSION_DECISION_REASON_MAX,
   VERSION_DECISION_REFS_MAX,
 } from "../../model/project-state.ts";
-import type { ProjectNoteInput, ProjectNoteOp, ProjectStateQuery, VersionDecisionRequest } from "../../model/project-state.ts";
+import type { ProjectNoteInput, ProjectNoteOp, VersionDecisionRequest } from "../../model/project-state.ts";
+import type { DurableRequestWorkflowStartFn } from "../../model/durable-workflow.ts";
 import type { GovernanceMatrixFn } from "../../model/governance-matrix.ts";
 import {
   CONTRACT_SCHEMA_TOPICS,
@@ -131,7 +132,7 @@ import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
 import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
 import type { MessageKey } from "../../common/shared/i18n/keys.ts";
-import { describeTool } from "./schema.ts";
+import { describeTool, WORKFLOW_DEFINITION_DIGEST_PATTERN, WORKFLOW_DEFINITION_ID_PATTERN } from "./schema.ts";
 // E2 X-R2/X-R4（rapporteur / convener）：requirement-change 动作前置的角色模块 public entry。
 // E0.3 §2 依赖方向：engines（含 Provider）只经角色模块 `index.ts` 只读消费；本前置不经 Service，
 // 也不 import 角色模块内部文件/门禁引擎私有 common。模块为纯数据/纯策略（无 I/O、无状态）。
@@ -280,6 +281,7 @@ export const REQUEST_REQUIREMENT_CHANGE_TOOL_NAME = "request_requirement_change"
 
 /** project_state 工具名（2026-11-02；全局任务状态只读摘要——与 UI 同一 builder，注入才注册）。 */
 export const PROJECT_STATE_TOOL_NAME = "project_state";
+export const REQUEST_WORKFLOW_START_TOOL_NAME = "request_workflow_start";
 
 /** project_note 工具名（2026-11-02；幕僚受控备注（focus/blocker/next-step），append-only，注入才注册）。 */
 export const PROJECT_NOTE_TOOL_NAME = "project_note";
@@ -4058,7 +4060,10 @@ function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn, scope?
 // 纪律：`project_state` 纯读；`project_note` 只提交受控备注（不改机器事实）；`request_version_decision`
 // 只发起申请（**申请≠批准、路线≠内容批准**；不写文档、不派角色、不创建任务、不执行）。
 
-const PROJECT_STATE_ARG_KEYS: ReadonlySet<string> = new Set(["flowId"]);
+const WORKFLOW_DEFINITION_ID_RE = new RegExp(WORKFLOW_DEFINITION_ID_PATTERN);
+const WORKFLOW_DEFINITION_DIGEST_RE = new RegExp(WORKFLOW_DEFINITION_DIGEST_PATTERN);
+const PROJECT_STATE_ARG_KEYS: ReadonlySet<string> = new Set(["flowId", "definitionId"]);
+const REQUEST_WORKFLOW_START_ARG_KEYS: ReadonlySet<string> = new Set(["definitionId", "source", "expectedDigest", "reason"]);
 const PROJECT_STATE_TRUNCATED_MARKER = "\n[truncated：项目状态输出超过 8 KiB 上限，已按 UTF-8 字节截断]";
 
 /** `project_note` 的严格 op 参数面（未知参数/与 op 不符的参数在触达能力前拒绝）。 */
@@ -4131,7 +4136,7 @@ function projectRefsArg(
 
 /**
  * project_state：全局任务状态**只读**摘要（与 UI `project-state:get` 同一 builder 的文本投影）。
- * 本层只做查询形状校验（仅可选 flowId）、截断防御（≤8 KiB）与如实转达；数据源失败不编造状态。
+ * 本层校验可选 flowId、definitionId，限制输出 ≤8 KiB，并如实转达数据源的结果。
  */
 function makeProjectStateTool(
   fn: ProjectStateFn,
@@ -4146,7 +4151,14 @@ function makeProjectStateTool(
       if (unknown !== undefined) return unknown;
       const flowId = readGovernanceSlugArg(call.args, "flowId", name);
       if (!flowId.ok) return flowId.result;
-      const query: ProjectStateQuery = { ...(flowId.value !== undefined ? { flowId: flowId.value } : {}) };
+      const definitionId = call.args["definitionId"];
+      if (definitionId !== undefined && (typeof definitionId !== "string" || !WORKFLOW_DEFINITION_ID_RE.test(definitionId))) {
+        return governanceArgumentError(name, "definitionId 参数非法（须为工作流定义 ID）");
+      }
+      const query: Parameters<ProjectStateFn>[0] = {
+        ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
+        ...(definitionId !== undefined ? { definitionId } : {}),
+      };
       const turnId = currentTurnId?.();
       let result: unknown;
       try {
@@ -4171,6 +4183,46 @@ function makeProjectStateTool(
       if (Buffer.byteLength(text, "utf8") <= PROJECT_STATE_TOOL_MAX_BYTES) return { ok: true, message: text };
       const capped = truncateUtf8(text, PROJECT_STATE_TOOL_MAX_BYTES - Buffer.byteLength(PROJECT_STATE_TRUNCATED_MARKER, "utf8"));
       return { ok: true, message: `${capped.text}${PROJECT_STATE_TRUNCATED_MARKER}` };
+    },
+  };
+}
+
+function makeRequestWorkflowStartTool(fn: DurableRequestWorkflowStartFn): ExecutableTool {
+  const name = REQUEST_WORKFLOW_START_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownGovernanceArg(call.args, REQUEST_WORKFLOW_START_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      const { definitionId, source, expectedDigest, reason } = call.args;
+      if (typeof definitionId !== "string" || !WORKFLOW_DEFINITION_ID_RE.test(definitionId)) {
+        return governanceArgumentError(name, "definitionId 参数非法（须为工作流定义 ID）");
+      }
+      if (source !== "project" && source !== "preset") {
+        return governanceArgumentError(name, "source 参数非法（须为 project 或 preset）");
+      }
+      if (typeof expectedDigest !== "string" || !WORKFLOW_DEFINITION_DIGEST_RE.test(expectedDigest)) {
+        return governanceArgumentError(name, "expectedDigest 参数非法（须为定义条目的 SHA-256 摘要）");
+      }
+      if (typeof reason !== "string" || reason.trim() === "") {
+        return governanceArgumentError(name, "reason 参数非法（须说明选择理由）");
+      }
+      const invoked = await invokeSubmissionCapability(name, call.signal, () => {
+        call.signal?.throwIfAborted();
+        return fn({ definitionId, source, expectedDigest, reason });
+      });
+      if (!invoked.ok) return invoked.result;
+      const receipt = invoked.value;
+      if (directRecord(receipt) && receipt.ok === false && typeof receipt.code === "string" && typeof receipt.message === "string") {
+        return { ok: false, message: name + "：" + receipt.code + " · " + receipt.message };
+      }
+      if (directRecord(receipt) && receipt.ok === true && directRecord(receipt.value)) {
+        const { state, activationId, definitionDigest } = receipt.value;
+        if (state === "pending" && typeof activationId === "string" && activationId.trim() !== "" && definitionDigest === expectedDigest) {
+          return { ok: true, message: name + "：" + JSON.stringify({ state, activationId, definitionDigest }) + "。等待客户本人确认启用。" };
+        }
+      }
+      return { ok: false, message: name + "：应用回执无法确认提议状态。" };
     },
   };
 }
@@ -5594,6 +5646,10 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const projectState = options?.projectState;
   if (projectState !== undefined) {
     tools.push(makeProjectStateTool(projectState, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  const requestWorkflowStart = options?.requestWorkflowStart;
+  if (requestWorkflowStart !== undefined && options?.roleId === "chief") {
+    tools.push(makeRequestWorkflowStartTool(requestWorkflowStart));
   }
   // 治理权力矩阵（2026-11-05 C2）：**注入才注册**——未注入 ⇒ 工具不存在（能力缺席 = 最强 fail-closed）。
   // 角色门控在编排（C3）注入端：仅 trio 六个内置治理角色；worker/`su`/判断会话/single 不注入。

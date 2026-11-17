@@ -110,7 +110,7 @@ test("Windows B2 audit and B4 delivery recover from the real merge without a sec
   const projectRoot = f.root;
   const start = { projectRoot, enabled: true, definitionId: "path-b", requestId: "w5-audit-delivery-rework",
     summary: "Fix the legacy-path collision threshold and show the local delivery" };
-  const started = unwrap(await handle.desktop.startDurableWorkflow(start));
+  const started = unwrap(await handle.startViaChief(start));
   assert.ok(started.instance);
   instanceId = started.instance.instanceId;
   const selector = { projectRoot, instanceId };
@@ -131,7 +131,7 @@ test("Windows B2 audit and B4 delivery recover from the real merge without a sec
   log("audited-scope-before-restart", { scopeBefore, firstHost, projection: await projection() });
   await handle.close();
   handle = await app(f, model, log);
-  assert.equal(unwrap(await handle.desktop.startDurableWorkflow(start)).instance?.instanceId, instanceId);
+  assert.equal(unwrap(await handle.desktop.getDurableWorkflowProjection(selector)).instance?.instanceId, instanceId);
   const card = await until("original workflow presents B4 approval", async () => [...handle.cards.values()][0], model.errors);
   const resumedHost = await daprdListener(f);
   assert.ok(resumedHost && resumedHost.pid !== firstHost.pid);
@@ -264,7 +264,7 @@ test("Windows B4 customer rejection cannot create a note, delivery receipt or me
   const model = pathBModel(f, () => instanceId, log);
   const handle = await app(f, model, log);
   t.after(() => handle.close());
-  const started = unwrap(await handle.desktop.startDurableWorkflow({ projectRoot, enabled: true, definitionId: "path-b",
+  const started = unwrap(await handle.startViaChief({ projectRoot, enabled: true, definitionId: "path-b",
     requestId: "w5-reject-delivery-rework", summary: "Review this local candidate and decline merging it" }));
   assert.ok(started.instance);
   instanceId = started.instance.instanceId;
@@ -323,7 +323,7 @@ test("Windows B4 records the actual subset when main independently has the first
   });
   let handle = await app(f, model, log);
   t.after(() => handle.close());
-  const started = unwrap(await handle.desktop.startDurableWorkflow({ projectRoot, enabled: true, definitionId: "path-b",
+  const started = unwrap(await handle.startViaChief({ projectRoot, enabled: true, definitionId: "path-b",
     requestId: "w5-b4-actual-subset", summary: "Fix both thresholds and compare the approved and actual merge" }));
   assert.ok(started.instance);
   instanceId = started.instance.instanceId;

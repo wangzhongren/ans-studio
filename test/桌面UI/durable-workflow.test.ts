@@ -8,6 +8,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { enUS, zhCN } from "../../src/common/shared/i18n/index.ts";
+import { isWorkflowStartCard } from "../../app/renderer/src/chat/decision-card.ts";
+import type { DesktopWorkflowStartProposal } from "../../app/desktop/workflow-chief-start.ts";
 
 const here = fileURLToPath(import.meta.url);
 const repo = fileURLToPath(new URL("../../", import.meta.url));
@@ -37,7 +39,8 @@ if (!process.versions.electron) {
       ["validateDurableWorkflow", "validate"],
       ["copyDurableWorkflowPreset", "preset-copy"],
       ["importDurableWorkflow", "import"],
-      ["startDurableWorkflow", "start"],
+      ["listWorkflowStartProposals", "start-proposals"],
+      ["revokeWorkflowStartProposal", "start-proposal-revoke"],
       ["getDurableWorkflowProjection", "projection"],
       ["readDurableWorkflowDelivery", "delivery-read"],
       ["acknowledgeDurableWorkflowDelivery", "delivery-acknowledge"],
@@ -45,10 +48,22 @@ if (!process.versions.electron) {
       assert.ok(ipc.includes(`"${method}"`));
       assert.ok(preload.includes(`${method}: input => ipcRenderer.invoke("durable-workflow:${channel}", input)`));
     }
-    assert.match(panel, /enabled && drawerOpen \? \(/);
+    assert.match(panel, /showDefinitions && drawerOpen \? \(/);
     assert.match(panel, /pendingOperator\[approval\.requestId\]/);
     assert.match(panel, /useDecisionCenterStore\.getState\(\)\.open\(approval\.requestId\)/);
     assert.doesNotMatch(panel, /operatorRespond|\bipcRenderer\b|node:|["']path-[ab]["']/);
+    assert.doesNotMatch(panel + ipc, /startDurableWorkflow|submitDurableStart|pendingDurableStart|ui\.durableWorkflow\.(enable|retryStart)\b/);
+  });
+
+  test("an activation card presents fixed, single-select application options", () => {
+    const request = {
+      kind: "choice", cardKind: "workflow-start", application: true,
+      options: [{ id: "approve-workflow-start" }, { id: "reject-workflow-start" }],
+    };
+    assert.equal(isWorkflowStartCard(request), true);
+    assert.equal(isWorkflowStartCard({ ...request, application: false }), false);
+    assert.equal(isWorkflowStartCard({ ...request, multiple: true }), false);
+    assert.equal(isWorkflowStartCard({ ...request, options: [request.options[0], request.options[0]] }), false);
   });
 
   test("workflow controls and status labels resolve in both supported locales", async () => {
@@ -62,7 +77,7 @@ if (!process.versions.electron) {
   });
 
   // The general test suite runs before the renderer build. Opt into this scenario with a built bundle.
-  test("task drawer exercises the built renderer, preload and release card in Electron", {
+  test("task drawer exercises activation and release cards through the built renderer and preload", {
     skip: process.env.ANS_DURABLE_RENDERER_SMOKE !== "1",
   }, async () => {
     const electron = (await import("electron")).default as unknown as string;
@@ -85,11 +100,24 @@ if (!process.versions.electron) {
   const { app, BrowserWindow, ipcMain } = await import("electron");
   app.setPath("userData", process.argv[2]!);
   const ok = <T>(value: T) => ({ ok: true, value });
-  const definition = { id: "path-b", name: "Path B preset", source: "preset", file: "path-b.yaml", version: 2, digest };
-  const presetA = { id: "path-a", name: "Path A preset", source: "preset", file: "path-a.yaml", version: 2, digest: "e".repeat(64) };
+  const definition = { id: "path-b", name: "Path B preset", source: "preset", file: "path-b.yaml", version: 2, digest } as const;
+  const presetA = { id: "path-a", name: "Path A preset", source: "preset", file: "path-a.yaml", version: 2, digest: "e".repeat(64) } as const;
   const imported = {
     id: "third-graph", name: "Local workflow", source: "project", file: "third-graph.yaml", version: 9, digest: "f".repeat(64),
-  };
+  } as const;
+  const proposal = (definition: DesktopWorkflowStartProposal["definition"], key: string): DesktopWorkflowStartProposal => ({
+    activationId: `activate-${key}`,
+    requestId: `workflow-card-${key}`,
+    generation: 1,
+    state: "pending",
+    definition,
+    requirement: { text: `Original customer request for ${key}\nSecond line preserved` },
+    reason: `The Chief selected ${definition.name} because it fits this project.`,
+    createdAt: "2026-11-17T03:30:00.000Z",
+  });
+  const activationA = proposal(presetA, "a");
+  const activationB = proposal(definition, "b");
+  const activationThird = proposal(imported, "third");
   const invalid = { id: "bad", source: "project", file: "bad.yaml", error: {
     code: "definition-invalid", path: "$.steps.impact.on", message: "Missing outcome branch",
   } };
@@ -136,6 +164,7 @@ if (!process.versions.electron) {
     import: [] as unknown[],
     projection: [] as unknown[],
     start: [] as unknown[],
+    revoke: [] as unknown[],
     operator: [] as unknown[],
     readDelivery: [] as unknown[],
     ackDelivery: [] as unknown[],
@@ -143,12 +172,10 @@ if (!process.versions.electron) {
   let pickedRoot = root;
   let hasInstance = false;
   let connected = true;
-  let dropNextStart = true;
   let pauseRead: Promise<void> | undefined;
   let failRead = false;
   let failAck = true;
   let emptyInstance: Record<string, unknown> | undefined;
-  let occupied = true;
   let projectA: "missing" | "valid" | "invalid" = "missing";
   let importMode: "cancel" | "success" | "conflict" = "cancel";
   let importedOnDisk = false;
@@ -237,48 +264,39 @@ if (!process.versions.electron) {
       }
       return ok(presetA);
     }
+    if (input.definitionId === imported.id) return ok(imported);
     return ok(definition);
   });
   ipcMain.handle("durable-workflow:start", (_, input) => {
     calls.start.push(input);
-    if (input.projectRoot === emptyRoot) {
-      if (occupied) return { ok: false, code: "workflow-workspace-busy", message: "The project is occupied by another workflow." };
-      const selected = input.definitionId === imported.id ? imported : presetA;
-      emptyInstance = {
-        ...instance,
-        instanceId: "dw-pre-git-fixture",
-        definitionId: selected.id,
-        definitionName: selected.name,
-        definitionVersion: selected.version,
-        definitionDigest: selected.digest,
-        definitionSource: selected.source,
-        schema: 2,
-        stepId: "before-baseline",
-        stepName: "Before baseline",
-        status: "waiting",
-        action: "confirm-intent",
-        flowId: "flow-pre-git",
-        approval: undefined,
-        waiting: "Awaiting intent confirmation",
-        pendingTasks: [
-          { taskId: "task-standards", roleId: "verifier", stepId: "review-work", attempt: 1, state: "reported" },
-          { taskId: "task-already-accepted", roleId: "verifier", stepId: "previous", attempt: 1, state: "accepted" },
-        ],
-      };
-      return ok({ controlPlane: { state: "ready" }, instance: emptyInstance });
-    }
-    if (dropNextStart) {
-      dropNextStart = false;
-      return { ok: false, code: "workflow-operation-failed", message: "Start response was lost" };
-    }
-    hasInstance = true;
-    return ok(projection());
+    return { ok: false, code: "workflow-start-confirmation-required", message: "Activation requires the customer card." };
+  });
+  ipcMain.handle("durable-workflow:start-proposals", (_, input) => ok(input.projectRoot === emptyRoot
+    ? [activationA, activationB, ...(importedOnDisk ? [activationThird] : [])]
+    : []));
+  ipcMain.handle("durable-workflow:start-proposal-revoke", (_, input) => {
+    calls.revoke.push(input);
+    assert.deepEqual(input, { projectRoot: emptyRoot, activationId: activationThird.activationId, requestId: activationThird.requestId });
+    activationThird.state = "revoked";
+    activationThird.decision = { action: "revoke", source: "customer", at: "2026-11-17T03:36:00.000Z" };
+    return ok(activationThird);
   });
   ipcMain.handle("session:operator-response", (_, input) => {
     calls.operator.push(input);
     if (input.id === requestId) {
       instance.approval.status = "reject";
       instance.status = "stopped";
+    }
+    if (input.id === activationA.requestId) {
+      assert.deepEqual(input.decision, { kind: "choice", selected: ["approve-workflow-start"] });
+      activationA.state = "approved";
+      activationA.decision = { action: "approve", source: "customer", at: "2026-11-17T03:34:00.000Z" };
+      activationA.startup = { state: "waiting" };
+    }
+    if (input.id === activationB.requestId) {
+      assert.deepEqual(input.decision, { kind: "choice", selected: ["reject-workflow-start"] });
+      activationB.state = "rejected";
+      activationB.decision = { action: "reject", source: "customer", at: "2026-11-17T03:35:00.000Z" };
     }
     return { ok: true };
   });
@@ -342,11 +360,20 @@ if (!process.versions.electron) {
         select.dispatchEvent(new Event("change", { bubbles: true }));
       }`);
     };
-    const typeSummary = (text: string) => js(`{
-      const field = ${panel}.querySelector("textarea");
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(field, ${JSON.stringify(text)});
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-    }`);
+    const openDefinitions = () => click("[data-workflow-definitions] > summary");
+    const proposalElement = (record: DesktopWorkflowStartProposal) =>
+      `document.querySelector('[data-workflow-start-proposal="${record.activationId}"]')`;
+    const proposalState = (record: DesktopWorkflowStartProposal, state: string) =>
+      waitFor(`${proposalElement(record)}?.dataset.proposalState === ${JSON.stringify(state)}`);
+    const presentActivation = (record: DesktopWorkflowStartProposal) => page.send("session:operator-request", {
+      id: record.requestId, projectRoot: emptyRoot, roleId: "chief",
+      request: {
+        kind: "choice", cardKind: "workflow-start", application: true,
+        title: "Confirm workflow activation",
+        preview: [record.requirement.text, record.reason, record.definition.name, record.definition.digest].join("\n"),
+        options: [{ id: "approve-workflow-start", label: "Confirm activation" }, { id: "reject-workflow-start", label: "Do not activate" }],
+      },
+    });
     const pickProject = async () => {
       await click("#btn-import");
       await waitFor(`document.getElementById("project-path").textContent === ${JSON.stringify(pickedRoot)}`);
@@ -369,34 +396,25 @@ if (!process.versions.electron) {
     assert.equal(calls.list.length, 0);
     await click("[data-durable-workflow] > summary");
     await includes("This project has no durable workflow instance.");
+    await includes("This project has no activation proposals.");
     assert.equal(calls.list.length, 0);
-    assert.equal(calls.start.length, 0);
+    assert.equal(await js(`${panel}.querySelectorAll('textarea, input[type="checkbox"]').length`), 0);
 
-    await click('[data-durable-workflow] input[type="checkbox"]');
+    await openDefinitions();
     await select("project:bad.yaml");
     await includes("$.steps.impact.on");
     await clickButton("Validate YAML");
     await includes("Missing outcome branch");
-    assert.equal(await js(`${button("Start instance")}.disabled`), true);
+    assert.equal(await js(`Boolean(${button("Start instance")})`), false);
     assert.equal(calls.start.length, 0);
 
     await select("preset:path-b.yaml");
     await clickButton("Validate YAML");
     await includes("Definition validated");
     await includes(digest);
-    await typeSummary("  Review the workflow  ");
-    await clickButton("Start instance");
-    await includes("The start result is unknown.");
-    assert.equal(calls.start.length, 1);
-    await clickButton("Retry start");
+    hasInstance = true;
     await includes(instanceId);
-    assert.equal(calls.start.length, 2);
-    assert.deepEqual(calls.start[0], calls.start[1]);
-    assert.deepEqual(calls.start[0], {
-      projectRoot: root, definitionId: definition.id, source: "preset", expectedDigest: digest, enabled: true,
-      summary: "Review the workflow", requestId: (calls.start[0] as { requestId: string }).requestId,
-    });
-    assert.match((calls.start[0] as { requestId: string }).requestId, /^[0-9a-f-]{36}$/);
+    assert.equal(calls.start.length, 0);
     assert.deepEqual(calls.validation, [
       { projectRoot: root, definitionId: invalid.id, source: "project", expectedDigest: undefined },
       { projectRoot: root, definitionId: definition.id, source: "preset", expectedDigest: digest },
@@ -409,10 +427,10 @@ if (!process.versions.electron) {
     await includes("Port unavailable");
     await includes("Waiting for the local engine");
     await includes("Waiting to reconnect");
-    assert.equal(calls.start.length, 2);
+    assert.equal(calls.start.length, 0);
     connected = true;
     await waitFor(`!${panel}.textContent.includes("Port unavailable")`);
-    assert.equal(calls.start.length, 2);
+    assert.equal(calls.start.length, 0);
 
     page.send("session:operator-request", {
       id: requestId, projectRoot: root, roleId: "chief",
@@ -430,14 +448,14 @@ if (!process.versions.electron) {
     await includes("Customer rejected");
     assert.deepEqual(calls.operator, [{ id: requestId, decision: { kind: "choice", selected: ["reject-merge-main"] } }]);
 
-    // A fresh renderer queries the existing instance without enable or start.
+    // A fresh renderer still queries the existing instance and release note.
     await window.loadFile(join(repo, "app/renderer/dist/index.html"));
     await pickProject();
     await click("[data-durable-workflow] > summary");
     await includes(instanceId);
-    assert.equal(await js(`${panel}.querySelector('input[type="checkbox"]').checked`), false);
+    assert.equal(await js(`${panel}.querySelector('input[type="checkbox"]') === null`), true);
     assert.equal(calls.list.length, 1);
-    assert.equal(calls.start.length, 2);
+    assert.equal(calls.start.length, 0);
 
     await findInstance(closedInstanceId);
     await click("[data-durable-scope-decision] > summary");
@@ -524,27 +542,90 @@ if (!process.versions.electron) {
     assert.equal(await js('Boolean(document.querySelector("[data-delivery-explanation]"))'), false);
     assert.equal(calls.ackDelivery.length, 2);
     assert.equal(calls.list.length, 1);
-    assert.equal(calls.start.length, 2);
+    assert.equal(calls.start.length, 0);
 
     await click("#drawer-close");
     pickedRoot = emptyRoot;
     await pickProject();
     await click("[data-durable-workflow] > summary");
-    await click('[data-durable-workflow] input[type="checkbox"]');
+    await openDefinitions();
     await select("preset:path-a.yaml");
     await includes(presetA.name);
     await includes(definition.name);
     await includes("Bundled preset");
     await clickButton("Validate YAML");
     await includes("Definition validated");
-    await typeSummary("Start from a directory before Git");
-    await clickButton("Start instance");
-    await includes("workflow-workspace-busy");
     assert.equal(calls.copy.length, 0);
     assert.equal(calls.import.length, 0);
     assert.equal(emptyInstance, undefined);
-    occupied = false;
-    await clickButton("Start instance");
+    assert.deepEqual(calls.validation.at(-1), {
+      projectRoot: emptyRoot, definitionId: presetA.id, source: "preset", expectedDigest: presetA.digest,
+    });
+    await proposalState(activationA, "pending");
+    await click(`[data-workflow-start-proposal="${activationA.activationId}"] > summary`);
+    for (const value of [activationA.requirement.text, activationA.reason, activationA.definition.digest, activationA.requestId]) {
+      await includes(value);
+    }
+    presentActivation(activationA);
+    await waitFor(`document.querySelector("#decision-dialog")?.dataset.requestId === ${JSON.stringify(activationA.requestId)}`);
+    assert.equal(await js('document.querySelector("#decision-dialog .dd-submit").disabled'), true);
+    assert.equal(await js('document.querySelector("#decision-dialog input:checked") === null'), true);
+    await click("#decision-dialog .dd-later");
+    await proposalState(activationA, "pending");
+    assert.equal(calls.operator.length, 1);
+
+    await click("#drawer-close");
+    pickedRoot = otherRoot;
+    await pickProject();
+    await click("[data-durable-workflow] > summary");
+    await includes("This project has no activation proposals.");
+    assert.equal(await js(`Boolean(${proposalElement(activationA)})`), false);
+    await click("#drawer-close");
+    pickedRoot = emptyRoot;
+    await pickProject();
+    await click("[data-durable-workflow] > summary");
+    await proposalState(activationA, "pending");
+    page.send("session:operator-queued", { id: activationB.requestId, projectRoot: emptyRoot, roleId: "chief" });
+    await waitFor(`${proposalElement(activationB)}?.textContent.includes("Queued")`);
+    assert.equal(await js(`Array.from(${proposalElement(activationB)}.querySelectorAll("button")).some(button => button.textContent === "Open")`), false);
+    presentActivation(activationA);
+    await click("#decision-dialog .dd-later");
+    await click(`[data-workflow-start-proposal="${activationA.activationId}"] > summary`);
+    await clickButton("Open");
+    await waitFor(`document.querySelector("#decision-dialog")?.dataset.requestId === ${JSON.stringify(activationA.requestId)}`);
+    await click('#decision-dialog input[value="approve-workflow-start"]');
+    await click("#decision-dialog .dd-submit");
+    await proposalState(activationA, "approved");
+    await includes("Approved, awaiting startup");
+    assert.equal(emptyInstance, undefined);
+    assert.equal(calls.start.length, 0);
+    activationA.startup = { state: "blocked", code: "workflow-workspace-busy", message: "Another workflow has the project" };
+    await includes("Another workflow has the project");
+    emptyInstance = {
+      ...instance,
+      instanceId: "dw-pre-git-fixture",
+      definitionId: presetA.id,
+      definitionName: presetA.name,
+      definitionVersion: presetA.version,
+      definitionDigest: presetA.digest,
+      definitionSource: presetA.source,
+      schema: 2,
+      stepId: "before-baseline",
+      stepName: "Before baseline",
+      status: "waiting",
+      action: "confirm-intent",
+      flowId: "flow-pre-git",
+      approval: undefined,
+      waiting: "Awaiting intent confirmation",
+      pendingTasks: [
+        { taskId: "task-standards", roleId: "verifier", stepId: "review-work", attempt: 1, state: "reported" },
+        { taskId: "task-already-accepted", roleId: "verifier", stepId: "previous", attempt: 1, state: "accepted" },
+      ],
+    };
+    activationA.state = "started";
+    activationA.instanceId = "dw-pre-git-fixture";
+    activationA.startup = { state: "created" };
+    await includes("Instance created, awaiting scheduling");
     await includes("dw-pre-git-fixture");
     await includes("flow-pre-git");
     await includes("Before baseline");
@@ -552,11 +633,16 @@ if (!process.versions.electron) {
     await includes("task-standards");
     await includes("Report submitted");
     assert.equal(await js(`${panel}.textContent.includes("task-already-accepted")`), false);
-    assert.deepEqual(calls.validation.at(-1), {
-      projectRoot: emptyRoot, definitionId: presetA.id, source: "preset", expectedDigest: presetA.digest,
-    });
-    assert.equal(calls.copy.length, 0);
-    assert.equal(calls.import.length, 0);
+    activationA.startup = { state: "scheduled" };
+    await waitFor(`${proposalElement(activationA)}?.dataset.startupState === "scheduled"`);
+    presentActivation(activationB);
+    await waitFor(`document.querySelector("#decision-dialog")?.dataset.requestId === ${JSON.stringify(activationB.requestId)}`);
+    await click("#decision-dialog .dd-reject");
+    await proposalState(activationB, "rejected");
+    assert.deepEqual(calls.operator.slice(1), [
+      { id: activationA.requestId, decision: { kind: "choice", selected: ["approve-workflow-start"] } },
+      { id: activationB.requestId, decision: { kind: "choice", selected: ["reject-workflow-start"] } },
+    ]);
 
     // A pre-baseline instance and independent task remain discoverable through the same project entry.
     await window.loadFile(join(repo, "app/renderer/dist/index.html"));
@@ -564,8 +650,9 @@ if (!process.versions.electron) {
     await click("[data-durable-workflow] > summary");
     await includes("dw-pre-git-fixture");
     await includes("task-standards");
-    assert.equal(await js(`${panel}.querySelector('input[type="checkbox"]').checked`), false);
-    assert.equal(calls.start.length, 4);
+    await proposalState(activationA, "started");
+    assert.equal(await js(`${panel}.querySelector('input[type="checkbox"]') === null`), true);
+    assert.equal(calls.start.length, 0);
 
     for (const card of [
       { id: "approval-a3", request: { kind: "confirm", title: "Confirm current intent", cardKind: "intent-confirm" } },
@@ -583,13 +670,13 @@ if (!process.versions.electron) {
       }
       await waitFor('!document.querySelector("#decision-dialog")');
     }
-    assert.deepEqual(calls.operator.slice(1), [
+    assert.deepEqual(calls.operator.slice(3), [
       { id: "approval-a3", decision: { kind: "confirm", confirmed: true } },
       { id: "approval-a6", decision: { kind: "confirm", confirmed: true } },
       { id: "approval-a10", decision: { kind: "choice", selected: ["operator"] } },
     ]);
 
-    await click('[data-durable-workflow] input[type="checkbox"]');
+    await openDefinitions();
     await select("preset:path-a.yaml");
     await clickButton("Copy preset to project");
     await waitFor(`${panel}.querySelector("select")?.value === "project:path-a.yaml"`);
@@ -606,14 +693,14 @@ if (!process.versions.electron) {
     await click("[data-durable-workflow] .ps-refresh");
     await includes("Invalid project workflow body");
     await includes("$.steps.start");
-    assert.equal(await js(`${button("Start instance")}.disabled`), true);
+    assert.equal(await js(`Boolean(${button("Start instance")})`), false);
     assert.equal(await js(`${panel}.querySelector("select").value`), "project:path-a.yaml");
     assert.equal(await js(`Array.from(${panel}.querySelector("select").options).some(option => option.value === "preset:path-a.yaml")`), false);
     projectA = "missing";
     await click("[data-durable-workflow] .ps-refresh");
     await includes("The selected definition is unavailable.");
     assert.equal(await js(`${panel}.querySelector("select").value`), "project:path-a.yaml");
-    assert.equal(await js(`${button("Start instance")}.disabled`), true);
+    assert.equal(await js(`Boolean(${button("Start instance")})`), false);
 
     await clickButton("Import YAML");
     await waitFor(`${button("Import YAML")} && !${button("Import YAML")}.disabled`);
@@ -621,21 +708,23 @@ if (!process.versions.electron) {
     importMode = "conflict";
     await clickButton("Import YAML");
     await includes("definition-id-conflict");
-    assert.equal(calls.start.length, 4);
+    assert.equal(calls.start.length, 0);
     importMode = "success";
     await clickButton("Import YAML");
     await includes(imported.name);
     await waitFor(`${panel}.querySelector("select")?.value === "project:third-graph.yaml"`);
     await includes(imported.digest);
-    await typeSummary("Run the imported graph");
-    await clickButton("Start instance");
-    await waitFor(`${panel}.textContent.includes("Local workflow · third-graph")`);
-    assert.equal(calls.start.length, 5);
-    const lastStart = calls.start.at(-1) as Record<string, unknown>;
-    assert.deepEqual(lastStart, {
+    await clickButton("Validate YAML");
+    await includes("Definition validated");
+    assert.deepEqual(calls.validation.at(-1), {
       projectRoot: emptyRoot, definitionId: imported.id, source: "project", expectedDigest: imported.digest,
-      enabled: true, summary: "Run the imported graph", requestId: lastStart.requestId,
     });
+    await proposalState(activationThird, "pending");
+    await click(`[data-workflow-start-proposal="${activationThird.activationId}"] > summary`);
+    await clickButton("Revoke activation proposal");
+    await proposalState(activationThird, "revoked");
+    assert.equal(calls.revoke.length, 1);
+    assert.equal(calls.start.length, 0);
     assert.equal(calls.copy.length, 1);
     assert.equal(calls.import.length, 3);
     window.destroy();

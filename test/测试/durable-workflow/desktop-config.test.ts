@@ -62,7 +62,7 @@ test("Desktop keeps an active read-only definition pinned when external YAML is 
   const handle = await app(f, model, log);
   t.after(() => { hold.resolve(); return handle.close(); });
   const selector = { projectRoot: f.root };
-  const start = async (requestId: string) => handle.desktop.startDurableWorkflow({ ...selector, definitionId, enabled: true,
+  const start = async (requestId: string) => handle.startViaChief({ ...selector, definitionId, enabled: true,
     requestId, summary: "Read the collision threshold with the existing module owner" });
   const initial = unwrap(await start("w5-old-definition")).instance!;
   const projection = async (instanceId: string) => unwrap(await handle.desktop.getDurableWorkflowProjection({ ...selector, instanceId }));
@@ -128,7 +128,7 @@ for (const winner of ["project", "preset"] as const) test(`Windows active ${winn
   const active = await app(f, activeModel, log);
   t.after(() => active.close());
   const selection = { projectRoot: f.root, definitionId: "path-b", enabled: true };
-  const winningInstance = unwrap(await active.desktop.startDurableWorkflow({ ...selection, source: winner,
+  const winningInstance = unwrap(await active.startViaChief({ ...selection, source: winner,
     requestId: "w5-active-owner", summary: "Review the applicable existing file" })).instance;
   assert.ok(winningInstance);
   const ready = await until("the winner's scheduled native Workflow", async () => {
@@ -142,7 +142,7 @@ for (const winner of ["project", "preset"] as const) test(`Windows active ${winn
   const contenderModel = modelFixture(async () => assert.fail("A conflicting executor must stay outside role execution"), log);
   const contender = await app({ directory: contenderDirectory, root: f.root, userDataRoot: path.join(contenderDirectory, "data") }, contenderModel, log);
   t.after(() => contender.close());
-  const result = await contender.desktop.startDurableWorkflow({ ...selection, source: winner === "project" ? "preset" : "project",
+  const result = await contender.startViaChief({ ...selection, source: winner === "project" ? "preset" : "project",
     requestId: "w5-different-executor", summary: "This second executor must respect the original owner" });
   assert.equal(result.ok, false, JSON.stringify(result));
   const contenderStore = await contender.durable.store();

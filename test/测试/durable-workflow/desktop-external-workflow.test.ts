@@ -171,16 +171,16 @@ for (const branch of ["read-only", "authorized-write", "bundled-b"] as const) te
   if (!bundledB) assert.equal((await handle.desktop.importDurableWorkflow({ projectRoot })).ok, false);
   const before = await trackedAndBusinessState(f.root);
   const initialRuntimeFiles = await applicationRuntimeFiles(f.root);
-  const definition = { definitionId: selectedId, source: "project", expectedDigest: imported.digest };
+  const definition = { definitionId: selectedId, source: "project" as const, expectedDigest: imported.digest };
   const validation = unwrap(await handle.desktop.validateDurableWorkflow({ projectRoot, ...definition }));
   assert.equal(validation.digest, imported.digest);
-  const staleSelection = await handle.desktop.startDurableWorkflow({ projectRoot, ...definition, expectedDigest: "0".repeat(64), enabled: true,
+  const staleSelection = await handle.startViaChief({ projectRoot, ...definition, expectedDigest: "0".repeat(64), enabled: true,
     requestId: "w5-no-stale-selection", summary: "A stale selection cannot start a new instance" });
   assert.equal(staleSelection.ok, false, JSON.stringify(staleSelection));
   if (!staleSelection.ok) assert.equal(staleSelection.code, "definition-digest-changed");
   assert.equal((await readTaskState(f.root)).records.size, 0);
   log("external-stale-selection-rejected", staleSelection);
-  const started = unwrap(await handle.desktop.startDurableWorkflow({ projectRoot, ...definition, enabled: true,
+  const started = unwrap(await handle.startViaChief({ projectRoot, ...definition, enabled: true,
     requestId: `w5-external-${branch}`, summary: branch === "read-only" ? "Inspect the current threshold without changing it" : "Fix the existing threshold from 1 to 2" }));
   assert.ok(started.instance);
   const { instanceId } = started.instance;
@@ -289,9 +289,9 @@ test("Windows existing-change graph refuses a new empty project without creating
   const model = modelFixture(async () => assert.fail("An ineligible new project must stay outside role execution"), log);
   const handle = await app(f, model, log, { pickWorkflowDefinition: async () => definitionPath });
   t.after(() => handle.close());
-  const selection = { projectRoot: f.root, definitionId, source: "project" };
+  const selection = { projectRoot: f.root, definitionId, source: "project" as const };
   const installed = unwrap(await handle.desktop.importDurableWorkflow({ projectRoot: f.root }));
-  const rejected = await handle.desktop.startDurableWorkflow({ ...selection, enabled: true, requestId: "w5-new-project-ineligible",
+  const rejected = await handle.startViaChief({ ...selection, enabled: true, requestId: "w5-new-project-ineligible",
     expectedDigest: installed.digest, summary: "Create a new module with no existing project baseline" });
   assert.equal(rejected.ok, false);
   if (!rejected.ok) assert.equal(rejected.code, "workflow-existing-change-unavailable");
@@ -327,10 +327,10 @@ test("Windows verified stop releases the original v2 owner for a different saved
   t.after(() => next.close());
   const alternative = unwrap(await next.desktop.importDurableWorkflow({ projectRoot }));
   const initial = await trackedAndBusinessState(projectRoot);
-  const started = unwrap(await handle.desktop.startDurableWorkflow({ projectRoot, definitionId: firstId, source: "project", expectedDigest: stopGraph.digest,
+  const started = unwrap(await handle.startViaChief({ projectRoot, definitionId: firstId, source: "project", expectedDigest: stopGraph.digest,
     requestId: "w5-stop-original", enabled: true, summary: "Inspect the existing threshold, then finish only after operations verifies no work remains" })).instance!;
   scenario.bind(handle, started.instanceId, initial);
-  const startAlternative = () => next.desktop.startDurableWorkflow({ projectRoot, definitionId: nextId, source: "project", expectedDigest: alternative.digest,
+  const startAlternative = () => next.startViaChief({ projectRoot, definitionId: nextId, source: "project", expectedDigest: alternative.digest,
     requestId: "w5-after-verified-stop", enabled: true, summary: "Begin a separate review after the earlier operation has come to a verified stop" });
   await until("actual stop-verification role before report submission", async () => atStop ? true : undefined, scenario.model.errors);
   const refused = await startAlternative();
@@ -373,7 +373,7 @@ for (const deniedPurpose of ["new-work", "untracked-file"] as const) test(`Windo
   const projectRoot = f.root;
   const definition = unwrap(await handle.desktop.importDurableWorkflow({ projectRoot }));
   const before = await trackedAndBusinessState(projectRoot);
-  const started = unwrap(await handle.desktop.startDurableWorkflow({ projectRoot, definitionId, source: "project", expectedDigest: definition.digest,
+  const started = unwrap(await handle.startViaChief({ projectRoot, definitionId, source: "project", expectedDigest: definition.digest,
     requestId: `w5-existing-purpose-${deniedPurpose}`, enabled: true,
     summary: deniedPurpose === "new-work" ? "Use the full new-work governance to create an unrelated new module" : "Review the purported current behavior in src/core/absent.ts" }));
   assert.ok(started.instance);

@@ -8,9 +8,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCustomerInputChannel, MERGE_MAIN_OPTION_IDS, type OperatorRequestPayload } from "../../../app/desktop/customer-input.ts";
 import { createDesktopInterface } from "../../../app/desktop/interface.ts";
-import { DesktopDurableWorkflow } from "../../../app/desktop/durable-workflow.ts";
+import { DesktopDurableWorkflow, type DesktopDurableView } from "../../../app/desktop/durable-workflow.ts";
 import { buildDesktopShellArming } from "../../../app/desktop/operator-channel.ts";
 import { createDesktopBaselineGitPort } from "../../../app/desktop/workflow-git.ts";
+import { WORKFLOW_START_OPTION_IDS, type DesktopWorkflowStartProposal } from "../../../app/desktop/workflow-chief-start.ts";
 import { createEventQueue } from "../../../src/common/runtime-core/event-queue.ts";
 import { createNetworkGate } from "../../../src/common/runtime-core/network-gate.ts";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
@@ -102,6 +103,7 @@ export type Log = (event: string, value: unknown) => void;
 export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Log) {
   let sequence = 0;
   const errors: unknown[] = [];
+  const ordinaryChiefTurns = new Map<string, (turn: ModelTurn) => Promise<void>>();
   const factory: RuntimeProviderFactory = options => ({
     async composeContext() { return { systemPrompt: "Deterministic W5 model transport fixture" }; },
     async bindRole(role) {
@@ -117,7 +119,8 @@ export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Lo
           const toolNames = options.tools.map(tool => tool.name);
           log("model-turn", { roleId, turnId, text, tools: toolNames });
           try {
-            await script({ roleId, text, turnId, signal: abort.signal, toolNames, async call(name, args) {
+            const next = roleId === "chief" ? ordinaryChiefTurns.get(text) ?? script : script;
+            await next({ roleId, text, turnId, signal: abort.signal, toolNames, async call(name, args) {
               const tool = options.tools.find(candidate => candidate.name === name);
               assert.ok(tool, `${roleId} missing actual ${name} capability`);
               const toolCallId = `w5-${++sequence}`;
@@ -138,7 +141,7 @@ export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Lo
       };
     },
   });
-  return { factory, errors };
+  return { factory, errors, ordinaryChiefTurns };
 }
 
 type PathBHooks = {
@@ -205,6 +208,15 @@ type AppFixtureOptions = {
   pickWorkflowDefinition?: () => Promise<string | null>;
   bundleResources?: string;
 };
+type ChiefStartInput = {
+  projectRoot?: string;
+  definitionId: string;
+  source?: "project" | "preset";
+  expectedDigest?: string;
+  summary: string;
+  requestId?: string;
+  enabled?: boolean;
+};
 
 export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFixture>, log: Log, options: AppFixtureOptions = {}) {
   const { bundleResources, pickWorkflowDefinition } = options;
@@ -248,6 +260,7 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
     runtimeOptions: { providerFactories: { pi: model.factory }, persistSession: true, networkGate },
     resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "selected", skipped: [] }),
     customerInput: channel.customerInput,
+    hasPendingProjectCard: root => channel.hasPendingProjectCard(root),
     shellArming: shellArming(),
     shellOperatorChannel: () => ({ outcome: "unavailable", reason: "W5 disables arbitrary shell escalation" }),
   });
@@ -255,16 +268,70 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
   assert.equal(await desktop.pickProject(), f.root);
   const listing = await desktop.listProject({ projectRoot: f.root });
   if ("baselineOid" in f) assert.ok(listing.roles.some(role => role.roleId === "worker"), JSON.stringify(listing.roles));
-  return { desktop, durable, cards, listing,
+  const project = { projectRoot: f.root };
+  const listProposals = async () => unwrap(await desktop.listWorkflowStartProposals(project));
+  async function proposeViaChief(input: ChiefStartInput): Promise<DurableResult<DesktopWorkflowStartProposal>> {
+    const { definitionId, source, expectedDigest, summary, requestId } = input;
+    if (input.projectRoot !== undefined) assert.equal(input.projectRoot, f.root);
+    const selection = await desktop.validateDurableWorkflow({ ...project, definitionId, source });
+    if (!selection.ok && (!expectedDigest || !source)) return selection;
+    const digest = expectedDigest ?? (selection.ok ? selection.value.digest : undefined);
+    const definitionSource = source ?? (selection.ok ? selection.value.source : undefined);
+    assert.ok(digest && definitionSource);
+    const target = { ...project, roleId: "chief", runtime: "pi" as const };
+    const opened = await desktop.openSession(target);
+    assert.equal(opened.ok, true, JSON.stringify(opened));
+    let receipt: ToolResult | undefined;
+    assert.equal(model.ordinaryChiefTurns.has(summary), false, "one fixture should register one handler per live input");
+    model.ordinaryChiefTurns.set(summary, async turn => {
+      await successful(turn, "project_state", { definitionId });
+      receipt = await turn.call("request_workflow_start", { definitionId, source: definitionSource, expectedDigest: digest,
+        reason: `The selected definition ${definitionId} covers this isolated customer request.` });
+    });
+    try {
+      const sent = await desktop.sendSession({ text: summary, target, ...(requestId ? { metadata: { clientMessageId: requestId } } : {}) }, () => true);
+      assert.equal(sent.ok, true, JSON.stringify(sent));
+      const reply = await until("the ordinary Chief's actual startup tool receipt", async () => receipt, model.errors);
+      if (!reply.ok) {
+        const code = /request_workflow_start：([a-z][a-z-]+) ·/.exec(reply.message ?? "")?.[1] ?? "workflow-start-tool-refused";
+        return { ok: false, code, message: reply.message ?? "The actual Chief tool refused the proposal." };
+      }
+      const id = /"activationId":"([^"]+)"/.exec(reply.message ?? "")?.[1];
+      assert.ok(id, reply.message);
+      const proposal = await until("the authorized proposal is visible", async () => (await listProposals()).find(row => row.activationId === id), model.errors);
+      return { ok: true, value: proposal };
+    } finally {
+      model.ordinaryChiefTurns.delete(summary);
+    }
+  }
+  async function startViaChief(input: ChiefStartInput): Promise<DurableResult<DesktopDurableView>> {
+    const proposed = await proposeViaChief(input);
+    if (!proposed.ok) return proposed;
+    const requestId = proposed.value.requestId;
+    const card = await until("the application's personal startup card", async () => cards.get(requestId), model.errors);
+    assert.equal(card.request.cardKind, "workflow-start");
+    const reply = { id: card.id, decision: { kind: "choice", selected: [WORKFLOW_START_OPTION_IDS[0]] } };
+    const receipt = await channel.respondDurable(reply, () => true);
+    log("customer-receipt", { input: reply, result: receipt });
+    assert.ok(receipt?.ok, JSON.stringify(receipt));
+    cards.delete(card.id);
+    const activated = await until("the approved proposal creates one instance or reports a blocker", async () => {
+      const row = (await listProposals()).find(item => item.activationId === proposed.value.activationId);
+      return row?.instanceId || row?.startup?.state === "blocked" ? row : undefined;
+    }, model.errors);
+    if (!activated.instanceId) return { ok: false, code: activated.startup?.code ?? "workflow-start-blocked", message: activated.startup?.message ?? "The approved start is blocked." };
+    return desktop.getDurableWorkflowProjection({ ...project, instanceId: activated.instanceId });
+  }
+  return { desktop, durable, cards, listing, proposeViaChief, startViaChief,
     simulateNetwork(online: boolean) {
       const state = { online, source: "main-net", reason: online ? "resume" : "interface-down", at: Date.now(), stableForMs: 0 } as const;
       networkGate.apply(state);
       desktop.applyNetworkState(state);
       log("model-network-state-injected", state);
     },
-    async respond(id: string, selected: string | readonly string[]) {
+    async respond(id: string, selected: string | readonly string[], isMainFrameCurrent?: () => boolean) {
       const input = { id, decision: { kind: "choice", selected: typeof selected === "string" ? [selected] : [...selected] } };
-      const result = await channel.respondDurable(input) ?? await desktop.replayDurableReleaseDecision(input) ?? channel.respond(input);
+      const result = await channel.respondDurable(input, isMainFrameCurrent) ?? await desktop.replayDurableReleaseDecision(input) ?? channel.respond(input);
       log("customer-receipt", { input, result });
       return result;
     },

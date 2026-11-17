@@ -112,6 +112,9 @@ export class LifecycleSend {
       diagnostic.record("session.send.failed", { reasonCode: "session-not-open" });
       return { ok: false, error: mainT("main.session.notOpen") };
     }
+    const candidate = metadata?.workflowInput;
+    const workflowInput = !background && entry.roleId === "chief" && candidate?.projectRoot === entry.projectRoot
+      && candidate.text === text ? candidate : undefined;
     // **同一应用任务已在队列/在途（含直接 send 开跑的那一轮）⇒ 不重复入队/发送**——重建前后、两条应用
     // 链路各调一次时，客户侧只看到一条 user 消息（重复调用方拿到 `duplicate:true`，仍视为已受理）。
     if (appTaskId !== undefined) {
@@ -140,6 +143,7 @@ export class LifecycleSend {
       this.enqueueDelivery(entry.projectRoot, roleId, {
         kind: deliveryKind,
         clientMessageId,
+        ...(workflowInput ? { workflowInput } : {}),
         runtime: entry.runtime,
         targetRoleId: roleId,
         sourceRoleId: roleId,
@@ -166,6 +170,7 @@ export class LifecycleSend {
     if (origin === undefined) return queueBecauseBusy(); // turn lease 争用（同步段不可达；防御：入队不覆盖）
     // Direct and queued inputs retain the same actual source kind, including customer messages.
     origin.kind = deliveryKind;
+    origin.workflowInput = workflowInput;
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准；busy 期间才被读取）
@@ -295,6 +300,9 @@ export class LifecycleSend {
         if (metadata.runtime !== entry.runtime || metadata.roleId !== entry.roleId || typeof metadata.turnId !== "string" || metadata.turnId === "") return;
         if (origin.turnId === undefined) {
           origin.turnId = metadata.turnId;
+          if (origin.workflowInput && origin.kind === "message" && entry.roleId === "chief" && origin.workflowInput.text === text) {
+            origin.workflowInputAck = metadata.turnId;
+          }
           if (creatorReports) origin.creatorReports = structuredClone(creatorReports);
           acceptAssignment();
           entry.origins.byTurn.set(metadata.turnId, origin);

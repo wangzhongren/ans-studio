@@ -65,6 +65,8 @@ contextBridge.exposeInMainWorld("desktop", {
   copyDurableWorkflowPreset: input => ipcRenderer.invoke("durable-workflow:preset-copy", input),
   importDurableWorkflow: input => ipcRenderer.invoke("durable-workflow:import", input),
   startDurableWorkflow: input => ipcRenderer.invoke("durable-workflow:start", input),
+  listWorkflowStartProposals: input => ipcRenderer.invoke("durable-workflow:start-proposals", input),
+  revokeWorkflowStartProposal: input => ipcRenderer.invoke("durable-workflow:start-proposal-revoke", input),
   getDurableWorkflowProjection: input => ipcRenderer.invoke("durable-workflow:projection", input),
   readDurableWorkflowDelivery: input => ipcRenderer.invoke("durable-workflow:delivery-read", input),
   acknowledgeDurableWorkflowDelivery: input => ipcRenderer.invoke("durable-workflow:delivery-acknowledge", input),

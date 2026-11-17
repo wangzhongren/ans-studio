@@ -548,7 +548,7 @@ export class SessionManager {
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async projectStateView(projectRoot: string, scope: { roleId?: string; viewerRoleId?: string; full?: boolean; flowId?: string; now?: Date } = {}): Promise<ProjectStateView> { return this.tasks.projectStateView(projectRoot, scope); }
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
-  private async projectStateTool(projectRoot: string, roleId: string, query: { flowId?: string }): Promise<ProjectStateToolResult> { return this.tasks.projectStateTool(projectRoot, roleId, query); }
+  private async projectStateTool(projectRoot: string, roleId: string, query: { flowId?: string; definitionId?: string }): Promise<ProjectStateToolResult> { return this.tasks.projectStateTool(projectRoot, roleId, query); }
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async projectNote(input: { projectRoot: string; roleId: string; input: ProjectNoteInput }): Promise<ProjectNoteResult> { return this.tasks.projectNote(input); }
   /** 薄委托 → `session/cards/version-decisions.ts`（JSDoc/方法体见模块）。 */

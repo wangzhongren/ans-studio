@@ -3,12 +3,13 @@ import { DURABLE_ACTIVITY_CONTRACT, DURABLE_EXECUTOR, DURABLE_GRAPH_ACTIVITY_CON
 import type {
   DurableCapabilityEvent, DurableDefinitionSelection, DurableDefinitionSnapshot, DurableDelivery, DurableDomainRequest, DurableEffect, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome, DurableEffectRecord,
   DurableEvidenceRef, DurableFact, DurableFactReceipt, DurableInstanceRef, DurableOwner, DurableProjection, DurableResult, DurableStartInput,
+  DurableStartProposal, DurableStartProposalDecisionInput, DurableStartProposalInput,
 } from '../../model/durable-workflow.ts';
 import {
   changeWorkspaceOwner, DurableLedger, definitionFiles, digest, gitRead, pinRepositoryDefinition, readImportedDefinition, readProjectFile, releaseOwner,
   repositoryIdentity, repositoryOwner, reserveOwnerState, reserveWorkspace, saveDefinitionFile, stableJson, workspaceIdentity, workspaceOwner,
 } from '../../provider/durable-workflow/public.ts';
-import type { OutboxItem, StoredInstance, WorkspaceIdentity, WorkspaceReservation } from '../../provider/durable-workflow/public.ts';
+import type { OutboxItem, StoredInstance, StoredStartSelection, WorkspaceIdentity, WorkspaceReservation } from '../../provider/durable-workflow/public.ts';
 import { checkGitProtectionFactsCurrent, readGitProtectionFacts } from '../../provider/trunk/public/trunk-store.ts';
 import { deriveDurablePathBWriteSets, readWorkflowLedger } from '../../common/编排/workflow-service.ts';
 import { loadLatestRoster, reviewRoleIdOfRoster } from '../../common/编排/workflow-preconditions.ts';
@@ -17,6 +18,7 @@ import { WORKFLOW_LEDGER_SCHEMA } from '../../model/runtime.ts';
 import type { WorkflowEvent, WorkflowStage } from '../../model/runtime.ts';
 import { readIntentEntryFacts } from '../../common/shared/intent-entry-contract.ts';
 import { parseDefinition } from './definition.ts';
+import { WorkflowStartActivation } from './activation.ts';
 import { capabilities, graphNeedsWrite } from './capabilities.ts';
 import { admitCapability, applyGraph, capabilityEvidence, graphCardDigest } from './path-a.ts';
 import { graphDocumentRoots, graphImplementationPaths, requiresEffectResolution, takeEffect, settleEffect } from './effects.ts';
@@ -42,10 +44,12 @@ export interface DurableDefinitionEntry {
 }
 
 type Evidence = { ref: DurableEvidenceRef; bytes: Buffer };
+type LoadedDefinitionEntry = DurableDefinitionEntry & { fileDigest?: string };
 const ownerSlot = (definitionId: string): string => definitionId === 'path-b' ? 'path-b' : 'read-only:' + definitionId;
 const fingerprintStart = (input: DurableStartInput) => digest(stableJson([
   input.definitionId, input.source ?? null, input.expectedDigest ?? null, input.customerPurpose ?? null, input.metadata ?? {},
 ]));
+const startContextStale = () => fail('workflow-start-source-stale', '当前项目已变化或原发起回合尚未结束。');
 
 async function trackedFiles(projectRoot: string, head: string, files: readonly string[]): Promise<boolean> {
   if (!oidValid(head) || files.some(file => !safePath(file))) return false;
@@ -64,10 +68,13 @@ function project(ledger: DurableLedger, value: StoredInstance): DurableProjectio
 export class DurableWorkflowService {
   readonly #ledger: DurableLedger;
   readonly #presetRoot?: string;
+  readonly #activation: WorkflowStartActivation;
 
   constructor(dataDir: string, presetRoot?: string) {
     this.#ledger = new DurableLedger(dataDir);
     this.#presetRoot = presetRoot;
+    this.#activation = new WorkflowStartActivation(this.#ledger, (root, id) => this.#selectDefinition(root, id, {}, true),
+      (input, selection, current) => this.#start(input, selection, current));
     try {
       this.#recoverBusinessRecords();
     } catch (error) {
@@ -100,12 +107,16 @@ export class DurableWorkflowService {
   close(): void { this.#ledger.close(); }
 
   async listDefinitions(projectRoot: string): Promise<DurableDefinitionEntry[]> {
+    return (await this.#listDefinitions(projectRoot)).map(({ fileDigest, ...item }) => item);
+  }
+
+  async #listDefinitions(projectRoot: string): Promise<LoadedDefinitionEntry[]> {
     const project = await this.#definitionsFrom(projectRoot, 'project');
     const preset = this.#presetRoot ? await this.#definitionsFrom(this.#presetRoot, 'preset') : [];
     return [...project, ...preset.filter(item => !item.ok || item.definition?.schema === 2)];
   }
 
-  async #definitionsFrom(projectRoot: string, source: 'project' | 'preset'): Promise<DurableDefinitionEntry[]> {
+  async #definitionsFrom(projectRoot: string, source: 'project' | 'preset'): Promise<LoadedDefinitionEntry[]> {
     let files: string[];
     try {
       files = await definitionFiles(projectRoot);
@@ -116,26 +127,31 @@ export class DurableWorkflowService {
     }
     return Promise.all(files.map(async file => {
       try {
-        const result = parseDefinition((await readProjectFile(projectRoot, file, MaxDefinitionBytes)).toString('utf8'));
-        return result.ok ? { file, source, ok: true, definition: result.value } : { file, source, ...result };
+        const bytes = await readProjectFile(projectRoot, file, MaxDefinitionBytes);
+        const result = parseDefinition(bytes.toString('utf8'));
+        return result.ok ? { file, source, ok: true, definition: result.value, fileDigest: digest(bytes) } : { file, source, ...result };
       } catch (error) {
         return { file, source, ok: false, code: 'definition-unreadable', message: message(error) };
       }
     }));
   }
 
-  async #selectDefinition(projectRoot: string, id: string, selection: DurableDefinitionSelection): Promise<DurableResult<DurableDefinitionEntry & { definition: DurableDefinitionSnapshot }>> {
+  async #selectDefinition(projectRoot: string, id: string, selection: DurableDefinitionSelection,
+    requireEffectiveSource = false): Promise<DurableResult<StoredStartSelection>> {
     if (!/^[a-z][a-z0-9-]{0,63}$/.test(id)) return fail('definition-id-invalid', '工作流定义 ID 无效。');
-    const entries = await this.listDefinitions(projectRoot);
+    const entries = await this.#listDefinitions(projectRoot);
+    const unavailable = requireEffectiveSource && entries.find(item => item.source === 'project'
+      && item.file === 'docs/workflows' && !item.ok);
+    if (unavailable) return fail('definition-directory-invalid', unavailable.message ?? '无法核验当前项目的有效工作流来源。');
     const base = 'docs/workflows/' + id;
     const all = entries.filter(item => item.definition?.id === id || item.file === base + '.yaml' || item.file === base + '.yml');
     const source = selection.source ?? (all.some(item => item.source === 'project') ? 'project' : 'preset');
     const matches = all.filter(item => item.source === source);
     if (matches.length > 1) return fail('definition-id-conflict', '项目中多个 YAML 声明相同定义。');
     const entry = matches[0];
-    if (entry?.definition?.id === id) {
+    if (entry?.definition?.id === id && entry.fileDigest) {
       if (selection.expectedDigest !== undefined && entry.definition.digest !== selection.expectedDigest) return fail('definition-digest-changed', '所选定义已修改，请重新校验。');
-      return ok({ ...entry, definition: entry.definition });
+      return ok({ file: entry.file, source, definition: entry.definition, fileDigest: entry.fileDigest });
     }
     if (entry && !entry.ok) {
       return { ok: false, code: entry.code!, message: entry.message!, path: entry.path };
@@ -176,10 +192,35 @@ export class DurableWorkflowService {
     } catch (error) { return fail('definition-import-failed', message(error)); }
   }
 
-  async start(input: DurableStartInput): Promise<DurableResult<DurableProjection>> {
+  proposeWorkflowStart(input: DurableStartProposalInput, current?: () => boolean): Promise<DurableResult<DurableStartProposal>> {
+    return this.#activation.propose(input, current);
+  }
+
+  listWorkflowStartProposals(projectRoot: string): Promise<DurableStartProposal[]> {
+    return this.#activation.list(projectRoot);
+  }
+
+  refreshWorkflowStartProposal(projectRoot: string, activationId: string, current?: () => boolean): Promise<DurableResult<DurableStartProposal>> {
+    return this.#activation.refresh(projectRoot, activationId, current);
+  }
+
+  decideWorkflowStart(input: DurableStartProposalDecisionInput, current?: () => boolean): Promise<DurableResult<DurableStartProposal>> {
+    return this.#activation.decide(input, current);
+  }
+
+  startApprovedWorkflow(projectRoot: string, activationId: string, current?: () => boolean): Promise<DurableResult<DurableStartProposal>> {
+    return this.#activation.startApproved(projectRoot, activationId, current);
+  }
+
+  start(input: DurableStartInput): Promise<DurableResult<DurableProjection>> {
+    return this.#start(input);
+  }
+
+  async #start(input: DurableStartInput, approved?: StoredStartSelection, current?: () => boolean): Promise<DurableResult<DurableProjection>> {
     if (!validKey(input.requestId)) return fail('start-request-invalid', '启动请求缺有效且稳定的操作键。');
     const workspace = await workspaceIdentity(input.projectRoot).catch(() => undefined);
     if (!workspace) return fail('workflow-workspace-invalid', '请选择可核验的工作区根目录。');
+    if (current && !current()) return startContextStale();
     const repo = workspace.repository;
     const ledger = this.#ledger;
     const fingerprint = fingerprintStart(input);
@@ -189,18 +230,28 @@ export class DurableWorkflowService {
         && (input.source === undefined || input.source === (previous.definitionSource ?? 'project'))
         && (input.expectedDigest === undefined || input.expectedDigest === previous.definition.digest))
       ? ok(project(ledger, previous)) : fail('start-key-conflict', '相同启动键已绑定其他请求。');
+    if (approved && ledger.instancesForRoot(workspace.root).some(item => item.status === 'waiting')) {
+      return fail('workflow-workspace-busy', '该项目已有运行中的工作流。');
+    }
+    if (approved) {
+      const legacy = await readWorkflowLedger(workspace.root);
+      const closed = new Set(legacy.events.filter(item => item.kind === 'workflow.closed').map(item => item.workflowId));
+      if (legacy.badLines || legacy.errors.length || legacy.events.some(item => item.kind === 'workflow.started' && !closed.has(item.workflowId))) {
+        return fail('workflow-workspace-busy', '该项目已有活动或待核对的既有工作流。');
+      }
+    }
 
     const heldWorkspace = workspaceOwner(workspace.root);
     if (heldWorkspace?.engine === 'dapr' && heldWorkspace.state === 'reserved' && heldWorkspace.dataDir === ledger.dataDir
       && heldWorkspace.requestId === input.requestId && heldWorkspace.definition?.schema === 2) {
       if (heldWorkspace.fingerprint !== fingerprint) return fail('start-key-conflict', '原申请的来源、摘要或内容已经固定。');
-      return this.#startGraph(workspace, input, heldWorkspace.definition, heldWorkspace.source ?? 'project', heldWorkspace.definitionFile, heldWorkspace);
+      return this.#startGraph(workspace, input, heldWorkspace.definition, heldWorkspace.source ?? 'project', heldWorkspace.definitionFile, heldWorkspace, current);
     }
-    const selected = await this.#selectDefinition(workspace.root, input.definitionId, input);
+    const selected = approved ? ok(approved) : await this.#selectDefinition(workspace.root, input.definitionId, input);
     if (!selected.ok) return selected;
     const { definition, source: definitionSource } = selected.value;
     const definitionFile = definitionSource === 'project' ? selected.value.file : undefined;
-    if (definition.schema === 2) return this.#startGraph(workspace, input, definition, definitionSource, definitionFile);
+    if (definition.schema === 2) return this.#startGraph(workspace, input, definition, definitionSource, definitionFile, undefined, current);
     if (!repo) return fail('b-repository-required', '工作流须从已有 Git 根目录启动。');
     if (definition.id === 'path-b' && this.#workspaceReservation(workspace)?.engine === 'dapr') {
       return fail('workflow-workspace-busy', '此工作区已由另一持久工作流申请或占用。');
@@ -225,6 +276,7 @@ export class DurableWorkflowService {
         return fail('workflow-git-protection-unavailable', '无法核对此仓库的写入保护（' + message(error) + '）。');
       }
     }
+    if (current && !current()) return startContextStale();
     const reserved = reserveOwnerState(repo, requestedOwner, slot);
     if (reserved === 'conflict') {
       return fail('workflow-workspace-busy', '规范化 Git 仓库已有其他工作流所有者。');
@@ -240,9 +292,13 @@ export class DurableWorkflowService {
         }
       }
       return ledger.transaction(() => {
+        if (current && !current()) return startContextStale();
         const concurrent = ledger.request(repo.projectId, input.requestId);
         if (concurrent) return concurrent.startupFingerprint === fingerprint
           ? ok(project(ledger, concurrent)) : fail('start-key-conflict', '相同启动键已绑定其他请求。');
+        if (approved && ledger.instancesForRoot(workspace.root).some(item => item.status === 'waiting')) {
+          return fail('workflow-workspace-busy', '该项目已有运行中的工作流。');
+        }
         const pinned = ledger.definition(repo.projectId, definition.id, definition.version);
         if (pinned && pinned.digest !== definition.digest || !pinRepositoryDefinition(repo, definition)) {
           return fail('definition-version-conflict', '此项目的同版本定义已固定到不同摘要。');
@@ -279,7 +335,7 @@ export class DurableWorkflowService {
 
   async #startGraph(workspace: WorkspaceIdentity, input: DurableStartInput,
     definition: Extract<DurableDefinitionSnapshot, { schema: 2 }>, definitionSource: 'project' | 'preset', definitionFile?: string,
-    resume?: WorkspaceReservation): Promise<DurableResult<DurableProjection>> {
+    resume?: WorkspaceReservation, current?: () => boolean): Promise<DurableResult<DurableProjection>> {
     const { root, repository: repo, projectId } = workspace;
     const ledger = this.#ledger;
     const write = graphNeedsWrite(definition);
@@ -306,6 +362,7 @@ export class DurableWorkflowService {
     let shared: 'acquired' | 'already-owned' | 'conflict' | undefined;
     let active = false;
     try {
+      if (current && !current()) return startContextStale();
       if (write) {
         const held = this.#workspaceReservation(workspace);
         if (held && (held.instanceId !== instanceId || held.fingerprint !== fingerprint || held.dataDir !== ledger.dataDir || held.engine !== 'dapr')) {
@@ -328,9 +385,13 @@ export class DurableWorkflowService {
         }
       }
       const result = ledger.transaction(() => {
+        if (current && !current()) return startContextStale();
         const previous = ledger.request(projectId, input.requestId);
         if (previous) return previous.startupFingerprint === fingerprint ? ok(project(ledger, previous))
           : fail('start-key-conflict', '相同启动键已绑定其他请求。');
+        if (current && ledger.instancesForRoot(root).some(item => item.status === 'waiting')) {
+          return fail('workflow-workspace-busy', '该项目已有运行中的工作流。');
+        }
         const pinned = ledger.definition(projectId, definition.id, definition.version);
         if (pinned && pinned.digest !== definition.digest || repo && !pinRepositoryDefinition(repo, definition)) {
           return fail('definition-version-conflict', '此项目的同版本定义已固定到不同摘要。');

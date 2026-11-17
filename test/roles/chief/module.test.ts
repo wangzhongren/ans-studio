@@ -89,7 +89,7 @@ test("spec：capabilities 七字段（D10 唯一真源）", () => {
 
 // —————————————————————— tools ——————————————————————
 
-test("tools：trio 返回 6 个 chief 专属 id（含 E2 C-1 的 closeCreatedTask），顺序与旧 run-role 一致，capabilities 同 spec 引用", () => {
+test("tools：trio 保留旧工具顺序并追加工作流启用提议，capabilities 同 spec 引用", () => {
   const policy = chiefRoleModule.tools({ governanceModel: "trio" });
   assert.deepEqual(policy.tools, [
     "roleActivityLog",
@@ -98,6 +98,7 @@ test("tools：trio 返回 6 个 chief 专属 id（含 E2 C-1 的 closeCreatedTas
     "projectNote",
     "requestVersionDecision",
     "closeCreatedTask",
+    "requestWorkflowStart",
   ]);
   assert.equal(policy.tools.includes("closeCreatedTask"), true, "E2 C-1：旧 directGovernance 下 trio chief 注入的工具不得丢失");
   assert.equal(policy.tools.includes("decidePendingRequest"), false, "独立决策上下文工具不由普通会话声明");

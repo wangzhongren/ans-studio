@@ -33,6 +33,7 @@ export interface DesktopDurableDefinition {
   source: "project" | "preset";
   version?: number;
   digest?: string;
+  purpose?: string;
   file: string;
   error?: DurableProblem;
 }
@@ -185,12 +186,15 @@ export class DesktopDurableWorkflow {
     return this.storePromise;
   }
 
-  async resume(): Promise<void> {
-    const present = await fs.stat(this.dataDir).then(stat => stat.isDirectory(), error => {
+  hasStoredBusiness(): Promise<boolean> {
+    return fs.stat(this.dataDir).then(stat => stat.isDirectory(), error => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
       throw error;
     });
-    if (!present || this.closing) return;
+  }
+
+  async resume(): Promise<void> {
+    if (!await this.hasStoredBusiness() || this.closing) return;
     // Existing persisted data is needed before the control plane can reattach.
     if ((await this.store()).activeProjections().length !== 0) this.activate();
   }
@@ -267,15 +271,22 @@ export class DesktopDurableWorkflow {
 
   async listDefinitions(projectRoot: string): Promise<DesktopDurableDefinition[]> {
     const entries = await (await this.store()).listDefinitions(projectRoot);
-    return entries.map(({ file, source, definition, code, message, path: field }) => ({
+    return entries.map(({ file, source, definition, code, message, path: field }) => {
+      const first = definition?.steps[definition.start];
+      const action = first && "action" in first ? first.action : undefined;
+      const purpose = action === "product-prepare" ? "New product work with full governance"
+        : action === "observe-existing" || action === "b1-impact-readonly" ? "Existing implementation and supportable file-level scope required"
+        : action === "readonly-report" ? "Read-only work, no change authorization" : undefined;
+      return ({
       id: definition?.id ?? path.basename(file, path.extname(file)),
       file: path.basename(file),
       source,
-      ...(definition ? { name: definition.name, version: definition.version, digest: definition.digest } : {
+      ...(definition ? { name: definition.name, version: definition.version, digest: definition.digest, purpose } : {
         error: { code: code ?? "workflow-definition-invalid", message: message ?? "The workflow definition could not be read.",
           ...(field ? { path: field } : {}) },
       }),
-    }));
+      });
+    });
   }
 
   async validateDefinition(projectRoot: string, definitionId: string, selection: DesktopDurableSelection = {}): Promise<DurableResult<DesktopDurableDefinition>> {

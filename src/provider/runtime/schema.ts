@@ -23,6 +23,9 @@ import {
   DOWNLOAD_URL_MAX_BYTES,
 } from "../../model/download.ts";
 import { GIT_QUERY_TEMPLATES, GIT_CAPABILITY_PATHS_MAX, GIT_CAPABILITY_CANDIDATES_MAX, GIT_CAPABILITY_MESSAGE_MAX } from "../../model/trunk.ts";
+
+export const WORKFLOW_DEFINITION_ID_PATTERN = "^[a-z][a-z0-9-]{0,63}$";
+export const WORKFLOW_DEFINITION_DIGEST_PATTERN = "^[a-f0-9]{64}$";
 /** describeTool 的返回：Pi 侧参数 schema、说明与可选的提示/执行模式（均按工具名分派）。 */
 export interface ToolDescription {
   parameters: Record<string, unknown>;
@@ -1494,6 +1497,11 @@ export function describeTool(name: string): ToolDescription {
             pattern: GOVERNANCE_SLUG_PATTERN,
             description: "Optional flow id (slug) to filter the read-only snapshot",
           },
+          definitionId: {
+            type: "string",
+            pattern: WORKFLOW_DEFINITION_ID_PATTERN,
+            description: "Optional workflow definition ID to filter the available definition catalog",
+          },
         },
         required: [],
         additionalProperties: false,
@@ -1502,12 +1510,32 @@ export function describeTool(name: string): ToolDescription {
         "**只读**全局任务状态摘要（幕僚/内置治理角色工具，注入才存在）：当前 focus flow/run/阶段、未收口任务计数、" +
         "阻塞/卡点、版本/证据指针与下一步。数据与 UI 项目状态区来自**同一派生结果**——本工具不重算、不写第二份状态；" +
         "按调用角色裁剪：幕僚完整，其他内置治理角色只看到自己的任务与 focus 聚合，项目 worker 无本工具。" +
+        "如应用提供工作流目录，可传 definitionId 查询指定定义。" +
         "**纯读：不写账本/manifest/文档、不缓存、不改任何任务/run 状态或写权**；坏行/坏 manifest 进 errors 并返回可读部分，" +
         "不抛、不阻塞。文本输出有界（≤8 KiB），超限截断并如实标注 `truncated`；**本工具输出不是验收证据，查询不构成放行**。",
       promptGuidelines: [
         "派发/收口/巡检前先读 project_state，对齐当前 focus、未收口任务、阻塞与下一步；机器事实以应用为准。",
         "project_state 只读摘要：不要据此写盘，也不要把它当验收/批准证据；逐任务动作仍在任务中心/既有工具。",
       ],
+    };
+  }
+  if (name === "request_workflow_start") {
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          definitionId: { type: "string", pattern: WORKFLOW_DEFINITION_ID_PATTERN },
+          source: { type: "string", enum: ["project", "preset"] },
+          expectedDigest: { type: "string", pattern: WORKFLOW_DEFINITION_DIGEST_PATTERN },
+          reason: { type: "string", pattern: "\\S", description: "Why this workflow fits the customer's requirement" },
+        },
+        required: ["definitionId", "source", "expectedDigest", "reason"],
+        additionalProperties: false,
+      },
+      description:
+        "幕僚提议启用一份工作流定义。先用 project_state 查看定义目录，引用同一条目的 definitionId、source 和摘要，并说明选择理由。" +
+        "应用绑定当前客户需求，由客户本人确认启用。pending 表示提议已登记，等待客户确认。",
+      executionMode: "sequential",
     };
   }
   if (name === "governance_matrix") {

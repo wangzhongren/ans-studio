@@ -70,7 +70,7 @@ async function assertContenderBlocked(f: Awaited<ReturnType<typeof emptyFixture>
     try {
       const store = await handle.durable.store();
       const owner = await store.owner(input.root);
-      const result = await handle.desktop.startDurableWorkflow({ projectRoot: input.root, definitionId: "path-a",
+      const result = await handle.startViaChief({ projectRoot: input.root, definitionId: "path-a",
         source: "preset", enabled: true, requestId: "w5-contender", summary: "An independent window requests the occupied project" });
       process.stdout.write("W5_CONTENDER " + JSON.stringify({ pid: process.pid, result, turns, owner,
         instances: store.activeProjections().length }) + "\\n");
@@ -111,9 +111,9 @@ for (const checkpoint of ["intent-reopen", "baseline-recovery", "linked-worktree
     ? unwrap(await handle.desktop.copyDurableWorkflowPreset(definition))
     : undefined;
   const startRequest = { ...definition,
-    source: projectDefinition ? "project" : "preset", expectedDigest: projectDefinition?.digest, enabled: true,
+    source: projectDefinition ? "project" as const : "preset" as const, expectedDigest: projectDefinition?.digest, enabled: true,
     requestId: `w5-path-a-${checkpoint}`, summary: "Create an isolated local threshold module from an empty project" };
-  const result = unwrap(await handle.desktop.startDurableWorkflow(startRequest));
+  const result = unwrap(await handle.startViaChief(startRequest));
   assert.ok(result.instance);
   assert.equal(result.instance.definitionSource, projectDefinition ? "project" : "preset");
   const { instanceId, projectId, definitionDigest } = result.instance;
@@ -221,12 +221,12 @@ for (const checkpoint of ["intent-reopen", "baseline-recovery", "linked-worktree
   }
   if (checkpoint === "intent-reopen") {
     await assertContenderBlocked(f, log, "before-git", instanceId);
-    const replay = unwrap(await handle.desktop.startDurableWorkflow(startRequest));
-    assert.equal(replay.instance?.instanceId, instanceId);
-    const conflict = await handle.desktop.startDurableWorkflow({ ...startRequest, summary: "Different request under the original key" });
+    const [approved] = unwrap(await handle.desktop.listWorkflowStartProposals(selector));
+    assert.equal(approved.instanceId, instanceId);
+    const conflict = await handle.desktop.startDurableWorkflow({ ...startRequest, summary: "Different request under the previous display key" });
     assert.equal(conflict.ok, false);
-    if (!conflict.ok) assert.equal(conflict.code, "start-key-conflict");
-    log("same-start-key-identity-and-conflict", { replay, conflict });
+    if (!conflict.ok) assert.equal(conflict.code, "workflow-start-confirmation-required");
+    log("recorded-start-and-legacy-entry-conflict", { approved, conflict });
     const yamlPath = "docs/workflows/path-a.yaml";
     const originalYaml = await readFile(path.join(f.root, yamlPath), "utf8");
     const brokenYaml = originalYaml.replace("action: product-prepare", "action: unregistered-w5-action");

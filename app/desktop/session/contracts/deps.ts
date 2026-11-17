@@ -35,6 +35,7 @@ import type { OpenResult, SessionEventEnvelope } from "./session-types.ts";
 
 export interface SessionManagerDeps {
   durableWorkflow?: import("../../durable-workflow.ts").DesktopDurableWorkflow;
+  workflowChiefStart?: import("../../workflow-chief-start.ts").WorkflowChiefStart;
   readDurableReports?: (input: { projectRoot: string; roleId: string; runtime: RuntimeKind }) =>
     Promise<readonly import("../../../../src/model/runtime.ts").RuntimeReportSnapshotV1[]>;
   /** Native selection + successful same-root listing only; never renderer/model metadata. */
@@ -52,6 +53,7 @@ export interface SessionManagerDeps {
       runtime?: RuntimeKind;
       chiefDecisionContext?: ChiefDecisionExecutionContext;
       decidePendingRequest?: DecidePendingRequestFn;
+      requestWorkflowStart?: import("../../../../src/model/durable-workflow.ts").DurableRequestWorkflowStartFn;
       routineShellPolicy?: RoutineShellPolicy;
       taskId?: string;
       scope?: undefined;

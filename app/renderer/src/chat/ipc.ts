@@ -88,8 +88,6 @@ export function directiveBridgeOf(value: unknown): DirectiveBridge | null {
 type DurableProjectRequest = { projectRoot: string };
 type DurableDefinitionRequest = DurableProjectRequest & { definitionId: string };
 type DurableDefinitionSelection = { source?: DesktopDurableDefinition["source"]; expectedDigest?: string };
-type DurableStartDraft = DurableDefinitionRequest & DurableDefinitionSelection & { summary: string };
-type DurableStartRequest = DurableStartDraft & { requestId: string; enabled: true };
 
 // Wire DTOs exposed by preload. Keep renderer compilation independent of Node and Dapr.
 export interface DurableProblem {
@@ -178,6 +176,20 @@ export interface DesktopDurableView {
   instance?: DesktopDurableInstance;
 }
 
+export interface DesktopWorkflowStartProposal {
+  activationId: string;
+  requestId: string;
+  generation: number;
+  state: "pending" | "approved" | "rejected" | "revoked" | "stale" | "started";
+  definition: Required<Pick<DesktopDurableDefinition, "id" | "name" | "version" | "digest" | "source">>;
+  requirement: { text: string };
+  reason: string;
+  createdAt: string;
+  decision?: { action: "approve" | "reject" | "revoke"; source: "customer"; at: string };
+  instanceId?: string;
+  startup?: { state: "waiting" | "blocked" | "created" | "scheduled"; code?: string; message?: string };
+}
+
 export interface DurableWorkflowBridge {
   listDurableWorkflows(input: DurableProjectRequest): Promise<DurableResult<{
     definitions: DesktopDurableDefinition[];
@@ -186,7 +198,11 @@ export interface DurableWorkflowBridge {
   validateDurableWorkflow(input: DurableDefinitionRequest & DurableDefinitionSelection): Promise<DurableResult<DesktopDurableDefinition>>;
   copyDurableWorkflowPreset(input: DurableDefinitionRequest): Promise<DurableResult<DesktopDurableDefinition>>;
   importDurableWorkflow(input: DurableProjectRequest): Promise<DurableResult<DesktopDurableDefinition>>;
-  startDurableWorkflow(input: DurableStartRequest): Promise<DurableResult<DesktopDurableView>>;
+  listWorkflowStartProposals(input: DurableProjectRequest): Promise<DurableResult<DesktopWorkflowStartProposal[]>>;
+  revokeWorkflowStartProposal(input: DurableProjectRequest & {
+    activationId: string;
+    requestId: string;
+  }): Promise<DurableResult<DesktopWorkflowStartProposal>>;
   getDurableWorkflowProjection(input: DurableProjectRequest & {
     instanceId?: string;
   }): Promise<DurableResult<DesktopDurableView>>;
@@ -201,7 +217,8 @@ const DURABLE_METHODS = [
   "validateDurableWorkflow",
   "copyDurableWorkflowPreset",
   "importDurableWorkflow",
-  "startDurableWorkflow",
+  "listWorkflowStartProposals",
+  "revokeWorkflowStartProposal",
   "getDurableWorkflowProjection",
   "readDurableWorkflowDelivery",
   "acknowledgeDurableWorkflowDelivery",
@@ -212,34 +229,6 @@ export function getDurableWorkflowBridge(): DurableWorkflowBridge | null {
   const record = asRecord(bridge);
   if (!DURABLE_METHODS.every((method) => typeof record[method] === "function")) return null;
   return bridge as unknown as DurableWorkflowBridge;
-}
-
-// Keep an unacknowledged start across visits to the task drawer so a retry uses the original key.
-const durableStarts = new Map<string, {
-  request: DurableStartRequest;
-  pending?: ReturnType<DurableWorkflowBridge["startDurableWorkflow"]>;
-}>();
-
-export function pendingDurableStart(projectRoot: string): DurableStartRequest | undefined {
-  return durableStarts.get(projectRoot)?.request;
-}
-
-export async function submitDurableStart(bridge: DurableWorkflowBridge, draft: DurableStartDraft) {
-  const { projectRoot } = draft;
-  let attempt = durableStarts.get(projectRoot);
-  if (!attempt) {
-    attempt = { request: { ...draft, enabled: true, requestId: crypto.randomUUID() } };
-    durableStarts.set(projectRoot, attempt);
-  }
-  if (attempt.pending) return attempt.pending;
-  try {
-    attempt.pending = bridge.startDurableWorkflow(attempt.request);
-    const result = await attempt.pending;
-    if (result.ok || result.code !== "workflow-operation-failed") durableStarts.delete(projectRoot);
-    return result;
-  } finally {
-    attempt.pending = undefined;
-  }
 }
 
 function viewIdentity(): { projectRoot: string | null; runtime: string } {

@@ -469,7 +469,8 @@ import {
   type DesktopDurableView,
   type DesktopDurableWorkflow,
 } from "./durable-workflow.ts";
-import type { DurableResult } from "../../src/model/durable-workflow.ts";
+import type { DurableRequestWorkflowStartFn, DurableResult } from "../../src/model/durable-workflow.ts";
+import { WorkflowChiefStart, type DesktopWorkflowStartProposal } from "./workflow-chief-start.ts";
 import { MERGE_MAIN_OPTION_IDS } from "./customer-input.ts";
 
 export interface DesktopDeps {
@@ -494,6 +495,7 @@ export interface DesktopDeps {
       scope?: undefined;
       /** 客户确认制交互通道（A-1/A-3）：仅内置治理角色（su）会话注入（见 session.ts）。 */
       customerInput?: CustomerInputFn;
+      requestWorkflowStart?: DurableRequestWorkflowStartFn;
       /** 下载申请能力（2026-11-04 download-requests W-1）：每会话能力；未注入 ⇒ 工具不注册。 */
       requestDownload?: RequestDownloadFn;
       /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
@@ -644,6 +646,7 @@ export interface DesktopDeps {
    * 交互卡 + per-window pending Map + 按请求快照校验回包）构造后传入。**测试/e2e 可注入替身**。
    */
   customerInput?: DesktopCustomerInputFn;
+  hasPendingProjectCard?: (projectRoot: string) => boolean;
   /**
    * **客户授权平面控制器（C1，2026-11-03）**：main.ts 用应用运行级 `sessionId` 构造后注入（presenter/系统行
    * 由主进程接线）。`sendSession` 命中 `@审批`/`@决策` 时只调用它——**绝不**回退 `manager.send`/普通聊天；
@@ -774,6 +777,8 @@ export interface DesktopInterface {
   copyDurableWorkflowPreset(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
   importDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
   startDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableView>>;
+  listWorkflowStartProposals(input: unknown): Promise<DurableResult<DesktopWorkflowStartProposal[]>>;
+  revokeWorkflowStartProposal(input: unknown, isMainFrameCurrent?: () => boolean): Promise<DurableResult<DesktopWorkflowStartProposal>>;
   getDurableWorkflowProjection(input: unknown): Promise<DurableResult<DesktopDurableView>>;
   readDurableWorkflowDelivery(input: unknown): Promise<DurableResult<DesktopDurableDeliveryView>>;
   acknowledgeDurableWorkflowDelivery(input: unknown): Promise<DurableResult<DesktopDurableDeliverySummary>>;
@@ -847,7 +852,7 @@ export interface DesktopInterface {
    * 一律不可信**：本层按**真实字节重校验**（base64 严格解码 → 魔数嗅探定类型 → ≤5MB），全过才组
    * `PromptOptions` 下发；任一张不合格 ⇒ **整条拒发**（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
    */
-  sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult>;
+  sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }, isMainFrameCurrent?: () => boolean): Promise<SendResult>;
   /**
    * **客户授权平面自然语言解释入口**（2026-11-04 客户直修；主进程内部使用，不挂 IPC）：
    * 只做判断 AI 纯理解/预填，不落账、不放行；失败返回 `{ok:false}`（控制器回退现有面板）。
@@ -2159,9 +2164,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const versionChangeStacks = new Map<string, VersionChangeStack>();
   let stackForRef: (projectRoot: string) => VersionChangeStack | undefined = () => undefined;
 
-  const manager = new SessionManager({
+  const workflowChiefStart = deps.durableWorkflow ? new WorkflowChiefStart({
+    durable: deps.durableWorkflow,
+    customer: deps.customerInput,
+    selection: projectRoot => importedProjectRoot === projectRoot && registeredProjectLifecycle?.projectRoot === projectRoot
+      && listingCache.get(projectRoot)?.governanceModel === "trio" ? registeredProjectLifecycle : undefined,
+    hasActiveTurn: projectRoot => manager.hasActiveRoleTurn(projectRoot),
+    hasPendingCard: deps.hasPendingProjectCard,
+    hasActiveRun: async projectRoot => {
+      const current = await manager.activeRunViews(projectRoot);
+      return !current.ok || current.runs.length !== 0;
+    },
+  }) : undefined;
+  const manager: SessionManager = new SessionManager({
     openRoleSession: openRoleSessionFn,
     durableWorkflow: deps.durableWorkflow,
+    workflowChiefStart,
     readDurableReports: deps.durableWorkflow ? async input => (await getSessionHistory(input, {
       credentialEnvNames: [...(deps.runtimeOptions?.extraCredentialEnvVars ?? []),
         ...(deps.runtimeOptions?.apiKeyEnvVar ? [deps.runtimeOptions.apiKeyEnvVar] : [])],
@@ -2481,6 +2499,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       let selection = 0;
       changeProjectSource([], () => {
         openedDeliveryViews.clear();
+        workflowChiefStart?.select();
         unobserveDurableProject?.();
         unobserveDurableProject = undefined;
         observedDurableProjectRoot = undefined;
@@ -2523,31 +2542,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (!isCurrent()) return durableFailure("workflow-project-unselected", "The selected project changed.");
       return durable.importDefinition(projectRoot, selectedFile);
     }),
-    startDurableWorkflow: input => durableCall(input, async (durable, projectRoot, request, isCurrent) => {
-      if (request.enabled !== true || !durableIdentifier(request.definitionId) || !durableIdentifier(request.requestId)
-        || typeof request.summary !== "string" || !request.summary.trim() || request.summary.length > 12_000) {
-        return durableFailure("workflow-start-invalid", "Enable the prototype, select a workflow, and enter a change request.");
+    startDurableWorkflow: async () => durableFailure("workflow-start-confirmation-required", mainT("main.workflowStart.approvalRequired")),
+    listWorkflowStartProposals: input => durableCall(input, async (_durable, projectRoot, _request, isCurrent) => {
+      if (!workflowChiefStart?.mode(projectRoot)) return { ok: true, value: [] };
+      const proposals = await workflowChiefStart.list(projectRoot);
+      return isCurrent() ? { ok: true, value: proposals } : durableFailure("workflow-project-unselected", "The selected project changed.");
+    }),
+    revokeWorkflowStartProposal: (input, isMainFrameCurrent) => durableCall(input, async (_durable, projectRoot, request, isCurrent) => {
+      if (!workflowChiefStart?.mode(projectRoot) || !isMainFrameCurrent?.()
+        || !durableIdentifier(request.activationId) || !durableIdentifier(request.requestId)) {
+        return durableFailure("workflow-start-revoke-unverified", mainT("main.workflowStart.approvalRequired"));
       }
-      const selection = durableSelection(request);
-      if (!selection.ok) return selection;
-      if (registeredProjectLifecycle?.projectRoot !== projectRoot) {
-        return durableFailure("workflow-project-unselected", "The selected project changed.");
-      }
-      if (listingCache.get(projectRoot)?.governanceModel !== "trio") {
-        return durableFailure("workflow-project-roles-missing", "The selected project must have its governance roles configured.");
-      }
-      if (!await durable.owns(projectRoot)) {
-        if (manager.hasActiveRoleTurn(projectRoot)) {
-          return durableFailure("workflow-existing-turn", "Wait for the project's active role turn to finish.");
-        }
-        const existing = await manager.activeRunViews(projectRoot);
-        if (!existing.ok || existing.runs.length !== 0 || manager.hasActiveRoleTurn(projectRoot)) {
-          return durableFailure("workflow-existing-run", "The project's active execution could not be cleared for a new workflow.");
-        }
-      }
-      const runtime = await resolveNoteRuntime(projectRoot) ?? "pi";
-      if (!isCurrent()) return durableFailure("workflow-project-unselected", "The selected project changed.");
-      return durable.start(projectRoot, request.definitionId, request.requestId, request.summary.trim(), runtime, selection.value);
+      return workflowChiefStart.revoke(projectRoot, request.activationId, request.requestId, () => isCurrent() && isMainFrameCurrent());
     }),
     getDurableWorkflowProjection: input => durableCall(input, async (durable, projectRoot, request) => {
       if (request.instanceId !== undefined && !durableIdentifier(request.instanceId)) {
@@ -2605,6 +2611,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     disposeProjectDocuments() {
       changeProjectSource([], () => {
         openedDeliveryViews.clear();
+        workflowChiefStart?.select();
         unobserveDurableProject?.();
         unobserveDurableProject = undefined;
         observedDurableProjectRoot = undefined;
@@ -2710,6 +2717,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (picked && path.resolve(picked.root) === path.resolve(listing.projectRoot)) {
           registeredProjectLifecycle = { selectionId: picked.selectionId, selectedRoot: picked.root, projectRoot: listing.projectRoot,
             source: "native-directory-selection", selectedAt: picked.selectedAt, listingGeneration: generation };
+          workflowChiefStart?.select(listing.projectRoot);
           if (observedDurableProjectRoot !== listing.projectRoot) {
             unobserveDurableProject?.();
             unobserveDurableProject = manager.observeDurableProject(listing.projectRoot);
@@ -2717,6 +2725,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           }
         } else if (registeredProjectLifecycle?.projectRoot !== listing.projectRoot) {
           openedDeliveryViews.clear();
+          workflowChiefStart?.select();
           registeredProjectLifecycle = undefined;
           nativeSelection = undefined;
           unobserveDurableProject?.();
@@ -3184,7 +3193,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return result;
     },
 
-    async sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult> {
+    async sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }, isMainFrameCurrent?: () => boolean): Promise<SendResult> {
       const customerTarget = resolveDirectiveTarget(input?.target);
       if (!customerTarget.ok || customerTarget.roleId !== "chief") {
         return { ok: false, error: mainT("ui.composer.customerEntryChiefOnly") };
@@ -3193,6 +3202,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const customerMetadata: SessionMessageMetadata | undefined = typeof input?.metadata?.clientMessageId === "string"
         ? { clientMessageId: input.metadata.clientMessageId } : undefined;
       const text = input && typeof input.text === "string" ? input.text : "";
+      const ordinaryMetadata = () => {
+        const workflowInput = workflowChiefStart?.issueInput(customerTarget.projectRoot, text, isMainFrameCurrent);
+        return workflowInput ? { ...customerMetadata, workflowInput } : customerMetadata;
+      };
       const rawImages = input && Array.isArray(input.images) ? input.images : [];
       // —— 客户授权平面（C1，2026-11-03）：**先**解析标记（纯函数、零副作用），早于图片校验/manager.send。——
       // 命中：带图 ⇒ 直接拒绝（不解码、不投递、不落账）；无图 ⇒ 只调用指令控制器（绝不 manager.send/handle.send），
@@ -3232,7 +3245,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 逐张：严格 base64 解码 → 魔数嗅探定类型（声明 mime 不作数）→ ≤5MB；**全过才放行**，
       // 任一张不合格 ⇒ 整条拒发（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
       if (rawImages.length === 0) {
-        return manager.send(text, undefined, customerTarget, customerMetadata);
+        return manager.send(text, undefined, customerTarget, ordinaryMetadata());
       }
       const cleaned: PromptImage[] = [];
       for (const it of rawImages) {
@@ -3256,7 +3269,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       // 组**契约形状** `PromptOptions`（单一来源 `src/model/runtime.ts`）——之后整包同一引用透传。
       const opts: PromptOptions = { images: cleaned };
-      return manager.send(text, opts, customerTarget, customerMetadata);
+      return manager.send(text, opts, customerTarget, ordinaryMetadata());
     },
 
     async stopSession(input?: { roleId?: string | null; projectRoot?: string; runtime?: RuntimeKind }): Promise<StopResult> {

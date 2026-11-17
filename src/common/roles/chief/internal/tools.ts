@@ -5,6 +5,7 @@
 //  - `requestVersionDecision`：`canRequestVersionDecision(trioSpec.id)`（仅 chief，`:2344-2346`）；
 //  - `closeCreatedTask`：chief/convener 共享的直接能力，旧注入为
 //    `directGovernance && (role.id === "chief" || role.id === "convener")`（`:1824`/`:1828`）。
+//  - `requestWorkflowStart`：幕僚提出选用的流程，实际客户输入核验与启用确认由桌面宿主管理。
 //
 // 本模块只声明**角色专属额外注入**的稳定 id 闭集（E0.3 §3.1 R-1）；宿主是否真的提供对应能力仍由
 // 注入层决定（`input.xxx !== undefined` 才注册）。`projectState` 等内置治理角色共有工具不在此列。
@@ -23,8 +24,7 @@ import { CHIEF_CAPABILITIES } from "./spec.ts";
 import { CHIEF_TOOL_MESSAGE_KEYS, CHIEF_TOOL_REASON_CODES } from "./codes.ts";
 
 /**
- * chief 额外注入工具 id（顺序与旧 run-role 注入顺序一致：`:1697-1705` 五个在前，
- * `directGovernance` 的 `closeCreatedTask`（`:1828`）在后）。
+ * chief 额外注入工具 id，保留旧 run-role 声明顺序，并追加工作流启用提议工具。
  * `RoleToolId` 闭集内的允许项；越界/未知 id 由引擎装配 fail-closed（E0.3 §3.1 R-1）。
  */
 export const CHIEF_TOOL_IDS: readonly RoleToolId[] = Object.freeze([
@@ -34,6 +34,7 @@ export const CHIEF_TOOL_IDS: readonly RoleToolId[] = Object.freeze([
   "projectNote",
   "requestVersionDecision",
   "closeCreatedTask",
+  "requestWorkflowStart",
 ]);
 
 const NO_TOOLS: readonly RoleToolId[] = Object.freeze([]);
@@ -41,7 +42,7 @@ const NO_TOOLS: readonly RoleToolId[] = Object.freeze([]);
 /**
  * `tools()`：按治理模型返回 chief 可额外注入的工具 id。
  *
- * - `trio`：返回 6 个 chief 专属 id（含 `closeCreatedTask`；宿主是否注入仍看能力存在与会话模式）。
+ * - `trio`：返回 chief 可额外注入的 id。宿主核验各项能力与会话模式。
  * - `single`：按 `TrustedToolPolicyInput` 契约注释（single 不装配 trio 角色工具）返回空集，
  *   并给出结构化原因（非 deny）。
  * - 未知/缺失治理模型：fail-closed（空集 + 原因），不猜测。

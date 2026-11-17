@@ -265,7 +265,7 @@ test("fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独�
 
 // —————————————————————— 接口评审拒绝项 / 工具闭集 ——————————————————————
 
-test("G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项", () => {
+test("G-IR 拒绝发布工具，幕僚启动 v1.1 仅增加一项", () => {
   const sources = [
     join(REPO_ROOT, "src", "model", "role.ts"),
     join(REPO_ROOT, "src", "common", "门禁引擎", "governance-roles.ts"),
@@ -276,7 +276,8 @@ test("G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配
     const source = readFileSync(file, "utf8");
     assert.doesNotMatch(source, /requestReleaseMerge|request_release_merge/, `${file} 不得出现 requestReleaseMerge`);
   }
-  assert.equal(ROLE_TOOL_CATALOG.length, 14, "RoleToolId 装配表保持在冻结的 14 项");
+  assert.equal(ROLE_TOOL_CATALOG.length, 15);
+  assert.equal(ROLE_TOOL_CATALOG[14]?.id, "requestWorkflowStart");
   assert.equal(ROLE_TOOL_CATALOG.some((entry) => /release/i.test(entry.id) || /release/i.test(entry.name)), false);
 });
 

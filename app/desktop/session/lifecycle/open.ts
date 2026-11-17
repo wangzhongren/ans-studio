@@ -1140,6 +1140,10 @@ export class LifecycleOpen {
       if (stopped()) return stoppedResult();
       const durable = this.deps.durableWorkflow;
       const durableOwned = durable ? await durable.owns(req.projectRoot) : false;
+      const requestWorkflowStart = durableOwned ? undefined : this.deps.workflowChiefStart?.requestForSession(req.projectRoot, req.roleId, req.taskId, () => {
+        const live = this.sessions.get(key);
+        return live?.handle === gitBinding.handle ? live : undefined;
+      });
       const graph = durable && durableOwned && (await durable.find(req.projectRoot))?.schema === 2 ? graphRolePorts({
         durable, customer: customerInput, chiefDecision, isRegistered: () => !!this.deps.getRegisteredProjectLifecycle?.(req.projectRoot), session: () => {
           const entry = this.sessions.get(key);
@@ -1296,6 +1300,7 @@ export class LifecycleOpen {
           // 2026-11-02（全局任务状态/版本决策）：三能力均「注入才注册」；project_state 给全部内置治理角色，
           // project_note / request_version_decision 仅 chief（编排 run-role 再按 trioSpec 收口）。
           ...(projectStateCapability ? { projectState: projectStateCapability } : {}),
+          ...(requestWorkflowStart ? { requestWorkflowStart } : {}),
           ...(projectNoteCapability ? { projectNote: projectNoteCapability } : {}),
           ...(legacyOnlyCapabilitiesAllowed && requestVersionDecisionCapability ? { requestVersionDecision: requestVersionDecisionCapability } : {}),
           ...(roleStatus ? { roleStatus } : {}),

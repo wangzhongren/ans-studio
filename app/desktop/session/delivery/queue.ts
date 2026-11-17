@@ -1091,6 +1091,8 @@ export class Delivery {
     origin.kind = sent.kind;
     const originFlows = [...new Set(sentItems.map((queued) => queued.flowId).filter((id): id is string => typeof id === "string" && id !== ""))];
     if (originFlows.length > 0) origin.flowIds = originFlows;
+    if (sent.kind === "message" && sent.workflowInput?.projectRoot === entry.projectRoot
+      && entry.roleId === "chief" && sent.workflowInput.text === sent.text) origin.workflowInput = sent.workflowInput;
     if (sent.kind === "handback") {
       origin.handbackEvidence = [
         ...new Set(sentItems.flatMap((queued) => queued.handback?.evidence ?? []).filter((item): item is string => typeof item === "string" && item !== "")),

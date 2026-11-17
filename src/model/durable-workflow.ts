@@ -301,6 +301,52 @@ export interface DurableStartInput extends DurableDefinitionSelection {
   customerPurpose?: 'new-work' | 'existing-change';
 }
 
+export interface DurableStartRequirement {
+  inputId: string;
+  turnId: string;
+  text: string;
+  digest: string;
+  runtime: string;
+}
+
+export interface DurableRequestWorkflowStartInput {
+  definitionId: string;
+  source: 'project' | 'preset';
+  expectedDigest: string;
+  reason: string;
+}
+
+export interface DurableStartProposalInput extends DurableRequestWorkflowStartInput {
+  projectRoot: string;
+  requirement: DurableStartRequirement;
+  customerPurpose?: DurableStartInput['customerPurpose'];
+}
+
+export interface DurableStartProposalDecisionInput {
+  projectRoot: string;
+  activationId: string;
+  requestId: string;
+  action: 'approve' | 'reject' | 'revoke';
+}
+
+export interface DurableStartProposal {
+  activationId: string;
+  requestId: string;
+  projectId: string;
+  generation: number;
+  state: 'pending' | 'approved' | 'rejected' | 'revoked' | 'stale' | 'started';
+  definition: Pick<DurableDefinitionSnapshot, 'id' | 'name' | 'version' | 'digest'> & { source: 'project' | 'preset' };
+  requirement: DurableStartRequirement;
+  reason: string;
+  createdAt: string;
+  decision?: { action: DurableStartProposalDecisionInput['action']; source: 'customer'; at: string };
+  instanceRef?: DurableInstanceRef;
+  startup?: { state: 'waiting' | 'blocked' | 'created' | 'scheduled'; code?: string; message?: string };
+}
+
+export type DurableRequestWorkflowStartFn = (input: DurableRequestWorkflowStartInput) =>
+  Promise<DurableResult<{ state: 'pending'; activationId: string; definitionDigest: string }>>;
+
 export interface DurableActionIntent {
   key: string;
   action: DurableCapability;

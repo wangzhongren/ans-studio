@@ -2079,6 +2079,33 @@ export const zhCN = {
   "ui.durableWorkflow.pendingTasks": "工作流待办",
   "ui.durableWorkflow.definitionMissing": "已选定义已无法读取。请恢复文件后刷新，或选择其他定义。",
   "ui.durableWorkflow.taskReported": "已提交报告",
+  "ui.durableWorkflow.definitions": "工作流定义",
+  "ui.durableWorkflow.activationHelp": "在幕僚会话发送需求，收到启用提议后由你确认。",
+  "ui.durableWorkflow.startProposals": "工作流启用提议",
+  "ui.durableWorkflow.noStartProposals": "此项目暂无启用提议。",
+  "ui.durableWorkflow.originalRequest": "原始需求",
+  "ui.durableWorkflow.proposalReason": "幕僚选用理由",
+  "ui.durableWorkflow.proposalGeneration": "提议代次",
+  "ui.durableWorkflow.activationCard": "工作流启用",
+  "ui.durableWorkflow.revokeProposal": "撤销启用提议",
+  "ui.durableWorkflow.proposalRevoked": "提议已撤销",
+  "ui.durableWorkflow.proposalStale": "提议已失效",
+  "ui.durableWorkflow.startApproved": "已批准，待启动",
+  "ui.durableWorkflow.startCreated": "实例已创建，待排程",
+  "ui.durableWorkflow.startScheduled": "已排程",
+  "ui.durableWorkflow.startStarted": "实例已启动",
+  "ui.durableWorkflow.activationId": "启用记录 ID",
+
+  // ---- 幕僚提出的工作流启用提议 ----
+  "main.workflowStart.title": "确认启用工作流",
+  "main.workflowStart.question": "是否按幕僚提出的定版工作流启动本次需求？",
+  "main.workflowStart.approve": "确认启用",
+  "main.workflowStart.reject": "不启用",
+  "main.workflowStart.preview": "原始需求：{requirement}\n幕僚选用理由：{reason}\n工作流定义：{name}\n定义来源：{source}\n定义 ID：{definitionId}\n定义版本：{version}\n定义摘要：{digest}",
+  "main.workflowStart.waitingForTurn": "已批准，等待本项目的角色回合结束。",
+  "main.workflowStart.waitingForCard": "已批准，等待本项目其他客户决定处理。",
+  "main.workflowStart.blockedByRun": "本项目已有运行或暂不能核实运行状态，启动将等到可以继续。",
+  "main.workflowStart.approvalRequired": "请由幕僚根据普通需求消息提出工作流，再由你本人确认启用。",
 
   // ---- 全局任务状态与版本决策（2026-11-02 global-task-state；A3；P1 审核 §六 冻结）----
   // ui.projectState.*：项目状态面板（62）

@@ -145,7 +145,7 @@ import type {
   WorkerRoleInput,
 } from "../../model/governance-matrix.ts";
 import { isChiefDecisionExecutionContext, isRuntimeSessionDrained } from "../../model/runtime.ts";
-import type { DurableDomainOperation } from "../../model/durable-workflow.ts";
+import type { DurableDomainOperation, DurableRequestWorkflowStartFn } from "../../model/durable-workflow.ts";
 import type {
   RuntimeReplayEntry,
   RuntimeSessionRecord,
@@ -387,6 +387,7 @@ export interface AdapterCapabilities {
    * 注入面：全部内置治理角色（chief 完整、其余按会话角色裁剪；含旧 su 只读）；项目 worker 不注入。
    */
   projectState?: ProjectStateFn;
+  requestWorkflowStart?: DurableRequestWorkflowStartFn;
   /** 2026-11-02：`project_note` 受控备注能力；**只给 trio chief** 注入，未注入 ⇒ 工具不注册。 */
   projectNote?: ProjectNoteFn;
   /** 2026-11-02：`request_version_decision` 能力；**只给 trio chief** 注入，未注入 ⇒ 工具不注册。 */
@@ -1320,6 +1321,7 @@ export async function openRoleSession(
      * **只对内置治理角色（含旧 su）转交**；项目角色即便调用方误给也不注入。纯读、零写入。
      */
     projectState?: ProjectStateFn;
+    requestWorkflowStart?: DurableRequestWorkflowStartFn;
     /** 2026-11-02：`project_note` 受控备注能力；**只对 trio chief 转交**。 */
     projectNote?: ProjectNoteFn;
     /** 2026-11-02：`request_version_decision` 能力；**只对 trio chief 转交**。 */
@@ -2808,6 +2810,8 @@ export async function openRoleSession(
   const effectiveTerminateRoleRun = moduleToolValue("terminateRoleRun", terminateRoleRun, input.terminateRoleRun);
   const effectiveRedispatchTask = moduleToolValue("redispatchTask", redispatchTask, input.redispatchTask);
   const effectiveProjectNote = moduleToolValue("projectNote", projectNote, input.projectNote);
+  const requestWorkflowStart = directGovernance && setup.role.id === "chief" && !input.taskId && !input.workflowDomain
+    && moduleDeclaresTool("requestWorkflowStart") === true ? input.requestWorkflowStart : undefined;
   const effectiveRequestVersionDecision = moduleToolValue("requestVersionDecision", requestVersionDecision, input.requestVersionDecision);
   const moduleSubmitVersionChange = moduleDeclaresTool("submitVersionChange");
   const legacySubmitVersionChange =
@@ -3049,6 +3053,13 @@ export async function openRoleSession(
       });
     }
   }
+  if (requestWorkflowStart) {
+    contextSections = [...(contextSections ?? []),
+      "## 客户需求与工作流启用\n收到普通客户的新需求时，先用 project_state 查当前项目有效工作流目录，"
+      + "按需提供 definitionId 查看定义。根据实际需求和项目条件选择定义，使用 request_workflow_start 提交目录的 ID、来源、摘要和选择理由。"
+      + "工具回执表示待客户本人确认，随后结束当前回合。新需求的首个 A1/B1 阶段须等本人批准并由应用启动；"
+      + "已有实例仍按当前已分配任务及受信状态续办。"];
+  }
   // T3 B1（AC-23）：fixed 会话**不注入** legacy trunk/git/VCA/stable 工具（注入面 = 最强 fail-closed）。
   const legacyOnlyToolsAllowed = sessionWorkflowMode !== "fixed";
   const capabilities: AdapterCapabilities = chiefDecisionContext !== undefined ? {
@@ -3073,6 +3084,7 @@ export async function openRoleSession(
     ...(input.requestDownload !== undefined ? { requestDownload: input.requestDownload } : {}),
     ...(projectState !== undefined ? { projectState } : {}),
     ...(effectiveProjectNote !== undefined ? { projectNote: effectiveProjectNote } : {}),
+    ...(requestWorkflowStart ? { requestWorkflowStart } : {}),
     ...(legacyOnlyToolsAllowed && effectiveRequestVersionDecision !== undefined ? { requestVersionDecision: effectiveRequestVersionDecision } : {}),
     // D 批：验收产物汇报能力已撤除（不注入 reportArtifact）；
     // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层只透传同一引用，不包装、
@@ -4346,6 +4358,7 @@ const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> &
   "intent-confirm": "请改为请幕僚（chief）发起需求确认卡",
   "merge-main": "merge-main 为应用合并通道发起的高风险确认卡，必须客户本人确认、judge 不可代批；不得用 request_choice/request_confirmation 发该卡",
   "stable-write": "stable 写入确认卡由应用自有通道（stable-write-runtime）发起；不得用 request_choice/request_confirmation 发 stable 写入确认卡",
+  "workflow-start": "工作流启用卡由应用在幕僚提交提议后呈现，须客户本人确认",
 };
 
 /**
@@ -4733,6 +4746,7 @@ export function createRuntimeAdapterFactory(
     requestDownload: capabilities?.requestDownload,
     // 2026-11-02（全局任务状态/版本决策）：能力位逐字同名透传；undefined ⇒ 工具不注册。
     projectState: capabilities?.projectState,
+    requestWorkflowStart: capabilities?.requestWorkflowStart,
     projectNote: capabilities?.projectNote,
     requestVersionDecision: capabilities?.requestVersionDecision,
     // G-2/R1-R2：看护三能力并入适配器选项——**契约字段名** `roleStatus` / `sessionTail` /

@@ -17,7 +17,7 @@ import type {
   VersionDecisionStatus,
 } from "./project-state.ts";
 import type { DownloadJudgeFacts, RequestDownloadFn } from "./download.ts";
-import type { DurableResult } from "./durable-workflow.ts";
+import type { DurableRequestWorkflowStartFn, DurableResult } from "./durable-workflow.ts";
 import type { GovernanceMatrixFn } from "./governance-matrix.ts";
 import type {
   DirectActionReceipt,
@@ -919,14 +919,15 @@ export type GovernanceConfirmCardKind = "appointment-write";
  *   变更文件数、diff stat、合并方式与高风险提示；**必须客户本人 approve/reject，judge 不可代批**
  *   （只能转人工/拒绝，不得 approve、不得冒充客户；协调方决策 #4）。合并由应用执行，不经角色
  *   工具/shell，不 push/tag。
- * 两者都只由应用自有通道构造，客户本人回答，**永不进判断器/委托/指令**；都不是
+ * - `workflow-start` = 幕僚选用定版定义后，由应用发给客户本人的流程启用选择卡。
+ * 这些卡只由应用自有通道构造，客户本人回答，**永不进判断器/委托/指令**；都不是
  * `request_choice`/`request_confirmation` 可发卡种（两个工具卡种联合均不含它们），
  * 也都**不进 `GOVERNANCE_CARD_GROUP`**（`governanceCardGroup(...) === undefined`）。
  */
-export type AppOwnedGovernanceCardKind = "stable-write" | "merge-main";
+export type AppOwnedGovernanceCardKind = "stable-write" | "merge-main" | "workflow-start";
 
 /** 应用自有、非判断分组的卡种清单（与 `GOVERNANCE_CARD_GROUP` 键集互斥；`GOVERNANCE_CARD_KINDS` 派生来源）。 */
-export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKind[] = Object.freeze(["stable-write", "merge-main"]);
+export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKind[] = Object.freeze(["stable-write", "merge-main", "workflow-start"]);
 
 /**
  * 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。
@@ -3030,7 +3031,7 @@ export type RequestRequirementChangeFn = (input: RequestRequirementChangeInput) 
  * 注入面由编排/桌面注入端决定：全部内置治理角色（chief 完整、其余按会话角色裁剪），项目 worker 不注入。
  */
 export type ProjectStateFn = (
-  query: ProjectStateQuery,
+  query: ProjectStateQuery & { definitionId?: string },
   metadata?: ReportHandbackMetadata,
 ) => ProjectStateToolResult | Promise<ProjectStateToolResult>;
 
@@ -4413,6 +4414,8 @@ export interface GovernedToolsOptions {
    * （chief 完整、其余按会话角色裁剪），项目 worker 不注入。纯读、零写入；不改变任何写权/判定链。
    */
   projectState?: ProjectStateFn;
+  /** `request_workflow_start` 只提交提议。受信宿主绑定普通幕僚会话及实际客户输入，由客户本人决定是否启用。 */
+  requestWorkflowStart?: DurableRequestWorkflowStartFn;
   /**
    * 治理权力矩阵只读能力（governance-authority-matrix，C2）：`governance_matrix` 工具。
    * **注入才注册**：未注入 ⇒ 工具不存在（能力缺席 = 最强 fail-closed）。注入面由编排（C3）决定：

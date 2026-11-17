@@ -27,6 +27,7 @@ import { extractDispatchReadPaths, planDispatchDelivery } from "../../../src/com
 import { formatMechanicalRejection, humanRejection, technicalRejectionCode, type MechanicalRejection } from "../../../src/common/编排/mechanical-rejection.ts";
 import { classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskEvent, taskIdempotencyKey, type TaskReplay } from "../../../src/common/编排/task-state.ts";
 import { evaluateDispatchAuthorization, loadLatestRoster, reportTargetForTaskCreator, type DispatchPreflightInput, type ProjectRoster, type RosterLoadResult } from "../../../src/common/编排/workflow-preconditions.ts";
+import { readWorkflowLedger } from "../../../src/common/编排/workflow-service.ts";
 import { collectDispatchAdvisories, type DispatchAdvisory } from "../../../src/common/编排/dispatch-advisories.ts";
 import { ensureDraftRun, findActiveRun, loadPinnedRoster, readRunManifest, RUN_PENDING_FLOW_ID, validateRunManifest, verifyPinnedRun, type RunManifest } from "../../../src/common/编排/run-manifest.ts";
 import { collectDispatchBaselineFacts, freezeExecutionRun, inspectAssignedTask, prepareControllerResume, prepareParentTaskRef, prepareRoleDispatch, beginGitHostAction, endGitHostAction, recordTaskObservation } from "../../../src/pipeline/orchestration/trunk-runtime.ts";
@@ -203,6 +204,27 @@ export class Dispatch {
    * 放行文本**入队即定格**（重试复用同一份——绑定「派发那一刻的契约版本」）。回交与客户消息**不经过**本段
    * （不受必读块影响）。
    */
+  private async existingFirstStageWorkflow(
+    projectRoot: string, runtime: RuntimeKind, roleId: string, request: DispatchTaskPayload, source?: ActualDispatchSource,
+  ): Promise<string | undefined> {
+    const actualTaskId = source?.origin.taskId;
+    const current = () => !!source && !!actualTaskId && roleId === "chief" && source.entry.roleId === roleId
+      && source.entry.assignedTaskId === actualTaskId && this.sessions.get(this.sessionKey(projectRoot, roleId, runtime)) === source.entry
+      && source.entry.origins.running === source.origin && source.entry.busy && !source.origin.settled
+      && !source.entry.interactionState.turn.signal.aborted && !source.entry.interactionState.lifetime.signal.aborted;
+    if (!actualTaskId || !current()) return undefined;
+    const state = await this.readTasks(projectRoot);
+    const record = state.records.get(actualTaskId);
+    const task = record?.created;
+    if (!task?.workflowId || task.to !== roleId || record?.closed || task.flowId !== dispatchFlowIdOf(request)
+      || request.workflowId !== undefined && request.workflowId !== task.workflowId) return undefined;
+    const ledger = await readWorkflowLedger(projectRoot);
+    const sameWorkflow = ledger.events.filter(event => event.workflowId === task.workflowId);
+    return !ledger.badLines && !ledger.errors.length && sameWorkflow.some(event => event.kind === "workflow.started"
+      && event.flowId === task.flowId && event.path === request.workflowPath)
+      && !sameWorkflow.some(event => event.kind === "workflow.closed") && current() ? task.workflowId : undefined;
+  }
+
   async routeDispatch(projectRoot: string, runtime: RuntimeKind, fromRoleId: string, d: DispatchTaskPayload, source?: ActualDispatchSource): Promise<DispatchReceipt> {
     const targetRoleId = d && typeof d.roleId === "string" ? d.roleId.trim() : "";
     const task = d && typeof d.task === "string" ? d.task : "";
@@ -221,6 +243,15 @@ export class Dispatch {
         return { ok: false, message: "workflow-owner-conflict: This repository has an active durable workflow." };
       }
       return this.port.routeDurableDispatch(projection, runtime, fromRoleId, d, targetRoleId, task, source);
+    }
+    if (this.deps.workflowChiefStart?.mode(projectRoot) && d.taskKind === "stage-request"
+      && (d.stage === "A1" || d.stage === "B1") && (d.workflowAction ?? "advance") === "advance") {
+      const existing = await this.existingFirstStageWorkflow(projectRoot, runtime, fromRoleId, d, source);
+      if (!existing) {
+        const reason = `workflow-start-confirmation-required: ${mainT("main.workflowStart.approvalRequired")}`;
+        return fail(reason, reason);
+      }
+      d = { ...d, workflowId: existing };
     }
     // —— 来源防御性校验 ——
     // trio：只有幕僚（chief）可派发（星形主链）；single：主入口（su）。正常路径由 `open()` 的能力注入

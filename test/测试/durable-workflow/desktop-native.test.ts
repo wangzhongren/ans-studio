@@ -47,7 +47,7 @@ for (const mode of ["normal", "pending-card-restart", "daprd-loss-during-handbac
   simulateNetwork = handle.simulateNetwork;
   t.after(() => handle.close());
   const selector = { projectRoot: f.root };
-  const started = unwrap(await handle.desktop.startDurableWorkflow({ ...selector, enabled: true, definitionId: "path-b",
+  const started = unwrap(await handle.startViaChief({ ...selector, enabled: true, definitionId: "path-b",
     requestId: "w5-normal-chain", summary: "Fix collision threshold in the existing Git project" }));
   assert.ok(started.instance);
   instanceId = started.instance.instanceId;
@@ -161,7 +161,7 @@ test("Native Desktop blocks unsupported repo-local Git config before any instanc
   const handle = await app(f, model, log);
   t.after(() => handle.close());
   const selector = { projectRoot: f.root };
-  const result = await handle.desktop.startDurableWorkflow({ ...selector, enabled: true, definitionId: "path-b", requestId: "invalid-git-config", summary: "A B1 task must not be created" });
+  const result = await handle.startViaChief({ ...selector, enabled: true, definitionId: "path-b", requestId: "invalid-git-config", summary: "A B1 task must not be created" });
   assert.equal(result.ok, false, JSON.stringify(result));
   assert.equal(result.code, "workflow-git-protection-unavailable");
   const view = unwrap(await handle.desktop.getDurableWorkflowProjection(selector));

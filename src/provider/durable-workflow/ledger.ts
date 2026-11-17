@@ -5,6 +5,7 @@ import type {
   DurableActionIntent, DurableDefinitionSnapshot, DurableDelivery, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome,
   DurableEvidenceRef, DurableFact, DurableFactReceipt, DurableInstanceRef, DurableOwner, DurableProjection, DurableReleaseRequest,
   DurableGraphCard, DurablePendingTask, DurableScopeDecision, DurableTaskBinding, DurableTerminal, DurableWriteSet,
+  DurableStartInput, DurableStartProposal,
 } from '../../model/durable-workflow.ts';
 import type { RepositoryIdentity } from './files.ts';
 
@@ -63,6 +64,26 @@ export interface StoredEffect {
   result?: DurableEffectOutcome;
 }
 export interface OutboxItem { instanceId: string; key: string; nextAt: number; attempts: number; phase: 'pending' | 'accepted' }
+
+export interface StoredStartSelection {
+  definition: DurableDefinitionSnapshot;
+  source: DurableStartProposal['definition']['source'];
+  file: string;
+  fileDigest: string;
+}
+
+export interface StoredStartProposal {
+  proposal: DurableStartProposal;
+  selection: StoredStartSelection;
+  fingerprint: string;
+  start: DurableStartInput;
+}
+
+export interface StoredApprovedStart {
+  activationId: string;
+  start: DurableStartInput;
+  selection: StoredStartSelection;
+}
 
 type JsonRow = { data: string };
 const asJson = <T>(row: unknown): T | undefined => row === undefined ? undefined : JSON.parse((row as JsonRow).data) as T;
@@ -126,6 +147,16 @@ export class DurableLedger {
       CREATE TABLE IF NOT EXISTS delivery_receipt (
         delivery_id TEXT PRIMARY KEY REFERENCES delivery_note(id), delivered_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS workflow_start_proposal (
+        activation_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, input_id TEXT NOT NULL, generation INTEGER NOT NULL,
+        state TEXT NOT NULL, data TEXT NOT NULL, UNIQUE(project_id,input_id,generation)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS workflow_start_proposal_active_input
+        ON workflow_start_proposal(project_id,input_id) WHERE state IN ('pending','approved','started');
+      CREATE TABLE IF NOT EXISTS workflow_start_job (
+        activation_id TEXT PRIMARY KEY REFERENCES workflow_start_proposal(activation_id),
+        startup_key TEXT NOT NULL UNIQUE, data TEXT NOT NULL
+      );
     `);
   }
 
@@ -187,6 +218,34 @@ export class DurableLedger {
   definition(projectId: string, definitionId: string, version: number): DurableDefinitionSnapshot | undefined {
     return asJson(this.#db.prepare('SELECT data FROM definition WHERE project_id=? AND definition_id=? AND version=?')
       .get(projectId, definitionId, version));
+  }
+
+  startProposal(activationId: string): StoredStartProposal | undefined {
+    return asJson(this.#db.prepare('SELECT data FROM workflow_start_proposal WHERE activation_id=?').get(activationId));
+  }
+
+  startProposals(projectId: string, inputId?: string): StoredStartProposal[] {
+    const query = 'SELECT data FROM workflow_start_proposal WHERE project_id=?';
+    const rows = inputId === undefined
+      ? this.#db.prepare(query + ' ORDER BY rowid').all(projectId)
+      : this.#db.prepare(query + ' AND input_id=? ORDER BY generation').all(projectId, inputId);
+    return rows.map(row => asJson<StoredStartProposal>(row)!);
+  }
+
+  saveStartProposal(value: StoredStartProposal): void {
+    const { activationId, projectId, requirement, generation, state } = value.proposal;
+    this.#db.prepare(`INSERT INTO workflow_start_proposal(activation_id,project_id,input_id,generation,state,data) VALUES(?,?,?,?,?,?)
+      ON CONFLICT(activation_id) DO UPDATE SET state=excluded.state,data=excluded.data`)
+      .run(activationId, projectId, requirement.inputId, generation, state, JSON.stringify(value));
+  }
+
+  approvedStart(activationId: string): StoredApprovedStart | undefined {
+    return asJson(this.#db.prepare('SELECT data FROM workflow_start_job WHERE activation_id=?').get(activationId));
+  }
+
+  saveApprovedStart(value: StoredApprovedStart): void {
+    this.#db.prepare('INSERT INTO workflow_start_job(activation_id,startup_key,data) VALUES(?,?,?)')
+      .run(value.activationId, value.start.requestId, JSON.stringify(value));
   }
 
   pin(projectId: string, value: DurableDefinitionSnapshot): void {

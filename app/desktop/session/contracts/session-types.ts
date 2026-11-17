@@ -106,6 +106,8 @@ export interface EffectiveConfigInfo {
 
 export interface SessionMessageMetadata {
   clientMessageId?: string;
+  /** Minted inside the desktop host after validating the current main frame. */
+  workflowInput?: TrustedWorkflowCustomerInput;
   /** **应用代客户推进治理流程**（2026-10-18 客户修正）：后台投递标记——不抢 `activeRoleId`/当前 pane，
    *  边界陈旧重建也按「非用户发起」处理。仅桌面主进程内部使用（渲染侧传了也不构成任何权限）。 */
   background?: boolean;
@@ -115,6 +117,14 @@ export interface SessionMessageMetadata {
    * （真实客户消息语义逐字不变）。仅桌面主进程内部使用；渲染侧/客户输入不构成权限。
    */
   kind?: "system";
+}
+
+export interface TrustedWorkflowCustomerInput {
+  readonly inputId: string;
+  readonly projectRoot: string;
+  readonly selectionId: string;
+  readonly text: string;
+  readonly digest: string;
 }
 
 export interface SessionTarget { projectRoot?: string; roleId: string; runtime?: RuntimeKind }
@@ -229,6 +239,8 @@ export interface DeliveryOrigin {
   outcome?: RuntimeTurnOutcome;
   clientMessageId?: string;
   turnId?: string;
+  workflowInput?: TrustedWorkflowCustomerInput;
+  workflowInputAck?: string;
   settled: boolean;
   /** 本轮由哪类投递开跑（settle 后「收尾推进」据此只认回交轮）。 */
   kind?: DeliveryItem["kind"];
@@ -360,6 +372,8 @@ export interface DeliveryItem {
   safeText?: string;
   attemptId?: string;
   clientMessageId?: string;
+  /** Live authority only. A restored background queue item cannot mint it. */
+  workflowInput?: TrustedWorkflowCustomerInput;
   runtime: RuntimeKind;
   /**
    * 投递类别：`handback` 回交 / `dispatch` 派发 / `message` 客户消息 / **`system` 系统消息**

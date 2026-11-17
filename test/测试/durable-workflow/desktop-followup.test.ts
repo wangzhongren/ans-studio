@@ -45,7 +45,7 @@ test("The same Desktop and operator disposition follow different Path B YAML bra
   const handle = await app(f, model, log);
   t.after(() => handle.close());
   const selector = { projectRoot: f.root };
-  const start = async (requestId: string) => unwrap(await handle.desktop.startDurableWorkflow({ ...selector, definitionId: "path-b", enabled: true,
+  const start = async (requestId: string) => unwrap(await handle.startViaChief({ ...selector, definitionId: "path-b", enabled: true,
     requestId, summary: "Examine the collision threshold; report if further checking is needed" })).instance!;
   const blocked = (instanceId: string) => until("Path B terminal or configured follow-up is exhausted", async () => {
     const view = unwrap(await handle.desktop.getDurableWorkflowProjection({ ...selector, instanceId }));

@@ -860,6 +860,7 @@ function registerIpc(win: BrowserWindow): void {
     },
     // 客户交互通道（A-5）：仅内置治理角色（su）会话消费（见 session.ts 的注入判据）。
     customerInput: customerChannel.customerInput,
+    hasPendingProjectCard: projectRoot => customerChannel.hasPendingProjectCard(projectRoot),
     // 2026-11-04 trunk-amendment-model D1：`trunk:state` 单一状态源推送（主→渲；事件去抖在 Interface）。
     emitTrunkState: (payload) => {
       if (!win.isDestroyed()) win.webContents.send("trunk:state", payload);
@@ -973,11 +974,12 @@ function registerIpc(win: BrowserWindow): void {
   // 交互回包（A-5）：渲染侧提交决定 → 通道按**请求快照**校验（选项 id ⊆ 已发、单选恰一个、类型相符）
   // → 解挂为冻结三态；非法回包不受理（pending 保留，界面可重试失败后修正）。
   registerHandler("session:operator-response", async (event, input) => {
-    if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) {
+    const isMainFrameCurrent = () => !win.isDestroyed() && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;
+    if (!isMainFrameCurrent()) {
       return { ok: false, error: "Invalid customer decision source." };
     }
     const response = input && typeof input === "object" ? input : {};
-    return await customerChannel.respondDurable(response) ?? await desktop.replayDurableReleaseDecision(response)
+    return await customerChannel.respondDurable(response, isMainFrameCurrent) ?? await desktop.replayDurableReleaseDecision(response)
       ?? customerChannel.respond(response);
   });
 
@@ -994,6 +996,12 @@ function registerIpc(win: BrowserWindow): void {
     event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.importDurableWorkflow(input) : workflowSourceError());
   registerHandler("durable-workflow:start", (event, input) =>
     event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.startDurableWorkflow(input) : workflowSourceError());
+  registerHandler("durable-workflow:start-proposals", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.listWorkflowStartProposals(input) : workflowSourceError());
+  registerHandler("durable-workflow:start-proposal-revoke", (event, input) => {
+    const isMainFrameCurrent = () => !win.isDestroyed() && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;
+    return isMainFrameCurrent() ? desktop.revokeWorkflowStartProposal(input, isMainFrameCurrent) : workflowSourceError();
+  });
   registerHandler("durable-workflow:projection", (event, input) =>
     event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.getDurableWorkflowProjection(input) : workflowSourceError());
   registerHandler("durable-workflow:delivery-read", (event, input) =>
@@ -1079,7 +1087,10 @@ function registerIpc(win: BrowserWindow): void {
     if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
     return desktop.requestTrunkRecover(input);
   });
-  registerHandler("session:send", (_e, input: Parameters<DesktopInterface["sendSession"]>[0]) => desktop.sendSession(input));
+  registerHandler("session:send", (event, input: Parameters<DesktopInterface["sendSession"]>[0]) => {
+    const isMainFrameCurrent = () => !win.isDestroyed() && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;
+    return isMainFrameCurrent() ? desktop.sendSession(input, isMainFrameCurrent) : { ok: false, error: "Invalid customer input source." };
+  });
   // —————— 客户授权平面（C1，2026-11-03）：渲→主 invoke 三通道（sender 校验同既有模式）——————
   // `directive:confirm-request`/`directive:state` 只做主→渲推送，无入站 handler。
   registerHandler("directive:confirm-response", (event, input) => {

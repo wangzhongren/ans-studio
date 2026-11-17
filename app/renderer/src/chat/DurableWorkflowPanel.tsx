@@ -1,13 +1,14 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useChatStore } from "@/chat/chat-store";
+import { isWorkflowStartCard } from "@/chat/decision-card";
+import { decisionRequestOf } from "@/chat/decision-dialog";
 import {
   getDurableWorkflowBridge,
-  pendingDurableStart,
-  submitDurableStart,
   type DesktopDurableDefinition,
   type DesktopDurableInstance,
   type DesktopDurableView,
+  type DesktopWorkflowStartProposal,
   type DurableDeliverySummary,
   type DurableDeliveryView,
   type DurableProblem,
@@ -17,7 +18,6 @@ import {
 } from "@/chat/ipc";
 import { runtimeLabel } from "@/chat/runtime-config";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useLocaleState, useT, type MessageKey } from "@/i18n";
 import { useDecisionCenterStore } from "@/stores/decision-center-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -78,6 +78,28 @@ const pendingTaskKeys: Readonly<Record<string, MessageKey>> = {
   reported: "ui.durableWorkflow.taskReported",
 };
 
+const proposalKeys = {
+  pending: "ui.durableWorkflow.approval.pending",
+  approved: "ui.durableWorkflow.startApproved",
+  rejected: "ui.durableWorkflow.approval.reject",
+  revoked: "ui.durableWorkflow.proposalRevoked",
+  stale: "ui.durableWorkflow.proposalStale",
+  started: "ui.durableWorkflow.startStarted",
+} satisfies Record<DesktopWorkflowStartProposal["state"], MessageKey>;
+
+const startupKeys = {
+  waiting: "ui.durableWorkflow.startApproved",
+  blocked: "ui.durableWorkflow.status.blocked",
+  created: "ui.durableWorkflow.startCreated",
+  scheduled: "ui.durableWorkflow.startScheduled",
+} satisfies Record<NonNullable<DesktopWorkflowStartProposal["startup"]>["state"], MessageKey>;
+
+const proposalDecisionKeys = {
+  approve: "ui.durableWorkflow.approval.approve",
+  reject: "ui.durableWorkflow.approval.reject",
+  revoke: "ui.durableWorkflow.proposalRevoked",
+} satisfies Record<NonNullable<DesktopWorkflowStartProposal["decision"]>["action"], MessageKey>;
+
 function detail(problem: Partial<DurableProblem>): string {
   return [problem.code, problem.path, problem.message].filter(Boolean).join(" · ");
 }
@@ -87,7 +109,7 @@ function Fact({ label, value, wide }: { label: string; value?: string | number; 
   return (
     <div className={wide ? "ps-row col-span-full" : "ps-row"}>
       <dt className="ps-secondary">{label}</dt>
-      <dd className="ps-primary m-0">{value}</dd>
+      <dd className="ps-primary m-0 whitespace-pre-wrap">{value}</dd>
     </div>
   );
 }
@@ -367,25 +389,171 @@ function projectOverride(definitions: readonly DesktopDurableDefinition[], prese
     (definition.id === preset.id || definition.file === preset.file));
 }
 
-function WorkflowStartForm({
-  bridge,
-  projectRoot,
-  refreshVersion,
-  onStarted,
+function WorkflowStartProposals({
+  bridge, projectRoot, refreshVersion, onFindInstance,
 }: {
   bridge: DurableWorkflowBridge;
   projectRoot: string;
   refreshVersion: number;
-  onStarted: (view: DesktopDurableView) => void;
+  onFindInstance: (id: string) => void;
+}) {
+  const t = useT();
+  const pendingOperator = useChatStore((state) => state.pendingOperator);
+  const queuedOperator = useChatStore((state) => state.queuedOperator);
+  const [proposals, setProposals] = useState<DesktopWorkflowStartProposal[]>();
+  const [loadError, setLoadError] = useState<true | DurableProblem>();
+  const [revokeError, setRevokeError] = useState<{ id: string; problem: true | DurableProblem }>();
+  const [revoking, setRevoking] = useState("");
+  const revokeLock = useRef(false);
+  const mounted = useRef(false);
+  const revision = useRef(0);
+
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  useEffect(() => {
+    let current = true;
+    let timer: number | undefined;
+    const refresh = async () => {
+      const version = revision.current;
+      try {
+        const result = await bridge.listWorkflowStartProposals({ projectRoot });
+        if (!current || version !== revision.current) return;
+        if (result.ok) {
+          setProposals(result.value);
+          setLoadError(undefined);
+        } else {
+          setLoadError(result);
+        }
+      } catch {
+        if (current && version === revision.current) setLoadError(true);
+      } finally {
+        if (current) timer = window.setTimeout(() => void refresh(), 2_000);
+      }
+    };
+    void refresh();
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+  }, [bridge, projectRoot, refreshVersion]);
+
+  const revoke = async (proposal: DesktopWorkflowStartProposal) => {
+    if (revokeLock.current || proposal.state !== "pending" || useChatStore.getState().projectRoot !== projectRoot) return;
+    const { activationId, requestId } = proposal;
+    revokeLock.current = true;
+    setRevoking(activationId);
+    setRevokeError(undefined);
+    try {
+      const result = await bridge.revokeWorkflowStartProposal({ projectRoot, activationId, requestId });
+      if (!mounted.current || useChatStore.getState().projectRoot !== projectRoot) return;
+      if (!result.ok) {
+        setRevokeError({ id: activationId, problem: result });
+        return;
+      }
+      if (result.value.activationId !== activationId || result.value.requestId !== requestId) {
+        setRevokeError({ id: activationId, problem: true });
+        return;
+      }
+      revision.current += 1;
+      setProposals((records) => records?.map((record) => record.activationId === activationId ? result.value : record));
+    } catch {
+      if (mounted.current) setRevokeError({ id: activationId, problem: true });
+    } finally {
+      revokeLock.current = false;
+      if (mounted.current) setRevoking("");
+    }
+  };
+
+  return (
+    <section className="ps-section" aria-label={t("ui.durableWorkflow.startProposals")} data-workflow-start-proposals>
+      <h3 className="ps-title">{t("ui.durableWorkflow.startProposals")}</h3>
+      <p className="ps-note">{t("ui.durableWorkflow.activationHelp")}</p>
+      {loadError ? (
+        <p className="ps-error" role="alert">
+          {loadError === true ? t("ui.durableWorkflow.statusError") : detail(loadError)}
+        </p>
+      ) : null}
+      {proposals?.length === 0 ? <p className="ps-note">{t("ui.durableWorkflow.noStartProposals")}</p> : null}
+      {!proposals && !loadError ? <p className="ps-note" role="status">{t("ui.durableWorkflow.loading")}</p> : null}
+      {proposals?.map((proposal) => {
+        const { activationId, requestId, decision, definition, instanceId, startup } = proposal;
+        const canReview = proposal.state === "pending" && isWorkflowStartCard(decisionRequestOf(pendingOperator[requestId]));
+        const queued = proposal.state === "pending" && Boolean(queuedOperator[requestId]);
+        const statusKey = startup && (proposal.state === "approved" || proposal.state === "started")
+          ? startupKeys[startup.state]
+          : proposalKeys[proposal.state];
+        const failure = revokeError?.id === activationId ? revokeError.problem : undefined;
+        return (
+          <details
+            className="ps-details ps-row"
+            key={activationId}
+            data-workflow-start-proposal={activationId}
+            data-request-id={requestId}
+            data-proposal-state={proposal.state}
+            data-startup-state={startup?.state}
+          >
+            <summary className="ps-primary">{definition.name} · {t(statusKey)}</summary>
+            <dl className="ps-list">
+              <Fact label={t("ui.durableWorkflow.originalRequest")} value={proposal.requirement.text} />
+              <Fact label={t("ui.durableWorkflow.proposalReason")} value={proposal.reason} />
+              <Fact label={t("ui.durableWorkflow.definition")} value={definition.id} />
+              <Fact label={t("ui.durableWorkflow.definitionSource")} value={t(sourceKeys[definition.source])} />
+              <Fact label={t("ui.durableWorkflow.version")} value={definition.version} />
+              <Fact label={t("ui.durableWorkflow.digest")} value={definition.digest} />
+              <Fact label={t("ui.durableWorkflow.activationId")} value={activationId} />
+              <Fact label={t("ui.durableWorkflow.recordId")} value={requestId} />
+              <Fact label={t("ui.durableWorkflow.proposalGeneration")} value={proposal.generation} />
+              <Fact label={t("ui.durableWorkflow.recordedAt")} value={proposal.createdAt} />
+              {decision ? <Fact label={t("ui.decisionDialog.result")} value={`${t(proposalDecisionKeys[decision.action])} · ${decision.at}`} /> : null}
+              <Fact label={t("ui.durableWorkflow.instance")} value={instanceId} />
+            </dl>
+            {startup?.code || startup?.message ? <p className="ps-error" role="status">{detail(startup)}</p> : null}
+            {queued ? <p className="ps-note">{t("ui.decisionDialog.statusQueued")}</p> : null}
+            {failure ? (
+              <p className="ps-error" role="alert">{failure === true ? t("ui.durableWorkflow.requestError") : detail(failure)}</p>
+            ) : null}
+            <div className="ps-tools">
+              {canReview ? (
+                <Button type="button" variant="outline" size="sm" disabled={Boolean(revoking)}
+                  onClick={() => useDecisionCenterStore.getState().open(requestId)}>
+                  {t("ui.decisionDialog.open")}
+                </Button>
+              ) : null}
+              {proposal.state === "pending" ? (
+                <Button type="button" variant="outline" size="sm" disabled={Boolean(revoking)} onClick={() => void revoke(proposal)}>
+                  {t("ui.durableWorkflow.revokeProposal")}
+                </Button>
+              ) : null}
+              {instanceId ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => onFindInstance(instanceId)}>
+                  {t("ui.durableWorkflow.find")}
+                </Button>
+              ) : null}
+            </div>
+          </details>
+        );
+      })}
+    </section>
+  );
+}
+
+function WorkflowDefinitions({
+  bridge,
+  projectRoot,
+  refreshVersion,
+}: {
+  bridge: DurableWorkflowBridge;
+  projectRoot: string;
+  refreshVersion: number;
 }) {
   const t = useT();
   const definitionLabelId = useId();
-  const summaryLabelId = useId();
   const [definitions, setDefinitions] = useState<DesktopDurableDefinition[]>();
   const [listError, setListError] = useState<true | DurableProblem>();
   const [selection, setSelection] = useState<DesktopDurableDefinition>();
-  const [pending, setPending] = useState(() => pendingDurableStart(projectRoot));
-  const [summary, setSummary] = useState(pending?.summary ?? "");
   const [validated, setValidated] = useState<DesktopDurableDefinition>();
   const [error, setError] = useState<true | DurableProblem>();
   const [busy, setBusy] = useState(false);
@@ -427,7 +595,7 @@ function WorkflowStartForm({
   }, [bridge, projectRoot, refreshVersion]);
 
   const validate = async () => {
-    if (!selected || busyLock.current || pending) return;
+    if (!selected || busyLock.current) return;
     const revision = listRevision.current;
     busyLock.current = true;
     setBusy(true);
@@ -450,7 +618,7 @@ function WorkflowStartForm({
   };
 
   const installDefinition = async (operation: () => Promise<DurableResult<DesktopDurableDefinition>>) => {
-    if (busyLock.current || pending) return;
+    if (busyLock.current) return;
     busyLock.current = true;
     setBusy(true);
     setError(undefined);
@@ -476,68 +644,22 @@ function WorkflowStartForm({
     }
   };
 
-  const startable = Boolean(validated?.digest && selected && definitionKey(validated) === selectedKey && !selected.error && summary.trim());
-  const start = async () => {
-    const draft = pending ?? (startable && validated
-      ? { projectRoot, definitionId: validated.id, source: validated.source, expectedDigest: validated.digest, summary: summary.trim() }
-      : undefined);
-    if (!draft || busyLock.current) return;
-    busyLock.current = true;
-    setBusy(true);
-    setError(undefined);
-    try {
-      const result = await submitDurableStart(bridge, draft);
-      if (!mounted.current) return;
-      if (result.ok) {
-        setSummary("");
-        setValidated(undefined);
-        setSelection(undefined);
-        onStarted(result.value);
-      } else {
-        setError(result);
-        if (result.code.startsWith("definition-")) setValidated(undefined);
-      }
-    } catch {
-      if (mounted.current) setError(true);
-    } finally {
-      busyLock.current = false;
-      if (mounted.current) {
-        setPending(pendingDurableStart(projectRoot));
-        setBusy(false);
-      }
-    }
-  };
-
   const issue = error || listError;
   const definition = selected && (validated ?? selected);
   return (
-    <form
-      className="ps-section"
-      aria-label={t("ui.durableWorkflow.start")}
-      aria-busy={busy}
-      onSubmit={(event) => { event.preventDefault(); void start(); }}
-    >
+    <section className="ps-section" aria-label={t("ui.durableWorkflow.definitions")} aria-busy={busy}>
       {issue ? (
         <p className="ps-error break-all" role="alert">
           {issue === true ? t("ui.durableWorkflow.requestError") : detail(issue)}
         </p>
       ) : null}
-      {pending ? (
-        <p className="ps-note" role="status">{t("ui.durableWorkflow.startUnknown")}</p>
-      ) : null}
-      {!pending && definitions?.length === 0 ? (
+      {definitions?.length === 0 ? (
         <p className="ps-note">{t("ui.durableWorkflow.none")}</p>
       ) : null}
-      {!pending && !definitions && !listError ? (
+      {!definitions && !listError ? (
         <p className="ps-note" role="status">{t("ui.durableWorkflow.loading")}</p>
       ) : null}
-      {pending ? (
-        <dl className="ps-list">
-          <Fact label={t("ui.durableWorkflow.definition")} value={pending.definitionId} />
-          <Fact label={t("ui.durableWorkflow.definitionSource")} value={pending.source ? t(sourceKeys[pending.source]) : undefined} />
-          <Fact label={t("ui.durableWorkflow.digest")} value={pending.expectedDigest} />
-        </dl>
-      ) : choices?.length || missingSelection ? (
+      {choices?.length || missingSelection ? (
         <>
           <label className="ps-heading" htmlFor={definitionLabelId}>{t("ui.durableWorkflow.definition")}</label>
           <select
@@ -587,30 +709,12 @@ function WorkflowStartForm({
           </div>
         </>
       ) : null}
-      {!pending ? (
-        <Button type="button" variant="outline" size="sm" className="self-start"
-          disabled={busy || (!definitions && !listError)}
-          onClick={() => void installDefinition(() => bridge.importDurableWorkflow({ projectRoot }))}>
-          {t("ui.durableWorkflow.importDefinition")}
-        </Button>
-      ) : null}
-      {pending || definitions?.length ? (
-        <>
-          <label className="ps-heading" htmlFor={summaryLabelId}>{t("ui.durableWorkflow.summary")}</label>
-          <Textarea
-            id={summaryLabelId}
-            value={pending?.summary ?? summary}
-            disabled={Boolean(pending) || busy}
-            onChange={(event) => setSummary(event.target.value)}
-            maxLength={12_000}
-            rows={3}
-          />
-          <Button type="submit" size="sm" className="self-start" disabled={busy || (!pending && !startable)}>
-            {t(pending ? "ui.durableWorkflow.retryStart" : "ui.durableWorkflow.start")}
-          </Button>
-        </>
-      ) : null}
-    </form>
+      <Button type="button" variant="outline" size="sm" className="self-start"
+        disabled={busy || (!definitions && !listError)}
+        onClick={() => void installDefinition(() => bridge.importDurableWorkflow({ projectRoot }))}>
+        {t("ui.durableWorkflow.importDefinition")}
+      </Button>
+    </section>
   );
 }
 
@@ -620,7 +724,7 @@ export function DurableWorkflowPanel({ projectRoot }: { projectRoot: string }) {
   const instanceLabelId = useId();
   const bridge = getDurableWorkflowBridge();
   const [expanded, setExpanded] = useState(false);
-  const [enabled, setEnabled] = useState(false);
+  const [showDefinitions, setShowDefinitions] = useState(false);
   const [view, setView] = useState<DesktopDurableView>();
   const [projectionError, setProjectionError] = useState<true | DurableProblem>();
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -680,6 +784,10 @@ export function DurableWorkflowPanel({ projectRoot }: { projectRoot: string }) {
               {t("ui.projectState.refresh")}
             </button>
           </div>
+          {drawerOpen ? (
+            <WorkflowStartProposals bridge={bridge} projectRoot={projectRoot} refreshVersion={refreshVersion}
+              onFindInstance={(id) => { setInstanceInput(id); changeInstance(id); }} />
+          ) : null}
           {projectionError ? (
             <p className="ps-error break-all" role="status">
               {projectionError === true ? t("ui.durableWorkflow.statusError") : detail(projectionError)}
@@ -726,24 +834,12 @@ export function DurableWorkflowPanel({ projectRoot }: { projectRoot: string }) {
             </div>
           </form>
 
-          <label className="ps-primary flex items-start gap-2">
-            <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
-            {t("ui.durableWorkflow.enable")}
-          </label>
-          {enabled && drawerOpen ? (
-            <WorkflowStartForm
-              bridge={bridge}
-              projectRoot={projectRoot}
-              refreshVersion={refreshVersion}
-              onStarted={(startedView) => {
-                const id = startedView.instance?.instanceId ?? "";
-                setQuery({ instanceId: id });
-                setInstanceInput(id);
-                setView(startedView);
-                setProjectionError(undefined);
-              }}
-            />
-          ) : null}
+          <details className="ps-details" data-workflow-definitions onToggle={(event) => setShowDefinitions(event.currentTarget.open)}>
+            <summary>{t("ui.durableWorkflow.definitions")}</summary>
+            {showDefinitions && drawerOpen ? (
+              <WorkflowDefinitions bridge={bridge} projectRoot={projectRoot} refreshVersion={refreshVersion} />
+            ) : null}
+          </details>
         </>
       ) : null}
     </details>

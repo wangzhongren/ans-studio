@@ -2347,6 +2347,33 @@ export const enUS = {
   "ui.durableWorkflow.pendingTasks": "Workflow tasks",
   "ui.durableWorkflow.definitionMissing": "The selected definition is unavailable. Restore the file and refresh, or select another definition.",
   "ui.durableWorkflow.taskReported": "Report submitted",
+  "ui.durableWorkflow.definitions": "Workflow definitions",
+  "ui.durableWorkflow.activationHelp": "Send your request in the Chief conversation, then review the activation proposal.",
+  "ui.durableWorkflow.startProposals": "Workflow activation proposals",
+  "ui.durableWorkflow.noStartProposals": "This project has no activation proposals.",
+  "ui.durableWorkflow.originalRequest": "Original request",
+  "ui.durableWorkflow.proposalReason": "Chief’s reason",
+  "ui.durableWorkflow.proposalGeneration": "Proposal generation",
+  "ui.durableWorkflow.activationCard": "Workflow activation",
+  "ui.durableWorkflow.revokeProposal": "Revoke activation proposal",
+  "ui.durableWorkflow.proposalRevoked": "Proposal revoked",
+  "ui.durableWorkflow.proposalStale": "Proposal no longer valid",
+  "ui.durableWorkflow.startApproved": "Approved, awaiting startup",
+  "ui.durableWorkflow.startCreated": "Instance created, awaiting scheduling",
+  "ui.durableWorkflow.startScheduled": "Scheduled",
+  "ui.durableWorkflow.startStarted": "Instance started",
+  "ui.durableWorkflow.activationId": "Activation record ID",
+
+  // ---- Chief workflow activation proposal ----
+  "main.workflowStart.title": "Confirm workflow activation",
+  "main.workflowStart.question": "Start this request with the workflow version recommended by Chief?",
+  "main.workflowStart.approve": "Confirm activation",
+  "main.workflowStart.reject": "Do not activate",
+  "main.workflowStart.preview": "Original request: {requirement}\nChief’s reason: {reason}\nWorkflow definition: {name}\nDefinition source: {source}\nDefinition ID: {definitionId}\nDefinition version: {version}\nDefinition digest: {digest}",
+  "main.workflowStart.waitingForTurn": "Approved. Waiting for the active project role turn to finish.",
+  "main.workflowStart.waitingForCard": "Approved. Waiting for the other customer decisions in this project.",
+  "main.workflowStart.blockedByRun": "This project has an active run or its state is unavailable. Startup will wait.",
+  "main.workflowStart.approvalRequired": "Ask Chief to recommend a workflow from your conversation, then confirm activation yourself.",
 
   // ---- Global task state and version decision (2026-11-02 global-task-state; A3; frozen in P1 review §6) ----
   // ui.projectState.*: project-state panel (62)

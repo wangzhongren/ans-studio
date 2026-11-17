@@ -209,10 +209,10 @@ test("context 矩阵缺省/显式 legacy-v1/空输入：返回同一 legacy 冻�
 
 // —————————————————————— tools：不新增 requestReleaseMerge（G-IR 拒绝项） ——————————————————————
 
-test("tools：fixed 批次不新增发布合并工具；trio 声明仍为冻结的 6 项（含 closeCreatedTask）", () => {
+test("tools：fixed 批次保留六项工具并追加工作流启用提议，发布和合并继续由应用授权", () => {
   const policy = chiefRoleModule.tools({ governanceModel: "trio" });
   assert.deepEqual([...policy.tools], [...CHIEF_TOOL_IDS], "tools 声明与 CHIEF_TOOL_IDS 同源");
-  assert.deepEqual([...policy.tools], [
+  assert.deepEqual(policy.tools.slice(0, 6), [
     "roleActivityLog",
     "terminateRoleRun",
     "redispatchTask",
@@ -220,7 +220,7 @@ test("tools：fixed 批次不新增发布合并工具；trio 声明仍为冻结�
     "requestVersionDecision",
     "closeCreatedTask",
   ], "trio 工具 6 项/顺序逐字冻结");
-  assert.equal(policy.tools.length, 6);
+  assert.deepEqual(policy.tools.slice(6), ["requestWorkflowStart"]);
   assert.equal(policy.tools.some((id) => /release|merge/i.test(id)), false, "不得出现发布/合并类工具 id");
   assert.equal(Object.keys(chiefRoleModule).some((key) => /release|merge/i.test(key)), false, "模块对象不得新增发布/合并字段");
 });

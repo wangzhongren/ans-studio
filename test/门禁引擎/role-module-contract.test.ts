@@ -116,7 +116,7 @@ type _PreflightOptional = Assert<Equal<undefined extends BuiltInRoleModule["pref
 type _PreflightInput = Assert<Equal<Parameters<RolePreflightHooks["checkAction"]>[0], RolePreflightInput>>;
 type _PreflightOutput = Assert<Equal<ReturnType<RolePreflightHooks["checkAction"]>, RolePolicyDecision>>;
 
-// —— E0.2 D1：RoleToolId 14 id 闭集 + RoleToolName 14 snake_case 闭集；RoleToolPolicy.tools 保持 RoleToolId[] —— //
+// —— E0.2 D1 与幕僚启动 v1.1：RoleToolId / RoleToolName 闭集 —— //
 
 type _ToolIdSet = Assert<
   Equal<
@@ -135,6 +135,7 @@ type _ToolIdSet = Assert<
     | "submitRefactor"
     | "requestStableWrite"
     | "decidePendingRequest"
+    | "requestWorkflowStart"
   >
 >;
 type _ToolNameSet = Assert<
@@ -154,6 +155,7 @@ type _ToolNameSet = Assert<
     | "submit_refactor"
     | "request_stable_write"
     | "decide_pending_request"
+    | "request_workflow_start"
   >
 >;
 type _ToolPolicyTools = Assert<Equal<RoleToolPolicy["tools"], readonly RoleToolId[]>>;
@@ -753,7 +755,7 @@ const EXPECTED_ROLE_TOOL_TABLE = [
 
 test("D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致", () => {
   assert.equal(EXPECTED_ROLE_TOOL_TABLE.length, 14);
-  assert.equal(ROLE_TOOL_CATALOG.length, 14);
+  assert.equal(ROLE_TOOL_CATALOG.length, 15);
   for (let index = 0; index < EXPECTED_ROLE_TOOL_TABLE.length; index += 1) {
     const expected = EXPECTED_ROLE_TOOL_TABLE[index];
     const actual = ROLE_TOOL_CATALOG[index];
@@ -765,13 +767,30 @@ test("D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致", () =>
     assert.equal(actual.chiefIndependentDecisionOnly === true, expectedIndependent);
     assert.equal(roleToolCatalogEntryOf(expected.id)?.name, expected.name);
   }
-  // 唯一性：14 个 id、14 个运行时工具名，无重复/无遗漏。
-  assert.equal(new Set(ROLE_TOOL_CATALOG.map((entry) => entry.id)).size, 14);
-  assert.equal(new Set(ROLE_TOOL_CATALOG.map((entry) => entry.name)).size, 14);
+  assert.equal(new Set(ROLE_TOOL_CATALOG.map((entry) => entry.id)).size, 15);
+  assert.equal(new Set(ROLE_TOOL_CATALOG.map((entry) => entry.name)).size, 15);
   // 未知/错形 id 不猜、不兜底（snake_case 运行时名不能当 id 用）。
   assert.equal(roleToolCatalogEntryOf("dispatch_task"), undefined);
   assert.equal(roleToolCatalogEntryOf("decide_pending_request"), undefined);
+  assert.equal(roleToolCatalogEntryOf("request_workflow_start"), undefined);
   assert.equal(roleToolCatalogEntryOf(""), undefined);
+});
+
+test("幕僚启动 v1.1：第 15 项只允许 chief 声明", () => {
+  const binding = { id: "requestWorkflowStart", name: "request_workflow_start" } as const;
+  assert.deepEqual(ROLE_TOOL_CATALOG[14], { ...binding, allowedRoleIds: ["chief"] });
+  assert.equal(roleToolCatalogEntryOf(binding.id), ROLE_TOOL_CATALOG[14]);
+  assert.deepEqual(validateRoleToolDeclaration("chief", [binding.id]), {
+    allow: true,
+    tools: [binding],
+    reasons: [],
+  });
+  for (const roleId of ["product", "rapporteur", "nominator", "convener", "verifier", "su", "worker"]) {
+    const denied = validateRoleToolDeclaration(roleId, [binding.id]);
+    assert.equal(denied.allow, false);
+    assert.deepEqual(denied.tools, []);
+    assert.deepEqual(denied.reasons.map((reason) => reason.code), ["role-tool-not-allowed"]);
+  }
 });
 
 test("D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确", () => {

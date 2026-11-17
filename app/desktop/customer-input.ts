@@ -482,6 +482,11 @@ export function toMergeMainCardDecision(outcome: CustomerInputOutcome | null | u
 export function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest): boolean {
   if (request.kind !== "choice") return false;
   const cardKind = (request as { cardKind?: unknown }).cardKind;
+  if (cardKind === "workflow-start") {
+    const ids = request.options.map(option => option.id);
+    return request.application === true && request.sourceRoleId === "application" && request.multiple !== true
+      && ids.length === 2 && new Set(ids).size === 2 && ids.includes("approve-workflow-start") && ids.includes("reject-workflow-start");
+  }
   // stable workflow 确认卡：app-owned、无 flowId；客户本人，永不判断/委托/指令。
   if (cardKind === STABLE_WRITE_CARD_KIND) {
     if ((request as { application?: unknown }).application !== true) return false;
@@ -822,11 +827,12 @@ export interface CustomerInputChannel {
    *    **不得**解冻反复重试。
    */
   respond(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean };
-  respondDurable(input: { id?: unknown; decision?: unknown }): Promise<{ ok: boolean; error?: string; expired?: boolean } | undefined>;
+  respondDurable(input: { id?: unknown; decision?: unknown }, isMainFrameCurrent?: () => boolean): Promise<{ ok: boolean; error?: string; expired?: boolean } | undefined>;
   /** 关闭通道：所有挂起请求归 `declined`（窗口已关——未获同意，fail-closed）。幂等。 */
   rejectAllPending(reason: string): void;
   /** 当前挂起数（测试/如实呈现用）：**已呈现的那张＋排队中的请求**（排队者另见 `queuedCount`）。 */
   pendingCount(): number;
+  hasPendingProjectCard(projectRoot: string): boolean;
   /** **排队中的治理请求数**（同项目已有待决定卡时入队；未呈现、未自动批准）。 */
   queuedCount(): number;
   /**
@@ -859,7 +865,7 @@ export type DurableCustomerAnswer =
 export type PersistDurableCustomerAnswer = (answer: DurableCustomerAnswer, delegated?: {
   source: Extract<DirectActionSource, { kind: "chief-delegated" }>;
   isCurrent(): boolean;
-}) => ReturnType<PersistReleaseDecision>;
+}, isMainFrameCurrent?: () => boolean) => ReturnType<PersistReleaseDecision>;
 
 /**
  * 桌面侧的客户通道（**带角色上下文**）：与冻结家 `CustomerInputFn` 同形，但多一个 `ctx.roleId`——
@@ -2538,8 +2544,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
     req = structuredClone(req);
+    if (req.cardKind === "workflow-start" && (!ctx.persistWorkflowDecision || !isApplicationDecisionReservedForCustomer(req))) {
+      return { outcome: "unavailable", reason: "Workflow activation requires an application-issued customer card." };
+    }
     if (ctx.persistWorkflowDecision && (!ctx.requestId ||
-      (req.cardKind !== "intent-confirm" && req.cardKind !== "proposal" && req.cardKind !== "appointment"))) {
+      (req.cardKind !== "intent-confirm" && req.cardKind !== "proposal" && req.cardKind !== "appointment" && req.cardKind !== "workflow-start"))) {
       return { outcome: "unavailable", reason: "Invalid durable workflow card." };
     }
     if (ctx.persistReleaseDecision !== undefined && (
@@ -2833,10 +2842,13 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     return result;
   }
 
-  async function respondDurable(input: { id?: unknown; decision?: unknown }): Promise<{ ok: boolean; error?: string; expired?: boolean } | undefined> {
+  async function respondDurable(input: { id?: unknown; decision?: unknown }, isMainFrameCurrent?: () => boolean): Promise<{ ok: boolean; error?: string; expired?: boolean } | undefined> {
     if (typeof input.id !== "string") return undefined;
     const workflow = workflowChoices.get(input.id);
     if (workflow) {
+      if (workflow.request.cardKind === "workflow-start" && !isMainFrameCurrent?.()) {
+        return { ok: false, error: "Confirm this workflow in the current main project window." };
+      }
       const entry = pending.get(input.id);
       if (!workflow.accepted && !entry?.presented) {
         return { ok: false, error: mainT("main.customerInput.noPendingRequest"), expired: true };
@@ -2861,7 +2873,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         return invalid;
       }
       try {
-        const saved = await workflow.persist(answer);
+        const saved = await workflow.persist(answer, undefined, isMainFrameCurrent);
         if (!saved.ok) return { ok: false, error: saved.message, expired: saved.stale };
         workflow.accepted = true;
         if (entry && pending.get(input.id) === entry) {
@@ -2948,6 +2960,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     respondDurable,
     rejectAllPending,
     pendingCount: () => pending.size + queuedCount(),
+    hasPendingProjectCard: projectRoot => activeByProject.has(projectRoot) || (waiting.get(projectRoot)?.length ?? 0) > 0,
     queuedCount,
     pendingRoles,
     replayPending,
