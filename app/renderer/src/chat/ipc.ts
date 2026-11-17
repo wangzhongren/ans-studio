@@ -39,7 +39,13 @@ import {
 import { isRuntimeId } from "@/chat/runtime-config";
 import { useDirectiveStore, type DirectiveBridge } from "@/stores/directive-store";
 import { useVersionChangeStore } from "@/stores/version-change-store";
-import type { DurableProblem, DurableProjection, DurableResult } from "../../../../src/model/durable-workflow.ts";
+import type {
+  DurableDelivery,
+  DurableProblem,
+  DurableProjection,
+  DurableResult,
+  DurableScopeDecision,
+} from "../../../../src/model/durable-workflow.ts";
 
 export type { DirectiveBridge } from "@/stores/directive-store";
 
@@ -118,7 +124,13 @@ export interface DesktopDurableInstance {
   blockedReason?: string;
   approval?: { requestId: string; status: string };
   evidence?: { kind: "analysis" | "scope" | "operator" | "approval"; sha256: string }[];
+  scopeDecision?: DurableScopeDecision;
+  delivery?: DurableDeliverySummary;
 }
+
+type DurableDeliveryRequest = DurableProjectRequest & { instanceId: string; deliveryId: string };
+export type DurableDeliverySummary = Pick<DurableDelivery, "id" | "state" | "releaseRequestId" | "createdAt" | "deliveredAt">;
+export type DurableDeliveryView = { delivery: DurableDelivery; viewToken: string };
 
 export interface DesktopDurableView {
   controlPlane: { state: "stopped" | "starting" | "ready" | "failed"; code?: string; message?: string };
@@ -135,6 +147,10 @@ export interface DurableWorkflowBridge {
   getDurableWorkflowProjection(input: DurableProjectRequest & {
     instanceId?: string;
   }): Promise<DurableResult<DesktopDurableView>>;
+  readDurableWorkflowDelivery(input: DurableDeliveryRequest): Promise<DurableResult<DurableDeliveryView>>;
+  acknowledgeDurableWorkflowDelivery(input: DurableDeliveryRequest & {
+    viewToken: string;
+  }): Promise<DurableResult<DurableDeliverySummary>>;
 }
 
 const DURABLE_METHODS = [
@@ -142,6 +158,8 @@ const DURABLE_METHODS = [
   "validateDurableWorkflow",
   "startDurableWorkflow",
   "getDurableWorkflowProjection",
+  "readDurableWorkflowDelivery",
+  "acknowledgeDurableWorkflowDelivery",
 ] as const;
 
 export function getDurableWorkflowBridge(): DurableWorkflowBridge | null {

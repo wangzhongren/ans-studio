@@ -463,6 +463,8 @@ import {
   durableIdentifier,
   durableRequest,
   type DesktopDurableDefinition,
+  type DesktopDurableDeliverySummary,
+  type DesktopDurableDeliveryView,
   type DesktopDurableView,
   type DesktopDurableWorkflow,
 } from "./durable-workflow.ts";
@@ -769,6 +771,8 @@ export interface DesktopInterface {
   validateDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
   startDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableView>>;
   getDurableWorkflowProjection(input: unknown): Promise<DurableResult<DesktopDurableView>>;
+  readDurableWorkflowDelivery(input: unknown): Promise<DurableResult<DesktopDurableDeliveryView>>;
+  acknowledgeDurableWorkflowDelivery(input: unknown): Promise<DurableResult<DesktopDurableDeliverySummary>>;
   replayDurableReleaseDecision(input: unknown): Promise<{ ok: boolean; error?: string } | undefined>;
   disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
@@ -2441,10 +2445,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   let unobserveDurableProject: (() => void) | undefined;
   let observedDurableProjectRoot: string | undefined;
+  const openedDeliveryViews = new Map<string, { projectId: string; deliveryId: string; releaseRequestId: string; token: string }>();
 
   async function durableCall<T>(
     input: unknown,
-    operation: (durable: DesktopDurableWorkflow, projectRoot: string, request: Record<string, unknown>) => Promise<DurableResult<T>>,
+    operation: (durable: DesktopDurableWorkflow, projectRoot: string, request: Record<string, unknown>, isCurrent: () => boolean) => Promise<DurableResult<T>>,
   ): Promise<DurableResult<T>> {
     const request = durableRequest(input);
     const registration = registeredProjectLifecycle;
@@ -2454,7 +2459,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const durable = deps.durableWorkflow;
     if (!durable) return durableFailure("workflow-unavailable", "Durable workflow support is unavailable.");
     try {
-      return await operation(durable, registration.projectRoot, request);
+      return await operation(durable, registration.projectRoot, request, () =>
+        registeredProjectLifecycle?.selectionId === registration.selectionId && importedProjectRoot === registration.projectRoot);
     } catch (error) {
       createDiagnosticLogger({ component: "desktop.durable-workflow", projectRoot: registration.projectRoot }).error("workflow.request.failed", error);
       return durableFailure("workflow-operation-failed", "The durable workflow operation could not be completed.");
@@ -2470,6 +2476,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async pickProject(): Promise<string | null> {
       let selection = 0;
       changeProjectSource([], () => {
+        openedDeliveryViews.clear();
         unobserveDurableProject?.();
         unobserveDurableProject = undefined;
         observedDurableProjectRoot = undefined;
@@ -2529,6 +2536,38 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       return { ok: true, value: durable.view(await durable.find(projectRoot, request.instanceId)) };
     }),
+    readDurableWorkflowDelivery: input => durableCall(input, async (durable, projectRoot, request, isCurrent) => {
+      const { instanceId, deliveryId } = request;
+      if (!durableIdentifier(instanceId) || !durableIdentifier(deliveryId)) {
+        return durableFailure("workflow-delivery-invalid", "Choose a workflow instance and its delivery explanation.");
+      }
+      const result = await durable.findDelivery(projectRoot, instanceId, deliveryId);
+      if (!result.ok) return result;
+      if (!isCurrent()) return durableFailure("workflow-project-unselected", "The selected project changed.");
+      const { ref, delivery } = result.value;
+      const opened = openedDeliveryViews.get(instanceId);
+      const token = opened?.projectId === ref.projectId && opened.deliveryId === deliveryId
+        && opened.releaseRequestId === delivery.releaseRequestId ? opened.token : randomUUID();
+      openedDeliveryViews.set(instanceId, { projectId: ref.projectId, deliveryId, releaseRequestId: delivery.releaseRequestId, token });
+      return { ok: true, value: { delivery, viewToken: token } };
+    }),
+    acknowledgeDurableWorkflowDelivery: input => durableCall(input, async (durable, projectRoot, request, isCurrent) => {
+      const { instanceId, deliveryId, viewToken } = request;
+      if (!durableIdentifier(instanceId) || !durableIdentifier(deliveryId) || !durableIdentifier(viewToken)) {
+        return durableFailure("workflow-delivery-invalid", "The delivery view identity is invalid.");
+      }
+      const opened = openedDeliveryViews.get(instanceId);
+      if (!opened || opened.token !== viewToken || opened.deliveryId !== deliveryId) {
+        return durableFailure("workflow-delivery-not-opened", "Open the delivery explanation in this window before acknowledging it.");
+      }
+      const result = await durable.findDelivery(projectRoot, instanceId, deliveryId);
+      if (!result.ok) return result;
+      const { ref, delivery } = result.value;
+      if (opened.projectId !== ref.projectId || opened.releaseRequestId !== delivery.releaseRequestId) {
+        return durableFailure("workflow-delivery-not-opened", "This delivery explanation no longer matches the opened view.");
+      }
+      return durable.acknowledgeDelivery(ref, delivery, isCurrent);
+    }),
     async replayDurableReleaseDecision(input) {
       const durable = deps.durableWorkflow;
       const selection = registeredProjectLifecycle;
@@ -2546,6 +2585,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
     disposeProjectDocuments() {
       changeProjectSource([], () => {
+        openedDeliveryViews.clear();
         unobserveDurableProject?.();
         unobserveDurableProject = undefined;
         observedDurableProjectRoot = undefined;
@@ -2657,6 +2697,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             observedDurableProjectRoot = listing.projectRoot;
           }
         } else if (registeredProjectLifecycle?.projectRoot !== listing.projectRoot) {
+          openedDeliveryViews.clear();
           registeredProjectLifecycle = undefined;
           nativeSelection = undefined;
           unobserveDurableProject?.();

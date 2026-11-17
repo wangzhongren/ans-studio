@@ -209,6 +209,7 @@ export function openDurableWorkflow(options: OpenDurableWorkflowOptions) {
     claimEffect: service.claimEffect.bind(service), settleEffect: service.settleEffect.bind(service),
     listEffects: service.listEffects.bind(service), taskGitScope: service.taskGitScope.bind(service),
     block: service.block.bind(service),
+    acknowledgeDelivery: service.acknowledgeDelivery.bind(service),
     startWorker, stopWorker, reconcile, close, workerStatus: () => status,
   };
 }

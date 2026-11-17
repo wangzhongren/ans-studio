@@ -2321,6 +2321,23 @@ export const enUS = {
   "ui.durableWorkflow.evidence.scope": "B3 request digest",
   "ui.durableWorkflow.evidence.operator": "Operator report",
   "ui.durableWorkflow.evidence.approval": "Approval snapshot",
+  "ui.durableWorkflow.scopeAudit": "B2 scope decision audit",
+  "ui.durableWorkflow.recordId": "Record ID",
+  "ui.durableWorkflow.b3Request": "Linked B3 request",
+  "ui.durableWorkflow.baseline": "Baseline",
+  "ui.durableWorkflow.candidateSource": "Candidate scope source",
+  "ui.durableWorkflow.writeSets": "Derived write sets",
+  "ui.durableWorkflow.scopeReason": "Scope decision rationale",
+  "ui.durableWorkflow.recordedAt": "Recorded at",
+  "ui.durableWorkflow.delivery": "Delivery explanation",
+  "ui.durableWorkflow.deliveryPending": "Awaiting delivery",
+  "ui.durableWorkflow.deliveryDelivered": "Delivered",
+  "ui.durableWorkflow.openDelivery": "View delivery explanation",
+  "ui.durableWorkflow.retryDeliveryAck": "Retry delivery acknowledgment",
+  "ui.durableWorkflow.mergeCommit": "Local merge commit",
+  "ui.durableWorkflow.deliveryFiles": "Delivered files",
+  "ui.durableWorkflow.diffDigest": "Diff digest",
+  "ui.durableWorkflow.runtimeUnverified": "Runtime behavior has not been independently verified.",
 
   // ---- Global task state and version decision (2026-11-02 global-task-state; A3; frozen in P1 review §6) ----
   // ui.projectState.*: project-state panel (62)

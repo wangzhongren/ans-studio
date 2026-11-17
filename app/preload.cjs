@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld("desktop", {
   validateDurableWorkflow: input => ipcRenderer.invoke("durable-workflow:validate", input),
   startDurableWorkflow: input => ipcRenderer.invoke("durable-workflow:start", input),
   getDurableWorkflowProjection: input => ipcRenderer.invoke("durable-workflow:projection", input),
+  readDurableWorkflowDelivery: input => ipcRenderer.invoke("durable-workflow:delivery-read", input),
+  acknowledgeDurableWorkflowDelivery: input => ipcRenderer.invoke("durable-workflow:delivery-acknowledge", input),
   retryReportSave: input => ipcRenderer.invoke('report:retry-save', input),
   getReportSaveState: input => ipcRenderer.invoke('report:get-save-state', input),
   retryDeliveryHistorySave: input => ipcRenderer.invoke('delivery:retry-history-save', input),

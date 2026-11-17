@@ -985,6 +985,10 @@ function registerIpc(win: BrowserWindow): void {
     event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.startDurableWorkflow(input) : workflowSourceError());
   registerHandler("durable-workflow:projection", (event, input) =>
     event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.getDurableWorkflowProjection(input) : workflowSourceError());
+  registerHandler("durable-workflow:delivery-read", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.readDurableWorkflowDelivery(input) : workflowSourceError());
+  registerHandler("durable-workflow:delivery-acknowledge", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.acknowledgeDurableWorkflowDelivery(input) : workflowSourceError());
   registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
   registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
   registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));

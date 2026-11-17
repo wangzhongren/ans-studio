@@ -15,6 +15,8 @@ const root = join(tmpdir(), "ans-durable-fixture");
 const otherRoot = join(tmpdir(), "ans-ordinary-fixture");
 const instanceId = "dw-renderer-fixture";
 const requestId = "release-renderer-fixture";
+const closedInstanceId = "dw-closed-fixture";
+const deliveryId = "delivery-renderer-fixture";
 const digest = "a".repeat(64);
 
 if (!process.versions.electron) {
@@ -34,6 +36,8 @@ if (!process.versions.electron) {
       ["validateDurableWorkflow", "validate"],
       ["startDurableWorkflow", "start"],
       ["getDurableWorkflowProjection", "projection"],
+      ["readDurableWorkflowDelivery", "delivery-read"],
+      ["acknowledgeDurableWorkflowDelivery", "delivery-acknowledge"],
     ]) {
       assert.ok(ipc.includes(`"${method}"`));
       assert.ok(preload.includes(`${method}: input => ipcRenderer.invoke("durable-workflow:${channel}", input)`));
@@ -82,6 +86,35 @@ if (!process.versions.electron) {
   const invalid = { id: "bad", file: "bad.yaml", error: {
     code: "definition-invalid", path: "$.steps.impact.on", message: "Missing outcome branch",
   } };
+  const decision = {
+    kind: "change.scope-decided",
+    id: "scope-decision-fixture",
+    b3Request: { key: "b3-advance-fixture", sourceTaskId: "chief-b3-task", digest },
+    b1Report: { key: "b1-report-fixture", path: "docs/reports/impact.md", sha256: digest, attempt: 2 },
+    baseline: { oid: "b".repeat(40), branch: "task-b" },
+    candidateSource: "modulePaths",
+    candidates: ["src/product.ts"],
+    writeSets: [{ roleId: "module-owner", paths: ["src/product.ts"] }],
+    reason: "The change affects this module.",
+    recordedAt: "2026-11-17T03:00:00.000Z",
+  };
+  const delivery = {
+    id: deliveryId,
+    state: "pending",
+    releaseRequestId: "release-closed-fixture",
+    mergeOid: "c".repeat(40),
+    files: ["src/product.ts"],
+    diffDigest: "d".repeat(64),
+    operatorReport: { path: "docs/reports/operator.md", sha256: digest },
+    operatorReportArtifacts: [{ path: "docs/reports/tests.md", sha256: digest }],
+    runtimeVerification: "not-independently-verified",
+    createdAt: "2026-11-17T04:00:00.000Z",
+    deliveredAt: undefined as string | undefined,
+  };
+  const deliverySummary = () => {
+    const { id, state, releaseRequestId, createdAt, deliveredAt } = delivery;
+    return { id, state, releaseRequestId, createdAt, deliveredAt };
+  };
   const instance = {
     instanceId, owner: "dapr", definitionId: definition.id, definitionName: "Path B",
     definitionVersion: definition.version, definitionDigest: digest, status: "waiting",
@@ -95,14 +128,31 @@ if (!process.versions.electron) {
     projection: [] as unknown[],
     start: [] as unknown[],
     operator: [] as unknown[],
+    readDelivery: [] as unknown[],
+    ackDelivery: [] as unknown[],
   };
   let pickedRoot = root;
   let hasInstance = false;
   let connected = true;
   let dropNextStart = true;
-  const projection = () => ({
+  let pauseRead: Promise<void> | undefined;
+  let failRead = false;
+  let failAck = true;
+  const ackGate = Promise.withResolvers<void>();
+  const projection = (id?: string) => ({
     controlPlane: connected ? { state: "ready" } : { state: "failed", code: "port-conflict", message: "Port unavailable" },
-    ...(hasInstance ? { instance: connected ? instance : { ...instance, engine: "offline", blockedReason: "Waiting for the local engine" } } : {}),
+    ...(hasInstance ? { instance: id === closedInstanceId ? {
+      ...instance,
+      instanceId: closedInstanceId,
+      status: "delivered",
+      stepId: "delivered",
+      stepName: "Delivered",
+      action: undefined,
+      waiting: undefined,
+      scopeDecision: decision,
+      approval: { requestId: delivery.releaseRequestId, status: "approve" },
+      delivery: deliverySummary(),
+    } : connected ? instance : { ...instance, engine: "offline", blockedReason: "Waiting for the local engine" } } : {}),
   });
 
   ipcMain.handle("app:pick-project", () => pickedRoot);
@@ -126,7 +176,7 @@ if (!process.versions.electron) {
 
   ipcMain.handle("durable-workflow:projection", (_, input) => {
     calls.projection.push(input);
-    return ok(input.projectRoot === root ? projection() : { controlPlane: { state: "stopped" } });
+    return ok(input.projectRoot === root ? projection(input.instanceId) : { controlPlane: { state: "stopped" } });
   });
   ipcMain.handle("durable-workflow:list", (_, input) => {
     calls.list.push(input);
@@ -151,6 +201,24 @@ if (!process.versions.electron) {
     instance.status = "stopped";
     return { ok: true };
   });
+  ipcMain.handle("durable-workflow:delivery-read", async (_, input) => {
+    calls.readDelivery.push(input);
+    if (failRead) return { ok: false, code: "workflow-delivery-not-found", message: "Test read failure" };
+    await pauseRead;
+    return ok({ delivery, viewToken: "test-view-token" });
+  });
+  ipcMain.handle("durable-workflow:delivery-acknowledge", async (event, input) => {
+    calls.ackDelivery.push(input);
+    assert.equal(await event.sender.executeJavaScript(`Boolean(
+      document.querySelector("[data-delivery-explanation]")?.getClientRects().length &&
+      document.querySelector("[data-delivery-explanation]").textContent.includes("${delivery.mergeOid}")
+    )`), true);
+    if (failAck) return { ok: false, code: "workflow-operation-failed", message: "Test acknowledgment failure" };
+    await ackGate.promise;
+    delivery.state = "delivered";
+    delivery.deliveredAt = "2026-11-17T04:05:00.000Z";
+    return ok(deliverySummary());
+  });
 
   const run = async () => {
     await app.whenReady();
@@ -158,7 +226,9 @@ if (!process.versions.electron) {
       show: false,
       width: 1100,
       height: 800,
-      webPreferences: { preload: join(repo, "app/preload.cjs"), contextIsolation: true, sandbox: true },
+      webPreferences: {
+        preload: join(repo, "app/preload.cjs"), contextIsolation: true, sandbox: true, backgroundThrottling: false,
+      },
     });
     const page = window.webContents;
     const js = <T>(script: string): Promise<T> => page.executeJavaScript(script);
@@ -196,6 +266,15 @@ if (!process.versions.electron) {
       await waitFor(`document.getElementById("project-path").textContent === ${JSON.stringify(pickedRoot)}`);
       await click("#tab-tasks");
       await includes("Durable workflow prototype");
+    };
+    const findInstance = async (id: string) => {
+      await js(`{
+        const field = document.querySelector('form[aria-label="Find instance"] input');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(field, ${JSON.stringify(id)});
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      }`);
+      await clickButton("Find instance");
+      await includes(id);
     };
 
     await window.loadFile(join(repo, "app/renderer/dist/index.html"));
@@ -278,12 +357,90 @@ if (!process.versions.electron) {
     assert.equal(calls.list.length, 1);
     assert.equal(calls.start.length, 2);
 
+    await findInstance(closedInstanceId);
+    await click("[data-durable-scope-decision] > summary");
+    for (const text of [
+      decision.kind, decision.id, decision.b3Request.key, decision.b3Request.sourceTaskId,
+      decision.b1Report.path, decision.baseline.oid, decision.candidateSource, decision.reason, "module-owner",
+    ]) await includes(text);
+    const deliverySection = 'document.querySelector("[data-durable-delivery]")';
+    const receiptState = (state: string) => waitFor(`${deliverySection}?.dataset.deliveryState === ${JSON.stringify(state)}`);
+    await receiptState("pending");
+    assert.equal(await js('Boolean(document.querySelector("[data-delivery-explanation]"))'), false);
+    assert.equal(calls.readDelivery.length, 0);
+    assert.equal(calls.ackDelivery.length, 0);
+
+    // Collapsing the panel during the read leaves the persisted receipt pending.
+    const collapsedRead = Promise.withResolvers<void>();
+    pauseRead = collapsedRead.promise;
+    await clickButton("View delivery explanation");
+    await click("[data-durable-workflow] > summary");
+    await waitFor(`!${panel}.open`);
+    collapsedRead.resolve();
+    pauseRead = undefined;
+    await delay(100);
+    assert.equal(calls.ackDelivery.length, 0);
+    await click("[data-durable-workflow] > summary");
+    await receiptState("pending");
+
+    // Changing the projected instance invalidates its outstanding read before rendering.
+    const switchedRead = Promise.withResolvers<void>();
+    pauseRead = switchedRead.promise;
+    await clickButton("View delivery explanation");
+    await findInstance(instanceId);
+    await waitFor(`!${deliverySection}`);
+    switchedRead.resolve();
+    pauseRead = undefined;
+    await findInstance(closedInstanceId);
+    await receiptState("pending");
+    assert.equal(calls.ackDelivery.length, 0);
+
+    failRead = true;
+    await clickButton("View delivery explanation");
+    await includes("Test read failure");
+    assert.equal(calls.ackDelivery.length, 0);
+    failRead = false;
+    await clickButton("View delivery explanation");
+    await includes("Test acknowledgment failure");
+    await receiptState("pending");
+    await includes(delivery.mergeOid);
+    await includes("Runtime behavior has not been independently verified.");
+    await includes("docs/reports/tests.md");
+    assert.equal(calls.ackDelivery.length, 1);
+    failAck = false;
+    await clickButton("Retry delivery acknowledgment");
+    await receiptState("pending");
+    ackGate.resolve();
+    await receiptState("delivered");
+    assert.deepEqual(calls.ackDelivery, Array.from({ length: 2 }, () => ({
+      projectRoot: root, instanceId: closedInstanceId, deliveryId, viewToken: "test-view-token",
+    })));
+    await clickButton("Close");
+    await clickButton("View delivery explanation");
+    await includes(delivery.mergeOid);
+    assert.equal(calls.ackDelivery.length, 2);
+
+    await window.loadFile(join(repo, "app/renderer/dist/index.html"));
+    await pickProject();
+    await click("[data-durable-workflow] > summary");
+    await findInstance(closedInstanceId);
+    await receiptState("delivered");
+    assert.equal(await js('Boolean(document.querySelector("[data-delivery-explanation]"))'), false);
+    assert.equal(calls.ackDelivery.length, 2);
+
+    const projectRead = Promise.withResolvers<void>();
+    pauseRead = projectRead.promise;
+    await clickButton("View delivery explanation");
     await click("#drawer-close");
     pickedRoot = otherRoot;
     await pickProject();
+    projectRead.resolve();
+    pauseRead = undefined;
     await click("[data-durable-workflow] > summary");
     await includes("This project has no durable workflow instance.");
     assert.equal(await js(`${panel}.textContent.includes(${JSON.stringify(instanceId)})`), false);
+    assert.equal(await js('Boolean(document.querySelector("[data-delivery-explanation]"))'), false);
+    assert.equal(calls.ackDelivery.length, 2);
     assert.equal(calls.list.length, 1);
     assert.equal(calls.start.length, 2);
     window.destroy();

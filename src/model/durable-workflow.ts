@@ -100,6 +100,34 @@ export interface DurableReleaseRequest {
   decision?: { id: string; action: 'approve' | 'reject'; at: string; source: 'customer' };
 }
 
+export interface DurableScopeDecision {
+  kind: 'change.scope-decided';
+  id: string;
+  b3Request: { key: string; sourceTaskId: string; digest: string };
+  b1Report: DurableEvidenceRef & { key: string; attempt: number };
+  baseline: { oid: string; branch: string };
+  candidateSource: 'requestedEvidence' | 'modulePaths';
+  candidates: readonly string[];
+  writeSets: readonly DurableWriteSet[];
+  reason: string;
+  recordedAt: string;
+  decidedAt?: string;
+}
+
+export interface DurableDelivery {
+  id: string;
+  state: 'pending' | 'delivered';
+  releaseRequestId: string;
+  mergeOid: string;
+  files: readonly string[];
+  diffDigest: string;
+  operatorReport: DurableEvidenceRef;
+  operatorReportArtifacts?: readonly DurableEvidenceRef[];
+  runtimeVerification: 'not-independently-verified';
+  createdAt: string;
+  deliveredAt?: string;
+}
+
 export interface DurableDispatchDetails {
   text: string;
   runtime?: string;
@@ -202,8 +230,10 @@ export interface DurableProjection {
   stageRequest?: Extract<DurableFact, { kind: 'stage-request' }>;
   analysisReport?: { key: string; evidence: DurableEvidenceRef; attempt: number; modulePaths: readonly string[] };
   scope?: Extract<DurableFact, { kind: 'b3-advance' }>;
+  scopeDecision?: DurableScopeDecision;
   implementation?: Extract<DurableFact, { kind: 'implementation-accepted' }>;
   release?: DurableReleaseRequest;
+  delivery?: DurableDelivery;
   metadata: Readonly<Record<string, string>>;
 }
 

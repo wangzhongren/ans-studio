@@ -1,4 +1,4 @@
-import type { DurableFact, DurableFactReceipt, DurableReleaseRequest, DurableResult } from '../../model/durable-workflow.ts';
+import type { DurableDelivery, DurableEvidenceRef, DurableFact, DurableFactReceipt, DurableReleaseRequest, DurableResult, DurableScopeDecision } from '../../model/durable-workflow.ts';
 import { digest, stableJson } from '../../provider/durable-workflow/public.ts';
 import type { DurableLedger, StoredFact, StoredInstance } from '../../provider/durable-workflow/public.ts';
 import { activeAction, equal, fail, hashValid, liveEffect, oidValid, ok, safePath, sameTask, validKey } from './rules.ts';
@@ -153,4 +153,86 @@ function valueIsB1Step(instance: StoredInstance, stepId: string): boolean {
 
 export function storedFact(fact: DurableFact, receipt: DurableFactReceipt): StoredFact {
   return { fact, receipt, fingerprint: digest(stableJson(fact)) };
+}
+
+function accepted(stored: StoredFact | undefined): stored is StoredFact {
+  return stored !== undefined && (stored.receipt.state === 'pending' || stored.receipt.state === 'consumed')
+    && stored.receipt.key === stored.fact.key && digest(stableJson(stored.fact)) === stored.fingerprint;
+}
+
+function hasEvidence(ledger: DurableLedger, instanceId: string, evidence: DurableEvidenceRef): boolean {
+  if (!evidence?.path || !hashValid(evidence.sha256)) return false;
+  const bytes = ledger.evidence(instanceId, evidence.sha256);
+  return bytes !== undefined && digest(bytes) === evidence.sha256;
+}
+
+export function scopeDecisionFor(ledger: DurableLedger, instance: StoredInstance, source: StoredFact | undefined, recordedAt: string,
+  decidedAt?: string): DurableScopeDecision | undefined {
+  if (!accepted(source) || source.fact.kind !== 'b3-advance' || source.fact.source !== 'chief') return undefined;
+  const b3 = source.fact;
+  const id = instance.ref.instanceId;
+  const report = instance.analysisReport;
+  const baseline = instance.baseline;
+  if (!report || !baseline || !equal(instance.scope, b3) || report.key !== b3.reportKey || report.attempt !== b3.b1Attempt
+    || baseline.oid !== b3.baselineOid || !oidValid(baseline.oid) || baseline.branch !== 'ans/task/' + id
+    || !validKey(b3.sourceTaskId) || !hashValid(b3.requestDigest) || !hasEvidence(ledger, id, report.evidence)) return undefined;
+  const savedReport = ledger.fact(id, report.key);
+  if (!accepted(savedReport) || savedReport.receipt.state !== 'consumed' || savedReport.fact.kind !== 'task-report'
+    || !equal(savedReport.fact.evidence, report.evidence) || savedReport.fact.task.stage !== 'B1'
+    || savedReport.fact.task.stageAttempt !== report.attempt) return undefined;
+  const task = savedReport.fact.task;
+  const closed = ledger.facts(id).some(item => accepted(item) && item.receipt.state === 'consumed'
+    && item.fact.kind === 'analysis-disposition' && item.fact.outcome === 'usable'
+    && item.fact.reportKey === report.key && sameTask(task, item.fact.task));
+  if (!closed) return undefined;
+  return {
+    id: 'scope:' + digest(stableJson([instance.ref.projectId, id, b3.key])), kind: 'change.scope-decided',
+    b3Request: { key: b3.key, sourceTaskId: b3.sourceTaskId, digest: b3.requestDigest },
+    b1Report: { ...report.evidence, key: report.key, attempt: report.attempt }, baseline,
+    candidateSource: b3.candidateSource, candidates: b3.candidates, writeSets: b3.writeSets, reason: b3.reason,
+    recordedAt, ...(decidedAt ? { decidedAt } : {}),
+  };
+}
+
+export function deliveryFor(ledger: DurableLedger, instance: StoredInstance, source: StoredFact | undefined,
+  createdAt: string): DurableDelivery | undefined {
+  if (!accepted(source) || source.fact.kind !== 'release-merged' || source.fact.source !== 'host'
+    || source.fact.closed !== true) return undefined;
+  const merge = source.fact;
+  const id = instance.ref.instanceId;
+  const release = instance.release;
+  if (!release || release.requestId !== merge.requestId || release.decision?.source !== 'customer'
+    || release.decision.action !== 'approve' || !oidValid(merge.mainOid)) return undefined;
+  const savedDecision = ledger.fact(id, release.decision.id);
+  if (!accepted(savedDecision) || savedDecision.fact.kind !== 'release-decision' || savedDecision.fact.source !== 'customer'
+    || savedDecision.fact.action !== 'approve' || savedDecision.fact.requestId !== release.requestId
+    || savedDecision.fact.digest !== release.digest || savedDecision.fact.generation !== release.generation
+    || savedDecision.fact.attempt !== merge.attempt || savedDecision.fact.stepId !== merge.stepId) return undefined;
+
+  const effect = ledger.effect(id, merge.effectKey);
+  const outcome = effect?.result;
+  const verified = outcome?.result;
+  const snapshot = release.snapshot;
+  if (!effect || effect.state !== 'succeeded' || effect.intent.kind !== 'release-merge'
+    || effect.intent.requestId !== release.requestId || effect.intent.snapshotDigest !== release.digest
+    || effect.intent.attempt !== merge.attempt || effect.intent.stepId !== merge.stepId
+    || effect.intent.expected?.mainOid !== snapshot.mainOid || effect.intent.expected.tipOid !== snapshot.tipOid
+    || effect.intent.expected.branch !== snapshot.branch || !equal(effect.intent.expected.files, snapshot.files)
+    || outcome?.outcome !== 'succeeded' || outcome.token !== effect.token || verified?.mainOid !== merge.mainOid
+    || typeof verified.diffDigest !== 'string' || !hashValid(verified.diffDigest) || verified.diffDigest !== snapshot.diffDigest
+    || !Array.isArray(verified.files) || verified.files.length === 0 || !verified.files.every(safePath)
+    || !equal(verified.files, snapshot.files)) return undefined;
+
+  const { operatorReport, operatorReportArtifacts } = snapshot;
+  if (!instance.implementation || instance.implementation.key !== snapshot.b3CloseKey
+    || !equal(instance.implementation.operatorReport, operatorReport)
+    || !hasEvidence(ledger, id, operatorReport)
+    || operatorReportArtifacts?.some(artifact => !hasEvidence(ledger, id, artifact))) return undefined;
+  return {
+    id: 'delivery:' + digest(stableJson([instance.ref.projectId, id, release.requestId, merge.effectKey])),
+    state: 'pending', releaseRequestId: release.requestId, mergeOid: merge.mainOid, files: verified.files,
+    diffDigest: verified.diffDigest, operatorReport, ...(operatorReportArtifacts ? { operatorReportArtifacts } : {}),
+    // A role's report is retained as evidence. No independent runtime-verification fact exists in this workflow.
+    runtimeVerification: 'not-independently-verified', createdAt,
+  };
 }

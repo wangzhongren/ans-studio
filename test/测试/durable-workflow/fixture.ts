@@ -12,6 +12,7 @@ import { buildDesktopShellArming } from "../../../app/desktop/operator-channel.t
 import { createDesktopBaselineGitPort } from "../../../app/desktop/workflow-git.ts";
 import { createEventQueue } from "../../../src/common/runtime-core/event-queue.ts";
 import { createNetworkGate } from "../../../src/common/runtime-core/network-gate.ts";
+import { readTaskState } from "../../../src/common/编排/task-state.ts";
 import type { DurableResult } from "../../../src/model/durable-workflow.ts";
 import type { RuntimeProviderFactory, SessionEvent, ToolResult } from "../../../src/model/runtime.ts";
 import { writeRealPinnedAns } from "../existing-project-compat-verify/fixture.ts";
@@ -69,7 +70,7 @@ export async function fixture() {
 }
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
-export type ModelTurn = { roleId: string; text: string; call(name: string, args: Record<string, unknown>): Promise<ToolResult> };
+export type ModelTurn = { roleId: string; text: string; turnId?: string; call(name: string, args: Record<string, unknown>): Promise<ToolResult> };
 export type Log = (event: string, value: unknown) => void;
 
 export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Log) {
@@ -89,7 +90,7 @@ export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Lo
           const roleId = role.id;
           log("model-turn", { roleId, turnId, text, tools: options.tools.map(tool => tool.name) });
           try {
-            await script({ roleId, text, async call(name, args) {
+            await script({ roleId, text, turnId, async call(name, args) {
               const tool = options.tools.find(candidate => candidate.name === name);
               assert.ok(tool, `${roleId} missing actual ${name} capability`);
               const toolCallId = `w5-${++sequence}`;
@@ -111,6 +112,63 @@ export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Lo
     },
   });
   return { factory, errors };
+}
+
+type PathBHooks = {
+  beforeScope?(turn: ModelTurn, request: Record<string, unknown>): Promise<void>;
+  afterScope?(turn: ModelTurn, request: Record<string, unknown>): Promise<void>;
+  afterImplementationReport?(): Promise<void>;
+};
+
+export function pathBModel(f: Fixture, instanceId: () => string, log: Log, hooks: PathBHooks = {}) {
+  const flowId = "snake";
+  const runs = new Map<string, number>();
+  const model = modelFixture(async turn => {
+    const { roleId } = turn;
+    const run = (runs.get(roleId) ?? 0) + 1;
+    runs.set(roleId, run);
+    if (roleId === "chief") {
+      assert.ok(run <= 2, `Unexpected lead turn ${run}`);
+      const stage = run === 1 ? "B1" : "B3";
+      const request = { roleId: "convener", task: `Advance ${stage} for collision repair`, flowId,
+        workflowId: instanceId(), taskKind: "stage-request", workflowPath: "B", stage, workflowAction: "advance", sideEffect: "read-only",
+        ...(stage === "B3" ? { requestedEvidence: [target], reason: "Verified analysis identifies the single source file" } : {}) };
+      if (stage === "B3") await hooks.beforeScope?.(turn, request);
+      await successful(turn, "dispatch_task", request);
+      if (stage === "B3") await hooks.afterScope?.(turn, request);
+      return;
+    }
+    if (roleId === "convener" && (run === 1 || run === 3)) {
+      const stage = run === 1 ? "B1" : "B3";
+      await successful(turn, "dispatch_task", { roleId: "worker", task: `W5 ${stage} assigned file ${target}`, flowId, workflowId: instanceId(),
+        stage, sideEffect: stage === "B1" ? "read-only" : "code", moduleId: "core", modulePaths: [target] });
+      return;
+    }
+    if (roleId === "convener" && (run === 2 || run === 4)) {
+      const stage = run === 2 ? "B1" : "B3";
+      const saved = await readTaskState(f.root);
+      const records = [...saved.records.values()].filter(record => record.created?.to === "worker" && record.created.stage === stage);
+      assert.equal(records.length, 1);
+      await successful(turn, "close_created_task", { operationId: `w5-close-${stage}`, taskId: records[0].taskId, outcome: "accepted" });
+      await successful(turn, "submit_report", { status: "completed", summary: `W5 accepted actual ${stage} worker report`, evidence: [stage === "B1" ? analysis : operatorReport] });
+      return;
+    }
+    if (roleId === "worker" && run === 1) {
+      await successful(turn, "read_file", { path: target });
+      await successful(turn, "submit_report", { status: "completed", summary: "Analysis identifies the collision threshold", evidence: [analysis] });
+      return;
+    }
+    if (roleId === "worker" && run === 2) {
+      await successful(turn, "write_file", { path: target, content: fix });
+      await successful(turn, "run_shell", { command: `git add ${target}` });
+      await successful(turn, "run_shell", { command: 'git commit -m "W5 fix collision threshold"' });
+      await successful(turn, "submit_report", { status: "completed", summary: "Changed only the collision threshold", evidence: [target] });
+      await hooks.afterImplementationReport?.();
+      return;
+    }
+    assert.fail(`Unscripted role turn ${roleId}:${run}`);
+  }, log);
+  return { ...model, runs };
 }
 
 export async function app(f: Fixture, model: ReturnType<typeof modelFixture>, log: Log) {
@@ -174,16 +232,23 @@ export async function until<T>(phase: string, probe: () => Promise<T | undefined
   assert.fail(`Timed out waiting for ${phase}`);
 }
 
-export function sqliteSnapshot(f: Fixture, instanceId: string): Record<string, Record<string, unknown>[]> {
-  const db = new DatabaseSync(path.join(f.userDataRoot, "business", "ans-workflow.sqlite"), { readOnly: true });
+export function businessDb<T>(f: Fixture, run: (db: DatabaseSync) => T, writable = false): T {
+  const db = new DatabaseSync(path.join(f.userDataRoot, "business", "ans-workflow.sqlite"), { readOnly: !writable });
   try {
+    db.exec("PRAGMA busy_timeout = 2000");
+    return run(db);
+  } finally { db.close(); }
+}
+
+export function sqliteSnapshot(f: Fixture, instanceId: string): Record<string, Record<string, unknown>[]> {
+  return businessDb(f, db => {
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all();
     return Object.fromEntries(tables.flatMap(({ name }) => {
       assert.match(String(name), /^[a-z_]+$/);
       if (!db.prepare(`PRAGMA table_info(${name})`).all().some(column => column.name === "instance_id")) return [];
       return [[name, db.prepare(`SELECT * FROM ${name} WHERE instance_id = ?`).all(instanceId)]];
     }));
-  } finally { db.close(); }
+  });
 }
 
 export async function successful(turn: ModelTurn, name: string, args: Record<string, unknown>) {

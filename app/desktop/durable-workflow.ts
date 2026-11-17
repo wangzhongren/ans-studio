@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
+  DurableDelivery as DurableDeliveryNote,
   DurableEffectIntent,
   DurableEffectOutcome,
   DurableInstanceRef,
   DurableProblem,
   DurableProjection,
   DurableResult,
+  DurableScopeDecision,
 } from "../../src/model/durable-workflow.ts";
 import type { ClaimFileWriteFn } from "../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
@@ -52,6 +54,15 @@ export interface DesktopDurableInstance {
   blockedReason?: string;
   approval?: { requestId: string; status: string };
   evidence?: { kind: "analysis" | "scope" | "operator" | "approval"; sha256: string }[];
+  scopeDecision?: DurableScopeDecision;
+  delivery?: DesktopDurableDeliverySummary;
+}
+
+export type DesktopDurableDeliverySummary = Pick<DurableDeliveryNote, "id" | "state" | "releaseRequestId" | "createdAt" | "deliveredAt">;
+
+export interface DesktopDurableDeliveryView {
+  delivery: DurableDeliveryNote;
+  viewToken: string;
 }
 
 export interface DesktopDurableView {
@@ -61,6 +72,11 @@ export interface DesktopDurableView {
 
 export function durableFailure(code: string, message: string): DurableResult<never> {
   return { ok: false, code, message };
+}
+
+function deliverySummary(delivery: DurableDeliveryNote): DesktopDurableDeliverySummary {
+  const { id, state, releaseRequestId, createdAt, deliveredAt } = delivery;
+  return { id, state, releaseRequestId, createdAt, ...(deliveredAt ? { deliveredAt } : {}) };
 }
 
 export function durableInstanceView(projection: DurableProjection): DesktopDurableInstance {
@@ -83,6 +99,8 @@ export function durableInstanceView(projection: DurableProjection): DesktopDurab
     waiting: waitingFor,
     blockedReason,
     ...(release ? { approval: { requestId: release.requestId, status: release.decision?.action ?? "pending" } } : {}),
+    ...(projection.scopeDecision ? { scopeDecision: projection.scopeDecision } : {}),
+    ...(projection.delivery ? { delivery: deliverySummary(projection.delivery) } : {}),
     evidence: [
       ...(projection.analysisReport ? [{ kind: "analysis" as const, sha256: projection.analysisReport.evidence.sha256 }] : []),
       ...(projection.scope ? [{ kind: "scope" as const, sha256: projection.scope.requestDigest }] : []),
@@ -265,6 +283,27 @@ export class DesktopDurableWorkflow {
 
   async lookup(ref: DurableInstanceRef): Promise<DurableProjection | undefined> {
     return (await this.store()).lookup(ref);
+  }
+
+  async findDelivery(projectRoot: string, instanceId: string, deliveryId: string): Promise<
+    DurableResult<{ ref: DurableInstanceRef; delivery: DurableDeliveryNote }>
+  > {
+    const projection = await this.find(projectRoot, instanceId);
+    const delivery = projection?.delivery;
+    if (!projection || !delivery || delivery.id !== deliveryId
+      || projection.release?.requestId !== delivery.releaseRequestId || projection.release.decision?.action !== "approve") {
+      return durableFailure("workflow-delivery-not-found", "The workflow has no matching delivery explanation.");
+    }
+    return { ok: true, value: { ref: projection.ref, delivery } };
+  }
+
+  async acknowledgeDelivery(ref: DurableInstanceRef, delivery: DurableDeliveryNote, isCurrent: () => boolean): Promise<
+    DurableResult<DesktopDurableDeliverySummary>
+  > {
+    const store = await this.store();
+    if (!isCurrent()) return durableFailure("workflow-project-unselected", "The selected project changed.");
+    const result = store.acknowledgeDelivery(ref, { deliveryId: delivery.id, requestId: delivery.releaseRequestId });
+    return result.ok ? { ok: true, value: deliverySummary(result.value) } : result;
   }
 
   registerDelivery(projectRoot: string, clientMessageId: string, delivery: DurableDelivery): void {

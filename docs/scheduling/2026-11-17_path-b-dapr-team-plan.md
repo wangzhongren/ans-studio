@@ -59,3 +59,19 @@ W3 交回 Windows 装配检查 101/101，以及原生 Dapr 定时器、跨进程
 W1 已交编排检查 108/108 及 Windows 原生 Dapr 1/1。W2 最终类型检查通过，Windows 定向检查共 52/52（旧行为 48/48 和新局部 4/4）。W8 已交实际任务文件检查 5/5。接线闭合后优先 W5 组合联调及最终 ZIP，使用组合候选哈希关联各项证据。
 
 W5 将构建 runner 与实际可重启宿主分别记录。每次故障窗口在至少一个原生候选包独立复现两次，三原生平台各一次候选包和独立 OS 重启，用同一持久数据卷与测试 Git 仓库。每项用同一关联 ID 串联 UI、ANS 事务/outbox、Dapr 历史、进程状态、授权/回执以及实际 Git 结果。健康恢复后的判据沿用 v1.1 的 60 秒与起算条件。候选发生变化时按影响重测。缺失实测平台、无法消歧的副作用、安全不变量失败或证据不足，均按 B1/B2 记录实际结论。
+
+## B2 范围审计与 B4 交付说明返工
+
+沟通已登记[本轮客户授权](../communication/2026-11-17_path-b-audit-and-delivery-rework.md)。本轮是对 [B2 独立验收 V1 的两项确证偏差](../../角色卡/独立验收/docs/change/2026-11-17_path-b-dapr-b2.md#v1-已证实的差异) 的分支内返工。接续原策划 v1.1、[已冻结 B1](../../角色卡/独立验收/docs/design/2026-11-17_path-b-dapr-b1.md) 与 T3 变更包口径，保留历史证据，复用固定职责和原预留路径。确认同一实际候选后，分别记录这两项返工判定和整套 B1 的状态。
+
+| 原节点及固定角色 | 本轮最小写集 | 依赖、交付及验证 |
+| --- | --- | --- |
+| W1 编排 | `src/model/durable-workflow.ts`、`src/pipeline/orchestration/durable-workflow.ts`、`src/service/durable-workflow/{facts,public}.ts`、`src/provider/durable-workflow/{ledger,public}.ts`、`test/编排/durable-workflow/audit-delivery-rework.test.ts` | 与 W2 同时启动并先对齐公开输入、投影及回执端口。按实例和原 B3 请求建立正式 `change.scope-decided`，与同一原 B3 来源、有效 B1 证据、基线、派生写集、决策及 outbox 在一笔 ANS 事务关联，重复请求及恢复只写一条。为已保存 scope 从既有可核验来源补记。根据已核验的合并事实生成独立、稳定身份的交付说明，与合并、关闭及送达事实关联，初始待送达。支持已合并可核验实例补齐、重启恢复和同键重复回执，记录证据能支持的事实及运行期验证缺口。交单测、事务与查询证据。 |
+| W2 桌面窗口 | `app/main.ts`、`app/preload.cjs`、`app/desktop/{durable-workflow,interface,workflow-git}.ts`、`app/desktop/session/fixed-workflow/{route,release-merge}.ts`、`test/桌面应用/durable-workflow.test.ts` | 与 W1 并行准备。传入实际 B3 受理来源、关联证据和既有已核验合并事实，使用现有权限与 Git 只读核验入口。在既有项目作用域和受信客户窗口的 IPC 开放交付说明的查询和持久回执；仅实际打开说明的用户操作可使待送达转已送达，重复投递或打开保持原回执。恢复补齐业务记录；实际 Git 执行次数保持原结果。交 IPC 作用域、兼容与恢复检查，并把 DTO 交给 W4。 |
+| W4 桌面UI | `app/renderer/src/chat/{DurableWorkflowPanel,TaskCenterPanel,ProjectStatePanel}.tsx`、`app/renderer/src/chat/ipc.ts`、`test/桌面UI/durable-workflow.test.ts` | W1/W2 的读投影与回执字段齐备后启动。在原任务导航及证据区公开范围证据与交付说明入口，展示待送达、已送达和实际说明。用真实受信窗口的明确查看操作交回执。待回执写成前沿用待送达展示。交 renderer 类型/构建检查及交互证据。 |
+| W9 shared-code（仅所需词条） | `src/common/shared/i18n/messages/zh-CN.ts`、`src/common/shared/i18n/messages/en-US.ts`、`test/项目管理/shared/i18n.test.ts` | W4 报出复用现有词条后仍需的键和参数时启动。仅增加所需双语 `ui.durableWorkflow.*`，按实际新增量同步严格计数，交双语键与参数检查。 |
+| W3 装配 | 已有 Windows 本地包输出目录，仅生成返工 ZIP 与验证产物 | W1/W2/W4 及所用词条合为一版后，沿已有打包、原生宿主与本地包验证命令构建同一 Windows x64 实包，交候选 SHA、ZIP/二进制哈希和实际运行证据。 |
+| W5 测试 | `test/测试/durable-workflow/desktop-native.test.ts`、`test/测试/durable-workflow/fixture.ts`、`test/测试/durable-workflow/desktop-audit-delivery-rework.test.ts`、`角色卡/测试/docs/change/2026-11-17_path-b-audit-and-delivery-rework.md` 及同名证据子目录 | 可先准备测试。对 W3 已标识的同机 Windows 候选，走真实桌面、持久数据、Dapr 和隔离 Git，核对新实例及保存 scope/已合并存量原型实例。覆盖 B3 同请求补投、合并已完成但说明未生成或回执未写的重启、界面明确查看、重复回执、影响原有 B2/B4 门的负例。用 SQLite 审计与回执、界面状态和 Git 前后 OID 及执行计数证明范围决定、说明、回执各只生效一次。记候选、命令、用例、替身、失败或缺证。 |
+| W6 独立验收 | `角色卡/独立验收/docs/change/2026-11-17_path-b-audit-and-delivery-rework.md` | 先接收 W5 用例并核对已冻结的 B1。候选、实际路径、W5 新证据和历史证据的可复用性齐备后，按同版 B1 复验 V1 两项及受影响证据，独立给出返工结论与整体状态。 |
+
+W1 与 W2 先派发，沟通按预留代启；W4、W9 随契约与空槽接续，W5 准备可与实现并行。W3 以完成接线的实际候选出包，W5 按该包取证，W6 对同一候选复验。原产品仓、本机正在使用的项目和发布仍在本轮授权之外。仅凭部分通过不得将原 B1 的其他缺证或平台结果标为达成。

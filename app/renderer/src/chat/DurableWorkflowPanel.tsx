@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import type { DurableProblem } from "../../../../src/model/durable-workflow.ts";
+import type { DurableProblem, DurableScopeDecision } from "../../../../src/model/durable-workflow.ts";
 import { useChatStore } from "@/chat/chat-store";
 import {
   getDurableWorkflowBridge,
@@ -9,6 +9,8 @@ import {
   type DesktopDurableDefinition,
   type DesktopDurableInstance,
   type DesktopDurableView,
+  type DurableDeliverySummary,
+  type DurableDeliveryView,
   type DurableWorkflowBridge,
 } from "@/chat/ipc";
 import { runtimeLabel } from "@/chat/runtime-config";
@@ -78,7 +80,173 @@ function Fact({ label, value, wide }: { label: string; value?: string | number; 
   );
 }
 
-function InstanceStatus({ instance }: { instance: DesktopDurableInstance }) {
+function ScopeDecision({ decision }: { decision: DurableScopeDecision }) {
+  const t = useT();
+  const { b3Request, b1Report, baseline } = decision;
+  return (
+    <details className="ps-details" data-durable-scope-decision={decision.id}>
+      <summary>{t("ui.durableWorkflow.scopeAudit")} · <code>{decision.kind}</code></summary>
+      <dl className="ps-list">
+        <Fact label={t("ui.durableWorkflow.recordId")} value={decision.id} />
+        <Fact label={t("ui.durableWorkflow.b3Request")} value={[b3Request.key, b3Request.sourceTaskId, b3Request.digest].join(" · ")} />
+        <Fact label={t("ui.durableWorkflow.evidence.analysis")} value={[b1Report.key, b1Report.path, b1Report.sha256].join(" · ")} />
+        <Fact label={t("ui.durableWorkflow.attempt")} value={b1Report.attempt} />
+        <Fact label={t("ui.durableWorkflow.baseline")} value={`${baseline.branch} · ${baseline.oid}`} />
+        <Fact label={t("ui.durableWorkflow.candidateSource")} value={`${decision.candidateSource} · ${decision.candidates.join(", ")}`} />
+        {decision.writeSets.map(({ roleId, paths }) => (
+          <Fact key={roleId} label={`${t("ui.durableWorkflow.writeSets")} · ${roleId}`} value={paths.join(", ")} />
+        ))}
+        <Fact label={t("ui.durableWorkflow.scopeReason")} value={decision.reason} />
+        <Fact label={t("ui.durableWorkflow.recordedAt")} value={decision.recordedAt} />
+      </dl>
+    </details>
+  );
+}
+
+function DeliveryExplanation({
+  bridge, projectRoot, instanceId, summary,
+}: {
+  bridge: DurableWorkflowBridge;
+  projectRoot: string;
+  instanceId: string;
+  summary: DurableDeliverySummary;
+}) {
+  const t = useT();
+  const deliveryId = summary.id;
+  const releaseRequestId = summary.releaseRequestId;
+  const generation = useRef(0);
+  const section = useRef<HTMLElement>(null);
+  const explanation = useRef<HTMLDivElement>(null);
+  const [reading, setReading] = useState(false);
+  const [view, setView] = useState<DurableDeliveryView>();
+  const [confirmed, setConfirmed] = useState<DurableDeliverySummary>();
+  const [readError, setReadError] = useState<true | DurableProblem>();
+  const [ackError, setAckError] = useState<true | DurableProblem>();
+  const [ackAttempt, setAckAttempt] = useState(0);
+  const receipt = confirmed ?? summary;
+  const delivered = receipt.state === "delivered";
+
+  useLayoutEffect(() => () => { generation.current += 1; }, []);
+
+  const open = async () => {
+    const current = ++generation.current;
+    setReading(true);
+    setReadError(undefined);
+    setAckError(undefined);
+    try {
+      const result = await bridge.readDurableWorkflowDelivery({ projectRoot, instanceId, deliveryId });
+      if (generation.current !== current || !section.current?.isConnected ||
+          !section.current.closest<HTMLDetailsElement>("details[data-durable-workflow]")?.open ||
+          !useUiStore.getState().drawerOpen || useChatStore.getState().projectRoot !== projectRoot) return;
+      if (!result.ok) {
+        setReadError(result);
+      } else if (result.value.delivery.id !== deliveryId || result.value.delivery.releaseRequestId !== releaseRequestId) {
+        setReadError(true);
+      } else {
+        setView(result.value);
+        if (result.value.delivery.state === "delivered") setConfirmed(result.value.delivery);
+      }
+    } catch {
+      if (generation.current === current) setReadError(true);
+    } finally {
+      if (generation.current === current) setReading(false);
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (view) explanation.current?.focus();
+  }, [view]);
+
+  useEffect(() => {
+    if (!view || delivered) return;
+    const current = generation.current;
+    let active = true;
+    let afterPaint = 0;
+    const isCurrent = () => active && generation.current === current && explanation.current?.isConnected &&
+      section.current?.closest<HTMLDetailsElement>("details[data-durable-workflow]")?.open &&
+      useChatStore.getState().projectRoot === projectRoot && useUiStore.getState().drawerOpen;
+    // Give the explanation a frame on screen before forwarding the view token.
+    const beforePaint = window.requestAnimationFrame(() => {
+      afterPaint = window.requestAnimationFrame(() => {
+        if (!isCurrent() || !explanation.current?.getClientRects().length) return;
+        void bridge.acknowledgeDurableWorkflowDelivery({ projectRoot, instanceId, deliveryId, viewToken: view.viewToken })
+          .then((result) => {
+            if (!isCurrent()) return;
+            if (!result.ok) setAckError(result);
+            else if (result.value.id !== deliveryId || result.value.releaseRequestId !== releaseRequestId ||
+                     result.value.state !== "delivered") setAckError(true);
+            else setConfirmed(result.value);
+          })
+          .catch(() => { if (isCurrent()) setAckError(true); });
+      });
+    });
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(beforePaint);
+      window.cancelAnimationFrame(afterPaint);
+    };
+  }, [ackAttempt, bridge, delivered, deliveryId, instanceId, projectRoot, releaseRequestId, view]);
+
+  const issue = readError || (!delivered && ackError);
+  return (
+    <section
+      className="ps-section"
+      aria-label={t("ui.durableWorkflow.delivery")}
+      data-durable-delivery={deliveryId}
+      data-delivery-state={receipt.state}
+      ref={section}
+    >
+      <p className="ps-focus" role="status">
+        {t("ui.durableWorkflow.delivery")} · {t(delivered ? "ui.durableWorkflow.deliveryDelivered" : "ui.durableWorkflow.deliveryPending")}
+        {receipt.deliveredAt ? ` · ${receipt.deliveredAt}` : ""}
+      </p>
+      {!view ? (
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => void open()} disabled={reading}>
+          {t(reading ? "ui.durableWorkflow.loading" : "ui.durableWorkflow.openDelivery")}
+        </Button>
+      ) : (
+        <div className="ps-section" tabIndex={-1} ref={explanation} data-delivery-explanation>
+          <dl className="ps-list">
+            <Fact label={t("ui.durableWorkflow.recordId")} value={view.delivery.id} />
+            <Fact label={t("ui.durableWorkflow.approval")} value={view.delivery.releaseRequestId} />
+            <Fact label={t("ui.durableWorkflow.mergeCommit")} value={view.delivery.mergeOid} />
+            <Fact label={t("ui.durableWorkflow.deliveryFiles")} value={view.delivery.files.join(", ")} />
+            <Fact label={t("ui.durableWorkflow.diffDigest")} value={view.delivery.diffDigest} />
+            {[view.delivery.operatorReport, ...(view.delivery.operatorReportArtifacts ?? [])].map(({ path, sha256 }) => (
+              <Fact key={`${path}:${sha256}`} label={t("ui.durableWorkflow.evidence.operator")} value={`${path} · ${sha256}`} />
+            ))}
+            <Fact label={t("ui.durableWorkflow.recordedAt")} value={view.delivery.createdAt} />
+          </dl>
+          {view.delivery.runtimeVerification === "not-independently-verified" ? (
+            <p className="ps-note">{t("ui.durableWorkflow.runtimeUnverified")}</p>
+          ) : null}
+          <div className="ps-tools">
+            {ackError && !delivered ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => { setAckError(undefined); setAckAttempt((value) => value + 1); }}>
+                {t("ui.durableWorkflow.retryDeliveryAck")}
+              </Button>
+            ) : null}
+            <Button type="button" variant="ghost" size="sm" onClick={() => {
+              generation.current += 1;
+              setAckError(undefined);
+              setView(undefined);
+            }}>
+              {t("shared.common.close")}
+            </Button>
+          </div>
+        </div>
+      )}
+      {issue ? <p className="ps-error" role="alert">{issue === true ? t("ui.durableWorkflow.requestError") : detail(issue)}</p> : null}
+    </section>
+  );
+}
+
+function InstanceStatus({ instance, projectRoot, bridge, drawerOpen }: {
+  instance: DesktopDurableInstance;
+  projectRoot: string;
+  bridge: DurableWorkflowBridge;
+  drawerOpen: boolean;
+}) {
   const t = useT();
   const locale = useLocaleState((state) => state.locale);
   const runtime = useUiStore((state) => state.runtime);
@@ -133,6 +301,16 @@ function InstanceStatus({ instance }: { instance: DesktopDurableInstance }) {
       ) : null}
       {approval?.status === "pending" && !canOpenApproval && instance.runtime && instance.runtime !== runtime ? (
         <p className="ps-note">{t("ui.durableWorkflow.approvalRuntime", { runtime: runtimeLabel(instance.runtime, locale) })}</p>
+      ) : null}
+      {instance.scopeDecision ? <ScopeDecision decision={instance.scopeDecision} /> : null}
+      {instance.delivery && drawerOpen ? (
+        <DeliveryExplanation
+          key={`${instance.instanceId}:${instance.delivery.id}:${instance.delivery.releaseRequestId}`}
+          bridge={bridge}
+          projectRoot={projectRoot}
+          instanceId={instance.instanceId}
+          summary={instance.delivery}
+        />
       ) : null}
       {instance.evidence?.length ? (
         <details className="ps-details">
@@ -404,7 +582,9 @@ export function DurableWorkflowPanel({ projectRoot }: { projectRoot: string }) {
           {control?.code || control?.message ? (
             <p className="ps-error break-all" role="status">{detail(control)}</p>
           ) : null}
-          {view?.instance ? <InstanceStatus instance={view.instance} /> : null}
+          {view?.instance ? (
+            <InstanceStatus instance={view.instance} projectRoot={projectRoot} bridge={bridge} drawerOpen={drawerOpen} />
+          ) : null}
           {view && !view.instance ? (
             <p className="ps-note" role="status">{t(instanceId ? "ui.durableWorkflow.notFound" : "ui.durableWorkflow.empty")}</p>
           ) : null}

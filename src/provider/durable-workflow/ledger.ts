@@ -2,9 +2,9 @@ import { existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type {
-  DurableActionIntent, DurableDefinition, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome,
+  DurableActionIntent, DurableDefinition, DurableDelivery, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome,
   DurableFact, DurableFactReceipt, DurableInstanceRef, DurableOwner, DurableProjection, DurableReleaseRequest,
-  DurableTaskBinding, DurableTerminal,
+  DurableScopeDecision, DurableTaskBinding, DurableTerminal,
 } from '../../model/durable-workflow.ts';
 import type { RepositoryIdentity } from './files.ts';
 
@@ -94,6 +94,18 @@ export class DurableLedger {
         instance_id TEXT NOT NULL REFERENCES instance(id), digest TEXT NOT NULL,
         content BLOB NOT NULL, PRIMARY KEY(instance_id,digest)
       );
+      CREATE TABLE IF NOT EXISTS scope_decision (
+        instance_id TEXT PRIMARY KEY, request_key TEXT NOT NULL, id TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL CHECK(kind='change.scope-decided'), data TEXT NOT NULL,
+        FOREIGN KEY(instance_id,request_key) REFERENCES fact(instance_id,business_key)
+      );
+      CREATE TABLE IF NOT EXISTS delivery_note (
+        instance_id TEXT PRIMARY KEY, merge_fact_key TEXT NOT NULL, id TEXT NOT NULL UNIQUE, data TEXT NOT NULL,
+        FOREIGN KEY(instance_id,merge_fact_key) REFERENCES fact(instance_id,business_key)
+      );
+      CREATE TABLE IF NOT EXISTS delivery_receipt (
+        delivery_id TEXT PRIMARY KEY REFERENCES delivery_note(id), delivered_at TEXT NOT NULL
+      );
     `);
   }
 
@@ -131,6 +143,16 @@ export class DurableLedger {
       .map(row => asJson<StoredInstance>(row)!);
   }
 
+  missingBusinessRecords(): StoredInstance[] {
+    return this.#db.prepare(`SELECT i.data FROM instance AS i
+      LEFT JOIN scope_decision AS s ON s.instance_id=i.id
+      LEFT JOIN delivery_note AS d ON d.instance_id=i.id
+      WHERE (s.instance_id IS NULL AND json_extract(i.data,'$.scope.key') IS NOT NULL)
+        OR (d.instance_id IS NULL AND json_extract(i.data,'$.release.decision.action')='approve'
+          AND EXISTS (SELECT 1 FROM fact AS f WHERE f.instance_id=i.id AND f.state IN ('pending','consumed')
+            AND json_extract(f.data,'$.fact.kind')='release-merged'))`).all().map(row => asJson<StoredInstance>(row)!);
+  }
+
   save(value: StoredInstance): void {
     this.#db.prepare(`INSERT INTO instance(id,project_id,request_id,status,data) VALUES(?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET status=excluded.status,data=excluded.data`)
@@ -166,6 +188,31 @@ export class DurableLedger {
     } else {
       this.#db.prepare('DELETE FROM outbox WHERE instance_id=? AND business_key=?').run(instanceId, value.fact.key);
     }
+  }
+
+  scopeDecision(instanceId: string): DurableScopeDecision | undefined {
+    return asJson(this.#db.prepare('SELECT data FROM scope_decision WHERE instance_id=?').get(instanceId));
+  }
+
+  saveScopeDecision(instanceId: string, value: DurableScopeDecision): void {
+    this.#db.prepare('INSERT INTO scope_decision(instance_id,request_key,id,kind,data) VALUES(?,?,?,?,?)')
+      .run(instanceId, value.b3Request.key, value.id, value.kind, JSON.stringify(value));
+  }
+
+  delivery(instanceId: string): DurableDelivery | undefined {
+    const row = this.#db.prepare(`SELECT d.data,r.delivered_at AS deliveredAt FROM delivery_note AS d
+      LEFT JOIN delivery_receipt AS r ON r.delivery_id=d.id WHERE d.instance_id=?`).get(instanceId);
+    const note = asJson<DurableDelivery>(row);
+    return note && (typeof row?.deliveredAt === 'string' ? { ...note, state: 'delivered', deliveredAt: row.deliveredAt } : note);
+  }
+
+  saveDelivery(instanceId: string, mergeKey: string, value: DurableDelivery): void {
+    this.#db.prepare('INSERT INTO delivery_note(instance_id,merge_fact_key,id,data) VALUES(?,?,?,?)')
+      .run(instanceId, mergeKey, value.id, JSON.stringify(value));
+  }
+
+  saveDeliveryReceipt(id: string, at: string): void {
+    this.#db.prepare('INSERT INTO delivery_receipt(delivery_id,delivered_at) VALUES(?,?) ON CONFLICT(delivery_id) DO NOTHING').run(id, at);
   }
 
   outbox(now: number): OutboxItem[] {

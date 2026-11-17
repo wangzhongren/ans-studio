@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { MERGE_MAIN_OPTION_IDS } from "../../../app/desktop/customer-input.ts";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
-import { analysis, app, daprdListener, fix, fixture, git, modelFixture, operatorReport, resourceRoot, sqliteSnapshot, successful, target, until, unwrap, write, type Log } from "./fixture.ts";
+import { app, daprdListener, fix, fixture, git, modelFixture, pathBModel, resourceRoot, sqliteSnapshot, target, until, unwrap, write, type Log } from "./fixture.ts";
 
 const windowsDapr = {
   skip: !resourceRoot && "Set ANS_W5_DAPR_ROOT to the verified bundle resource directory",
@@ -23,48 +23,13 @@ for (const mode of ["normal", "pending-card-restart", "daprd-loss-during-handbac
   const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
   log("fixture", f);
   let instanceId = "";
-  const flowId = "snake";
-  const runs = new Map<string, number>();
   let interrupted: Awaited<ReturnType<typeof daprdListener>>;
   let simulateNetwork: (online: boolean) => void;
-  const model = modelFixture(async turn => {
-    const { roleId } = turn;
-    const run = (runs.get(roleId) ?? 0) + 1;
-    runs.set(roleId, run);
-    if (roleId === "chief") {
-      const stage = run === 1 ? "B1" : "B3";
-      assert.ok(run <= 2, `Unexpected lead turn ${run}`);
-      await successful(turn, "dispatch_task", { roleId: "convener", task: `Advance ${stage} for collision repair`, flowId,
-        workflowId: instanceId, taskKind: "stage-request", workflowPath: "B", stage, workflowAction: "advance", sideEffect: "read-only",
-        ...(stage === "B3" ? { requestedEvidence: [target], reason: "Verified analysis identifies the single source file" } : {}) });
-      if (stage === "B3" && mode === "simulated-offline-before-dispatch") simulateNetwork(false);
-      return;
-    }
-    if (roleId === "convener" && (run === 1 || run === 3)) {
-      const stage = run === 1 ? "B1" : "B3";
-      await successful(turn, "dispatch_task", { roleId: "worker", task: `W5 ${stage} assigned file ${target}`, flowId, workflowId: instanceId,
-        stage, sideEffect: stage === "B1" ? "read-only" : "code", moduleId: "core", modulePaths: [target] });
-      return;
-    }
-    if (roleId === "convener" && (run === 2 || run === 4)) {
-      const stage = run === 2 ? "B1" : "B3";
-      const saved = await readTaskState(f.root);
-      const records = [...saved.records.values()].filter(record => record.created?.to === "worker" && record.created.stage === stage);
-      assert.equal(records.length, 1);
-      await successful(turn, "close_created_task", { operationId: `w5-close-${stage}`, taskId: records[0].taskId, outcome: "accepted" });
-      await successful(turn, "submit_report", { status: "completed", summary: `W5 accepted actual ${stage} worker report`, evidence: [stage === "B1" ? analysis : operatorReport] });
-      return;
-    }
-    if (roleId === "worker" && run === 1) {
-      await successful(turn, "read_file", { path: target });
-      await successful(turn, "submit_report", { status: "completed", summary: "Analysis identifies the collision threshold", evidence: [analysis] });
-      return;
-    }
-    if (roleId === "worker" && run === 2) {
-      await successful(turn, "write_file", { path: target, content: fix });
-      await successful(turn, "run_shell", { command: `git add ${target}` });
-      await successful(turn, "run_shell", { command: 'git commit -m "W5 fix collision threshold"' });
-      await successful(turn, "submit_report", { status: "completed", summary: "Changed only the collision threshold", evidence: [target] });
+  const model = pathBModel(f, () => instanceId, log, {
+    async afterScope() {
+      if (mode === "simulated-offline-before-dispatch") simulateNetwork(false);
+    },
+    async afterImplementationReport() {
       if (mode === "daprd-loss-during-handback") {
         // The product has accepted the report candidate. Its terminal event below drives
         // real persistence and handback while the fixture's own daprd is forcibly terminated.
@@ -75,10 +40,9 @@ for (const mode of ["normal", "pending-card-restart", "daprd-loss-during-handbac
         process.kill(interrupted.pid, "SIGKILL");
         log("daprd-force-exit", { ...interrupted, applicationPid: process.pid, from });
       }
-      return;
-    }
-    assert.fail(`Unscripted role turn ${roleId}:${run}`);
-  }, log);
+    },
+  });
+  const { runs } = model;
   let handle = await app(f, model, log);
   simulateNetwork = handle.simulateNetwork;
   t.after(() => handle.close());

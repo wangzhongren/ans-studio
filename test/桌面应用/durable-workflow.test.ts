@@ -5,9 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
 import { buildMergeMainCardRequest, createCustomerInputChannel, MERGE_MAIN_OPTION_IDS } from "../../app/desktop/customer-input.ts";
+import { DesktopDurableWorkflow } from "../../app/desktop/durable-workflow.ts";
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { createDesktopTaskGitShellPort, mergeDurableMain, previewDurableMerge, verifyDurableMerge, verifyDurableTaskCommit } from "../../app/desktop/workflow-git.ts";
-import type { DurableReleaseSnapshot } from "../../src/model/durable-workflow.ts";
+import { DURABLE_ACTIVITY_CONTRACT, DURABLE_EXECUTOR, type DurableReleaseSnapshot, type DurableResult } from "../../src/model/durable-workflow.ts";
+import { DurableLedger, repositoryIdentity } from "../../src/provider/durable-workflow/public.ts";
 
 function git(root: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -18,7 +20,7 @@ async function repository(t: TestContext) {
   const root = await fs.mkdtemp(path.join(temporary, "ans-durable-desktop-"));
   t.after(async () => {
     assert.equal(path.dirname(root), temporary);
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
   git(root, "init", "-b", "main");
   git(root, "config", "user.name", "ANS desktop test");
@@ -147,4 +149,114 @@ test("the actual Git commit and merge use their effect claim and can be verified
   assert.equal(actual.value.mainOid, git(root, "rev-parse", "main"));
   assert.deepEqual(actual.value.files, ["feature.txt"]);
   assert.equal((await verifyDurableMerge({ ...release, requestId: "wrong-request", writePaths: files })).ok, false);
+});
+
+function accepted<T>(result: DurableResult<T>): T {
+  if (!result.ok) assert.fail(`${result.code}: ${result.message}`);
+  return result.value;
+}
+
+function refused(result: DurableResult<unknown>, code: string): void {
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, code);
+}
+
+test("a saved delivery is scoped to its selected project and the first open receipt survives reopening", async t => {
+  let closeWindow: (() => Promise<void>) | undefined;
+  const { root, baselineOid, branch } = await repository(t);
+  const other = (await repository(t)).root;
+  const repo = await repositoryIdentity(root);
+  const userDataRoot = path.join(root, ".ans", "workflow-test");
+  const at = "2026-11-17T09:00:00.000Z";
+  const digest = "b".repeat(64);
+  const instanceId = "dw-delivery-fixture";
+  const deliveryId = "delivery-fixture";
+  const releaseRequestId = "release-request-fixture";
+  const ref = { projectId: repo.projectId, instanceId, definitionId: "path-b", definitionVersion: 1,
+    definitionDigest: digest, executor: DURABLE_EXECUTOR, activityContract: DURABLE_ACTIVITY_CONTRACT };
+  const report = { path: "ans-evidence/operator", sha256: digest };
+  const snapshot: DurableReleaseSnapshot = { mainOid: baselineOid, tipOid: baselineOid, baselineOid, branch, files: ["feature.txt"],
+    diffDigest: digest, b3CloseKey: "close", operatorReport: report };
+  // Seed a finished ledger to isolate this test to desktop query and receipt behavior.
+  const ledger = new DurableLedger(path.join(userDataRoot, "business"));
+  try {
+    ledger.transaction(() => {
+      ledger.save({ ref, definition: { id: "path-b", name: "Path B", schema: 1, version: 1, digest,
+        start: "done", steps: { done: { terminal: "delivered" } } }, projectRoot: repo.root, commonDir: repo.commonDir,
+        requestId: "start", metadata: {}, stepId: "done", entry: 1, attempt: 1, status: "delivered", engine: "healthy",
+        scheduled: true, scheduling: false, visits: {},
+        release: { logicalKey: "release", releaseId: "rel", requestId: releaseRequestId, generation: 1, digest, snapshot,
+          decision: { id: "approval", source: "customer", action: "approve", at } } });
+      ledger.saveFact(instanceId, { fact: { key: "advance", stepId: "scope", attempt: 1, kind: "b3-advance", source: "chief",
+        sourceTaskId: "chief-turn", requestDigest: digest, b1Attempt: 1, reportKey: "report", baselineOid, candidateSource: "modulePaths",
+        candidates: ["feature.txt"], writeSets: [{ roleId: "owner", paths: ["feature.txt"] }], reason: "Confirmed scope" },
+        receipt: { key: "advance", state: "consumed" }, fingerprint: digest });
+      ledger.saveScopeDecision(instanceId, { kind: "change.scope-decided", id: "scope-fixture",
+        b3Request: { key: "advance", sourceTaskId: "chief-turn", digest },
+        b1Report: { ...report, key: "report", attempt: 1 }, baseline: { oid: baselineOid, branch },
+        candidateSource: "modulePaths", candidates: ["feature.txt"], writeSets: [{ roleId: "owner", paths: ["feature.txt"] }],
+        reason: "Confirmed scope", recordedAt: at });
+      ledger.saveFact(instanceId, { fact: { key: "merge", stepId: "release", attempt: 1, kind: "release-merged", source: "host",
+        requestId: releaseRequestId, effectKey: "merge-effect", mainOid: baselineOid, closed: true },
+        receipt: { key: "merge", state: "consumed" }, fingerprint: digest });
+      ledger.saveDelivery(instanceId, "merge", { id: deliveryId, state: "pending", releaseRequestId, mergeOid: baselineOid,
+        files: ["feature.txt"], diffDigest: digest, operatorReport: report, runtimeVerification: "not-independently-verified", createdAt: at });
+    });
+  } finally {
+    ledger.close();
+  }
+  const input = { projectRoot: root, instanceId, deliveryId };
+  let projectToPick = root;
+  const openWindow = async () => {
+    await closeWindow?.();
+    const durable = new DesktopDurableWorkflow({ userDataRoot, resourceRoot: root });
+    const desktop = createDesktopInterface({
+      durableWorkflow: durable, envFilePath: path.join(root, ".ans", "desktop-test-env"), pickDirectory: async () => projectToPick, emitEvent: () => {},
+    });
+    closeWindow = async () => {
+      desktop.disposeProjectDocuments();
+      await durable.close();
+    };
+    assert.equal(await desktop.pickProject(), projectToPick);
+    await desktop.listProject({ projectRoot: projectToPick });
+    return desktop;
+  };
+  try {
+    const first = await openWindow();
+    const original = accepted(await first.getDurableWorkflowProjection(input)).instance;
+    assert.equal(original?.status, "delivered");
+    assert.equal(original.delivery?.state, "pending");
+    assert.equal(original.scopeDecision?.kind, "change.scope-decided");
+    assert.equal(original.scopeDecision.b3Request.sourceTaskId, "chief-turn");
+    refused(await first.readDurableWorkflowDelivery({ ...input, instanceId: "../invalid" }), "workflow-delivery-invalid");
+    refused(await first.readDurableWorkflowDelivery({ ...input, deliveryId: "not-generated" }), "workflow-delivery-not-found");
+    refused(await first.acknowledgeDurableWorkflowDelivery({ ...input, viewToken: "unopened" }), "workflow-delivery-not-opened");
+    const opened = accepted(await first.readDurableWorkflowDelivery(input));
+    assert.deepEqual(opened.delivery.files, ["feature.txt"]);
+    assert.equal(opened.delivery.runtimeVerification, "not-independently-verified");
+    assert.equal(accepted(await first.getDurableWorkflowProjection(input)).instance?.delivery?.state, "pending");
+    refused(await first.acknowledgeDurableWorkflowDelivery({ ...input, projectRoot: other, viewToken: opened.viewToken }), "workflow-project-unselected");
+    refused(await first.acknowledgeDurableWorkflowDelivery({ ...input, instanceId: "different", viewToken: opened.viewToken }), "workflow-delivery-not-opened");
+
+    const reopened = await openWindow();
+    assert.equal(accepted(await reopened.getDurableWorkflowProjection(input)).instance?.delivery?.state, "pending");
+    refused(await reopened.acknowledgeDurableWorkflowDelivery({ ...input, viewToken: opened.viewToken }), "workflow-delivery-not-opened");
+    const fresh = accepted(await reopened.readDurableWorkflowDelivery(input));
+    const viewed = { ...input, viewToken: fresh.viewToken };
+    const delivered = accepted(await reopened.acknowledgeDurableWorkflowDelivery(viewed));
+    assert.equal(delivered.state, "delivered");
+    assert.ok(delivered.deliveredAt);
+    assert.deepEqual(accepted(await reopened.acknowledgeDurableWorkflowDelivery(viewed)), delivered);
+
+    const restarted = await openWindow();
+    assert.deepEqual(accepted(await restarted.getDurableWorkflowProjection(input)).instance?.delivery, delivered);
+    const afterRestart = accepted(await restarted.readDurableWorkflowDelivery(input));
+    assert.deepEqual(accepted(await restarted.acknowledgeDurableWorkflowDelivery({ ...input, viewToken: afterRestart.viewToken })), delivered);
+    projectToPick = other;
+    assert.equal(await restarted.pickProject(), other);
+    await restarted.listProject({ projectRoot: other });
+    refused(await restarted.readDurableWorkflowDelivery({ ...input, projectRoot: other }), "workflow-delivery-not-found");
+  } finally {
+    await closeWindow?.();
+  }
 });

@@ -1,6 +1,6 @@
 import { DURABLE_ACTIVITY_CONTRACT, DURABLE_EXECUTOR } from '../../model/durable-workflow.ts';
 import type {
-  DurableDefinition, DurableEffect, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome, DurableEffectRecord,
+  DurableDefinition, DurableDelivery, DurableEffect, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome, DurableEffectRecord,
   DurableEvidenceRef, DurableFact, DurableFactReceipt, DurableInstanceRef, DurableOwner, DurableProjection, DurableResult, DurableStartInput,
 } from '../../model/durable-workflow.ts';
 import {
@@ -12,8 +12,8 @@ import { checkGitProtectionFactsCurrent, readGitProtectionFacts } from '../../pr
 import { deriveDurablePathBWriteSets, readWorkflowLedger } from '../../common/编排/workflow-service.ts';
 import { parseDefinition } from './definition.ts';
 import { takeEffect, settleEffect } from './effects.ts';
-import { admitFact, storedFact } from './facts.ts';
-import { activeAction, applyStep, equal, factShape, fail, hashValid, ok, project, sameInstance, validKey } from './rules.ts';
+import { admitFact, deliveryFor, scopeDecisionFor, storedFact } from './facts.ts';
+import { activeAction, applyStep, equal, factShape, fail, hashValid, ok, project as baseProjection, sameInstance, validKey } from './rules.ts';
 import type { ActivityInput, ActivityOutcome } from './rules.ts';
 
 export type { ActivityInput, ActivityOutcome } from './rules.ts';
@@ -35,10 +35,46 @@ export interface DurableDefinitionEntry {
 type Evidence = { ref: DurableEvidenceRef; bytes: Buffer };
 const ownerSlot = (definitionId: string): string => definitionId === 'path-b' ? 'path-b' : 'read-only:' + definitionId;
 
+function project(ledger: DurableLedger, value: StoredInstance): DurableProjection {
+  const projection = baseProjection(ledger, value);
+  if (value.ref.definitionId !== 'path-b') return projection;
+  return { ...projection, scopeDecision: ledger.scopeDecision(value.ref.instanceId), delivery: ledger.delivery(value.ref.instanceId) };
+}
+
 export class DurableWorkflowService {
   readonly #ledger: DurableLedger;
 
-  constructor(dataDir: string) { this.#ledger = new DurableLedger(dataDir); }
+  constructor(dataDir: string) {
+    this.#ledger = new DurableLedger(dataDir);
+    try {
+      this.#recoverBusinessRecords();
+    } catch (error) {
+      this.#ledger.close();
+      throw error;
+    }
+  }
+
+  #recoverBusinessRecords(): void {
+    const ledger = this.#ledger;
+    ledger.transaction(() => {
+      for (const value of ledger.missingBusinessRecords()) {
+        const id = value.ref.instanceId;
+        const recordedAt = new Date().toISOString();
+        if (value.scope && !ledger.scopeDecision(id)) {
+          const scope = scopeDecisionFor(ledger, value, ledger.fact(id, value.scope.key), recordedAt);
+          if (scope) ledger.saveScopeDecision(id, scope);
+        }
+        if (value.release?.decision?.action === 'approve' && !ledger.delivery(id)) {
+          for (const source of ledger.facts(id)) {
+            const delivery = deliveryFor(ledger, value, source, recordedAt);
+            if (!delivery) continue;
+            ledger.saveDelivery(id, source.fact.key, delivery);
+            break;
+          }
+        }
+      }
+    });
+  }
   close(): void { this.#ledger.close(); }
 
   async listDefinitions(projectRoot: string): Promise<DurableDefinitionEntry[]> {
@@ -279,20 +315,53 @@ export class DurableWorkflowService {
         return fail('fact-evidence-invalid', message(error));
       }
     }
-    return ledger.transaction(() => {
-      const previous = replay();
-      if (previous) return previous;
-      const current = this.#find(ref)!;
-      const admitted = admitFact(ledger, current, fact);
-      if (!admitted.ok) return admitted;
-      const { noWrite, ...receipt } = admitted.value;
-      if (!noWrite) {
+    try {
+      return ledger.transaction(() => {
+        const previous = replay();
+        if (previous) return previous;
+        const current = this.#find(ref)!;
+        const admitted = admitFact(ledger, current, fact);
+        if (!admitted.ok) return admitted;
+        const { noWrite, ...receipt } = admitted.value;
+        if (noWrite) return ok(receipt);
+        const stored = storedFact(fact, receipt);
+        const savedAt = new Date().toISOString();
+        const newScope = fact.kind === 'b3-advance' && receipt.state === 'pending';
+        const newDelivery = fact.kind === 'release-merged' && receipt.state === 'pending';
+        const scope = newScope ? scopeDecisionFor(ledger, current, stored, savedAt, savedAt) : undefined;
+        const delivery = newDelivery ? deliveryFor(ledger, current, stored, savedAt) : undefined;
+        if (newScope && !scope) return fail('scope-audit-evidence-invalid', '无法将 B2 决定绑定到持久的 B1 证据与原 B3 请求。');
+        if (newDelivery && !delivery) return fail('delivery-evidence-invalid', '合并回执与已批准的交付证据不一致。');
         for (const item of evidence) ledger.saveEvidence(ref.instanceId, item.ref.sha256, item.bytes);
         ledger.save(current);
-        ledger.saveFact(ref.instanceId, storedFact(fact, receipt));
-      }
-      return ok(receipt);
-    });
+        ledger.saveFact(ref.instanceId, stored);
+        if (scope) ledger.saveScopeDecision(ref.instanceId, scope);
+        if (delivery) ledger.saveDelivery(ref.instanceId, fact.key, delivery);
+        return ok(receipt);
+      });
+    } catch (error) {
+      return fail('fact-write-failed', message(error));
+    }
+  }
+
+  acknowledgeDelivery(ref: DurableInstanceRef, input: { deliveryId: string; requestId: string }): DurableResult<DurableDelivery> {
+    const ledger = this.#ledger;
+    try {
+      return ledger.transaction(() => {
+        const instance = this.#find(ref);
+        if (!instance) return fail('workflow-not-found', '作用域与已有实例不匹配。');
+        const delivery = ledger.delivery(ref.instanceId);
+        if (!delivery || delivery.id !== input.deliveryId || delivery.releaseRequestId !== input.requestId
+          || instance.release?.requestId !== input.requestId) {
+          return fail('delivery-note-not-found', '交付说明与本次实例及发布请求不匹配。');
+        }
+        if (delivery.state === 'delivered') return ok(delivery);
+        ledger.saveDeliveryReceipt(delivery.id, new Date().toISOString());
+        return ok(ledger.delivery(ref.instanceId)!);
+      });
+    } catch (error) {
+      return fail('delivery-receipt-write-failed', message(error));
+    }
   }
 
   listFacts(ref: DurableInstanceRef): readonly { fact: DurableFact; receipt: DurableFactReceipt }[] {

@@ -2053,6 +2053,23 @@ export const zhCN = {
   "ui.durableWorkflow.evidence.scope": "B3 请求摘要",
   "ui.durableWorkflow.evidence.operator": "运营报告",
   "ui.durableWorkflow.evidence.approval": "审批快照",
+  "ui.durableWorkflow.scopeAudit": "B2 范围决定审计",
+  "ui.durableWorkflow.recordId": "记录 ID",
+  "ui.durableWorkflow.b3Request": "关联 B3 请求",
+  "ui.durableWorkflow.baseline": "基线",
+  "ui.durableWorkflow.candidateSource": "候选范围来源",
+  "ui.durableWorkflow.writeSets": "派生写集",
+  "ui.durableWorkflow.scopeReason": "范围决定依据",
+  "ui.durableWorkflow.recordedAt": "记录时间",
+  "ui.durableWorkflow.delivery": "交付说明",
+  "ui.durableWorkflow.deliveryPending": "待送达",
+  "ui.durableWorkflow.deliveryDelivered": "已送达",
+  "ui.durableWorkflow.openDelivery": "查看交付说明",
+  "ui.durableWorkflow.retryDeliveryAck": "重试送达确认",
+  "ui.durableWorkflow.mergeCommit": "本地合并提交",
+  "ui.durableWorkflow.deliveryFiles": "交付文件",
+  "ui.durableWorkflow.diffDigest": "差异摘要",
+  "ui.durableWorkflow.runtimeUnverified": "运行期行为未经独立验证。",
 
   // ---- 全局任务状态与版本决策（2026-11-02 global-task-state；A3；P1 审核 §六 冻结）----
   // ui.projectState.*：项目状态面板（62）
