@@ -143,6 +143,17 @@ export interface DesktopBlockRouterHost {
    * 使回交的 `task.reported` 按任务绑定落账并回到 block router（与既有应用任务同口径）。
    */
   registerAppTask?(taskId: string, creator: "application"): void;
+  /**
+   * 2026-11-20（SMOKE-1 seams）：确定性重投一个应用任务（同 taskId；card-prompt 的 orphan 请求
+   * 以**同 requestId** 重呈现/重投，不新开卡）。幂等：已收口/已报告 ⇒ 如实 no-op；队列/在途 ⇒ 不重复入队。
+   * 缺省 ⇒ 引擎重投不可得（按既有 reconcile/advance 兜底，失败如实升级）。
+   */
+  redeliverAppTask?(projectRoot: string, taskId: string): Promise<{ ok: boolean; note: string; reEntry?: string }>;
+  /**
+   * 2026-11-20（SMOKE-1 seams）：扫描 card-prompt 投递/orphan 停摆事实（应用账本只读；
+   * B5 target-busy/投递停摆 + 同 requestId orphan 重呈现）。缺省 ⇒ 不扫描（测试/旧宿主零变化）。
+   */
+  scanAppCardPromptFacts?(projectRoot: string, options: { stallMs: number; maxAutoFixAttempts: number }): Promise<readonly BlockFact[]>;
 }
 
 /** block 卡等待的提醒去重/卡 promise 等进程内状态（不持久化；账本才是事实源）。 */
@@ -156,6 +167,17 @@ export interface BlockRouterOptions {
 const DIAGNOSTIC_COMPONENT = "desktop.block-router";
 const BLOCK_REPAIR_TASK_KIND = "repair";
 const BLOCK_REPAIR_KEY_PREFIX = "block-repair:";
+/**
+ * 2026-11-20（SMOKE-1 seams）：可由应用「确定性重投」收口的投递/card-prompt 事实码——
+ * 引擎动作 = 同 taskId 重投（orphan 请求同 requestId 重呈现），幂等、有界（maxAutoFix）。
+ */
+const APP_TASK_REDELIVERY_CODES: ReadonlySet<string> = new Set([
+  "card-prompt-orphaned",
+  "card-prompt-stalled",
+  "target-busy",
+  "session-open-failed",
+  "delivery-failed",
+]);
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "";
@@ -567,6 +589,20 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
   ): Promise<{ ok: true; reEntry: string; note: string } | { ok: false; note: string }> => {
     // 只做**确定性**动作：应用对账 / app-dispatch 重驱动；fixed-v2.1 在飞零迁移（不伪造阶段推进）。
     if (fact.protocol === WORKFLOW_PROTOCOL_APP_DISPATCH) {
+      // 2026-11-20（SMOKE-1 seams）：投递/card-prompt 事实 ⇒ 先做**针对性重投**（同 taskId；orphan 同
+      // requestId 重呈现），不触发任何任务重建。成功即收口；失败再走既有 reconcile/advance 兜底。
+      if (fact.taskId !== undefined && host.redeliverAppTask !== undefined
+        && (fact.kind === "driver-observation" || (fact.code !== undefined && APP_TASK_REDELIVERY_CODES.has(fact.code)))) {
+        const redelivered = await host.redeliverAppTask(projectRoot, fact.taskId);
+        if (redelivered.ok) {
+          return {
+            ok: true,
+            reEntry: redelivered.reEntry ?? `redeliver:${fact.taskId}`,
+            note: redelivered.note,
+          };
+        }
+        diagnosticFor(projectRoot).record("block.redeliver.failed", { blockId, taskId: fact.taskId, note: redelivered.note });
+      }
       if ((fact.kind === "reconcile" || fact.code === "workflow-corrupt"
         || fact.code === "reconcile-corrupt" || fact.code === "reconcile-error"
         || fact.code === "workflow-protocol-mismatch") && host.reconcileAppDispatch !== undefined) {
@@ -757,9 +793,14 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
       diagnosticFor(projectRoot).record("block.repair-task.create.failed", { blockId, reasonCode: appended.code ?? "task-create-failed" });
       return undefined;
     }
-    host.registerAppTask?.(taskId, "application");
-    diagnosticFor(projectRoot).record("block.repair-task.created", { blockId, taskId, ownerRoleId });
-    return taskId;
+    // 2026-11-20（SMOKE-1 seams）：并发同键创建由账本唯一 guard 归一——败方回执为 replay，
+    // **必须消费回执 taskId**（不得按本地 newTaskId 继续路由/投递第二条；回执缺省回退本地值兼容旧路径）。
+    const receiptTaskId = appended.taskId ?? taskId;
+    host.registerAppTask?.(receiptTaskId, "application");
+    diagnosticFor(projectRoot).record("block.repair-task.created", {
+      blockId, taskId: receiptTaskId, ownerRoleId, replay: appended.replay === true,
+    });
+    return receiptTaskId;
   };
 
   const deliverRepairTask = async (projectRoot: string, taskId: string, ownerRoleId: string): Promise<void> => {
@@ -1334,6 +1375,10 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
     protocol: lifecycle.protocol,
     kind: "task.reported",
     ...(lifecycle.code !== undefined ? { code: lifecycle.code } : {}),
+    // 2026-11-20（SMOKE-1 seams）：从 block.raised 读回 detailCode/engineCanRepair——恢复重路由按原
+    // 分类事实（如 detailCode:"reconcile" ⇒ engine-auto-fix），不回落 model-anomaly/owner-repair。
+    ...(lifecycle.detailCode !== undefined ? { detailCode: lifecycle.detailCode } : {}),
+    ...(lifecycle.engineCanRepair !== undefined ? { engineCanRepair: lifecycle.engineCanRepair } : {}),
     ...(lifecycle.workflowId !== undefined ? { workflowId: lifecycle.workflowId } : {}),
     ...(lifecycle.flowId !== undefined ? { flowId: lifecycle.flowId } : {}),
     ...(lifecycle.stage !== undefined ? { stage: lifecycle.stage } : {}),
@@ -1475,6 +1520,16 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
       if (raised.has(blockId)) continue;
       await handleFact(projectRoot, fact);
     }
+  };
+
+  /**
+   * 2026-11-20（SMOKE-1 seams）：card-prompt 投递/orphan 停摆扫描（应用账本事实；宿主实现）。
+   * 只在 tick/recover 时机运行；事实经同一 `handleFact`（raised→routed→engine 重投/升级）。
+   */
+  const scanAppCardPromptFailures = async (projectRoot: string): Promise<void> => {
+    if (host.scanAppCardPromptFacts === undefined) return;
+    const facts = await host.scanAppCardPromptFacts(projectRoot, { stallMs: timings.stallMs, maxAutoFixAttempts: maxAutoFix });
+    for (const fact of facts) await handleFact(projectRoot, fact);
   };
 
   const hasOpenCardForWorkflow = (state: TaskReplay, workflowId: string): boolean => {
@@ -1667,6 +1722,7 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
   const recover = async (projectRoot: string): Promise<void> => {
     await serialize(projectRoot, async () => {
       await scanStageBlockedFacts(projectRoot);
+      await scanAppCardPromptFailures(projectRoot);
       const ledger = await readBlockLedger(projectRoot);
       if (ledger.badLines > 0) {
         systemRow(projectRoot, `[Block·系统] blocks.jsonl 存在 ${ledger.badLines} 条坏行；恢复只读（不猜、不追加）。`);
@@ -1683,6 +1739,7 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
   const tick = async (projectRoot: string): Promise<void> => {
     await serialize(projectRoot, async () => {
       await scanStageBlockedFacts(projectRoot);
+      await scanAppCardPromptFailures(projectRoot);
       await checkStall(projectRoot);
       await checkRepairTimeoutsAndReminders(projectRoot);
     });

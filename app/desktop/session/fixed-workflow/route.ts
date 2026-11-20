@@ -84,6 +84,11 @@ export interface FixedWorkflowPorts {
   enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void;
   drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void>;
   appDispatchClientMessageId(dedupKey: string): string;
+  /**
+   * 2026-11-20（SMOKE-1 seams）：同一应用任务是否已在队列/在途（幂等重投判据；缺省 ⇒ 不做该检查）。
+   */
+  pendingAppTaskDelivery?(projectRoot: string, targetRoleId: string, runtime: RuntimeKind, clientMessageId: string):
+    { queued: boolean; position?: number } | undefined;
   /** 2026-11-20（block resolver 桌面批）：派发拒绝/服务失败的 block 事实（缺省 ⇒ 旧行为零变化）。 */
   onBlockFact?(projectRoot: string, fact: BlockFact): void;
 }
