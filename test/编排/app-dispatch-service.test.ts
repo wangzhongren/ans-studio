@@ -33,6 +33,7 @@ import { createHash } from "node:crypto";
 
 import {
   APP_DISPATCH_PROTOCOL,
+  WORKFLOWS_STATE_REL,
   appendWorkflowEvent,
   appDispatchPromptId,
   appDispatchTaskId,
@@ -59,6 +60,7 @@ import { parseProjectRoster } from "../../src/common/编排/workflow-preconditio
 import { classifyBlock } from "../../src/common/编排/block-resolution.ts";
 import { deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
 import {
+  TASKS_STATE_REL,
   appendTaskEvent,
   readTaskState,
   taskEvent,
@@ -185,6 +187,15 @@ async function viewOf(root: string, workflowId: string) {
   const ledger = await readWorkflowLedger(root);
   const tasks = await readTaskState(root);
   return deriveWorkflowView(ledger.events.filter((event) => event.workflowId === workflowId), tasks.events);
+}
+/** 账本 JSONL 非空行数（2026-11-20 SMOKE-3 S3：drive waiting 期间必须零写入）。 */
+async function ledgerLineCount(root: string, rel: string): Promise<number> {
+  const file = path.join(root, ...rel.split("/"));
+  const text = await fs.readFile(file, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+  return text.split(/\r?\n/).filter((line) => line.trim() !== "").length;
 }
 async function taskOf(root: string, workflowId: string, stage: WorkflowStage, to?: string): Promise<TaskRecord> {
   const state = await readTaskState(root);
@@ -957,14 +968,39 @@ test("A3 card prompt：request.created（promptId/documentRefs/选项/推荐集�
     await writeIntent(root);
     const observed = await observeAppDispatchTaskReport({ projectRoot: root, taskId: before.tasks[0]!.taskId });
     assert.equal(observed.ok, true);
-    // 删除意图入口，再驱动 A3 ⇒ intent-entry-missing，不写 request.created。
+    // 2026-11-20（SMOKE-3 S3 地基 + 测试批）：入口缺失 ⇒ drive 返回**有界等待回执**（成功形态，不是失败）：
+    // ok:true + waiting.code=intent-entry-missing、tasks=[]、requested/dispatched/completed/replay=false。
+    // 检查先于 stage.requested 第一笔写 ⇒ 两个账本行数不变（零 request.created / 零 stage.requested / 零任务）。
     await fs.rm(path.join(root, "docs", "intents", "snake-intent.md"));
+    const tasksLinesBefore = await ledgerLineCount(root, TASKS_STATE_REL);
+    const workflowLinesBefore = await ledgerLineCount(root, WORKFLOWS_STATE_REL);
     const missingEntry = await drive(root, WF);
-    assert.equal(missingEntry.ok, false);
-    if (!missingEntry.ok) {
-      assert.equal(missingEntry.code, "intent-entry-missing");
-      assert.deepEqual(missingEntry.missing, ["docs/intents/<intentId>.md"]);
+    assert.equal(missingEntry.ok, true, "入口未就绪是有界等待（成功形态），不是失败");
+    if (missingEntry.ok) {
+      assert.equal(missingEntry.stage, "A3");
+      assert.equal(missingEntry.attempt, 1);
+      assert.equal(missingEntry.waiting?.code, "intent-entry-missing");
+      assert.match(missingEntry.waiting?.message ?? "", /docs\/intents\/snake-intent\.md/);
+      assert.deepEqual(missingEntry.tasks, []);
+      assert.equal(missingEntry.requested, false);
+      assert.equal(missingEntry.dispatched, false);
+      assert.equal(missingEntry.completed, false);
+      assert.equal(missingEntry.replay, false);
     }
+    assert.equal(await ledgerLineCount(root, TASKS_STATE_REL), tasksLinesBefore,
+      "等待期间 tasks.jsonl 零写入（无 request.created / 无 task.created）");
+    assert.equal(await ledgerLineCount(root, WORKFLOWS_STATE_REL), workflowLinesBefore,
+      "等待期间 workflows.jsonl 零写入（无 stage.requested / 无 stage.dispatched）");
+    const waitingState = await readTaskState(root);
+    assert.equal(waitingState.events.some((event) => event.kind === "request.created"), false);
+    assert.equal([...waitingState.records.values()].some((record) => record.created?.stage === "A3"), false,
+      "等待期间不得创建 A3 任务");
+    // 重复 drive 仍等待、零事件（幂等；入口未出现前不推进）。
+    const missingAgain = await drive(root, WF);
+    assert.equal(missingAgain.ok, true);
+    if (missingAgain.ok) assert.equal(missingAgain.waiting?.code, "intent-entry-missing");
+    assert.equal(await ledgerLineCount(root, TASKS_STATE_REL), tasksLinesBefore, "重复 drive 仍零写入");
+    assert.equal(await ledgerLineCount(root, WORKFLOWS_STATE_REL), workflowLinesBefore, "重复 drive 仍零写入");
     assert.equal((await readTaskState(root)).events.some((event) => event.kind === "request.created"), false);
     // 恢复入口 ⇒ A3 prompt 成功。
     await writeIntent(root);
@@ -1007,6 +1043,10 @@ test("A3 card prompt：request.created（promptId/documentRefs/选项/推荐集�
     assert.equal(intentRef!.sha256, sha(await fs.readFile(path.join(root, "docs", "product", "snake-intent-v1.md"))));
     assert.equal(intentRef!.version, 1);
     assert.equal((await ofKind(root, WF, "stage.dispatched")).find((event) => event.stage === "A3")!.executorKind, "card-prompt");
+    // 等待期零写入后恢复：A3 只应有 1 条 stage.requested / 1 条任务（幂等，无重复）。
+    assert.equal((await ofKind(root, WF, "stage.requested")).filter((event) => event.stage === "A3").length, 1,
+      "等待恢复后 A3 仅一条 stage.requested（等待期未预写）");
+    assert.equal((await tasksOfStage(root, WF, "A3")).length, 1, "等待恢复后 A3 恰一条 card-prompt 任务");
 
     // 重放：不重复 request.created / card-prompt 任务。
     const replay = await driveOk(root, WF, "A3");

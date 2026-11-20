@@ -674,3 +674,54 @@ test("S3/C1b：cardKind=\"stable-write\"（app-owned 白名单）记账通过；
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
+
+test("S3 地基：request.created.supersedesOrphanAt 合法写入/读回；坏值拒写（invalid-event-source+稳定消息）且读侧坏行；无字段旧行兼容", async () => {
+  const root = await tempRoot();
+  try {
+    const orphanAt = "2026-11-20T00:00:01.000Z";
+    // 合法值：同 requestId 重呈现携带被取代 request.orphaned.at 原文。
+    const valid = taskEvent("request.created", {
+      requestId: "req-represented",
+      sourceRoleId: "application",
+      title: "重呈现的意图卡",
+      options: [{ id: "confirm", label: "确认" }],
+      supersedesOrphanAt: orphanAt,
+    }, () => new Date("2026-11-20T00:00:02.000Z"));
+    assert.equal((await appendTaskEvent(root, valid)).ok, true);
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 0, JSON.stringify(state.errors));
+    const row = state.events.find((event) => event.kind === "request.created");
+    assert.equal(row?.kind === "request.created" ? row.supersedesOrphanAt : undefined, orphanAt, "合法值按原文读回");
+
+    // 写侧拒写：空串 / 纯空白 / 非时间戳 ⇒ invalid-event-source + 稳定消息（账本零新增）。
+    for (const [index, bad] of ["", "   ", "not-a-timestamp"].entries()) {
+      const rejected = await appendTaskEvent(root, taskEvent("request.created", {
+        requestId: `req-bad-${index}`,
+        sourceRoleId: "application",
+        title: "坏值",
+        options: [{ id: "confirm", label: "确认" }],
+        supersedesOrphanAt: bad,
+      }, () => new Date("2026-11-20T00:00:03.000Z")));
+      assert.equal(rejected.ok, false, JSON.stringify({ bad }));
+      if (!rejected.ok) {
+        assert.equal(rejected.code, "invalid-event-source");
+        assert.equal(rejected.message, "request.created.supersedesOrphanAt 非法");
+      }
+    }
+    assert.equal((await readTaskState(root)).events.length, 1, "坏值拒写不落账");
+
+    // 读侧：手写坏行进 errors（不阻塞合法行）；无字段旧行零坏行。
+    const file = path.join(root, ...TASKS_STATE_REL.split("/"));
+    const badRow = { v: 1, at: "2026-11-20T00:00:04.000Z", kind: "request.created", requestId: "req-bad-read", sourceRoleId: "application", title: "读侧坏行", options: [], supersedesOrphanAt: "not-a-timestamp" };
+    const legacyRow = { v: 1, at: "2026-11-20T00:00:05.000Z", kind: "request.created", requestId: "req-legacy", sourceRoleId: "rapporteur", title: "旧行（无字段）", options: [{ id: "accept", label: "接受" }] };
+    await fs.appendFile(file, `${JSON.stringify(badRow)}\n${JSON.stringify(legacyRow)}\n`, "utf8");
+    const read = await readTaskState(root);
+    assert.equal(read.errors.length, 1, JSON.stringify(read.errors));
+    assert.match(read.errors[0]!.message, /supersedesOrphanAt/);
+    assert.equal(read.events.some((event) => event.kind === "request.created" && event.requestId === "req-represented"), true);
+    assert.equal(read.events.some((event) => event.kind === "request.created" && event.requestId === "req-legacy"), true, "无字段旧行照常读入（零坏行）");
+    assert.equal(read.events.some((event) => event.kind === "request.created" && event.requestId === "req-bad-read"), false);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});

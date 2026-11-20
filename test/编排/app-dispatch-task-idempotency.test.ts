@@ -28,6 +28,7 @@ import path from "node:path";
 
 import {
   APP_DISPATCH_PROTOCOL,
+  WORKFLOWS_STATE_REL,
   appDispatchIdempotencyKey,
   appDispatchPromptId,
   appDispatchTaskId,
@@ -47,6 +48,7 @@ import {
 } from "../../src/common/编排/workflow-service.ts";
 import { WORKFLOW_DEFINITION_HASHES_BY_VERSION } from "../../src/common/编排/workflow-definitions.ts";
 import {
+  TASKS_STATE_REL,
   appendTaskEvent,
   readTaskState,
   taskEvent,
@@ -506,6 +508,115 @@ test("并发同键 repair 任务 ⇒ 账本仅 1 条、另一回执 replay 同 i
     }, at));
     assert.equal(rebind.ok, false);
     if (!rebind.ok) assert.equal(rebind.code, "invalid-task-binding");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+// —————————————— 5) 2026-11-20（SMOKE-3 S3 地基）：reconcile 遇 drive waiting ——————————————
+
+async function writeFile(root: string, rel: string, text: string): Promise<void> {
+  const abs = path.join(root, ...rel.split("/"));
+  await fs.mkdir(path.dirname(abs), { recursive: true });
+  await fs.writeFile(abs, text, "utf8");
+}
+/** A3 卡事实计算所需的产品意图（`docs/product/<flow>-intent-v1.md`）。 */
+async function writeProductIntent(root: string): Promise<void> {
+  await writeFile(root, "docs/product/seam-intent-v1.md",
+    "---\nschema: project-intent/v1\nflowId: seam\nversion: 1\nintentId: seam-intent\ngoal: 缝测试\n---\n# 意图\n");
+}
+/** 幕僚在 A3 前写的意图入口（`docs/intents/<intentId>.md`）。 */
+async function writeIntentEntry(root: string): Promise<void> {
+  await writeFile(root, "docs/intents/seam-intent.md",
+    "---\nintentId: seam-intent\nflowId: seam\ngoal: 缝测试\n---\n# 意图入口\n");
+}
+async function ledgerLineCount(root: string, rel: string): Promise<number> {
+  const file = path.join(root, ...rel.split("/"));
+  const text = await fs.readFile(file, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+  return text.split(/\r?\n/).filter((line) => line.trim() !== "").length;
+}
+
+test("S3 地基：reconcile 遇 drive waiting（A3 入口缺失）不报 workflow-corrupt、不建任务；入口恢复后对账补建", async () => {
+  const root = await makeRoot();
+  try {
+    const wf = await startA(root);
+    // A2 完成：drive A2 → done 报告（证据文件先落盘）→ 应用观察收口。
+    const a2 = await driveOk(root, wf, "A2");
+    const a2TaskId = a2.tasks[0]!.taskId;
+    await writeProductIntent(root);
+    const reported = await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: a2TaskId, from: "product", status: "done", summary: "意图完成",
+      evidence: ["docs/product/seam-intent-v1.md"],
+    }, at));
+    assert.equal(reported.ok, true, reported.ok === false ? reported.message : "");
+    const observed = await observeAppDispatchTaskReport({ projectRoot: root, taskId: a2TaskId, now: at });
+    assert.equal(observed.ok, true, observed.ok === false ? `${observed.code}: ${observed.message}` : "");
+
+    // 在飞形态（地基记录 §四.3/§六）：A3 已 stage.requested（应用签发；requestTaskId = 确定性
+    // card-prompt taskId），但入口缺失 ⇒ 任务/request.created 均未建立。对账不得把等待误报 corrupt。
+    const expectedPromptId = appDispatchPromptId(wf, "A3", 1);
+    const expectedTaskId = appDispatchTaskId(cardPromptIdempotencyKey(wf, "A3", expectedPromptId));
+    const requestedEvent: WorkflowEvent = {
+      v: 1, at: new Date(AT).toISOString(), schema: WORKFLOW_LEDGER_SCHEMA, kind: "stage.requested",
+      workflowId: wf, flowId: FLOW, path: "A",
+      idempotencyKey: `stage-request:${wf}:A3:1`,
+      stage: "A3", requestTaskId: expectedTaskId, requestDigest: "a".repeat(64), attempt: 1, issuedBy: "application",
+    };
+    const seededRequested = await appendWorkflowEvent(root, requestedEvent);
+    assert.equal(seededRequested.ok, true, seededRequested.ok === false ? seededRequested.message : "");
+
+    // A3 入口缺失：reconcile 驱动 A3 ⇒ 有界等待（成功形态）；不是账本不一致、零写入。
+    const tasksBefore = await ledgerLineCount(root, TASKS_STATE_REL);
+    const workflowsBefore = await ledgerLineCount(root, WORKFLOWS_STATE_REL);
+    const reconciled = await reconcileFixedWorkflow({ projectRoot: root, workflowId: wf, now: at });
+    assert.equal(reconciled.ok, true, reconciled.ok === false ? `${reconciled.code}: ${reconciled.message}` : "");
+    if (!reconciled.ok) throw new Error("unreachable");
+    const receipt = reconciled.workflows.find((workflow) => workflow.workflowId === wf)!;
+    assert.equal(receipt.corrupt, undefined, "等待不是账本不一致（跳过 requestTaskId 判定）");
+    assert.equal(receipt.skipped, undefined);
+    assert.equal(receipt.driven?.waiting?.code, "intent-entry-missing");
+    assert.deepEqual(receipt.driven?.tasks, []);
+    assert.equal(receipt.driven?.requested, false);
+    assert.equal(receipt.driven?.dispatched, false);
+    assert.equal(receipt.driven?.completed, false);
+    assert.equal(receipt.driven?.replay, false);
+    assert.equal(await ledgerLineCount(root, TASKS_STATE_REL), tasksBefore, "等待对账零任务事件（无 request.created/task.created）");
+    assert.equal(await ledgerLineCount(root, WORKFLOWS_STATE_REL), workflowsBefore, "等待对账零工作流事件（无 stage.requested/dispatched）");
+    assert.equal((await recordsOfStage(root, wf, "A3")).length, 0, "等待期间不得建 A3 任务");
+
+    // 重复对账仍 waiting、零新增（幂等）。
+    const again = await reconcileFixedWorkflow({ projectRoot: root, workflowId: wf, now: at });
+    assert.equal(again.ok, true);
+    if (!again.ok) throw new Error("unreachable");
+    const againReceipt = again.workflows.find((workflow) => workflow.workflowId === wf)!;
+    assert.equal(againReceipt.corrupt, undefined);
+    assert.equal(againReceipt.driven?.waiting?.code, "intent-entry-missing");
+    assert.equal(await ledgerLineCount(root, TASKS_STATE_REL), tasksBefore);
+    assert.equal(await ledgerLineCount(root, WORKFLOWS_STATE_REL), workflowsBefore);
+
+    // 入口恢复 ⇒ 下一次对账走既有路径：stage.requested → request.created → card-prompt → stage.dispatched。
+    await writeIntentEntry(root);
+    const recovered = await reconcileFixedWorkflow({ projectRoot: root, workflowId: wf, now: at });
+    assert.equal(recovered.ok, true);
+    if (!recovered.ok) throw new Error("unreachable");
+    const recoveredReceipt = recovered.workflows.find((workflow) => workflow.workflowId === wf)!;
+    assert.equal(recoveredReceipt.corrupt, undefined, "入口恢复后对账正常（requestTaskId 一致性通过）");
+    assert.equal(recoveredReceipt.driven?.waiting, undefined);
+    assert.equal(recoveredReceipt.driven?.tasks.length, 1, "入口恢复后对账补建 1 个 card-prompt 任务");
+    assert.equal(recoveredReceipt.driven?.tasks[0]?.taskKind, "card-prompt");
+    const a3Tasks = await recordsOfStage(root, wf, "A3");
+    assert.equal(a3Tasks.length, 1);
+    assert.equal(a3Tasks[0]!.taskId, expectedTaskId, "补建任务复用 stage.requested.requestTaskId（确定性派生）");
+    assert.equal(a3Tasks[0]!.created?.promptId, expectedPromptId);
+    assert.equal((await workflowEventsOfKind(root, wf, "stage.requested")).filter((event) => event.stage === "A3").length, 1,
+      "补建后 A3 仅一条 stage.requested（等待期未预写）");
+    assert.equal((await workflowEventsOfKind(root, wf, "stage.dispatched")).filter((event) => event.stage === "A3").length, 1);
+    const requestRows = (await readTaskState(root)).events.filter((event) =>
+      event.kind === "request.created" && event.requestId === a3Tasks[0]!.created!.promptId);
+    assert.equal(requestRows.length, 1, "补建后恰一条 request.created");
   } finally {
     await cleanup(root);
   }
