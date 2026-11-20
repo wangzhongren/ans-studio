@@ -401,7 +401,112 @@ export function redispatchTaskId(retryOf: string, attempt: number): string {
 
 // —————————————— 追加（轮转 + 原子行；A2 共享辅助） ——————————————
 
-type AppendResult = { ok: true; path: string } | { ok: false; message: string; code?: string };
+type AppendResult =
+  | { ok: true; path: string; replay?: boolean; taskId?: string; created?: TaskCreatedEvent }
+  | { ok: false; message: string; code?: string };
+
+// —————————————— 应用任务/修复任务的账本唯一 guard（2026-11-20 SMOKE-1 seams） ——————————————
+//
+// 客户第一不变量：**应用任务必须由工作流/应用侧唯一派发，taskId 必须一致且确定**。
+// 本 guard 只覆盖「应用按流程定义创建」的三类任务（stage-execution/worker-dispatch/card-prompt）
+// 与 block 属主修复任务（taskKind=repair / 携带 blockId）；legacy 派遣与重派（无 workflowId/taskKind，
+// 重派沿用原键）**逐字保持原行为**（不受本 guard 影响）。
+//
+// 语义（串行/并发、进程内）：
+//  · 同 taskId 已存在：payload 一致 ⇒ 返回既有任务（replay，不追加）；不一致 ⇒ invalid-task-binding（不重绑）。
+//  · 同 idempotencyKey 但 taskId 不同：repair 任务返回既有（同键只允许一条修复任务）；
+//    应用任务 ⇒ invalid-task-binding（taskId 必须由键确定性派生，禁止第二创建者）。
+//  · 无冲突 ⇒ 追加一行。读-判-写在同一进程内串行链中完成（跨进程并发不在本批范围）。
+
+const IDEMPOTENT_TASK_CREATED_KINDS: ReadonlySet<string> = new Set([
+  "stage-execution", "worker-dispatch", "card-prompt", "repair",
+]);
+
+function isAppOwnedTaskCreated(event: TaskStateEvent): event is TaskCreatedEvent {
+  if (event.kind !== "task.created") return false;
+  if (event.blockId !== undefined) return true;
+  if (event.taskKind === undefined || event.taskKind === "") return false;
+  if (!IDEMPOTENT_TASK_CREATED_KINDS.has(event.taskKind)) return false;
+  return event.taskKind === "repair" || event.workflowId !== undefined;
+}
+
+/** 同 taskId 的 replay payload 校验字段（固定事实；模型不可自报）。 */
+const TASK_CREATED_STABLE_FIELDS: readonly (keyof TaskCreatedEvent)[] = [
+  "from", "to", "text", "sideEffect", "flowId", "workflowId", "stage", "taskKind", "promptId",
+  "cardKind", "blockId", "moduleId", "moduleDirectory", "expectedOutput",
+];
+
+/** 同 taskId 的 replay payload 校验（返回首个冲突字段；undefined = 一致）。 */
+function taskCreatedPayloadConflict(existing: TaskCreatedEvent, incoming: TaskCreatedEvent): string | undefined {
+  for (const field of TASK_CREATED_STABLE_FIELDS) {
+    if (existing[field] !== incoming[field]) return `${String(field)} 不一致`;
+  }
+  // 数组事实：既有记录缺少后加字段 ⇒ 不据此判冲突（在飞旧任务兼容）；既有有值则逐项一致。
+  const arrayFields: readonly (keyof TaskCreatedEvent)[] = [
+    "modulePaths", "requestedEvidence", "cardDocumentRefs", "cardOptions", "cardRecommended",
+  ];
+  for (const field of arrayFields) {
+    const prior = existing[field];
+    if (prior === undefined) continue;
+    if (JSON.stringify(prior) !== JSON.stringify(incoming[field])) return `${String(field)} 不一致`;
+  }
+  return undefined;
+}
+
+/** 同 tasks 文件的 task.created 幂等追加串行链（read-then-append 原子化）。 */
+const taskCreatedChains = new Map<string, Promise<unknown>>();
+
+function appendTaskCreatedIdempotent(projectRoot: string, event: TaskCreatedEvent): Promise<AppendResult> {
+  const file = tasksStatePath(projectRoot);
+  const canonical = path.resolve(file);
+  const previous = taskCreatedChains.get(canonical) ?? Promise.resolve();
+  const next = previous.then(async (): Promise<AppendResult> => {
+    const state = await readTaskState(projectRoot);
+    const sameId = state.records.get(event.taskId)?.created;
+    if (sameId !== undefined) {
+      const conflict = taskCreatedPayloadConflict(sameId, event);
+      if (conflict !== undefined) {
+        return {
+          ok: false,
+          code: "invalid-task-binding",
+          message: `task.created replay 冲突：任务 ${event.taskId} 已存在且 ${conflict}（不重绑、不追加）`,
+        };
+      }
+      return { ok: true, path: file, replay: true, taskId: sameId.taskId, created: sameId };
+    }
+    const sameKey = findTaskByIdempotencyKey(state, event.idempotencyKey);
+    if (sameKey?.created !== undefined) {
+      if (event.taskKind === "repair" && sameKey.created.taskKind === "repair") {
+        // 属主修复任务同键只允许一条（并发/重入的第二个创建者返回既有）。
+        return { ok: true, path: file, replay: true, taskId: sameKey.taskId, created: sameKey.created };
+      }
+      return {
+        ok: false,
+        code: "invalid-task-binding",
+        message: `task.created 幂等键冲突：${event.idempotencyKey} 已属于任务 ${sameKey.taskId}；新 taskId ${event.taskId} 被拒绝（应用任务 taskId 必须由键确定性派生，任何路径不得重复建任务）`,
+      };
+    }
+    const { maxBytes, rotations } = limits();
+    const appended = await appendJsonlLine(file, JSON.stringify(event), { maxBytes, rotations });
+    if (appended.ok) return { ok: true, path: file, replay: false, taskId: event.taskId, created: event };
+    createDiagnosticLogger({ component: "orchestration.task-state", projectRoot }).error(
+      "tasks.append.failed",
+      appended.cause ?? new Error(appended.message),
+      { taskId: event.taskId },
+    );
+    return {
+      ok: false,
+      message: appended.message,
+      ...(appended.code !== undefined ? { code: appended.code } : {}),
+    };
+  });
+  const settled = next.then(() => undefined, () => undefined);
+  taskCreatedChains.set(canonical, settled);
+  void settled.finally(() => {
+    if (taskCreatedChains.get(canonical) === settled) taskCreatedChains.delete(canonical);
+  });
+  return next;
+}
 
 /**
  * T3（2026-11-10 两条固定工作流路径，v1.3 §7.1 / B1 AC-17 / MF-3）：fixed `task.created` 绑定字段的
@@ -591,6 +696,11 @@ export async function appendTaskEvent(
     if (event.runId === undefined || event.runId === "" || event.runState === undefined) {
       return { ok: false, code: "run-required", message: "task.created.run-required：新建项目任务必须带 runId 与 runState（legacy 仅历史重放允许）" };
     }
+  }
+  // 2026-11-20（SMOKE-1 seams）：应用任务/修复任务走账本唯一 guard（同键/同 taskId replay；
+  // 冲突 fail-closed）。legacy 派遣/重派保持原追加路径（行为逐字不变）。
+  if (isAppOwnedTaskCreated(event)) {
+    return appendTaskCreatedIdempotent(projectRoot, event);
   }
   const { maxBytes, rotations } = limits();
   const file = tasksStatePath(projectRoot);

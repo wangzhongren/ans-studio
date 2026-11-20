@@ -29,7 +29,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createDiagnosticLogger } from "../../../../src/common/shared/diagnostics.ts";
-import { appendTaskEvent, readTaskState, renderTaskCardLines, shortenSummary, taskCardOf, type TaskRecord, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
+import { appendTaskEvent, readTaskState, renderTaskCardLines, shortenSummary, taskCardOf, taskEvent, type TaskRecord, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
 import { deriveWorkflowView } from "../../../../src/common/编排/workflow-state.ts";
 import {
   closeTask as closeFixedWorkflowTask,
@@ -45,7 +45,7 @@ import {
 } from "../../../../src/common/编排/workflow-service.ts";
 import { getWorkflowDefinition } from "../../../../src/common/编排/workflow-definitions.ts";
 import { WORKFLOW_PROTOCOL_APP_DISPATCH } from "../../../../src/model/runtime.ts";
-import type { TaskStateEvent, WorkflowEvent, WorkflowStage } from "../../../../src/model/runtime.ts";
+import type { RequestCreatedEvent, TaskStateEvent, WorkflowEvent, WorkflowStage } from "../../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
 import type { SelectWorkflowToolResult } from "../../../../src/provider/runtime/tools.ts";
 import { workflowProtocolForWorkflowId } from "../../workflow.ts";
@@ -59,6 +59,7 @@ import { extractDispatchReadPaths, planDispatchDelivery } from "../../../../src/
 // 2026-11-20（block resolver 桌面批）：app-dispatch 事实出口（receipt.blockFact / reconcile.blockFacts /
 // 服务拒绝）→ 桌面 block router（只观察，不改阶段语义）。
 import { blockFactFromServiceFailure, type BlockFact } from "../../../../src/common/编排/block-resolution.ts";
+import { readBlockLedger, replayBlockLifecycles } from "../../../../src/common/编排/block-ledger.ts";
 import type { BlockRouter } from "../../block-router.ts";
 import type { FixedWorkflowPorts, FixedWorkflowRefs } from "./route.ts";
 import type { FixedWorkflowRelease } from "./release-merge.ts";
@@ -202,7 +203,10 @@ export class FixedWorkflowStageDispatch {
       flowId?: string;
       stage?: WorkflowStage;
       taskId?: string;
+      requestId?: string;
       detailCode?: string;
+      engineCanRepair?: boolean;
+      ownerRoleId?: string;
       fingerprintMaterial?: readonly string[];
     } = {},
   ): void {
@@ -259,6 +263,17 @@ export class FixedWorkflowStageDispatch {
       const existingFixed = existing !== undefined && existing.projectRoot === projectRoot && existing.sessionWorkflowMode === "fixed";
       const bound = existingFixed && existing.assignedTaskId === taskId;
       const busy = existing !== undefined && (existing.busy || existing.origins.running !== undefined);
+      if (existingFixed && busy && !bound) {
+        // 2026-11-20（SMOKE-1 seams）：目标 fixed 会话忙 ⇒ 正常入队等待，不打断。持续 target-busy
+        // 由 block router 的 card-prompt 停摆扫描（T_stall）升为 B5 事实并做有界重投/升级。
+        this.diagnostics(projectRoot).record("app-dispatch.deliver.target-busy", {
+          taskId,
+          roleId: targetRoleId,
+          taskKind: created.taskKind ?? "stage-execution",
+          ...(created.workflowId !== undefined ? { workflowId: created.workflowId } : {}),
+          ...(created.stage !== undefined ? { stage: created.stage } : {}),
+        });
+      }
       if (!bound && !(existingFixed && busy)) {
         const opened: OpenResult = await this.port.openInternal(
           { projectRoot, roleId: targetRoleId, runtime, taskId, forcedWorkflowMode: "fixed" },
@@ -270,6 +285,8 @@ export class FixedWorkflowStageDispatch {
             ...(created.workflowId !== undefined ? { workflowId: created.workflowId } : {}),
             ...(created.stage !== undefined ? { stage: created.stage } : {}),
             taskId,
+            ...(created.promptId !== undefined ? { requestId: created.promptId } : {}),
+            engineCanRepair: true,
             fingerprintMaterial: ["deliver-open-failed", taskId],
           });
           this.emitDeliveryNote(projectRoot, runtime, targetRoleId, targetRoleId,
@@ -300,6 +317,8 @@ export class FixedWorkflowStageDispatch {
           ...(created.workflowId !== undefined ? { workflowId: created.workflowId } : {}),
           ...(created.stage !== undefined ? { stage: created.stage } : {}),
           taskId,
+          ...(created.promptId !== undefined ? { requestId: created.promptId } : {}),
+          engineCanRepair: true,
           fingerprintMaterial: ["deliver-rejected", taskId, plan.message],
         });
         this.emitDeliveryNote(projectRoot, runtime, targetRoleId, targetRoleId,
@@ -331,6 +350,351 @@ export class FixedWorkflowStageDispatch {
       report.delivered.push(taskId);
     }
     return report;
+  }
+
+  // —————————————— SMOKE-1 seams：确定性重投 / card-prompt orphan 重呈现 ——————————————
+
+  /**
+   * 2026-11-20（SMOKE-1 seams）：确定性重投一个应用任务（block router 引擎动作 / 恢复路径）。
+   * - **同 taskId、同幂等键**：已收口/已报告 ⇒ no-op；已在队列/在途 ⇒ 不重复入队；
+   * - card-prompt 且请求为 `request.orphaned`（重启）⇒ 以**同 requestId** 追加一次 `request.created`
+   *   重呈现（不新开卡），再重投同一 prompt 任务；
+   * - orphan 属 superseded / 流程已关 ⇒ 按实际语义收口 prompt 任务（不重呈现、不误判）；
+   * - 失败如实返回（任务保留待恢复，不伪造投递）。
+   */
+  async redeliverAppTask(projectRoot: string, taskId: string): Promise<{ ok: boolean; note: string; reEntry?: string }> {
+    const state = await this.readTasks(projectRoot);
+    const record = state.records.get(taskId);
+    const created = record?.created;
+    if (record === undefined || created === undefined) return { ok: false, note: `任务 ${taskId} 不存在（不猜、不重投）` };
+    if (created.from !== "application") return { ok: false, note: `任务 ${taskId} 不是应用创建（不重投）` };
+    if (record.closed !== undefined || record.reports.length > 0) {
+      return { ok: true, note: `任务 ${taskId} 已收口/已报告；无需重投（幂等）`, reEntry: `redeliver:${taskId}:settled` };
+    }
+    if (created.taskKind === "card-prompt" && created.promptId !== undefined) {
+      const represented = await this.representOrphanedCardRequest(projectRoot, record.taskId, created.promptId);
+      if (!represented.ok) return represented;
+      if (represented.kind === "settled" || represented.kind === "superseded" || represented.kind === "visible") {
+        return { ok: true, note: represented.note, reEntry: `redeliver:${taskId}:${represented.kind}` };
+      }
+    }
+    const targetRoleId = created.to;
+    let runtime = this.port.findLiveRuntime(projectRoot, targetRoleId) ?? this.refs.lastGovernanceRuntime.get(projectRoot) ?? "pi";
+    const existing = this.refs.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime));
+    const existingFixed = existing !== undefined && existing.projectRoot === projectRoot && existing.sessionWorkflowMode === "fixed";
+    const bound = existingFixed && existing.assignedTaskId === taskId;
+    const busy = existing !== undefined && (existing.busy || existing.origins.running !== undefined);
+    if (!bound && !(existingFixed && busy)) {
+      const opened = await this.port.openInternal(
+        { projectRoot, roleId: targetRoleId, runtime, taskId, forcedWorkflowMode: "fixed" },
+        false,
+      );
+      if (!opened.ok) {
+        return { ok: false, note: `重投未完成：${opened.error ?? "目标会话打开失败"}（任务保留待恢复，不伪造投递）` };
+      }
+      runtime = this.refs.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime))?.runtime ?? runtime;
+    }
+    const dedupKey = `${projectRoot}\u0000${runtime}\u0000task\u0000${taskId}`;
+    const clientMessageId = this.port.appDispatchClientMessageId(dedupKey);
+    const pending = this.port.pendingAppTaskDelivery?.(projectRoot, targetRoleId, runtime, clientMessageId);
+    if (pending !== undefined) {
+      return {
+        ok: true,
+        note: `任务 ${taskId} 已在${pending.queued ? "投递队列" : "投递中"}（同 taskId 幂等，不重复入队）`,
+        reEntry: `redeliver:${taskId}:queued`,
+      };
+    }
+    const probes = new Map<string, string | undefined>();
+    for (const readPath of extractDispatchReadPaths(created.text)) {
+      probes.set(readPath, await filePrint(path.join(projectRoot, readPath)));
+    }
+    const plan = planDispatchDelivery(
+      { roleId: targetRoleId, task: created.text },
+      probes,
+      {
+        sourceRoleId: "application",
+        taskId,
+        ...(created.expectedOutput !== undefined ? { expectedOutput: created.expectedOutput } : {}),
+        ...(created.requestedEvidence !== undefined ? { requestedEvidence: created.requestedEvidence } : {}),
+      },
+    );
+    if (plan.action === "reject") {
+      return { ok: false, note: `重投被拒：${plan.message}（任务保留待恢复，不伪造投递）` };
+    }
+    this.refs.starTaskIds.add(taskId);
+    taskCreators.set(taskId, "application");
+    this.port.enqueueDelivery(projectRoot, targetRoleId, {
+      kind: "dispatch",
+      runtime,
+      targetRoleId,
+      sourceRoleId: "application",
+      taskId,
+      text: plan.text,
+      summary: `[任务·重投] #${taskId} → ${targetRoleId}：${shortenText(created.text, 40)}`,
+      dedupKey,
+      clientMessageId,
+    });
+    void this.appendRoleActivity(projectRoot, targetRoleId, {
+      kind: "task.redelivered",
+      summary: `重新入队应用任务 #${taskId}（${created.taskKind ?? "stage-execution"}${created.promptId !== undefined ? `；prompt ${created.promptId}` : ""}）`,
+      status: "queued",
+      taskId,
+    });
+    void this.port.drainQueue(projectRoot, targetRoleId, runtime);
+    return {
+      ok: true,
+      note: `任务 ${taskId} 已重新入队（目标 ${targetRoleId}${busy && existingFixed ? "，忙时等待其空闲" : ""}；同 taskId 幂等）`,
+      reEntry: `redeliver:${taskId}`,
+    };
+  }
+
+  /**
+   * orphan card-prompt 请求的重呈现（同 requestId；内容逐项来自原应用 `request.created` 事实）。
+   * 返回 `waiting`（无需重呈现）/`visible`（已呈卡等待客户，不重投）/
+   * `represented`（已追加重呈现）/`settled`（已裁决收口）/
+   * `superseded`（被取代或流程已关，按实际语义收口）。多 request.created 的“最后一条为准”
+   * 语义由 requestViewOf / project-state 派生保持一致。
+   */
+  private async representOrphanedCardRequest(
+    projectRoot: string,
+    taskId: string,
+    requestId: string,
+  ): Promise<
+    | { ok: true; kind: "waiting" | "represented" | "settled" | "superseded" | "visible"; note: string }
+    | { ok: false; note: string }
+  > {
+    const state = await this.readTasks(projectRoot);
+    const view = requestViewOf(state.events, requestId);
+    if (view === undefined || view.created === undefined) {
+      return { ok: false, note: `card-prompt 请求 ${requestId} 缺少 request.created（账本不一致；不猜、不伪造卡）` };
+    }
+    const created = view.created;
+    const workflowId = created.workflowId;
+    if (workflowId === undefined || created.stage === undefined) {
+      return { ok: false, note: `card-prompt 请求 ${requestId} 缺 workflowId/stage（账本不一致）` };
+    }
+    if (!(await this.isAppDispatch(projectRoot, workflowId))) {
+      return { ok: true, kind: "waiting", note: `请求 ${requestId} 不属于 app-dispatch/v1；不重呈现` };
+    }
+    const operationId = `app-card-prompt-close:${workflowId}:${created.stage}:${requestId}`;
+    if (view.last === "resolved") {
+      const closed = await closeApplicationTaskDirect({
+        projectRoot, taskId, outcome: "accepted", operationId,
+        note: `card prompt ${requestId} 已裁决；恢复收口`,
+      });
+      if (!closed.ok) return { ok: false, note: `请求已裁决但 prompt 任务收口失败：${closed.code}：${closed.message}` };
+      return { ok: true, kind: "settled", note: `请求 ${requestId} 已裁决；prompt 任务已收口（不重呈现）` };
+    }
+    if (view.last === "presented") {
+      return { ok: true, kind: "visible", note: `请求 ${requestId} 已呈卡等待客户；不重投、不重弹` };
+    }
+    if (view.last !== "orphaned" || view.orphaned === undefined) {
+      return { ok: true, kind: "waiting", note: `请求 ${requestId} 当前可见等待（无需重呈现）` };
+    }
+    const ledger = await readWorkflowLedger(projectRoot);
+    const wfView = deriveWorkflowView(
+      ledger.events.filter((event) => event.workflowId === workflowId),
+      state.events,
+    );
+    const supersededReason = view.orphaned.reason === "superseded"
+      ? "superseded"
+      : wfView.closed !== undefined
+        ? `workflow-closed:${wfView.closed.outcome}`
+        : wfView.stopping === true
+          ? "workflow-stopping"
+          : wfView.stage !== created.stage
+            ? `stage-moved:${created.stage}->${wfView.stage}`
+            : undefined;
+    if (supersededReason !== undefined) {
+      const closed = await closeApplicationTaskDirect({
+        projectRoot, taskId, outcome: "rejected", operationId,
+        note: `card prompt ${requestId} orphaned(${supersededReason})；按实际语义收口（不重呈现、不重弹新卡）`,
+      });
+      if (!closed.ok) return { ok: false, note: `superseded 请求 ${requestId} 的 prompt 任务收口失败：${closed.code}：${closed.message}` };
+      return { ok: true, kind: "superseded", note: `请求 ${requestId} 已被取代/流程已关（${supersededReason}）；prompt 任务按实际语义收口（不重弹新卡）` };
+    }
+    // 同 requestId 重呈现：追加新的 request.created（内容逐项复制原应用事实；不采信模型自报）。
+    const represented = taskEvent("request.created", {
+      requestId,
+      ...(created.flowId !== undefined ? { flowId: created.flowId } : {}),
+      ...(created.cardKind !== undefined ? { cardKind: created.cardKind } : {}),
+      ...(created.intentId !== undefined ? { intentId: created.intentId } : {}),
+      ...(created.taskId !== undefined ? { taskId: created.taskId } : {}),
+      ...(created.documentRefs !== undefined ? { documentRefs: created.documentRefs.map((ref) => ({ ...ref })) } : {}),
+      ...(created.workflowId !== undefined ? { workflowId: created.workflowId } : {}),
+      ...(created.stage !== undefined ? { stage: created.stage } : {}),
+      ...(created.promptId !== undefined ? { promptId: created.promptId } : {}),
+      sourceRoleId: created.sourceRoleId,
+      title: created.title,
+      ...(created.context !== undefined ? { context: created.context } : {}),
+      options: created.options.map((option) => ({ ...option })),
+      ...(created.recommended !== undefined ? { recommended: [...created.recommended] } : {}),
+    }, () => new Date(this.now()));
+    const appended = await appendTaskEvent(projectRoot, represented);
+    if (!appended.ok) return { ok: false, note: `请求 ${requestId} 重呈现写入失败：${appended.message}` };
+    this.diagnostics(projectRoot).record("app-dispatch.card.orphan-represented", {
+      workflowId, stage: created.stage, requestId, taskId, orphanReason: view.orphaned.reason ?? null,
+    });
+    return { ok: true, kind: "represented", note: `请求 ${requestId} 已按同 requestId 重新呈现（不新开卡）；任务 ${taskId} 将重新投递` };
+  }
+
+  /**
+   * 2026-11-20（SMOKE-1 seams）：card-prompt 投递/orphan 停摆扫描（只读账本，返回 block 事实）：
+   * 1. `request.orphaned`（restart，且流程仍在该阶段）⇒ `card-prompt-orphaned`（detailCode=reconcile ⇒
+   *    engine-auto-fix 同 requestId 重呈现/重投）；superseded/流程已关按实际语义**收口任务**（不造块）；
+   * 2. 未送达超过 T_stall（target busy/会话打开失败/投递排队）⇒ `target-busy`（B5；引擎有界重投，
+   *    **每 T_stall 窗口最多一轮**，达到 `maxAutoFixAttempts` 后同码事实带 `autoFixForbidden` ⇒ 升级属主/客户）；
+   * 3. 已送达但超过 T_stall 仍未呈卡（request 仍 created）⇒ `card-prompt-stalled`（属主修复）。
+   */
+  async scanAppCardPromptFacts(
+    projectRoot: string,
+    options: { stallMs: number; maxAutoFixAttempts: number },
+  ): Promise<readonly BlockFact[]> {
+    const facts: BlockFact[] = [];
+    const state = await this.readTasks(projectRoot);
+    const nowMs = this.now();
+    const workflowViews = new Map<string, ReturnType<typeof deriveWorkflowView>>();
+    const stallMin = Math.max(1, Math.floor(options.stallMs / 60000));
+    // 2026-11-20（SMOKE-1 seams）：target-busy 的引擎重投**有界**——按 blocks 账本已结算的
+    // 同码/同 task 轮次计数与最后结算时刻，每 T_stall 窗口最多重投一轮；达到上限后升级属主。
+    const engineRounds = new Map<string, { count: number; lastAtMs: number }>();
+    const blockLedger = await readBlockLedger(projectRoot);
+    for (const lifecycle of replayBlockLifecycles(blockLedger.events).records.values()) {
+      if (lifecycle.resolution !== "fixed" || lifecycle.code !== "target-busy") continue;
+      if (lifecycle.protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH || lifecycle.taskId === undefined) continue;
+      const atMs = Date.parse(lifecycle.updatedAt);
+      const entry = engineRounds.get(lifecycle.taskId) ?? { count: 0, lastAtMs: 0 };
+      entry.count += 1;
+      entry.lastAtMs = Math.max(entry.lastAtMs, Number.isFinite(atMs) ? atMs : 0);
+      engineRounds.set(lifecycle.taskId, entry);
+    }
+    for (const record of state.records.values()) {
+      const created = record.created;
+      if (created === undefined) continue;
+      if (created.from !== "application" || created.taskKind !== "card-prompt") continue;
+      if (record.closed !== undefined || record.reports.length > 0) continue;
+      const workflowId = created.workflowId;
+      const stage = created.stage;
+      const promptId = created.promptId;
+      if (workflowId === undefined || stage === undefined || promptId === undefined) continue;
+      if (!(await this.isAppDispatch(projectRoot, workflowId))) continue;
+      let wfView = workflowViews.get(workflowId);
+      if (wfView === undefined) {
+        const ledger = await readWorkflowLedger(projectRoot);
+        wfView = deriveWorkflowView(
+          ledger.events.filter((event) => event.workflowId === workflowId),
+          state.events,
+        );
+        workflowViews.set(workflowId, wfView);
+      }
+      const requestView = requestViewOf(state.events, promptId);
+      if (requestView?.last === "resolved") continue; // 已裁决：收口由 afterCardResolved/恢复处理
+      if (requestView === undefined || requestView.created === undefined) {
+        facts.push({
+          protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+          kind: "service-rejection",
+          code: "workflow-corrupt",
+          detailCode: "reconcile",
+          source: "desktop.stage-dispatch.card-scan",
+          workflowId,
+          flowId: wfView.flowId,
+          stage,
+          taskId: record.taskId,
+          requestId: promptId,
+          engineCanRepair: true,
+          summary: `card-prompt 任务 ${record.taskId} 缺少 request.created（promptId=${promptId}）；账本不一致（不猜、交引擎对账）。`,
+          fingerprintMaterial: ["card-prompt-request-missing", workflowId, stage, record.taskId],
+        });
+        continue;
+      }
+      if (requestView.last === "orphaned" && requestView.orphaned !== undefined) {
+        const superseded = requestView.orphaned.reason === "superseded"
+          || wfView.closed !== undefined
+          || wfView.stopping === true
+          || wfView.stage !== stage;
+        if (superseded) {
+          // 实际语义：请求被取代/流程已关 ⇒ 应用收口 prompt 任务（不重投、不误判、不造块）。
+          const closed = await closeApplicationTaskDirect({
+            projectRoot,
+            taskId: record.taskId,
+            outcome: "rejected",
+            operationId: `app-card-prompt-close:${workflowId}:${stage}:${promptId}`,
+            note: `card prompt ${promptId} orphaned(${requestView.orphaned.reason ?? "?"})；按实际语义收口（不重呈现）`,
+          });
+          if (!closed.ok) {
+            this.diagnostics(projectRoot).record("app-dispatch.card.orphan-close.failed", { taskId: record.taskId, reasonCode: closed.code });
+          }
+          continue;
+        }
+        facts.push({
+          protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+          kind: "service-rejection",
+          code: "card-prompt-orphaned",
+          detailCode: "reconcile",
+          source: "desktop.stage-dispatch.card-scan",
+          workflowId,
+          flowId: wfView.flowId,
+          stage,
+          taskId: record.taskId,
+          requestId: promptId,
+          engineCanRepair: true,
+          summary: `card-prompt 请求 ${promptId} 重启后被标记 orphaned（${requestView.orphaned.at}）；应用以同 requestId 重呈现/重投（不新开卡）。`,
+          fingerprintMaterial: ["card-prompt-orphaned", workflowId, stage, promptId, requestView.orphaned.at],
+        });
+        continue;
+      }
+      if (requestView.last !== "created") continue; // presented ⇒ 客户可见等待（不造块）
+      const createdAtMs = Date.parse(created.at);
+      const ageMs = Number.isFinite(createdAtMs) ? Math.max(0, nowMs - createdAtMs) : 0;
+      if (ageMs < options.stallMs) continue;
+      if (record.delivered === undefined) {
+        const round = engineRounds.get(record.taskId) ?? { count: 0, lastAtMs: 0 };
+        // 上一轮引擎重投结算后，等满一个 T_stall 窗口再进入下一轮（避免每 tick 重投）。
+        if (round.count > 0 && nowMs - round.lastAtMs < options.stallMs) continue;
+        const exhausted = round.count >= Math.max(0, options.maxAutoFixAttempts);
+        facts.push({
+          protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+          kind: "driver-observation",
+          code: "target-busy",
+          source: "desktop.stage-dispatch.card-scan",
+          workflowId,
+          flowId: wfView.flowId,
+          stage,
+          taskId: record.taskId,
+          requestId: promptId,
+          ownerRoleId: created.to,
+          engineCanRepair: true,
+          // 引擎重投预算耗尽 ⇒ 同码事实带 autoFixForbidden（environment-infra 分类 ⇒ owner-repair/客户）。
+          ...(exhausted ? { autoFixForbidden: true } : {}),
+          summary: exhausted
+            ? `card-prompt 任务 ${record.taskId} 未送达目标 ${created.to}，引擎重投已达上限 ${options.maxAutoFixAttempts} 轮（每轮 ${stallMin} 分钟）；升级属主/客户（不继续自动重投）。`
+            : `card-prompt 任务 ${record.taskId} 超过 ${stallMin} 分钟未送达目标 ${created.to}（target busy/会话打开失败/队列受阻）；应用有界重投（第 ${round.count + 1} 轮）。`,
+          fingerprintMaterial: exhausted
+            ? ["card-prompt-undelivered", workflowId, stage, promptId, record.taskId, "round:escalated"]
+            : ["card-prompt-undelivered", workflowId, stage, promptId, record.taskId, `round:${round.count}`],
+        });
+        continue;
+      }
+      const deliveredMs = Date.parse(record.delivered.at);
+      const deliveredAgeMs = Number.isFinite(deliveredMs) ? Math.max(0, nowMs - deliveredMs) : 0;
+      if (deliveredAgeMs >= options.stallMs) {
+        facts.push({
+          protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+          kind: "driver-observation",
+          code: "card-prompt-stalled",
+          source: "desktop.stage-dispatch.card-scan",
+          workflowId,
+          flowId: wfView.flowId,
+          stage,
+          taskId: record.taskId,
+          requestId: promptId,
+          ownerRoleId: created.to,
+          summary: `card-prompt 任务 ${record.taskId} 已送达 ${created.to} 但超过 ${stallMin} 分钟未呈卡（request 仍等待）；交属主修复（不伪造决定）。`,
+          fingerprintMaterial: ["card-prompt-stalled", workflowId, stage, promptId, record.taskId],
+        });
+      }
+    }
+    return facts;
   }
 
   // —————————————— select_workflow（幕僚显式选流程） ——————————————
@@ -597,8 +961,14 @@ export class FixedWorkflowStageDispatch {
       this.diagnostics(projectRoot).record("app-dispatch.observe.settled", {
         workflowId, taskId, outcome: observed.outcome, stage: observed.stage,
         stageCompleted: observed.stageCompleted, retried: observed.retried !== undefined, blocked: observed.blocked !== undefined,
+        // 2026-11-20（SMOKE-1 seams）：编排对 block 事实的处置方向（retrying=重试已触发；fixed=
+        // 确定性动作已收口；escalated=预算耗尽/高风险/重试失败）——桌面按事实 raise 后由 router
+        // 走 engine-auto-fix（retrying/fixed）或客户/judge（escalated），不据此自造动作。
+        ...(observed.blockOutcome !== undefined ? { blockOutcome: observed.blockOutcome } : {}),
       });
-      // 2026-11-20（block resolver 桌面批）：Q8 重试耗尽 / 高风险零重派 ⇒ B9/B4 事实（R1 事实出口）。
+      // 2026-11-20（SMOKE-1 seams）：**每个** blocked/failed 报告的 blockFact（重试决策前生成；
+      // retrying/fixed 也必须在 blocks.jsonl 出现 raised→routed(engine-auto-fix)→resolved(fixed)），
+      // 不只依赖重试耗尽/高风险。Q8 重试期间路由分类为 protocol-reconcile ⇒ 不并发建属主修复任务。
       if (observed.blockFact !== undefined) this.blockRouter?.observeFactLater(projectRoot, observed.blockFact);
     } else {
       this.diagnostics(projectRoot).record("app-dispatch.observe.failed", { workflowId, taskId, reasonCode: observed.code });
@@ -793,6 +1163,39 @@ export class FixedWorkflowStageDispatch {
     }
     return summary;
   }
+}
+
+/**
+ * 2026-11-20（SMOKE-1 seams）：request 生命周期视图（**最后一条为准**；orphaned 不粘性——
+ * 同 requestId 的重新呈现（新 request.created）表示重新等待）。与 block-router `findRequestState`
+ * 及 project-state 派生同口径。
+ */
+interface RequestLedgerView {
+  last: "created" | "presented" | "orphaned" | "resolved";
+  created?: RequestCreatedEvent;
+  orphaned?: Extract<TaskStateEvent, { kind: "request.orphaned" }>;
+  resolved?: Extract<TaskStateEvent, { kind: "request.resolved" }>;
+}
+
+function requestViewOf(events: readonly TaskStateEvent[], requestId: string): RequestLedgerView | undefined {
+  let view: RequestLedgerView | undefined;
+  for (const event of events) {
+    if (event.kind === "request.created" && event.requestId === requestId) {
+      view = { last: "created", created: event };
+      continue;
+    }
+    if (view === undefined) continue;
+    if (event.kind === "request.presented" && event.requestId === requestId) {
+      view.last = "presented";
+    } else if (event.kind === "request.orphaned" && event.requestId === requestId) {
+      view.last = "orphaned";
+      view.orphaned = event;
+    } else if (event.kind === "request.resolved" && event.requestId === requestId) {
+      view.last = "resolved";
+      view.resolved = event;
+    }
+  }
+  return view;
 }
 
 /** 项目内文件字节 sha256（缺失/目录/非法路径 ⇒ undefined；不猜）。 */

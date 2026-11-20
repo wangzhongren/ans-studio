@@ -64,8 +64,10 @@ import {
 import {
   appendWorkflowEvent,
   driveAppDispatchStage,
+  observeAppDispatchTaskReport,
   readWorkflowLedger,
   selectWorkflow,
+  stageExecutionIdempotencyKey,
 } from "../../src/common/编排/workflow-service.ts";
 import {
   WORKFLOW_LEDGER_SCHEMA,
@@ -1541,6 +1543,220 @@ test("review 名单不可读：driveAppDispatchStage 返回 review-role-unavaila
     assert.ok(repair !== undefined, "创建属主修复任务");
     assert.equal(repair!.created?.to, "rapporteur");
     assert.equal(tasks.some((task) => task.created?.to === "verifier"), false, "不静默回落 verifier");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+// —————————————— 2026-11-20（SMOKE-1 seams 测试批）：block 必现 / 重试衔接 / 恢复读回 / 并发修复 ——————————————
+
+test("SMOKE-1 A2 blocked（Q8 重试成功）：observe blockFact/blockOutcome 经 router 必现 raised→routed(engine-auto-fix)→resolved(fixed)；零 repair", async () => {
+  const root = await makeRoot();
+  try {
+    const clock = { now: T0 };
+    const selected = await selectWorkflow({
+      projectRoot: root, flowId: "snake", workflowPath: "A", sourceTaskId: "turn-smoke-a2", now: () => new Date(T0),
+    });
+    assert.equal(selected.ok, true, selected.ok === false ? `${selected.code}: ${selected.message}` : "");
+    if (!selected.ok) return;
+    const wf = selected.workflowId;
+    const drive = await driveAppDispatchStage({ projectRoot: root, workflowId: wf, stage: "A2", now: () => new Date(T0) });
+    assert.equal(drive.ok, true, drive.ok === false ? `${drive.code}: ${drive.message}` : "");
+    if (!drive.ok) return;
+    const taskId = drive.tasks[0]!.taskId;
+    await seedTaskReported({ root, taskId, from: "product", status: "blocked", summary: "意图输入缺失" });
+
+    // 编排服务只交事实，不写 blocks.jsonl；Q8 重试成功 ⇒ retrying / detailCode=reconcile。
+    const observed = await observeAppDispatchTaskReport({ projectRoot: root, taskId, now: () => new Date(T0) });
+    assert.equal(observed.ok, true, observed.ok === false ? `${observed.code}: ${observed.message}` : "");
+    if (!observed.ok) return;
+    assert.deepEqual(observed.retried, { stage: "A2", attempt: 2 });
+    assert.equal(observed.blockOutcome, "retrying");
+    assert.ok(observed.blockFact !== undefined, "blocked 报告必须有事实出口（SMOKE-1 A2 无 blocks.jsonl 的根因防线）");
+    assert.equal(observed.blockFact!.code, "task-report-blocked");
+    assert.equal(observed.blockFact!.detailCode, "reconcile");
+    assert.equal(observed.blockFact!.engineCanRepair, true);
+    assert.equal(await blockEvents(root).then((events) => events.length), 0, "服务不写 blocks 账本（桌面 router 消费）");
+
+    const { router } = makeHarness(root, { clock });
+    await router.observeFact(root, observed.blockFact!);
+    const raised = await raisedEvents(root);
+    assert.equal(raised.length, 1, "即使 Q8 重试成功，blocks.jsonl 也必须出现 block.raised");
+    const event = raised[0]!;
+    assert.equal(event.code, "task-report-blocked");
+    assert.equal(event.protocol, "app-dispatch/v1");
+    assert.equal(event.class, "protocol-reconcile", "detailCode=reconcile ⇒ B6（不是 model-anomaly）");
+    assert.equal(event.detailCode, "reconcile", "raised 持久化 detailCode（恢复读回）");
+    assert.equal(event.engineCanRepair, true, "raised 持久化 engineCanRepair");
+    assert.equal(event.taskId, taskId);
+    assert.equal(event.workflowId, wf);
+    assert.equal(event.stage, "A2");
+    const record = await lifecycleOf(root, event.blockId);
+    assert.equal(record?.status, "resolved");
+    assert.equal(record?.resolution, "fixed");
+    assert.equal(record?.routeKind, "engine-auto-fix", "重试路径 ⇒ engine-auto-fix（不并发建 owner-repair）");
+    assert.equal(record?.routeTargetRoleId, undefined);
+    assert.deepEqual(
+      (await blockEvents(root)).filter((entry) => entry.blockId === event.blockId).map((entry) => entry.kind),
+      ["block.raised", "block.routed", "block.resolved"],
+      "SMOKE-1 形状 raised→routed(engine-auto-fix)→resolved(fixed)",
+    );
+    const state = await taskState(root);
+    const a2 = [...state.records.values()].filter((task) => task.created?.workflowId === wf && task.created.stage === "A2");
+    assert.equal(a2.length, 2, "A2 仅 attempt1+attempt2（不重复建任务）");
+    assert.equal(a2.filter((task) => task.created?.idempotencyKey === stageExecutionIdempotencyKey(wf, "A2", "product", 2)).length, 1);
+    assert.equal([...state.records.values()].filter((task) => task.created?.taskKind === "repair").length, 0, "引擎重试期间零属主修复任务");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test("Q8 重试耗尽 ⇒ observe blockOutcome=escalated（retry-budget-exhausted）经 router 路由客户决策卡；不靠 retry 消化", async () => {
+  const root = await makeRoot();
+  try {
+    const clock = { now: T0 };
+    const selected = await selectWorkflow({
+      projectRoot: root, flowId: "snake", workflowPath: "A", sourceTaskId: "turn-smoke-a2-exhausted", now: () => new Date(T0),
+    });
+    assert.equal(selected.ok, true, selected.ok === false ? `${selected.code}: ${selected.message}` : "");
+    if (!selected.ok) return;
+    const wf = selected.workflowId;
+    const drive = await driveAppDispatchStage({ projectRoot: root, workflowId: wf, stage: "A2", now: () => new Date(T0) });
+    assert.equal(drive.ok, true, drive.ok === false ? `${drive.code}: ${drive.message}` : "");
+    if (!drive.ok) return;
+    const firstTaskId = drive.tasks[0]!.taskId;
+    await seedTaskReported({ root, taskId: firstTaskId, from: "product", status: "blocked", summary: "第一次阻塞" });
+    const observed1 = await observeAppDispatchTaskReport({ projectRoot: root, taskId: firstTaskId, now: () => new Date(T0) });
+    assert.equal(observed1.ok, true);
+    if (!observed1.ok) return;
+    assert.equal(observed1.blockOutcome, "retrying");
+    const { router } = makeHarness(root, {
+      clock,
+      customerInput: async () => ({ outcome: "declined", reason: "seam-test: card not answered" }),
+    });
+    // SMOKE-1「A2 blocked 两次」：第一次 blocked（Q8 重试成功）也必须入 blocks.jsonl。
+    await router.observeFact(root, observed1.blockFact!);
+    const firstBlock = (await raisedEvents(root)).find((event) => event.taskId === firstTaskId);
+    assert.ok(firstBlock !== undefined, "第一次 blocked 必须入账（不得等耗尽）");
+    assert.equal(firstBlock!.class, "protocol-reconcile");
+    const firstRecord = await lifecycleOf(root, firstBlock!.blockId);
+    assert.equal(firstRecord?.status, "resolved");
+    assert.equal(firstRecord?.resolution, "fixed");
+    assert.equal(firstRecord?.routeKind, "engine-auto-fix");
+
+    const attempt2 = [...(await taskState(root)).records.values()].find((task) =>
+      task.created?.idempotencyKey === stageExecutionIdempotencyKey(wf, "A2", "product", 2));
+    assert.ok(attempt2 !== undefined, "Q8 重试任务存在");
+    await seedTaskReported({ root, taskId: attempt2!.taskId, from: "product", status: "blocked", summary: "第二次阻塞" });
+    const observed2 = await observeAppDispatchTaskReport({ projectRoot: root, taskId: attempt2!.taskId, now: () => new Date(T0) });
+    assert.equal(observed2.ok, true, observed2.ok === false ? `${observed2.code}: ${observed2.message}` : "");
+    if (!observed2.ok) return;
+    assert.deepEqual(observed2.blocked, { retryBudgetExhausted: true, highRiskNoRedispatch: false });
+    assert.equal(observed2.blockOutcome, "escalated", "预算耗尽 ⇒ escalated（不得只靠 retry 消化）");
+    assert.equal(observed2.blockFact?.code, "retry-budget-exhausted");
+
+    await router.observeFact(root, observed2.blockFact!);
+    const raised = await raisedEvents(root);
+    assert.equal(raised.length, 2, "A2 blocked 两次 ⇒ blocks.jsonl 两条 raised（SMOKE-1 根因防线）");
+    const budgetRaised = raised.find((event) => event.class === "budget-quota");
+    assert.ok(budgetRaised !== undefined);
+    const record = await lifecycleOf(root, budgetRaised!.blockId);
+    assert.equal(record?.routeKind, "customer-decision", "B9 ⇒ 客户决策面（不是 engine-auto-fix/owner-repair）");
+    assert.equal(record?.status, "routed");
+    assert.ok(record?.cardRequestId !== undefined && record.cardRequestId.length > 0, "客户决策卡已发行");
+    await waitFor(async () => {
+      const state = await taskState(root);
+      return state.events.some((item) => item.kind === "request.created" && item.requestId === record!.cardRequestId);
+    }, "retry-budget-exhausted 客户卡 request.created");
+    const state = await taskState(root);
+    const a2 = [...state.records.values()].filter((task) => task.created?.workflowId === wf && task.created.stage === "A2");
+    assert.equal(a2.length, 2, "预算耗尽不得建第 3 个任务");
+    assert.equal([...state.records.values()].filter((task) => task.created?.taskKind === "repair").length, 0, "客户面不建 repair 任务");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test("恢复重路由读回 detailCode/engineCanRepair：raised 持久化 ⇒ recover 仍 engine-auto-fix（不回落 model-anomaly/owner-repair）", async () => {
+  const root = await makeRoot();
+  try {
+    const clock = { now: T0 };
+    const fact: BlockFact = {
+      protocol: "app-dispatch/v1",
+      kind: "task.reported",
+      code: "task-report-blocked",
+      detailCode: "reconcile",
+      engineCanRepair: true,
+      workflowId: "wf-recover-detail",
+      flowId: "snake",
+      stage: "A2",
+      taskId: "t-a2-recover-detail",
+      summary: "Q8 重试在办事实（恢复读回）",
+      fingerprintMaterial: ["recover-detailcode", "t-a2-recover-detail"],
+    };
+    const raised = await raiseBlock({ projectRoot: root, fact, now: () => new Date(T0) });
+    assert.equal(raised.ok, true, raised.ok === false ? `${raised.code}: ${raised.message}` : "");
+    if (!raised.ok) return;
+    const beforeRecover = await lifecycleOf(root, raised.blockId);
+    assert.equal(beforeRecover?.status, "raised");
+    assert.equal(beforeRecover?.detailCode, "reconcile", "BlockLifecycle 重放携带 detailCode");
+    assert.equal(beforeRecover?.engineCanRepair, true, "BlockLifecycle 重放携带 engineCanRepair");
+    const raisedEvent = (await raisedEvents(root)).find((event) => event.blockId === raised.blockId)!;
+    assert.equal(raisedEvent.detailCode, "reconcile", "block.raised 行持久化 detailCode");
+    assert.equal(raisedEvent.engineCanRepair, true, "block.raised 行持久化 engineCanRepair");
+
+    const { router, advances } = makeHarness(root, { clock });
+    await router.recover(root);
+    const record = await lifecycleOf(root, raised.blockId);
+    assert.equal(record?.status, "resolved");
+    assert.equal(record?.resolution, "fixed");
+    assert.equal(record?.routeKind, "engine-auto-fix", "恢复后按原分类走 engine-auto-fix（不回落 model-anomaly→owner-repair）");
+    assert.equal(record?.routeTargetRoleId, undefined);
+    // 引擎动作 + fixed 后重入场各驱动一次（既有 reEnterAfterFixed 语义；两次都不建修复任务）。
+    assert.equal(advances.length >= 1, true, "引擎动作 = app-dispatch 重驱动");
+    assert.equal(advances.every((workflowId) => workflowId === "wf-recover-detail"), true);
+    assert.equal((await taskState(root)).records.size, 0, "恢复重路由不伪造任务");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test("并发两个 router 同键修复任务：账本仅 1 条 repair、routed 同 taskId（败方消费 replay 回执）", async () => {
+  const root = await makeRoot();
+  try {
+    const fact: BlockFact = {
+      protocol: "app-dispatch/v1",
+      kind: "service-rejection",
+      code: "missing-contract",
+      detailCode: "missing-file",
+      workflowId: "wf-concurrent-repair",
+      flowId: "flow-concurrent-repair",
+      stage: "A8",
+      evidencePaths: ["docs/contracts/x.md"],
+      summary: "并发属主修复任务",
+      fingerprintMaterial: ["concurrent-repair-task"],
+    };
+    const blockId = computeBlockId(fact);
+    const first = makeHarness(root);
+    const second = makeHarness(root);
+    await Promise.all([
+      first.router.observeFact(root, fact),
+      second.router.observeFact(root, fact),
+    ]);
+    const events = await blockEvents(root);
+    assert.equal(events.filter((event) => event.kind === "block.raised" && event.blockId === blockId).length, 1, "同事实只 raised 一条");
+    const routed = events.filter((event): event is Extract<BlockLedgerEvent, { kind: "block.routed" }> =>
+      event.kind === "block.routed" && event.blockId === blockId);
+    assert.equal(routed.length, 1, "同键 routed 只写一条（attempt 幂等）");
+    assert.equal(routed[0]!.route, "owner-repair");
+    assert.ok(routed[0]!.taskId !== undefined, "routed 记录修复任务 taskId");
+    const tasks = [...(await taskState(root)).records.values()].filter((task) =>
+      task.created?.taskKind === "repair" && task.created.blockId === blockId);
+    assert.equal(tasks.length, 1, `同键并发修复任务只允许一条（实际 ${tasks.length}）`);
+    assert.equal(tasks[0]!.taskId, routed[0]!.taskId, "路由/投递消费账本回执 taskId（不得按本地 newTaskId 写第二条）");
+    assert.equal(tasks[0]!.created?.idempotencyKey, `block-repair:${blockId}:1`);
+    assert.equal([...(await taskState(root)).records.values()].filter((task) =>
+      task.created?.idempotencyKey === `block-repair:${blockId}:1`).length, 1, "同键修复任务账本仅 1 条");
   } finally {
     await cleanup(root);
   }

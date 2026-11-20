@@ -91,6 +91,11 @@ export interface BlockRaisedEvent extends BlockLedgerEventBase {
   stage?: WorkflowStage;
   taskId?: string;
   requestId?: string;
+  /**
+   * 2026-11-20（SMOKE-1 seams，桌面批）：分类事实的「引擎可确定性修复」随 raised 持久化——
+   * 恢复重路由只读账本事实重建 BlockFact（不回落 model-anomaly）。旧行缺省 = 未声明。
+   */
+  engineCanRepair?: boolean;
   fingerprint: string;
   summary: string;
   evidenceRefs: string[];
@@ -169,6 +174,7 @@ export function isBlockLedgerEvent(value: unknown): value is BlockLedgerEvent {
     for (const key of ["code", "detailCode", "source", "workflowId", "flowId", "taskId", "requestId"] as const) {
       if (value[key] !== undefined && typeof value[key] !== "string") return false;
     }
+    if (value["engineCanRepair"] !== undefined && typeof value["engineCanRepair"] !== "boolean") return false;
     if (value["priorOccurrences"] !== undefined
       && (!Number.isSafeInteger(value["priorOccurrences"]) || (value["priorOccurrences"] as number) < 0)) {
       return false;
@@ -326,6 +332,9 @@ export interface BlockLifecycle {
   taskId?: string;
   requestId?: string;
   code?: string;
+  /** 2026-11-20（SMOKE-1 seams，桌面批）：raised 时的二级确定性码/引擎修复能力（恢复重路由读回）。 */
+  detailCode?: string;
+  engineCanRepair?: boolean;
   summary: string;
   evidenceRefs: readonly string[];
   raisedAt: string;
@@ -395,6 +404,8 @@ export function replayBlockLifecycles(events: readonly BlockLedgerEvent[]): Bloc
         ...(event.taskId !== undefined ? { taskId: event.taskId } : {}),
         ...(event.requestId !== undefined ? { requestId: event.requestId } : {}),
         ...(event.code !== undefined ? { code: event.code } : {}),
+        ...(event.detailCode !== undefined ? { detailCode: event.detailCode } : {}),
+        ...(event.engineCanRepair !== undefined ? { engineCanRepair: event.engineCanRepair } : {}),
         summary: event.summary,
         evidenceRefs: [...event.evidenceRefs],
         raisedAt: event.at,
@@ -671,6 +682,7 @@ export async function raiseBlock(input: RaiseBlockInput): Promise<RaiseBlockResu
     classCode: classification.classCode,
     ...(fact.code !== undefined ? { code: fact.code } : {}),
     ...(fact.detailCode !== undefined ? { detailCode: fact.detailCode } : {}),
+    ...(fact.engineCanRepair !== undefined ? { engineCanRepair: fact.engineCanRepair } : {}),
     ...(fact.source !== undefined ? { source: fact.source } : {}),
     ...(fact.workflowId !== undefined ? { workflowId: fact.workflowId } : {}),
     ...(fact.flowId !== undefined ? { flowId: fact.flowId } : {}),

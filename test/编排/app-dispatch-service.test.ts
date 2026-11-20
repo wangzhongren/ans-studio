@@ -779,6 +779,17 @@ test("observe blocked：Q8 一次自动重试（新 attempt/新幂等键）→ �
       assert.equal(observed1.stageCompleted, false);
       assert.deepEqual(observed1.retried, { stage: "A2", attempt: 2 }, "Q8：1 次自动重试");
       assert.equal(observed1.blocked, undefined);
+      // 2026-11-20（SMOKE-1 seams）：每个 blocked/failed 报告都在重试决策前交出事实；
+      // Q8 重试成功 ⇒ blockOutcome=retrying + detailCode=reconcile（resolver 走 engine-auto-fix，
+      // 不并发建 repair）。旧断言全保留，本组只增补新事实出口。
+      assert.equal(observed1.blockOutcome, "retrying", "重试已触发 ⇒ retrying");
+      assert.ok(observed1.blockFact !== undefined, "blocked 报告必须有 blockFact（blocks.jsonl 必现来源）");
+      assert.equal(observed1.blockFact!.code, "task-report-blocked");
+      assert.equal(observed1.blockFact!.detailCode, "reconcile");
+      assert.equal(observed1.blockFact!.engineCanRepair, true);
+      assert.equal(observed1.blockFact!.taskId, first);
+      assert.equal(observed1.blockFact!.protocol, "app-dispatch/v1");
+      assert.equal(observed1.blockFact!.stage, "A2");
     }
     const a2Tasks = await tasksOfStage(root, WF, "A2");
     assert.equal(a2Tasks.length, 2);
@@ -797,6 +808,10 @@ test("observe blocked：Q8 一次自动重试（新 attempt/新幂等键）→ �
       assert.equal(observed2.outcome, "rejected");
       assert.deepEqual(observed2.blocked, { retryBudgetExhausted: true, highRiskNoRedispatch: false });
       assert.equal(observed2.retried, undefined);
+      // 2026-11-20（SMOKE-1 seams）：预算耗尽 ⇒ escalated 事实（B9），不得只靠 retry 消化。
+      assert.equal(observed2.blockOutcome, "escalated");
+      assert.equal(observed2.blockFact?.code, "retry-budget-exhausted");
+      assert.equal(observed2.blockFact?.taskId, second.taskId);
     }
     assert.equal((await tasksOfStage(root, WF, "A2")).length, 2, "预算耗尽不得再建第 3 个任务");
     assert.equal((await viewOf(root, WF)).stages.A2.status, "blocked");
@@ -912,6 +927,11 @@ test("observe standard blocked + decision=rework：写 stage.reworked A12b→A11
         assert.equal(observed13.outcome, "rejected");
         assert.deepEqual(observed13.blocked, { retryBudgetExhausted: true, highRiskNoRedispatch: true });
         assert.equal(observed13.retried, undefined);
+        // 2026-11-20（SMOKE-1 seams）：高风险零重派 ⇒ escalated（B4 客户主权面），不得只靠 retry 消化。
+        assert.equal(observed13.blockOutcome, "escalated");
+        assert.equal(observed13.blockFact?.code, "high-risk-blocked");
+        assert.equal(observed13.blockFact?.highRisk, true);
+        assert.equal(observed13.blockFact?.taskId, a13Task);
       }
       assert.equal((await tasksOfStage(root2, WF2, "A13")).length, 1, "高风险阶段零自动重派");
     } finally {

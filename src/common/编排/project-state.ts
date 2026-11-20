@@ -325,8 +325,14 @@ function collectRequests(events: readonly TaskStateEvent[]): Map<string, Request
     return created;
   };
   for (const event of events) {
-    if (event.kind === "request.created") get(event.requestId).created = event;
-    else if (event.kind === "request.resolved") get(event.requestId).resolved = event;
+    if (event.kind === "request.created") {
+      // 2026-11-20（SMOKE-1 seams，桌面批）：orphaned 不是粘性状态——同一 requestId 的**重新呈现**
+      // （应用重投 card-prompt，同 requestId 新 request.created）表示仍在等待；不得因旧 orphaned
+      // 把请求从 project_state 的待决/等待投影里排除。
+      const view = get(event.requestId);
+      view.created = event;
+      delete view.orphaned;
+    } else if (event.kind === "request.resolved") get(event.requestId).resolved = event;
     else if (event.kind === "request.orphaned") get(event.requestId).orphaned = event;
   }
   return requests;
