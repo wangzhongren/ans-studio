@@ -60,7 +60,7 @@ import { filePrint, shortenText } from "../shared/text.ts";
 import { extractDispatchReadPaths, planDispatchDelivery } from "../../../../src/common/编排/handback.ts";
 // 2026-11-20（block resolver 桌面批）：app-dispatch 事实出口（receipt.blockFact / reconcile.blockFacts /
 // 服务拒绝）→ 桌面 block router（只观察，不改阶段语义）。
-import { blockFactFromServiceFailure, type BlockFact } from "../../../../src/common/编排/block-resolution.ts";
+import { blockFactFromServiceFailure, computeBlockId, type BlockFact } from "../../../../src/common/编排/block-resolution.ts";
 import { readBlockLedger, replayBlockLifecycles } from "../../../../src/common/编排/block-ledger.ts";
 import type { BlockRouter } from "../../block-router.ts";
 import type { FixedWorkflowPorts, FixedWorkflowRefs } from "./route.ts";
@@ -161,6 +161,10 @@ export class FixedWorkflowStageDispatch {
   private readonly deps: import("../contracts/deps.ts").SessionManagerDeps;
   /** 2026-11-20（block resolver 桌面批）：block 事实汇（缺省 ⇒ 只诊断，不路由——测试/旧宿主零变化）。 */
   private readonly blockRouter: Pick<BlockRouter, "observeFactLater" | "observeFactListLater"> | undefined;
+  /** 2026-11-20（SMOKE-3 S3 桌面批）：drive 有界等待诊断去重（同 workflow/stage/code 只记一次，不每 tick 刷屏）。 */
+  private readonly drivePendingLogged = new Set<string>();
+  /** 2026-11-20（SMOKE-3 S3 桌面批）：orphan 卡重呈现的每 (projectRoot, requestId) 在飞去重（同 orphan 只重呈现一次）。 */
+  private readonly cardRepresentInFlight = new Set<string>();
   constructor(
     refs: FixedWorkflowRefs,
     port: FixedWorkflowPorts,
@@ -219,6 +223,24 @@ export class FixedWorkflowStageDispatch {
       source: "desktop.stage-dispatch",
       ...extra,
     }));
+  }
+
+  /** 2026-11-20（SMOKE-3 S3 桌面批）：drive 有界等待诊断（同 workflow/stage/code 只记一次，不每 tick 刷屏）。 */
+  private noteDrivePending(projectRoot: string, workflowId: string, driven: DriveAppDispatchStageReceipt): void {
+    const waiting = driven.waiting;
+    if (waiting === undefined) return;
+    const key = `${projectRoot}\u0000${workflowId}\u0000${driven.stage}\u0000${waiting.code}`;
+    if (this.drivePendingLogged.has(key)) return;
+    this.drivePendingLogged.add(key);
+    // 诊断落盘白名单（src/common/shared/diagnostics.ts）只持久化元数据字段：workflowId/stage/code 不在
+    // FIELD_NAMES 时会被丢弃，reasonCode/attempt 为白名单字段，保证等待事实可检索。
+    this.diagnostics(projectRoot).record("app-dispatch.drive.pending", {
+      workflowId,
+      stage: driven.stage,
+      code: waiting.code,
+      reasonCode: waiting.code,
+      attempt: driven.attempt,
+    });
   }
 
   // —————————————— 投递桥 ——————————————
@@ -475,6 +497,14 @@ export class FixedWorkflowStageDispatch {
    * `represented`（已追加重呈现）/`settled`（已裁决收口）/
    * `superseded`（被取代或流程已关，按实际语义收口）。多 request.created 的“最后一条为准”
    * 语义由 requestViewOf / project-state 派生保持一致。
+   *
+   * 2026-11-20（SMOKE-3 S3 桌面批）：
+   *  · **显式取代**：追加的同 requestId `request.created` 携带 `supersedesOrphanAt`（= 被取代
+   *    `request.orphaned.at` 原文；地基已加字段/写侧校验），消费者据此恢复等待/可答；
+   *  · **幂等/并发**：每 (projectRoot, requestId) 在飞去重（并发调用 no-op 返回 waiting）；
+   *    追加前重读最新事件（last 仍必须是 orphaned，否则按最新状态 no-op）——同 orphan 只重呈现一次，
+   *    账本零新增或恰一条；
+   *  · 后到的 `request.presented` 保持既有写入（重呈现后卡恢复可答，不写“重置”事件）。
    */
   private async representOrphanedCardRequest(
     projectRoot: string,
@@ -484,79 +514,109 @@ export class FixedWorkflowStageDispatch {
     | { ok: true; kind: "waiting" | "represented" | "settled" | "superseded" | "visible"; note: string }
     | { ok: false; note: string }
   > {
-    const state = await this.readTasks(projectRoot);
-    const view = requestViewOf(state.events, requestId);
-    if (view === undefined || view.created === undefined) {
-      return { ok: false, note: `card-prompt 请求 ${requestId} 缺少 request.created（账本不一致；不猜、不伪造卡）` };
+    // 2026-11-20（SMOKE-3 S3 桌面批）：同 (projectRoot, requestId) 在飞去重——并发调用 no-op（账本零新增）。
+    const inFlightKey = `${projectRoot}\u0000${requestId}`;
+    if (this.cardRepresentInFlight.has(inFlightKey)) {
+      return { ok: true, kind: "waiting", note: `请求 ${requestId} 的重呈现正在进行（同 requestId 并发去重，不重复写入）` };
     }
-    const created = view.created;
-    const workflowId = created.workflowId;
-    if (workflowId === undefined || created.stage === undefined) {
-      return { ok: false, note: `card-prompt 请求 ${requestId} 缺 workflowId/stage（账本不一致）` };
-    }
-    if (!(await this.isAppDispatch(projectRoot, workflowId))) {
-      return { ok: true, kind: "waiting", note: `请求 ${requestId} 不属于 app-dispatch/v1；不重呈现` };
-    }
-    const operationId = `app-card-prompt-close:${workflowId}:${created.stage}:${requestId}`;
-    if (view.last === "resolved") {
-      const closed = await closeApplicationTaskDirect({
-        projectRoot, taskId, outcome: "accepted", operationId,
-        note: `card prompt ${requestId} 已裁决；恢复收口`,
+    this.cardRepresentInFlight.add(inFlightKey);
+    try {
+      const state = await this.readTasks(projectRoot);
+      const view = requestViewOf(state.events, requestId);
+      if (view === undefined || view.created === undefined) {
+        return { ok: false, note: `card-prompt 请求 ${requestId} 缺少 request.created（账本不一致；不猜、不伪造卡）` };
+      }
+      const created = view.created;
+      const workflowId = created.workflowId;
+      if (workflowId === undefined || created.stage === undefined) {
+        return { ok: false, note: `card-prompt 请求 ${requestId} 缺 workflowId/stage（账本不一致）` };
+      }
+      if (!(await this.isAppDispatch(projectRoot, workflowId))) {
+        return { ok: true, kind: "waiting", note: `请求 ${requestId} 不属于 app-dispatch/v1；不重呈现` };
+      }
+      const operationId = `app-card-prompt-close:${workflowId}:${created.stage}:${requestId}`;
+      const settleResolved = async (): Promise<{ ok: true; kind: "settled"; note: string } | { ok: false; note: string }> => {
+        const closed = await closeApplicationTaskDirect({
+          projectRoot, taskId, outcome: "accepted", operationId,
+          note: `card prompt ${requestId} 已裁决；恢复收口`,
+        });
+        if (!closed.ok) return { ok: false, note: `请求已裁决但 prompt 任务收口失败：${closed.code}：${closed.message}` };
+        return { ok: true, kind: "settled", note: `请求 ${requestId} 已裁决；prompt 任务已收口（不重呈现）` };
+      };
+      const settleSuperseded = async (reason: string): Promise<{ ok: true; kind: "superseded"; note: string } | { ok: false; note: string }> => {
+        const closed = await closeApplicationTaskDirect({
+          projectRoot, taskId, outcome: "rejected", operationId,
+          note: `card prompt ${requestId} orphaned(${reason})；按实际语义收口（不重呈现、不重弹新卡）`,
+        });
+        if (!closed.ok) return { ok: false, note: `superseded 请求 ${requestId} 的 prompt 任务收口失败：${closed.code}：${closed.message}` };
+        return { ok: true, kind: "superseded", note: `请求 ${requestId} 已被取代/流程已关（${reason}）；prompt 任务按实际语义收口（不重弹新卡）` };
+      };
+      if (view.last === "resolved") return settleResolved();
+      if (view.last === "presented") {
+        return { ok: true, kind: "visible", note: `请求 ${requestId} 已呈卡等待客户；不重投、不重弹` };
+      }
+      if (view.last !== "orphaned" || view.orphaned === undefined) {
+        return { ok: true, kind: "waiting", note: `请求 ${requestId} 当前可见等待（无需重呈现）` };
+      }
+      const ledger = await readWorkflowLedger(projectRoot);
+      const wfView = deriveWorkflowView(
+        ledger.events.filter((event) => event.workflowId === workflowId),
+        state.events,
+      );
+      const supersededReason = view.orphaned.reason === "superseded"
+        ? "superseded"
+        : wfView.closed !== undefined
+          ? `workflow-closed:${wfView.closed.outcome}`
+          : wfView.stopping === true
+            ? "workflow-stopping"
+            : wfView.stage !== created.stage
+              ? `stage-moved:${created.stage}->${wfView.stage}`
+              : undefined;
+      if (supersededReason !== undefined) return settleSuperseded(supersededReason);
+      // 2026-11-20（SMOKE-3 S3 桌面批）：追加前**重读最新事件**——last 仍必须是 orphaned
+      // （并发重呈现/裁决可能已改变状态；被取代的 orphan 不得再次重呈现）。
+      const fresh = await this.readTasks(projectRoot);
+      const freshView = requestViewOf(fresh.events, requestId);
+      if (freshView === undefined || freshView.created === undefined) {
+        return { ok: false, note: `card-prompt 请求 ${requestId} 缺少 request.created（账本不一致；不猜、不伪造卡）` };
+      }
+      if (freshView.last === "resolved") return settleResolved();
+      if (freshView.last === "presented") {
+        return { ok: true, kind: "visible", note: `请求 ${requestId} 已呈卡等待客户（并发恢复）；不重投、不重弹` };
+      }
+      if (freshView.last !== "orphaned" || freshView.orphaned === undefined) {
+        return { ok: true, kind: "waiting", note: `请求 ${requestId} 已被并发重呈现/恢复等待（同 orphan 只重呈现一次）` };
+      }
+      if (freshView.orphaned.reason === "superseded") return settleSuperseded("superseded");
+      const freshCreated = freshView.created;
+      // 同 requestId 重呈现：追加新的 request.created（内容逐项复制原应用事实；不采信模型自报），
+      // 并以 `supersedesOrphanAt` 显式记录被取代的 orphan（消费者按最后一条为准恢复等待/可答）。
+      const represented = taskEvent("request.created", {
+        requestId,
+        ...(freshCreated.flowId !== undefined ? { flowId: freshCreated.flowId } : {}),
+        ...(freshCreated.cardKind !== undefined ? { cardKind: freshCreated.cardKind } : {}),
+        ...(freshCreated.intentId !== undefined ? { intentId: freshCreated.intentId } : {}),
+        ...(freshCreated.taskId !== undefined ? { taskId: freshCreated.taskId } : {}),
+        ...(freshCreated.documentRefs !== undefined ? { documentRefs: freshCreated.documentRefs.map((ref) => ({ ...ref })) } : {}),
+        ...(freshCreated.workflowId !== undefined ? { workflowId: freshCreated.workflowId } : {}),
+        ...(freshCreated.stage !== undefined ? { stage: freshCreated.stage } : {}),
+        ...(freshCreated.promptId !== undefined ? { promptId: freshCreated.promptId } : {}),
+        sourceRoleId: freshCreated.sourceRoleId,
+        title: freshCreated.title,
+        ...(freshCreated.context !== undefined ? { context: freshCreated.context } : {}),
+        options: freshCreated.options.map((option) => ({ ...option })),
+        ...(freshCreated.recommended !== undefined ? { recommended: [...freshCreated.recommended] } : {}),
+        supersedesOrphanAt: freshView.orphaned.at,
+      }, () => new Date(this.now()));
+      const appended = await appendTaskEvent(projectRoot, represented);
+      if (!appended.ok) return { ok: false, note: `请求 ${requestId} 重呈现写入失败：${appended.message}` };
+      this.diagnostics(projectRoot).record("app-dispatch.card.orphan-represented", {
+        workflowId, stage: freshCreated.stage, requestId, taskId, orphanReason: freshView.orphaned.reason ?? null,
       });
-      if (!closed.ok) return { ok: false, note: `请求已裁决但 prompt 任务收口失败：${closed.code}：${closed.message}` };
-      return { ok: true, kind: "settled", note: `请求 ${requestId} 已裁决；prompt 任务已收口（不重呈现）` };
+      return { ok: true, kind: "represented", note: `请求 ${requestId} 已按同 requestId 重新呈现（不新开卡；supersedes ${freshView.orphaned.at}）；任务 ${taskId} 将重新投递` };
+    } finally {
+      this.cardRepresentInFlight.delete(inFlightKey);
     }
-    if (view.last === "presented") {
-      return { ok: true, kind: "visible", note: `请求 ${requestId} 已呈卡等待客户；不重投、不重弹` };
-    }
-    if (view.last !== "orphaned" || view.orphaned === undefined) {
-      return { ok: true, kind: "waiting", note: `请求 ${requestId} 当前可见等待（无需重呈现）` };
-    }
-    const ledger = await readWorkflowLedger(projectRoot);
-    const wfView = deriveWorkflowView(
-      ledger.events.filter((event) => event.workflowId === workflowId),
-      state.events,
-    );
-    const supersededReason = view.orphaned.reason === "superseded"
-      ? "superseded"
-      : wfView.closed !== undefined
-        ? `workflow-closed:${wfView.closed.outcome}`
-        : wfView.stopping === true
-          ? "workflow-stopping"
-          : wfView.stage !== created.stage
-            ? `stage-moved:${created.stage}->${wfView.stage}`
-            : undefined;
-    if (supersededReason !== undefined) {
-      const closed = await closeApplicationTaskDirect({
-        projectRoot, taskId, outcome: "rejected", operationId,
-        note: `card prompt ${requestId} orphaned(${supersededReason})；按实际语义收口（不重呈现、不重弹新卡）`,
-      });
-      if (!closed.ok) return { ok: false, note: `superseded 请求 ${requestId} 的 prompt 任务收口失败：${closed.code}：${closed.message}` };
-      return { ok: true, kind: "superseded", note: `请求 ${requestId} 已被取代/流程已关（${supersededReason}）；prompt 任务按实际语义收口（不重弹新卡）` };
-    }
-    // 同 requestId 重呈现：追加新的 request.created（内容逐项复制原应用事实；不采信模型自报）。
-    const represented = taskEvent("request.created", {
-      requestId,
-      ...(created.flowId !== undefined ? { flowId: created.flowId } : {}),
-      ...(created.cardKind !== undefined ? { cardKind: created.cardKind } : {}),
-      ...(created.intentId !== undefined ? { intentId: created.intentId } : {}),
-      ...(created.taskId !== undefined ? { taskId: created.taskId } : {}),
-      ...(created.documentRefs !== undefined ? { documentRefs: created.documentRefs.map((ref) => ({ ...ref })) } : {}),
-      ...(created.workflowId !== undefined ? { workflowId: created.workflowId } : {}),
-      ...(created.stage !== undefined ? { stage: created.stage } : {}),
-      ...(created.promptId !== undefined ? { promptId: created.promptId } : {}),
-      sourceRoleId: created.sourceRoleId,
-      title: created.title,
-      ...(created.context !== undefined ? { context: created.context } : {}),
-      options: created.options.map((option) => ({ ...option })),
-      ...(created.recommended !== undefined ? { recommended: [...created.recommended] } : {}),
-    }, () => new Date(this.now()));
-    const appended = await appendTaskEvent(projectRoot, represented);
-    if (!appended.ok) return { ok: false, note: `请求 ${requestId} 重呈现写入失败：${appended.message}` };
-    this.diagnostics(projectRoot).record("app-dispatch.card.orphan-represented", {
-      workflowId, stage: created.stage, requestId, taskId, orphanReason: view.orphaned.reason ?? null,
-    });
-    return { ok: true, kind: "represented", note: `请求 ${requestId} 已按同 requestId 重新呈现（不新开卡）；任务 ${taskId} 将重新投递` };
   }
 
   /**
@@ -566,6 +626,11 @@ export class FixedWorkflowStageDispatch {
    * 2. 未送达超过 T_stall（target busy/会话打开失败/投递排队）⇒ `target-busy`（B5；引擎有界重投，
    *    **每 T_stall 窗口最多一轮**，达到 `maxAutoFixAttempts` 后同码事实带 `autoFixForbidden` ⇒ 升级属主/客户）；
    * 3. 已送达但超过 T_stall 仍未呈卡（request 仍 created）⇒ `card-prompt-stalled`（属主修复）。
+   * 4. 2026-11-20（SMOKE-3 S3 桌面批补齐）：**请求级 orphan**——最新为 `request.orphaned(restart)`、
+   *    workflow 仍活动且阶段未迁移、且**无 live card-prompt 任务**（不存在或任务已收口/已报告）的
+   *    app-dispatch/v1 请求 ⇒ `card-prompt-orphaned`（engineCanRepair:false + ownerRoleId ⇒
+   *    **owner-repair**，不落 engine-auto-fix——无任务可重投）；superseded/关闭/迁移不造块。
+   *    指纹含 orphan.at，且 blockId 已存在（同 orphan 已 raised/结算）⇒ 跳过，重复扫描零新增。
    */
   async scanAppCardPromptFacts(
     projectRoot: string,
@@ -575,12 +640,25 @@ export class FixedWorkflowStageDispatch {
     const state = await this.readTasks(projectRoot);
     const nowMs = this.now();
     const workflowViews = new Map<string, ReturnType<typeof deriveWorkflowView>>();
+    const loadWorkflowView = async (workflowId: string): Promise<ReturnType<typeof deriveWorkflowView>> => {
+      let wfView = workflowViews.get(workflowId);
+      if (wfView === undefined) {
+        const ledger = await readWorkflowLedger(projectRoot);
+        wfView = deriveWorkflowView(
+          ledger.events.filter((event) => event.workflowId === workflowId),
+          state.events,
+        );
+        workflowViews.set(workflowId, wfView);
+      }
+      return wfView;
+    };
     const stallMin = Math.max(1, Math.floor(options.stallMs / 60000));
     // 2026-11-20（SMOKE-1 seams）：target-busy 的引擎重投**有界**——按 blocks 账本已结算的
     // 同码/同 task 轮次计数与最后结算时刻，每 T_stall 窗口最多重投一轮；达到上限后升级属主。
     const engineRounds = new Map<string, { count: number; lastAtMs: number }>();
     const blockLedger = await readBlockLedger(projectRoot);
-    for (const lifecycle of replayBlockLifecycles(blockLedger.events).records.values()) {
+    const blockRecords = replayBlockLifecycles(blockLedger.events).records;
+    for (const lifecycle of blockRecords.values()) {
       if (lifecycle.resolution !== "fixed" || lifecycle.code !== "target-busy") continue;
       if (lifecycle.protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH || lifecycle.taskId === undefined) continue;
       const atMs = Date.parse(lifecycle.updatedAt);
@@ -599,15 +677,7 @@ export class FixedWorkflowStageDispatch {
       const promptId = created.promptId;
       if (workflowId === undefined || stage === undefined || promptId === undefined) continue;
       if (!(await this.isAppDispatch(projectRoot, workflowId))) continue;
-      let wfView = workflowViews.get(workflowId);
-      if (wfView === undefined) {
-        const ledger = await readWorkflowLedger(projectRoot);
-        wfView = deriveWorkflowView(
-          ledger.events.filter((event) => event.workflowId === workflowId),
-          state.events,
-        );
-        workflowViews.set(workflowId, wfView);
-      }
+      const wfView = await loadWorkflowView(workflowId);
       const requestView = requestViewOf(state.events, promptId);
       if (requestView?.last === "resolved") continue; // 已裁决：收口由 afterCardResolved/恢复处理
       if (requestView === undefined || requestView.created === undefined) {
@@ -715,6 +785,62 @@ export class FixedWorkflowStageDispatch {
         });
       }
     }
+    // 2026-11-20（SMOKE-3 S3 桌面批补齐）：**请求级** orphan 扫描（任务循环只覆盖 live card-prompt 任务；
+    // 「无任务 / 任务已终态而请求仍开」此前永远不会产生 block 事实 ⇒ resolver 不动作，违反 S3.1）。
+    // 对「最新为 request.orphaned(restart)、workflow 仍活动且阶段未迁移、且无 live card-prompt 任务」的
+    // app-dispatch/v1 请求产出 card-prompt-orphaned 事实：engineCanRepair:false + ownerRoleId
+    // （classification: detailCode=reconcile ⇒ protocol-reconcile；engineCanRepair:false + ownerRoleId
+    //  ⇒ **owner-repair**，不落 engine-auto-fix——无任务可重投）。superseded/关闭/stopping/阶段迁移不造块。
+    // 幂等：指纹含 orphan.at；同 blockId 已在 blocks 账本（raised/结算）⇒ 跳过——重复扫描/tick 零新增，
+    // 同 requestId 新 orphan（不同 at）才允许新事实。
+    const seenRequestIds = new Set<string>();
+    for (const event of state.events) {
+      if (event.kind !== "request.created" || seenRequestIds.has(event.requestId)) continue;
+      seenRequestIds.add(event.requestId);
+      const requestView = requestViewOf(state.events, event.requestId);
+      const created = requestView?.created;
+      if (requestView === undefined || created === undefined) continue;
+      if (requestView.last !== "orphaned" || requestView.orphaned === undefined) continue;
+      // superseded/initiator-aborted 按既有语义（不重投、不造块）；请求级只处理重启对账产生的 restart。
+      if (requestView.orphaned.reason !== "restart") continue;
+      const workflowId = created.workflowId;
+      const stage = created.stage;
+      if (workflowId === undefined || stage === undefined || created.promptId === undefined) continue;
+      if (!(await this.isAppDispatch(projectRoot, workflowId))) continue;
+      let terminalTask: TaskRecord | undefined;
+      let liveTask = false;
+      for (const record of state.records.values()) {
+        const taskCreated = record.created;
+        if (taskCreated === undefined || taskCreated.from !== "application" || taskCreated.taskKind !== "card-prompt") continue;
+        if (taskCreated.promptId !== event.requestId) continue;
+        if (record.closed === undefined && record.reports.length === 0) { liveTask = true; break; }
+        terminalTask = record;
+      }
+      if (liveTask) continue; // live 任务由上方任务循环处理（engine 重呈现/重投）
+      const wfView = await loadWorkflowView(workflowId);
+      if (wfView.closed !== undefined || wfView.stopping === true || wfView.stage !== stage) continue; // superseded 语义：不造块
+      const ownerRoleId = terminalTask?.created?.to ?? "chief";
+      const requestFact: BlockFact = {
+        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+        kind: "service-rejection",
+        code: "card-prompt-orphaned",
+        detailCode: "reconcile",
+        source: "desktop.stage-dispatch.card-scan",
+        workflowId,
+        flowId: wfView.flowId,
+        stage,
+        ...(terminalTask !== undefined ? { taskId: terminalTask.taskId } : {}),
+        requestId: event.requestId,
+        ownerRoleId,
+        // 无任务可重投：交属主修复/客户裁决（decideBlockRoute：protocol-reconcile + engineCanRepair:false
+        // + ownerRoleId ⇒ owner-repair；不落 engine-auto-fix）。
+        engineCanRepair: false,
+        summary: `card-prompt 请求 ${event.requestId} 仍为 orphaned(restart, ${requestView.orphaned.at})，且无可重投的 card-prompt 任务（${terminalTask === undefined ? "不存在" : `任务 ${terminalTask.taskId} 已收口/已报告`}）；交属主 ${ownerRoleId} 修复/客户裁决（engine 不重投）。`,
+        fingerprintMaterial: ["card-prompt-orphaned", workflowId, stage, event.requestId, requestView.orphaned.at],
+      };
+      if (blockRecords.has(computeBlockId(requestFact))) continue; // 同 orphan 已 raised/结算：重复扫描零新增
+      facts.push(requestFact);
+    }
     return facts;
   }
 
@@ -789,6 +915,14 @@ export class FixedWorkflowStageDispatch {
             `[应用·工作流] ${workflowId} 账本不一致：${shortenSummary(driven.message, 160)}（停止自动推进，请核对）`);
         }
         return undefined;
+      }
+      if (driven.waiting !== undefined) {
+        // 2026-11-20（SMOKE-3 S3 桌面批）：有界等待回执（如 A3 入口 docs/intents/<intentId>.md 未就绪）是
+        // **成功形态、不是失败**——不写 app-dispatch.drive.failed、不造 block、零事件，只记一次去重诊断
+        // 并停止本轮；入口出现后下一 tick 正常推进。item 9「不得连续 drive.failed」只约束 block
+        // resolved 后的重入路径，本分支不改变该路径（重入 drive 仍按既有语义）。
+        this.noteDrivePending(projectRoot, workflowId, driven);
+        return driven;
       }
       await this.deliverTaskIds(projectRoot, fallbackRuntime, driven.tasks.map((task) => task.taskId));
       const allReplay = driven.tasks.length > 0 && driven.tasks.every((task) => task.replay);
