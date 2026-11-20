@@ -2471,6 +2471,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (report.restored > 0) {
           createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).record("tasks.restored", { count: report.restored });
         }
+        // 2026-11-17（app-dispatch/v1 第一步）：启动/打开项目对账（只处理 app-dispatch/v1；旧协议在服务层
+        // 跳过，不动在飞 fixed-v2.1）。幂等修复 + 桌面投递一致性（未送达的应用任务重新入队）。
+        return manager.reconcileAppDispatch(listing.projectRoot).then((summary) => {
+          if (summary.corrupt.length > 0 || summary.errors.length > 0) {
+            createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).record("app-dispatch.reconcile.issues", {
+              workflows: summary.activeWorkflows,
+              corrupt: summary.corrupt.length,
+              errors: summary.errors.length,
+            });
+          }
+        });
       }).catch((error) => {
         createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).error("tasks.restore.failed", error);
       });

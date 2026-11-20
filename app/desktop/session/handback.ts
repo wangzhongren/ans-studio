@@ -63,6 +63,11 @@ export interface HandbackPorts {
   activeRuntimeFor(projectRoot: string): RuntimeKind | undefined;
   enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void;
   drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void>;
+  /**
+   * 2026-11-17（app-dispatch/v1）：应用任务（from:"application"）的报告**只落账本**，随后由应用
+   * 观察 `task.reported` 并按流程定义收口/推进（不唤醒第二角色、不伪造收口）。缺省 ⇒ 不观察（防御）。
+   */
+  observeApplicationTaskReport?(projectRoot: string, taskId: string): Promise<void>;
 }
 
 /** 回交提交、回交主人路由与回交展示（原 SessionManager 4 方法的同签名实现）。 */
@@ -289,6 +294,21 @@ export class Handback {
           }
           this.reportedTaskKeys.add(reportKey);
         }
+      }
+      // 2026-11-17（app-dispatch/v1 第一步）：应用创建的任务（from:"application"）报告**不路由给角色**
+      // （reportTargetForTaskCreator 返回 null）：只落 `task.reported` 账本，随后由应用观察并按流程定义
+      // 收口/推进（`observeAppDispatchTaskReport`；A12b rework 用显式策略）。不伪造收口、不唤醒第二角色。
+      if (starTask && taskCreator === "application" && typeof hb.taskId === "string" && hb.taskId !== "") {
+        const appRecord = (await this.readTasks(projectRoot)).records.get(hb.taskId);
+        if (appRecord?.closed === undefined) {
+          try {
+            await this.port.observeApplicationTaskReport?.(projectRoot, hb.taskId);
+          } catch (error) {
+            diagnostic.error("report.app-dispatch.observe.failed", error);
+          }
+        }
+        diagnostic.record("report.app-dispatch.applied", { taskId: hb.taskId });
+        return true;
       }
       // 2026-11-05（客户最终口径：不是自动发卡，是让运营自己选择）：star 任务报告 blocked（trio、flowId 可解析）
       // 时**首次即**给 convener 一条 delivery-note 提示——是否调用 `report_plan_escalation`

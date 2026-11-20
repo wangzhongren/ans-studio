@@ -60,7 +60,7 @@ import type {
   SelectRunChangeInput, CompleteTeamPlanInput, ActivateRoleDocumentsInput, CloseCreatedTaskInput,
   FixedCloseCreatedTaskInput, FixedActivateRoleDocumentsInput, TaskClosedOutcome,
   DecidePendingRequestInput, DecidePendingRequestFn, ChiefDecisionExecutionContext,
-  WorkflowAction, WorkflowStage, WorkflowPath,
+  WorkflowAction, WorkflowStage, WorkflowPath, WorkflowDocumentRef,
   RuntimeActiveToolFact, RuntimeOwnedProcessFact,
   GitQueryRequest, GitCandidateRequest, GitPublishRequest,
 } from "../../model/runtime.ts";
@@ -103,6 +103,7 @@ import {
   STABLE_WRITE_CONTENT_MAX_CHARS,
   VCA_SUBMISSION_PATH_MAX_CHARS,
   VCA_SUBMISSION_TARGETS_MAX,
+  WORKFLOW_ACCEPTANCE_STRENGTHS,
   isChiefDecisionExecutionContext,
   isDispatchTaskReviewTarget,
   isDispatchTaskResumeController,
@@ -224,6 +225,35 @@ export const SUBMIT_REPORT_TOOL_NAME = "submit_report";
 
 /** dispatch_task 工具名（设计 H-1；su 派发任务给项目角色——派发 ≠ 授权）。 */
 export const DISPATCH_TASK_TOOL_NAME = "dispatch_task";
+
+/** select_workflow 工具名（2026-11-17 app-dispatch/v1；仅 fixed 幕僚——只选流程，不派发、不授权）。 */
+export const SELECT_WORKFLOW_TOOL_NAME = "select_workflow";
+
+/**
+ * `select_workflow` 能力入参（工具层完成形状校验后原样交给宿主能力；字段本身不构成派发/授权）。
+ * 类型单一来源在本层（桌面/编排按同名字段接线；不复制字面量）。
+ */
+export interface SelectWorkflowToolInput {
+  workflowPath: WorkflowPath;
+  flowId: string;
+  acceptanceStrength?: "light" | "standard";
+}
+
+/** `select_workflow` 能力回执（宿主绑定真实身份/账本；失败稳定码原样返回）。 */
+export interface SelectWorkflowToolResult {
+  ok: boolean;
+  message: string;
+  workflowId?: string;
+  stage?: WorkflowStage;
+  taskIds?: string[];
+  code?: string;
+}
+
+/** `select_workflow` 能力（注入才注册）：宿主捕获 chief 当前真实轮次并调用应用侧流程驱动。 */
+export type SelectWorkflowFn = (
+  input: SelectWorkflowToolInput,
+  metadata?: { turnId?: string; roleId?: string },
+) => Promise<SelectWorkflowToolResult> | SelectWorkflowToolResult;
 
 /** report_shell_verdict 工具名（R-1；审读会话交回结构化审读结论；与编排 shell-gate.ts:206 同串）。 */
 export const SHELL_VERDICT_TOOL_NAME = "report_shell_verdict";
@@ -404,6 +434,17 @@ function readGovernanceCardArgs(args: Record<string, unknown>, toolName: string,
   const cardKind = args["cardKind"];
   if (cardKind !== undefined && (typeof cardKind !== "string" || !(allowed as readonly string[]).includes(cardKind))) {
     return { ok: false, result: { ok: false, message: `${toolName}: 参数 cardKind 非法（本工具允许：${allowed.join(" / ")}）——未向客户发卡；请更正后重试` } };
+  }
+  // 2026-11-17（app-dispatch/v1）：应用发放的卡 promptId——仅原样回传，本层不签发、不验证
+  // （逐项校验由应用 `verifyCardPrompt` 完成；不一致 ⇒ `card-prompt-mismatch`，不发卡）。
+  // 缺省 = 旧卡（旧行为不变；legacy/fixed-v2.1 卡不要求 promptId）。
+  const promptIdRaw = args["promptId"] ?? args["prompt_id"];
+  if (promptIdRaw !== undefined) {
+    const promptId = typeof promptIdRaw === "string" ? promptIdRaw.trim() : "";
+    if (promptId === "" || promptId.length > 200 || /[\u0000-\u001F\u007F]/.test(promptId)) {
+      return { ok: false, result: { ok: false, message: `${toolName}: 参数 promptId 非法（应为 1–200 字符的非空字符串）——未向客户发卡；请更正后重试` } };
+    }
+    return { ok: true, value: { ...flow.value, ...(cardKind !== undefined ? { cardKind: cardKind as GovernanceCardKind } : {}), promptId } };
   }
   return {
     ok: true,
@@ -2605,6 +2646,36 @@ function intentConfirmationReceipt(result: ToolResult, out: CustomerInputOutcome
       : `\n意图确认应用状态：committed${detail}。原Service已完成本次应用；后续操作仍须通过原有授权校验。`) };
 }
 
+/**
+ * 2026-11-17（app-dispatch/v1）：幕僚回传应用发放的 card prompt `documentRefs`——本层只做**形状**
+ * 校验（项目相对路径 + 64-hex sha256 + 非空 kind + 可选正版本）；是否与 prompt 一致由应用
+ * `verifyCardPrompt` 逐项判定（不一致 ⇒ `card-prompt-mismatch`，不发卡）。缺省 = 不回传（旧卡
+ * 无 prompt/无 documentRefs，旧行为不变）。
+ */
+function readPromptDocumentRefs(args: Record<string, unknown>, toolName: string): GovernanceArgs<WorkflowDocumentRef[] | undefined> {
+  const raw = args["documentRefs"] ?? args["document_refs"];
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  const invalid = (): GovernanceArgs<WorkflowDocumentRef[]> => ({
+    ok: false,
+    result: { ok: false, message: `${toolName}: documentRefs 参数非法（应为 ≤16 项 {path, sha256, kind, version?}；path 项目相对、sha256 64 hex）——未向客户发卡` },
+  });
+  if (!Array.isArray(raw) || raw.length > 16) return invalid();
+  const refs: WorkflowDocumentRef[] = [];
+  for (const item of raw) {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) return invalid();
+    const record = item as Record<string, unknown>;
+    const path = typeof record["path"] === "string" ? record["path"].trim().replace(/\\/g, "/") : "";
+    if (path === "" || path.startsWith("/") || /^[a-zA-Z]:/.test(path) || path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return invalid();
+    const sha256 = typeof record["sha256"] === "string" ? record["sha256"].trim().toLowerCase() : "";
+    if (!/^[a-f0-9]{64}$/.test(sha256)) return invalid();
+    const kind = typeof record["kind"] === "string" ? record["kind"].trim() : undefined;
+    const version = record["version"];
+    if (version !== undefined && (typeof version !== "number" || !Number.isSafeInteger(version) || version < 1)) return invalid();
+    refs.push({ path, sha256, ...(kind !== undefined ? { kind } : {}), ...(typeof version === "number" ? { version } : {}) });
+  }
+  return { ok: true, value: refs };
+}
+
 function makeRequestChoiceTool(
   fn: CustomerInputFn,
   timeoutMs: number | undefined,
@@ -2646,6 +2717,9 @@ function makeRequestChoiceTool(
       }
       const governance = readGovernanceCardArgs(call.args, name, CHOICE_CARD_KINDS);
       if (!governance.ok) return governance.result;
+      // 2026-11-17（app-dispatch/v1）：可选的 prompt documentRefs 回传（只做形状；一致性由应用校验）。
+      const promptRefs = readPromptDocumentRefs(call.args, name);
+      if (!promptRefs.ok) return promptRefs.result;
       const question = readStringArg(call.args, ["question"]);
       const preview = readStringArg(call.args, ["preview"]);
       const multipleRaw = call.args["multiple"];
@@ -2658,7 +2732,9 @@ function makeRequestChoiceTool(
         ...(multiple !== undefined ? { multiple } : {}),
         ...(preview !== undefined ? { preview } : {}),
         ...governance.value,
-      };
+        // prompt 绑定的 documentRefs 为**运行时附加字段**（Model 契约不另立第二形状；应用侧防御读取）。
+        ...(promptRefs.value !== undefined ? { documentRefs: promptRefs.value } : {}),
+      } as CustomerInputRequest;
 
       const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, { ...metadata, ...governance.value });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
@@ -2965,6 +3041,74 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
         ok: false,
         message: `${name}：任务**未能派发**（回执：${receipt.message ?? "被拒"}）——请如实向客户说明；**不要当它成功、不要宣称已送达**。`,
       };
+    },
+  };
+}
+
+// —————————————— 选流程工具（2026-11-17 app-dispatch/v1；select_workflow） ——————————————
+
+const SELECT_WORKFLOW_ARG_KEYS: ReadonlySet<string> = new Set(["workflowPath", "flowId", "acceptanceStrength"]);
+
+/**
+ * select_workflow：**选择固定流程**工具（app-dispatch/v1；仅 fixed 幕僚会话注入）。
+ * 纪律（与 dispatch_task 同）：**本层不创建任务、不派发、不做治理判定、不改变任何写权**——handler
+ * 只校验 `{workflowPath, flowId, acceptanceStrength?}` 形状并把请求交给注入能力；是否启动 workflow/
+ * 建首阶段任务/幂等由应用侧流程驱动判定，失败稳定码（workflow-definition-* / workflow-protocol-mismatch /
+ * stage-request-source-missing 等）**原样转达**；绝不把「选择流程」说成派发/授权完成。
+ * 悬挂防护：`raceAbort`（会话中止即立即返回；本地调用，不设等待超时）。
+ */
+function makeSelectWorkflowTool(
+  fn: SelectWorkflowFn,
+  currentTurnId?: () => string | undefined,
+  scope?: Pick<GovernedToolsOptions, "roleId">,
+): ExecutableTool {
+  const name = SELECT_WORKFLOW_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownGovernanceArg(call.args, SELECT_WORKFLOW_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      const workflowPathRaw = call.args["workflowPath"];
+      if (!isWorkflowPath(workflowPathRaw)) {
+        return { ok: false, message: `${name}: workflowPath 参数非法（应为 "A"（新增）或 "B"（修改））——未选择流程` };
+      }
+      const flowIdRaw = call.args["flowId"];
+      if (typeof flowIdRaw !== "string" || !new RegExp(GOVERNANCE_SLUG_PATTERN).test(flowIdRaw)) {
+        return { ok: false, message: `${name}: flowId 参数非法（应为匹配 ${GOVERNANCE_SLUG_PATTERN} 的 slug）——未选择流程` };
+      }
+      const strengthRaw = call.args["acceptanceStrength"];
+      if (strengthRaw !== undefined && (typeof strengthRaw !== "string" || !(WORKFLOW_ACCEPTANCE_STRENGTHS as readonly string[]).includes(strengthRaw))) {
+        return { ok: false, message: `${name}: acceptanceStrength 参数非法（应为 ${WORKFLOW_ACCEPTANCE_STRENGTHS.join("/")}）——未选择流程` };
+      }
+      const turnId = currentTurnId?.();
+      const input: SelectWorkflowToolInput = {
+        workflowPath: workflowPathRaw,
+        flowId: flowIdRaw,
+        ...(strengthRaw !== undefined ? { acceptanceStrength: strengthRaw as SelectWorkflowToolInput["acceptanceStrength"] } : {}),
+      };
+      const label = `${name} 选择流程`;
+      let receipt: SelectWorkflowToolResult | undefined;
+      try {
+        receipt = await raceAbort(Promise.resolve().then(() => {
+          if (call.signal?.aborted) throw new Error("会话已中止");
+          return fn(input, { ...(turnId !== undefined ? { turnId } : {}), ...(scope?.roleId ? { roleId: scope.roleId } : {}) });
+        }), call.signal, label);
+      } catch (err) {
+        return { ok: false, message: `${name}：选择流程**未受理**（原因：${reasonOf(err)}）——请如实报告，不要自造流程或回执。` };
+      }
+      if (receipt !== undefined && receipt.ok === true) {
+        const parts: string[] = [];
+        if (receipt.workflowId !== undefined) parts.push(`workflowId=${receipt.workflowId}`);
+        if (receipt.stage !== undefined) parts.push(`stage=${receipt.stage}`);
+        if (receipt.taskIds !== undefined && receipt.taskIds.length > 0) parts.push(`首任务=${receipt.taskIds.join("/")}`);
+        const detail = parts.length > 0 ? `（${parts.join("；")}）` : "";
+        return { ok: true, message: `${name}：已选择流程 ${input.workflowPath}（flowId ${input.flowId}）${detail}。${receipt.message}` };
+      }
+      if (receipt !== undefined && receipt.ok === false) {
+        const code = receipt.code !== undefined ? `${receipt.code}：` : "";
+        return { ok: false, message: `${name}：选择流程**未受理**（${code}${receipt.message}）——请如实报告真实 code，不要换形重试、不要自造定义。` };
+      }
+      return { ok: false, message: `${name}：应用未返回明确结果（回执缺失）——不能视为流程已启动；以应用账本/系统行为为准，如实告知客户。` };
     },
   };
 }
@@ -5351,7 +5495,7 @@ function observeInjectedCapabilities<T extends object>(value: T, lifecycle: Runt
     };
   } });
 }
-export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptions, lifecycle?: RuntimeToolLifecycle): ToolDefinition[] {
+export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptions & { selectWorkflow?: SelectWorkflowFn }, lifecycle?: RuntimeToolLifecycle): ToolDefinition[] {
   if (lifecycle && options) {
     const original = options;
     const currentTurnId = () => original.currentTurnId?.();
@@ -5443,6 +5587,12 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const dispatchTask = options?.dispatchTask;
   if (dispatchTask !== undefined) {
     tools.push(makeDispatchTaskTool(dispatchTask, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  // 2026-11-17（app-dispatch/v1 第一步）：`select_workflow`（注入才注册）——仅 fixed 应用驱动协议的
+  // 幕僚会话注入；fixed-v2.1/legacy 会话字段缺席 ⇒ 工具不存在（旧工具面逐字不变）。
+  const selectWorkflow = options?.selectWorkflow;
+  if (selectWorkflow !== undefined) {
+    tools.push(makeSelectWorkflowTool(selectWorkflow, options?.currentTurnId, { roleId: options?.roleId }));
   }
 
   // 结构性保证（W6-A，同 dispatch_task 先例）：**未注入交接/澄清能力时对应工具不存在**。

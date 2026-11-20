@@ -307,6 +307,8 @@ export class Lifecycle implements LifecycleHost, SessionControl {
   afterStableWrite(...args: Parameters<LifecyclePorts["afterStableWrite"]>): ReturnType<LifecyclePorts["afterStableWrite"]> { return this.ports.afterStableWrite(...args); }
   appTaskClientMessageId(...args: Parameters<LifecyclePorts["appTaskClientMessageId"]>): ReturnType<LifecyclePorts["appTaskClientMessageId"]> { return this.ports.appTaskClientMessageId(...args); }
   appTaskClientMessageIdFromSeed(...args: Parameters<LifecyclePorts["appTaskClientMessageIdFromSeed"]>): ReturnType<LifecyclePorts["appTaskClientMessageIdFromSeed"]> { return this.ports.appTaskClientMessageIdFromSeed(...args); }
+  appDispatchSelectWorkflow(...args: Parameters<LifecyclePorts["appDispatchSelectWorkflow"]>): ReturnType<LifecyclePorts["appDispatchSelectWorkflow"]> { return this.ports.appDispatchSelectWorkflow(...args); }
+  appDispatchDriveWorkflow(...args: Parameters<LifecyclePorts["appDispatchDriveWorkflow"]>): ReturnType<LifecyclePorts["appDispatchDriveWorkflow"]> { return this.ports.appDispatchDriveWorkflow(...args); }
   appendRoleActivity(...args: Parameters<LifecyclePorts["appendRoleActivity"]>): ReturnType<LifecyclePorts["appendRoleActivity"]> { return this.ports.appendRoleActivity(...args); }
   applyMcpChange(...args: Parameters<LifecyclePorts["applyMcpChange"]>): ReturnType<LifecyclePorts["applyMcpChange"]> { return this.ports.applyMcpChange(...args); }
   applySkillChange(...args: Parameters<LifecyclePorts["applySkillChange"]>): ReturnType<LifecyclePorts["applySkillChange"]> { return this.ports.applySkillChange(...args); }

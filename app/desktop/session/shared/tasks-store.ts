@@ -17,12 +17,15 @@ import { recordTaskObservation } from "../../../../src/pipeline/orchestration/tr
 /**
  * 任务创建者内存索引（原 `SessionManager.taskCreators`；读盘重放/新建/重派共用；缺字段的旧记录按 chief 兼容）。
  * 方案 §3.6 将本状态归属 shared/tasks-store。
+ * 2026-11-17（app-dispatch/v1）：新增 `"application"`——应用侧流程驱动创建的任务（reported 只落账本、
+ * 由应用观察收口，不路由给角色）；旧值语义逐字不变。
  */
-export const taskCreators = new Map<string, "chief" | "convener">();
+export type TaskCreator = "chief" | "convener" | "application";
+export const taskCreators = new Map<string, TaskCreator>();
 
-/** 登记任务创建者（读盘重放/新建/重派共用；缺字段的旧记录按 chief 兼容）。 */
-export function rememberTaskCreator(taskId: string, created: { from?: "chief" | "convener" } | undefined): void {
-  taskCreators.set(taskId, created?.from === "convener" ? "convener" : "chief");
+/** 登记任务创建者（读盘重放/新建/重派共用；缺字段的旧记录按 chief 兼容；application 原样保留）。 */
+export function rememberTaskCreator(taskId: string, created: { from?: TaskCreator } | undefined): void {
+  taskCreators.set(taskId, created?.from === "convener" ? "convener" : created?.from === "application" ? "application" : "chief");
 }
 
 /** B 批：任务/汇报状态读取（坏行跳过；读失败按空状态 + 诊断，不阻塞）。 */

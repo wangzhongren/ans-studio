@@ -220,10 +220,12 @@ import type {
   GovernanceJudgeToolOptions,
   RequestResolvedEvent,
   WorkflowEvent,
+  WorkflowProtocol,
   ShellEscalationFn,
   ShellEscalationPresentFn,
 } from "../../model/runtime.ts";
-import { GOVERNANCE_SLUG_PATTERN, WORKFLOW_LEDGER_SCHEMA, governanceCardGroup } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, WORKFLOW_LEDGER_SCHEMA, WORKFLOW_PROTOCOL_APP_DISPATCH, governanceCardGroup } from "../../model/runtime.ts";
+import type { SelectWorkflowFn } from "../../provider/runtime/tools.ts";
 import { createRuntimeAdapter, createBlockedRoleCapabilityCallbacks, isRuntimeEditReadProbe, inspectRuntimeFileGateContext, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, inspectRuntimeConstructionFailure, recheckRuntimeConstructionFailure, discardRuntimeRolePreparation, inspectRuntimeCoreRegistry, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
 import { createTrunkService, type DecisionEvidenceInput, type PreparedIntentConfirmation } from "../../service/trunk/public/trunk-service.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
@@ -361,6 +363,11 @@ export interface AdapterCapabilities {
    */
   viewImage?: ViewImageFn;
   dispatchTask?: DispatchTaskFn;
+  /**
+   * 2026-11-17（app-dispatch/v1）：`select_workflow` 能力位（运行时核心 `GovernedToolsOptions.selectWorkflow`
+   * 同名能力位）。**仅 app-dispatch/v1 + fixed + chief 会话注入**；未注入 ⇒ 工具不注册（fail-closed）。
+   */
+  selectWorkflow?: SelectWorkflowFn;
   /**
    * 需求变更申请能力（`request_requirement_change`「注入才注册」，2026-10-26 客户要求 + 同日纠正/补充）。
    * **只给内置治理角色中的报告员 Rapporteur 与统筹 Convener 注入**（其他内置治理角色、single 的 su 与
@@ -1257,6 +1264,23 @@ export async function openRoleSession(
      */
     workflowMode?: WorkflowMode;
     workflowModeForFlow?: (flowId: string) => WorkflowMode | Promise<WorkflowMode>;
+    /**
+     * 2026-11-17（app-dispatch/v1 第一步）：会话级固定工作流**驱动协议**（宿主从
+     * `workflow.started.protocol` 解析；缺省 = `fixed-v2.1`，Q10 在飞旧协议逐字保留）。
+     * `app-dispatch/v1` 时收窄 fixed 幕僚工具面（不注入派发/收口/重派/停止，注入 `select_workflow`）。
+     */
+    workflowProtocol?: WorkflowProtocol;
+    /**
+     * 2026-11-17：`select_workflow` 能力（「注入才注册」）。仅 app-dispatch/v1 + fixed + chief 会话
+     * 注入；legacy/fixed-v2.1 会话字段缺席 ⇒ 工具不存在（旧工具面逐字不变）。纯选择器：不派发、不授权。
+     */
+    selectWorkflow?: SelectWorkflowFn;
+    /**
+     * 2026-11-17：fixed 阶段动作完成后的**应用驱动回调**（仅 app-dispatch/v1 注入；fire-and-forget）。
+     * A8 `activate_role_documents` 成功后由本层调用（`action:"activate-role-documents"`），宿主据此
+     * 调 `driveAppDispatchStage` 推进下一阶段；回调异常绝不影响工具回执。
+     */
+    afterFixedStageAction?: (input: { projectRoot: string; workflowId: string; action: "activate-role-documents" }) => void;
     scope?: TaskScope;
     /** 宿主按客户委托注入的本项目常规检查政策；项目角色三层链专用。 */
     routineShellPolicy?: RoutineShellPolicy;
@@ -1609,6 +1633,13 @@ export async function openRoleSession(
       sessionWorkflowMode = "legacy";
     }
   }
+  // 2026-11-17（app-dispatch/v1 第一步，设计 §2.1/§6.1）：**协议感知工具面**。
+  // `workflow.started.protocol` 缺省 = fixed-v2.1 ⇒ 下方一切旧注入矩阵逐字不变（Q10 在飞协议隔离）。
+  // app-dispatch/v1 下：fixed 幕僚不注入 dispatch_task/close_created_task/redispatch_task/
+  // terminate_role_run，改注入 select_workflow；运营 dispatch_task 目标矩阵由桌面路由谓词收窄；
+  // 其余角色注入面不变。
+  const appDispatchSession = sessionWorkflowMode === "fixed" && input.workflowProtocol === WORKFLOW_PROTOCOL_APP_DISPATCH;
+  const appDispatchChief = appDispatchSession && trioSpec?.id === "chief";
   // T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 任务级 Git 写事实（应用注入；模型不可自报）。
   // 只在「fixed 会话 + 真实受派实现任务（A11/B3）+ 应用完整注入（明细分类器 + 执行端口）」同时成立时
   // 解析并注入；任一步不成立 ⇒ **不注入**（v5 分类器无 scope ⇒ Git 写一律拒，fail-closed）。
@@ -2538,7 +2569,7 @@ export async function openRoleSession(
   // `tasks.jsonl`，目标由桌面星形路由校验（任意内置/项目 worker、自身除外）。convener 的旧 dispatch
   // 仍逐字走原派发范围门（保留至 D）；single/su 旧行为不变。
   const dispatchTask: DispatchTaskFn | undefined =
-    cap?.dispatchTask === true && input.dispatchTask !== undefined ? input.dispatchTask : undefined;
+    cap?.dispatchTask === true && input.dispatchTask !== undefined && !appDispatchChief ? input.dispatchTask : undefined;
 
   // G-2 看护三能力（R1/R2）：能力矩阵驱动——仅 `capabilities.roleStatus/sessionTail/proposeRecovery`
   // （trio=Convener；su 旧行为）。未注入 ⇒ 不注入（能力缺席 = 最强 fail-closed）。
@@ -2756,8 +2787,13 @@ export async function openRoleSession(
     return declared === undefined ? legacy : declared ? value : undefined;
   };
   const effectiveRoleActivityLog = moduleToolValue("roleActivityLog", roleActivityLog, input.roleActivityLog);
-  const effectiveTerminateRoleRun = moduleToolValue("terminateRoleRun", terminateRoleRun, input.terminateRoleRun);
-  const effectiveRedispatchTask = moduleToolValue("redispatchTask", redispatchTask, input.redispatchTask);
+  // 2026-11-17（app-dispatch/v1）：fixed 幕僚不再收口/重派/停止（重试与停止归应用/客户）；
+  // 旧协议（fixed-v2.1）与 legacy 的注入面逐字不变。
+  const effectiveTerminateRoleRun = appDispatchChief ? undefined : moduleToolValue("terminateRoleRun", terminateRoleRun, input.terminateRoleRun);
+  const effectiveRedispatchTask = appDispatchChief ? undefined : moduleToolValue("redispatchTask", redispatchTask, input.redispatchTask);
+  // 2026-11-17（app-dispatch/v1）：新 `select_workflow`（仅 fixed 应用驱动协议的幕僚；注入才注册）。
+  const selectWorkflow: SelectWorkflowFn | undefined =
+    appDispatchChief && directGovernance && input.selectWorkflow !== undefined ? input.selectWorkflow : undefined;
   const effectiveProjectNote = moduleToolValue("projectNote", projectNote, input.projectNote);
   const effectiveRequestVersionDecision = moduleToolValue("requestVersionDecision", requestVersionDecision, input.requestVersionDecision);
   const moduleSubmitVersionChange = moduleDeclaresTool("submitVersionChange");
@@ -2811,20 +2847,29 @@ export async function openRoleSession(
         const projectRoot = input.project.projectRoot;
         const hashed = await fillFixedActivationHashes({ projectRoot, input: toolInput });
         if (!hashed.ok) return hashed;
-        if (input.activateRoleDocumentsFixed !== undefined) {
+        const result = input.activateRoleDocumentsFixed !== undefined
           // 可信 projectRoot 放最后：模型参数即便夹带同名字段也不得覆盖宿主身份。
-          return await input.activateRoleDocumentsFixed({ ...hashed.input, projectRoot }, signal);
+          ? await input.activateRoleDocumentsFixed({ ...hashed.input, projectRoot }, signal)
+          : await workflowActivateRoleDocumentsFixed({
+              projectRoot,
+              operationId: hashed.input.operationId,
+              flowId: hashed.input.flowId,
+              workflowId: hashed.input.workflowId,
+              proposalDecisionId: hashed.input.proposalDecisionId,
+              targetRoleId: hashed.input.targetRoleId,
+              roster: hashed.input.roster,
+              documents: hashed.input.documents,
+            });
+        // 2026-11-17（app-dispatch/v1）：A8 激活成功 ⇒ 通知应用驱动回调（A8 的 stage.completed 由
+        // 服务在「全部名单角色激活」时写入；宿主据此 drive 下一阶段）。回调异常绝不改变工具回执。
+        if (result.ok === true && input.afterFixedStageAction !== undefined) {
+          try {
+            input.afterFixedStageAction({ projectRoot, workflowId: hashed.input.workflowId, action: "activate-role-documents" });
+          } catch (error) {
+            log.error("app-dispatch.after-stage-action.failed", error, { action: "activate-role-documents" });
+          }
         }
-        return await workflowActivateRoleDocumentsFixed({
-          projectRoot,
-          operationId: hashed.input.operationId,
-          flowId: hashed.input.flowId,
-          workflowId: hashed.input.workflowId,
-          proposalDecisionId: hashed.input.proposalDecisionId,
-          targetRoleId: hashed.input.targetRoleId,
-          roster: hashed.input.roster,
-          documents: hashed.input.documents,
-        });
+        return result;
       }
     : undefined;
   // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 的角色声明经模块 `tools()` 复核（`moduleDeclaresTool`
@@ -2844,6 +2889,7 @@ export async function openRoleSession(
   // `{operationId,taskId,outcome,note?}`；legacy 会话字段缺席（legacy 实现逐字保留在上方）。
   const fixedCloseCreatedTask: FixedCloseCreatedTaskFn | undefined = fixedSessionTools
     && directGovernance && (setup.role.id === "chief" || setup.role.id === "convener")
+    && !appDispatchChief
     && moduleCloseCreatedTask !== false
     ? async (toolInput: FixedCloseCreatedTaskToolInput, signal) => {
         if (signal?.aborted) {
@@ -2982,10 +3028,13 @@ export async function openRoleSession(
     // 只读资源 + path/version/sha256/bytes/应用版本元数据）。legacy `chief-workflow.md` 不改；legacy
     // 会话仍由运行时核心注入 v1（session.ts 既有行为，不在本批写集）。资源缺失/身份/版本/hash 不可核
     // ⇒ 抛错 fail-closed（与 legacy loader 同口径；不猜正文、不静默降级）。
+    // 2026-11-17（app-dispatch/v1）：协议为 app-dispatch/v1 时改注入 v3（`chief-workflow-v3.md`，
+    // 版本 `chief-workflow/v3`；仅选流程 + 按 prompt 呈卡口径）；fixed-v2.1 在飞仍逐字注入 v2。
     if (builtInGovernance && setup.role.id === "chief" && chiefDecisionContext === undefined) {
-      const fixedChiefWorkflow = await loadFixedChiefWorkflowResource();
+      const chiefWorkflowVersion = appDispatchSession ? "chief-workflow/v3" as const : "chief-workflow/v2" as const;
+      const fixedChiefWorkflow = await loadFixedChiefWorkflowResource(chiefWorkflowVersion);
       contextSections = [...(contextSections ?? []),
-        `## 应用内置 Chief workflow v2（fixed 固定路径；本段优先于任何 legacy chief-workflow v1 段）\n${JSON.stringify({
+        `## 应用内置 Chief workflow ${appDispatchSession ? "v3（app-dispatch/v1 应用流程驱动）" : "v2（fixed 固定路径；本段优先于任何 legacy chief-workflow v1 段）"}\n${JSON.stringify({
           sourceUrl: fixedChiefWorkflow.sourceUrl,
           moduleUrl: fixedChiefWorkflow.moduleUrl,
           resourceVersion: fixedChiefWorkflow.version,
@@ -2993,7 +3042,7 @@ export async function openRoleSession(
           bytes: fixedChiefWorkflow.bytes,
           applicationVersion: fixedChiefWorkflow.applicationVersion,
         })}\n\n${fixedChiefWorkflow.text}`];
-      log.record("chief.workflow.v2.loaded", {
+      log.record("chief.workflow.loaded", {
         version: fixedChiefWorkflow.version,
         sha256: fixedChiefWorkflow.sha256,
         bytes: fixedChiefWorkflow.bytes,
@@ -3018,6 +3067,8 @@ export async function openRoleSession(
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
+    // 2026-11-17（app-dispatch/v1）：`select_workflow`（仅 app-dispatch/v1 fixed chief 注入；未注入 ⇒ 不注册）。
+    ...(selectWorkflow !== undefined ? { selectWorkflow } : {}),
     ...(requestRequirementChange !== undefined ? { requestRequirementChange } : {}),
     // 2026-11-04 下载申请：纯透传；未注入 ⇒ 字段缺席、工具不注册。
     ...(input.requestDownload !== undefined ? { requestDownload: input.requestDownload } : {}),
@@ -4590,16 +4641,19 @@ interface FixedChiefWorkflowResource {
  * SHA-256/bytes 并附应用版本。读取/校验失败 ⇒ 抛错 fail-closed（不猜正文、不静默降级）。
  * legacy `chief-workflow.md`（v1）**不读、不改**；本函数只服务 fixed 会话注入。
  */
-async function loadFixedChiefWorkflowResource(): Promise<Readonly<FixedChiefWorkflowResource>> {
-  const source = new URL("../../common/门禁引擎/workflows/chief/chief-workflow-v2.md", import.meta.url);
+async function loadFixedChiefWorkflowResource(
+  version: "chief-workflow/v2" | "chief-workflow/v3" = "chief-workflow/v2",
+): Promise<Readonly<FixedChiefWorkflowResource>> {
+  const file = version === "chief-workflow/v3" ? "chief-workflow-v3.md" : "chief-workflow-v2.md";
+  const source = new URL(`../../common/门禁引擎/workflows/chief/${file}`, import.meta.url);
   try {
     const bytes = await readFile(source);
     if (bytes.length === 0 || bytes.length > 256 * 1024) throw new Error("empty or oversized fixed Chief workflow resource");
     const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
     if (text.includes("\0") || !/^\uFEFF?# Chief 工作流/.test(text)) throw new Error("invalid fixed Chief workflow Markdown identity");
     const versions = [...text.matchAll(/^资源版本：(chief-workflow\/v[1-9][0-9]*)\r?$/gm)];
-    if (versions.length !== 1 || versions[0]![1] !== "chief-workflow/v2") {
-      throw new Error("fixed Chief workflow resource version must be chief-workflow/v2");
+    if (versions.length !== 1 || versions[0]![1] !== version) {
+      throw new Error(`fixed Chief workflow resource version must be ${version}`);
     }
     const application = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url), "utf8")) as { version?: unknown };
     if (typeof application.version !== "string" || !/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(application.version)) {
@@ -4615,7 +4669,7 @@ async function loadFixedChiefWorkflowResource(): Promise<Readonly<FixedChiefWork
       applicationVersion: application.version,
     });
   } catch (error) {
-    throw new Error(`chief-workflow-v2-resource-unavailable: ${source.href} (${errText(error)})`, { cause: error });
+    throw new Error(`chief-workflow-resource-unavailable: ${source.href} (${errText(error)})`, { cause: error });
   }
 }
 
@@ -4626,8 +4680,14 @@ export function createRuntimeAdapterFactory(
   options: RuntimeAdapterFactoryOptions = {},
 ): RuntimeAdapterFactory {
   if (!(RUNTIME_KINDS as readonly string[]).includes(runtime)) throw new Error(`未知运行时：${runtime}`);
-  const factory: RuntimeAdapterFactory = (gate, capabilities) => createRuntimeAdapter({
-    ...options,
+  const factory: RuntimeAdapterFactory = (gate, capabilities) => {
+  // 2026-11-17（app-dispatch/v1）：`select_workflow` 能力位经**扩展选项**透传到 `buildGovernedTools`
+  // （Model `GovernedToolsOptions` 未改；运行时核心以 `...options` 原样携带该键；未注入 ⇒ 工具不注册）。
+  const adapterOptions = capabilities?.selectWorkflow !== undefined
+    ? { ...options, selectWorkflow: capabilities.selectWorkflow }
+    : options;
+  return createRuntimeAdapter({
+    ...adapterOptions,
     runtime, gate, projectRoot: project.projectRoot, skillRoot: project.skillRoot,
     readRoot: project.projectRoot,
     writeRoot: runtime === "demo" ? options.writeRoot : project.projectRoot,
@@ -4730,6 +4790,7 @@ export function createRuntimeAdapterFactory(
       : {}),
     shellVerdict: capabilities?.shellVerdict,
   });
+  };
   officialCoreAdapterFactories.add(factory);
   return factory;
 }

@@ -65,11 +65,15 @@ import {
   resolveProjectFixedPanelMode,
   sessionWorkflowModeForChat,
   sessionWorkflowModeForTask,
+  sessionWorkflowProtocolForChat,
+  sessionWorkflowProtocolForTask,
   shouldRecordFixedStageDispatch,
   workflowModeForFlowResolver,
   type FixedReleaseTriggerStage,
   type WorkflowMode,
 } from "../../workflow.ts";
+import { WORKFLOW_PROTOCOL_APP_DISPATCH, WORKFLOW_PROTOCOL_FIXED_V2_1, type WorkflowProtocol } from "../../../../src/model/runtime.ts";
+import type { SelectWorkflowFn } from "../../../../src/provider/runtime/tools.ts";
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../../../src/common/shared/diagnostics.ts";
 import { mainT } from "../../i18n.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../../../src/common/编排/watchdog.ts";
@@ -329,6 +333,16 @@ export class LifecycleOpen {
     ctx.forcedSessionWorkflowMode = forcedSessionWorkflowMode;
     ctx.requestedSessionMode = requestedSessionMode;
     ctx.requestedAssignment = requestedAssignment;
+    // 2026-11-17（app-dispatch/v1 第一步）：会话驱动协议（fixed 会话才有意义）。
+    // · 任务会话 ⇒ 该任务 workflow 的 `workflow.started.protocol`（缺失/读失败 ⇒ 旧协议 fail-closed）；
+    // · 聊天（无 taskId）⇒ 项目活动 workflow 协议；无 workflow 的新项目 ⇒ app-dispatch/v1（协调者口径）。
+    // fixed-v2.1 在飞 ⇒ 旧工具面/旧行为逐字保留（Q10 不迁移）。
+    ctx.sessionWorkflowProtocol = requestedSessionMode !== "fixed"
+      ? undefined
+      : req.taskId !== undefined
+        ? ((await sessionWorkflowProtocolForTask(req.projectRoot, req.taskId)) ?? WORKFLOW_PROTOCOL_FIXED_V2_1)
+        : await sessionWorkflowProtocolForChat(req.projectRoot);
+    ctx.appDispatchSession = requestedSessionMode === "fixed" && ctx.sessionWorkflowProtocol === WORKFLOW_PROTOCOL_APP_DISPATCH;
   }
 
   /** reuseOrRebindEntry：openInternalUnsafe 连续块（源 2061–2134；映射见 change 记录）。 */
@@ -591,6 +605,30 @@ export class LifecycleOpen {
       sessionWorkflowMode === "fixed" && direct !== undefined && (req.roleId === "chief" || req.roleId === "convener")
         ? async (input, signal) => this.closeCreatedTaskFixedForSession(req.projectRoot, req.roleId, input, signal)
         : undefined;
+    // 2026-11-17（app-dispatch/v1）：`select_workflow` 能力（仅应用驱动协议的 fixed 幕僚会话注入）。
+    // 宿主捕获 chief **当前真实客户轮次**（turnId）作为 sourceTaskId；轮次不在跑/已变 ⇒ 不伪造（返回
+    // `stage-request-source-missing`）。流程启动/首阶段任务创建/投递由应用驱动（不在本层）。
+    const selectWorkflowBinding: { handle?: RoleSessionHandle } = {};
+    const selectWorkflow: SelectWorkflowFn | undefined = ctx.appDispatchSession === true && req.roleId === "chief"
+      ? async (payload, metadata) => {
+          const entry = this.sessions.get(key);
+          const origin = entry?.origins.running;
+          const current = !!entry && !!origin && entry.handle === selectWorkflowBinding.handle && this.sessions.get(key) === entry
+            && entry.busy && !origin.settled && !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted
+            && (!metadata || ((metadata.turnId === undefined || metadata.turnId === origin.turnId)
+              && (metadata.roleId === undefined || metadata.roleId === req.roleId)));
+          return this.host.appDispatchSelectWorkflow({
+            projectRoot: req.projectRoot,
+            runtime: req.runtime,
+            workflowPath: payload.workflowPath,
+            flowId: payload.flowId,
+            ...(payload.acceptanceStrength !== undefined ? { acceptanceStrength: payload.acceptanceStrength } : {}),
+            ...(current && origin !== undefined ? { sourceTaskId: origin.turnId } : {}),
+          });
+        }
+      : undefined;
+    ctx.selectWorkflow = selectWorkflow;
+    ctx.selectWorkflowBinding = selectWorkflowBinding;
     ctx.governanceModel = governanceModel;
     ctx.governanceFunction = governanceFunction;
     ctx.sessionWorkflowMode = sessionWorkflowMode;
@@ -694,8 +732,9 @@ export class LifecycleOpen {
       canObserve ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
     const contractCheck: ContractCheckFn | undefined =
       // B7.1：契约速查按**本会话**的 workflow 模式分流（fixed 视图不含 legacy run/pin 口径；
-      // legacy/single 模式参数缺省路径逐字不变）。
-      (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input, sessionWorkflowMode);
+      // legacy/single 模式参数缺省路径逐字不变）。2026-11-17：fixed 再按协议分流（app-dispatch/v1
+      // 显示应用流程驱动/新任务种类/新稳定码；fixed-v2.1 文案逐字不变）。
+      (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input, sessionWorkflowMode, ctx.sessionWorkflowProtocol);
     // 2026-11-09（文档格式权威说明，方案 P1.2 §3.1/§4.1；B1 AC-9/AC-10）：`doc_format` 只读数据源——
     // **所有角色会话**（6 个内置治理角色 + 项目角色）与 `contractCheck` 同位无条件注入（项目角色走同一条
     // `openRoleSession` 路径，不依赖技能安装/动态 id 登记）。数据源 `docFormatText` 第一条语句静态早退到
@@ -887,7 +926,7 @@ export class LifecycleOpen {
 
   /** assembleToolSurface：openInternalUnsafe 连续块（源 2543–2956；映射见 change 记录）。 */
   private async assembleToolSurface(ctx: OpenContext): Promise<OpenResult | undefined> {
-    const { req, userInitiated, selectionVersion, internalReopen, lifecycle, key, stopped, stoppedResult, project, role, boundary, governanceModel, governanceFunction, sessionWorkflowMode, legacyOnlyCapabilitiesAllowed, customerInput, writeBoundary, mirrorRoleIdFor, dispatchTask, viewImage, canPresentAppRunChange, versionChangeStack, direct, closeCreatedTask, closeCreatedTaskFixed, submitVersionChangeCapability, submitRefactorCapability, reportPlanEscalationCapability, requestStableWriteCapability, requestRequirementChange, roleStatus, contractCheck, docFormat, evidenceCheck, sessionTail, roleActivityLog, terminateRoleRun, redispatchTaskCapability, projectStateCapability, projectNoteCapability, requestVersionDecisionCapability, installationBinding, installSkill, uninstallSkill, installMcp, uninstallMcp, interactionState, shellOperatorChannel, shellArming, shellEscalationPresenter, shellOperatorOnly, gitBinding, planBinding, routineShellPolicy, dispatchBinding, currentGitRuntime } = ctx;
+    const { req, userInitiated, selectionVersion, internalReopen, lifecycle, key, stopped, stoppedResult, project, role, boundary, governanceModel, governanceFunction, sessionWorkflowMode, legacyOnlyCapabilitiesAllowed, customerInput, writeBoundary, mirrorRoleIdFor, dispatchTask, viewImage, canPresentAppRunChange, versionChangeStack, direct, closeCreatedTask, closeCreatedTaskFixed, selectWorkflow, selectWorkflowBinding, submitVersionChangeCapability, submitRefactorCapability, reportPlanEscalationCapability, requestStableWriteCapability, requestRequirementChange, roleStatus, contractCheck, docFormat, evidenceCheck, sessionTail, roleActivityLog, terminateRoleRun, redispatchTaskCapability, projectStateCapability, projectNoteCapability, requestVersionDecisionCapability, installationBinding, installSkill, uninstallSkill, installMcp, uninstallMcp, interactionState, shellOperatorChannel, shellArming, shellEscalationPresenter, shellOperatorOnly, gitBinding, planBinding, routineShellPolicy, dispatchBinding, currentGitRuntime } = ctx;
     let createAdapter: RuntimeAdapterFactory;
     let profileRevision = this.profileRevision(req.runtime);
     try {
@@ -1147,6 +1186,15 @@ export class LifecycleOpen {
           // fixed 工具面（RR 根因修复）。legacy/single 不传本键：per-flow `workflowModeForFlow` 现场解析与
           // 旧注入面逐字不变（常量 legacy 会吞掉混合项目的 per-flow 判定，故不做无条件传入）。
           ...(sessionWorkflowMode === "fixed" ? { workflowMode: sessionWorkflowMode } : {}),
+          // 2026-11-17（app-dispatch/v1 第一步）：fixed 会话**驱动协议**（宿主从 workflow.started.protocol
+          // 解析；fixed-v2.1/缺省 ⇒ run-role 旧工具面逐字保留，Q10 在飞不迁移）。
+          ...(sessionWorkflowMode === "fixed" && ctx.sessionWorkflowProtocol !== undefined ? { workflowProtocol: ctx.sessionWorkflowProtocol } : {}),
+          // 2026-11-17：`select_workflow`（仅 app-dispatch/v1 fixed chief 注入；未注入 ⇒ 工具不注册）。
+          ...(selectWorkflow !== undefined ? { selectWorkflow } : {}),
+          // 2026-11-17：fixed 阶段动作完成应用回调（A8 激活成功后 drive 下一阶段；仅 app-dispatch/v1）。
+          ...(ctx.appDispatchSession === true
+            ? { afterFixedStageAction: (event: { projectRoot: string; workflowId: string; action: "activate-role-documents" }) => { void this.host.appDispatchDriveWorkflow(event.projectRoot, event.workflowId); } }
+            : {}),
           // T3 B4.2（2026-11-10，AC-21/T-09）：fixed 会话注入任务级 Git 写（分类器 + 真实端口）。
           // 仅「trio 项目 + 该任务真实 flow 解析为 fixed + 带真实 taskId」时注入；legacy/single 会话
           // 不传本字段（注入面/行为逐字不变）。桌面只给「实现」——**不传 scope/taskId 事实**：scope 由
@@ -1299,6 +1347,7 @@ export class LifecycleOpen {
       dispatchBinding.handle = handle;
       gitBinding.handle = handle;
       planBinding.handle = handle;
+      if (selectWorkflowBinding !== undefined) selectWorkflowBinding.handle = handle;
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
