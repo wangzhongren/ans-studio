@@ -1016,6 +1016,58 @@ export type GovernanceAcceptanceOptionId = "accept" | "reject";
 /** 提案版本（评审 §6.3-3：一个提案最多 v2）。 */
 export type GovernanceProposalVersion = 1 | 2;
 
+// —————————————— Block 决策卡选项词表（2026-11-20 block resolver 地基） ——————————————
+//
+// 依据：`docs/planning/2026-11-20_design_block-resolution-paths.md` §4.1/§7.3。
+// block 决策卡复用既有 `cardKind:"decision"` 与应用发行通道（`application:true`）；
+// 本段只定义**选项 id 词表**（单一来源），不表达权限、不做结算：
+//  · `block-decision` 词汇：judge 在「替我决策」开启且恰有唯一推荐时代选（仅非高危）；
+//  · `block-sovereign` 词汇：进入客户主权排除面，永远客户本人（judge 只能转人工/拒绝）。
+// 桌面批次消费这两个常量与守卫接线 `isApplicationDecisionReservedForCustomer`；
+// 模型/角色工具层不读取本词表，也不会因携带这些 id 获得额外权限。
+
+/** `block-decision` 选项 id（judge 可代批；「接受限制」仅限非高危）。 */
+export const BLOCK_DECISION_OPTION_IDS = Object.freeze([
+  "block-revise-scope",
+  "block-rework",
+  "block-replace-executor",
+  "block-retry-with-cap",
+  "block-accept-with-limits",
+] as const);
+export type BlockDecisionOptionId = (typeof BLOCK_DECISION_OPTION_IDS)[number];
+
+/** `block-sovereign` 选项 id（客户主权；judge 永不代批）。 */
+export const BLOCK_SOVEREIGN_OPTION_IDS = Object.freeze([
+  "block-terminate-flow",
+  "block-grant-exception",
+  "block-accept-current-state",
+  "block-merge-main",
+  "block-stable-write",
+] as const);
+export type BlockSovereignOptionId = (typeof BLOCK_SOVEREIGN_OPTION_IDS)[number];
+
+/** 全部 block 卡选项 id（两族并集；冻结）。 */
+export const BLOCK_OPTION_IDS: readonly (BlockDecisionOptionId | BlockSovereignOptionId)[] = Object.freeze([
+  ...BLOCK_DECISION_OPTION_IDS,
+  ...BLOCK_SOVEREIGN_OPTION_IDS,
+]);
+export type BlockOptionId = (typeof BLOCK_OPTION_IDS)[number];
+
+/** 终止本次流程选项 id（Q4：仅客户在决策卡中显式选择；judge 永不选择；是 decided 的结果，不是停止态）。 */
+export const BLOCK_TERMINATE_OPTION_ID = "block-terminate-flow" as const;
+
+export function isBlockDecisionOptionId(value: unknown): value is BlockDecisionOptionId {
+  return typeof value === "string" && (BLOCK_DECISION_OPTION_IDS as readonly string[]).includes(value);
+}
+
+export function isBlockSovereignOptionId(value: unknown): value is BlockSovereignOptionId {
+  return typeof value === "string" && (BLOCK_SOVEREIGN_OPTION_IDS as readonly string[]).includes(value);
+}
+
+export function isBlockOptionId(value: unknown): value is BlockOptionId {
+  return isBlockDecisionOptionId(value) || isBlockSovereignOptionId(value);
+}
+
 export interface CustomerInputOption {
 
   id: string;
@@ -1216,6 +1268,14 @@ export interface CustomerInputMetadata {
   criteriaRef?: CriteriaRef;
   /** 3.4：验收事实（priority 由应用派生）。 */
   acceptanceFacts?: AcceptanceFact[];
+  /**
+   * 2026-11-20（block resolver 桌面批）：block 决策卡的**应用绑定**（只由桌面 router 设置）：
+   * · `blockId`：block 生命周期 id（审计/回指；不构成权限）；
+   * · `blockJudgePermitted`：仅当该 block 的路由为 `judge-decision` 时为 true——通道只在此标记存在时
+   *   允许「替我决策」确定性代选唯一推荐项（客户主权/客户卡永不进入代选）。模型工具不读取/不转发。
+   */
+  blockId?: string;
+  blockJudgePermitted?: boolean;
 }
 
 export type CustomerInputFn = (
@@ -1435,6 +1495,11 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
    * `"worker-dispatch"`（应用→运营请派 worker）、`"card-prompt"`（应用→幕僚呈客户卡）。
    */
   taskKind?: FixedTaskKind | (string & {});
+  /**
+   * 2026-11-20（block resolver 桌面批）：`taskKind:"repair"` 的反向引用（`block-<24hex>` 的 24 位 hex；
+   * 只由应用写入，模型不可自报）。其它任务缺省；旧记录读取不变。
+   */
+  blockId?: string;
   /** fixed 路径（A/B）；首次 stage-request 写入，后续可省略（从账本解析）。 */
   workflowPath?: WorkflowPath;
   /**
@@ -2023,9 +2088,11 @@ export type WorkflowAction = "advance" | "stop";
  * - `stage-execution`：应用侧流程驱动 → 内置执行者（product/rapporteur/nominator/convener/verifier）；
  * - `worker-dispatch`：应用 → 运营（请为某阶段派 worker；由运营收口，Q6）；
  * - `card-prompt`：应用 → 幕僚（请按应用 prompt 呈客户卡）。
+ * - `repair`（2026-11-20 block resolver 桌面批）：应用 → 属主角色（确定性修复任务；`blockId` 反向引用；
+ *   报告由 desktop block router 观察/核验/收口，**不触发阶段完成**；fixed-v2.1 不用本种类——修复简报走创建者）。
  */
 export const FIXED_TASK_KINDS = Object.freeze([
-  "stage-request", "stage-execution", "worker-dispatch", "card-prompt",
+  "stage-request", "stage-execution", "worker-dispatch", "card-prompt", "repair",
 ] as const);
 export type FixedTaskKind = (typeof FIXED_TASK_KINDS)[number];
 
@@ -2834,6 +2901,13 @@ export interface DispatchTaskPayload {
 export interface DispatchReceipt {
   ok: boolean;
   message?: string;
+  /**
+   * 2026-11-20（block resolver 桌面批）：拒绝回执附带的 block 事实（应用确定性计算；模型只读展示）。
+   * `blockId` 为 `computeBlockId` 的确定性 24 位 hex；`nextActions` 为稳定短语（下一步正确动作）。
+   * 旧调用方/旧测试只读 `ok`/`message`——加法可选，形状兼容。
+   */
+  blockId?: string;
+  nextActions?: string[];
 }
 
 export type DispatchTaskFn = (

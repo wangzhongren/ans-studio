@@ -44,6 +44,7 @@ import type {
   ProjectStateLatestVersionPointer,
   ProjectStateNextStep,
   ProjectStateNote,
+  ProjectStateOpenBlock,
   ProjectStateRunView,
   ProjectStateTask,
   ProjectStateVersion,
@@ -69,6 +70,7 @@ import {
   readWorkflowLedger,
 } from "./workflow-service.ts";
 import { deriveWorkflowView, nextStages } from "./workflow-state.ts";
+import { readOpenBlockProjection } from "./block-ledger.ts";
 import { isVersionedDocPath, versionedDocVersionOf } from "../门禁引擎/versioned-doc-guard.ts";
 
 const FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
@@ -1064,6 +1066,41 @@ export async function buildProjectStateView(
     ? blockersForView.filter((blocker) => blocker.flowId === undefined || blocker.flowId === scope.flowId)
     : blockersForView;
 
+  // ———— open blocks（2026-11-20 block resolver 地基；只读派生，resolved 不展示） ————
+  // 不改变 workflows/tasks 投影；旧项目无 blocks.jsonl ⇒ 字段缺席（兼容）。
+  const blockProjection = await readOpenBlockProjection(projectRoot, {
+    now: new Date(generatedAt),
+    ...(scope.flowId !== undefined ? { flowId: scope.flowId } : {}),
+  });
+  let openBlocks: ProjectStateOpenBlock[] = blockProjection.summaries.map((summary) => ({
+    blockId: summary.blockId,
+    class: summary.class,
+    classCode: summary.classCode,
+    status: summary.status,
+    ...(summary.owner !== undefined ? { owner: summary.owner } : {}),
+    ...(summary.waitingOn !== undefined ? { waitingOn: summary.waitingOn } : {}),
+    ...(summary.ageMs !== undefined ? { ageMs: summary.ageMs } : {}),
+    evidenceRefs: [...summary.evidenceRefs],
+    ...(summary.workflowId !== undefined ? { workflowId: summary.workflowId } : {}),
+    ...(summary.flowId !== undefined ? { flowId: summary.flowId } : {}),
+    ...(summary.stage !== undefined ? { stage: summary.stage } : {}),
+    ...(summary.taskId !== undefined ? { taskId: summary.taskId } : {}),
+    summary: summary.summary,
+    ...(summary.routeKind !== undefined ? { routeKind: summary.routeKind } : {}),
+    ...(summary.routeReason !== undefined ? { routeReason: summary.routeReason } : {}),
+    ...(summary.routeAttempt !== undefined ? { routeAttempt: summary.routeAttempt } : {}),
+    ...(summary.routeTargetRoleId !== undefined ? { routeTargetRoleId: summary.routeTargetRoleId } : {}),
+    ...(summary.routeTaskId !== undefined ? { routeTaskId: summary.routeTaskId } : {}),
+    ...(summary.cardRequestId !== undefined ? { cardRequestId: summary.cardRequestId } : {}),
+  }));
+  if (!full && viewerRoleId !== undefined) {
+    // 角色裁剪：非完整视图只保留焦点 flow / 本人任务 flow 的 block（flowId 缺席的 block 不可判定 ⇒ 不展示）。
+    const allowedBlockFlows = new Set<string>();
+    if (focus.flowId !== undefined) allowedBlockFlows.add(focus.flowId);
+    for (const task of viewerTasks) if (task.flowId !== undefined) allowedBlockFlows.add(task.flowId);
+    openBlocks = openBlocks.filter((block) => block.flowId !== undefined && allowedBlockFlows.has(block.flowId));
+  }
+
   return {
     schema: PROJECT_STATE_SCHEMA,
     generatedAt,
@@ -1079,6 +1116,7 @@ export async function buildProjectStateView(
     errors,
     truncated: flowsTruncated || bounded.truncated || versionsTruncated || evidenceTruncated,
     counts,
+    ...(openBlocks.length > 0 ? { openBlocks } : {}),
   };
 }
 
@@ -1173,6 +1211,17 @@ export function renderProjectStateSummary(
     }
     for (const warning of workflow.warnings.slice(0, 10)) push(`- warning=${shortenSummary(warning, 160)}`);
   }
+  // 2026-11-20（block resolver 地基）：open blocks 可见——等待客户卡/修复任务/升级不是无声暂停。
+  const openBlocks = view.openBlocks ?? workflow?.openBlocks ?? [];
+  if (openBlocks.length > 0) {
+    push(`[blocks] count=${openBlocks.length}`);
+    for (const block of openBlocks.slice(0, 10)) {
+      if (!push(`- #${block.blockId} class=${block.class}(${block.classCode}) status=${block.status} ` +
+        `owner=${block.owner ?? text.none} waitingOn=${block.waitingOn ?? text.none} ageMs=${block.ageMs ?? text.none} ` +
+        `flow=${block.flowId ?? text.none} stage=${block.stage ?? text.none} evidence=${block.evidenceRefs.length} ` +
+        `summary=${shortenSummary(block.summary, 120)}`)) break;
+    }
+  }
   if (view.nextStep !== undefined) {
     push(`[${text.nextStep}] ${text.source}=${view.nextStep.source} text=${shortenSummary(view.nextStep.text, 200)}`);
   }
@@ -1233,6 +1282,8 @@ export interface ProjectStateWorkflowSummary {
   legacyStateIgnored: string[];
   roleActivations: ProjectStateRoleActivation[];
   warnings: string[];
+  /** 2026-11-20（block resolver 地基）：open blocks（raised/routed/escalated；只读派生）。 */
+  openBlocks: ProjectStateOpenBlock[];
 }
 
 /**
@@ -1243,6 +1294,8 @@ export interface ProjectStateWorkflowSummary {
  */
 export async function buildWorkflowStateProjection(input: {
   projectRoot: string;
+  /** 测试/调用方可注入时钟（open block 年龄）；缺省 `new Date()`。 */
+  now?: () => Date;
 }): Promise<ProjectStateWorkflowSummary> {
   const warnings: string[] = [];
   const workflowLedger = await readWorkflowLedger(input.projectRoot);
@@ -1253,6 +1306,31 @@ export async function buildWorkflowStateProjection(input: {
   if (legacy.present) warnings.push(`legacyStateIgnored: ${legacy.ignored.join(",")}（只读忽略，不删除/不迁移）`);
   if (workflowLedger.badLines > 0) warnings.push(`workflow-ledger-bad-lines: ${workflowLedger.badLines}`);
   if (basisLedger.badLines > 0) warnings.push(`basis-ledger-bad-lines: ${basisLedger.badLines}`);
+  const blockProjection = await readOpenBlockProjection(input.projectRoot, {
+    now: (input.now ?? (() => new Date()))(),
+  });
+  if (blockProjection.badLines > 0) warnings.push(`block-ledger-bad-lines: ${blockProjection.badLines}`);
+  const openBlocks: ProjectStateOpenBlock[] = blockProjection.summaries.map((summary) => ({
+    blockId: summary.blockId,
+    class: summary.class,
+    classCode: summary.classCode,
+    status: summary.status,
+    ...(summary.owner !== undefined ? { owner: summary.owner } : {}),
+    ...(summary.waitingOn !== undefined ? { waitingOn: summary.waitingOn } : {}),
+    ...(summary.ageMs !== undefined ? { ageMs: summary.ageMs } : {}),
+    evidenceRefs: [...summary.evidenceRefs],
+    ...(summary.workflowId !== undefined ? { workflowId: summary.workflowId } : {}),
+    ...(summary.flowId !== undefined ? { flowId: summary.flowId } : {}),
+    ...(summary.stage !== undefined ? { stage: summary.stage } : {}),
+    ...(summary.taskId !== undefined ? { taskId: summary.taskId } : {}),
+    summary: summary.summary,
+    ...(summary.routeKind !== undefined ? { routeKind: summary.routeKind } : {}),
+    ...(summary.routeReason !== undefined ? { routeReason: summary.routeReason } : {}),
+    ...(summary.routeAttempt !== undefined ? { routeAttempt: summary.routeAttempt } : {}),
+    ...(summary.routeTargetRoleId !== undefined ? { routeTargetRoleId: summary.routeTargetRoleId } : {}),
+    ...(summary.routeTaskId !== undefined ? { routeTaskId: summary.routeTaskId } : {}),
+    ...(summary.cardRequestId !== undefined ? { cardRequestId: summary.cardRequestId } : {}),
+  }));
 
   const workflowIds: string[] = [];
   for (const event of workflowLedger.events) if (!workflowIds.includes(event.workflowId)) workflowIds.push(event.workflowId);
@@ -1313,5 +1391,6 @@ export async function buildWorkflowStateProjection(input: {
     legacyStateIgnored: [...legacy.ignored],
     roleActivations,
     warnings,
+    openBlocks,
   };
 }

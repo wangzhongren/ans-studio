@@ -122,6 +122,12 @@ import {
   verifyBasisDocuments,
 } from "./basis-guard.ts";
 import { stageRequestIdempotencyKey, stageStopIdempotencyKey } from "./workflow-dispatch.ts";
+import {
+  blockFactFromReconcileReceipt,
+  blockFactFromServiceFailure,
+  type BlockFact,
+  type BlockDispatchRejectionInput,
+} from "./block-resolution.ts";
 
 // —————————————— 账本路径 / schema / 轮转 ——————————————
 
@@ -685,15 +691,52 @@ function activeWorkflowIdsOf(events: readonly WorkflowEvent[]): string[] {
   });
 }
 
-export type WorkflowServiceFailure = { ok: false; code: string; message: string; missing?: string[] };
+export type WorkflowServiceFailure = {
+  ok: false;
+  code: string;
+  message: string;
+  missing?: string[];
+  /**
+   * 2026-11-20（block resolver 地基）：可序列化的 block 事实（供桌面 router 消费）。
+   * 只做事实出口——本服务**不调用 resolver、不写 blocks 账本**，现有阶段/收口/错误码语义不变。
+   */
+  blockFact?: BlockFact;
+};
 
 function serviceFailure(code: string, message: string, missing?: string[]): WorkflowServiceFailure {
   return { ok: false, code, message, ...(missing !== undefined ? { missing } : {}) };
 }
 
-function viewFailure(view: WorkflowView): WorkflowServiceFailure | undefined {
+type BlockFailureContext = Omit<BlockDispatchRejectionInput, "code" | "message">;
+
+/** 携带 block 事实的服务拒绝（错误码/消息保持不变；额外附 `blockFact`）。 */
+function blockServiceFailure(
+  context: BlockFailureContext,
+  code: string,
+  message: string,
+  missing?: string[],
+): WorkflowServiceFailure {
+  return {
+    ...serviceFailure(code, message, missing),
+    blockFact: blockFactFromServiceFailure({ ...context, code, message }),
+  };
+}
+
+function viewFailure(view: WorkflowView, protocol: WorkflowProtocol = WORKFLOW_PROTOCOL_FIXED_V2_1): WorkflowServiceFailure | undefined {
   if (view.blocked?.code === WORKFLOW_CORRUPT_CODE) {
-    return serviceFailure(WORKFLOW_CORRUPT_CODE, `工作流账本损坏：${view.blocked.summary}（不猜、不自动推进）`);
+    return blockServiceFailure(
+      {
+        protocol,
+        workflowId: view.workflowId,
+        flowId: view.flowId,
+        stage: view.stage,
+        source: "workflow-service.viewFailure",
+        detailCode: "protocol-conflict",
+        engineCanRepair: true,
+      },
+      WORKFLOW_CORRUPT_CODE,
+      `工作流账本损坏：${view.blocked.summary}（不猜、不自动推进）`,
+    );
   }
   return undefined;
 }
@@ -757,15 +800,27 @@ export type StageRequestResult = ({ ok: true } & StageRequestReceipt) | Workflow
  */
 export async function requestStage(input: StageRequestInput): Promise<StageRequestResult> {
   const now = input.now ?? (() => new Date());
+  const fail = (code: string, message: string, missing?: string[]): WorkflowServiceFailure =>
+    blockServiceFailure(
+      {
+        protocol: WORKFLOW_PROTOCOL_FIXED_V2_1,
+        source: "workflow-service.requestStage",
+        ...(isWorkflowStage(input.stage) ? { stage: input.stage } : {}),
+        ...(typeof input.workflowId === "string" && input.workflowId !== "" ? { workflowId: input.workflowId } : {}),
+      },
+      code,
+      message,
+      missing,
+    );
   const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
-  if (!isWorkflowSlug(flowId)) return serviceFailure("stage-request-invalid", `flowId 非法（须小写 slug）：${String(input.flowId)}`);
-  if (!isWorkflowStage(input.stage)) return serviceFailure("stage-request-invalid", `stage 非法：${String(input.stage)}`);
-  if (!isNonEmptyText(input.text)) return serviceFailure("stage-request-invalid", "stage-request 任务文本不得为空。");
+  if (!isWorkflowSlug(flowId)) return fail("stage-request-invalid", `flowId 非法（须小写 slug）：${String(input.flowId)}`);
+  if (!isWorkflowStage(input.stage)) return fail("stage-request-invalid", `stage 非法：${String(input.stage)}`);
+  if (!isNonEmptyText(input.text)) return fail("stage-request-invalid", "stage-request 任务文本不得为空。");
   if (!isSha256Hex(input.requestDigest)) {
-    return serviceFailure("stage-request-invalid", "requestDigest 非法：必须是请求文本的 64 hex SHA-256（应用计算）。");
+    return fail("stage-request-invalid", "requestDigest 非法：必须是请求文本的 64 hex SHA-256（应用计算）。");
   }
   if (!isNonEmptyText(input.sourceTaskId)) {
-    return serviceFailure(
+    return fail(
       "stage-request-source-missing",
       "stage-request 未创建：缺少 chief 当前真实客户轮次（sourceTaskId 由 host 捕获，不可模型自报）。",
       ["sourceTaskId"],
@@ -773,7 +828,7 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   }
   const action: WorkflowAction = input.workflowAction ?? "advance";
   if (action !== "advance" && action !== "stop") {
-    return serviceFailure("stage-request-invalid", `workflowAction 非法：${String(action)}`);
+    return fail("stage-request-invalid", `workflowAction 非法：${String(action)}`);
   }
 
   const ledger = await readWorkflowLedger(input.projectRoot);
@@ -792,15 +847,15 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
       if (action === "advance" && activeForFlowAll.length === 0) {
         workflowId = undefined;
       } else {
-        return serviceFailure("workflow-not-found", `workflow ${workflowId} 不存在（账本无记录）。`);
+        return fail("workflow-not-found", `workflow ${workflowId} 不存在（账本无记录）。`);
       }
     } else if (!list.some((event) => event.kind === "workflow.started")) {
-      return serviceFailure(WORKFLOW_CORRUPT_CODE, `workflow ${workflowId} 缺少 workflow.started（关键事件缺失，不猜）。`);
+      return fail(WORKFLOW_CORRUPT_CODE, `workflow ${workflowId} 缺少 workflow.started（关键事件缺失，不猜）。`);
     }
   } else {
     const activeForFlow = activeForFlowAll;
     if (activeForFlow.length > 1) {
-      return serviceFailure("workflow-active-conflict", `flow ${flowId} 存在多个活动 fixed workflow；不猜。`);
+      return fail("workflow-active-conflict", `flow ${flowId} 存在多个活动 fixed workflow；不猜。`);
     }
     workflowId = activeForFlow[0];
   }
@@ -809,29 +864,29 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   let resolvedPath: WorkflowPath;
   if (startingNew) {
     if (action === "stop") {
-      return serviceFailure("workflow-not-found", `flow ${flowId} 没有活动 fixed workflow（stop 需活动 workflow）。`);
+      return fail("workflow-not-found", `flow ${flowId} 没有活动 fixed workflow（stop 需活动 workflow）。`);
     }
     if (!isWorkflowPath(input.workflowPath)) {
-      return serviceFailure("stage-request-invalid", "首次 advance 请求必须给出 workflowPath（A/B）。");
+      return fail("stage-request-invalid", "首次 advance 请求必须给出 workflowPath（A/B）。");
     }
     resolvedPath = input.workflowPath;
     const otherActive = active.filter((id) => !workflowEventList(events, id).some((event) => event.flowId === flowId));
     if (otherActive.length > 0) {
-      return serviceFailure(
+      return fail(
         "workflow-workspace-busy",
         `项目已有活动 fixed workflow（${otherActive[0]}）；每项目同时至多一个活动 fixed workflow。`,
       );
     }
     const firstStage: WorkflowStage = resolvedPath === "B" ? "B1" : "A1";
     if (input.stage !== firstStage) {
-      return serviceFailure(
+      return fail(
         "stage-transition-invalid",
         `新 workflow 的首个阶段必须是 ${firstStage}（收到 ${input.stage}）；不原地跳阶段。`,
       );
     }
     const computed = workflowIdFor(flowId, resolvedPath, input.sourceTaskId, input.requestDigest);
     if (input.workflowId !== undefined && input.workflowId !== computed) {
-      return serviceFailure(
+      return fail(
         "stage-request-invalid",
         `首请求 workflowId 必须是确定性计算值 ${computed}（收到 ${input.workflowId}；不采信模型自报）。`,
       );
@@ -839,14 +894,14 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
     workflowId = computed;
   } else {
     const first = workflowEventList(events, workflowId!).find((event) => event.kind === "workflow.started");
-    if (first === undefined) return serviceFailure(WORKFLOW_CORRUPT_CODE, `workflow ${workflowId} 缺少 workflow.started。`);
+    if (first === undefined) return fail(WORKFLOW_CORRUPT_CODE, `workflow ${workflowId} 缺少 workflow.started。`);
     if (first.flowId !== flowId) {
-      return serviceFailure("workflow-active-conflict", `workflow ${workflowId} 属于 flow ${first.flowId}，与请求 flow ${flowId} 不一致。`);
+      return fail("workflow-active-conflict", `workflow ${workflowId} 属于 flow ${first.flowId}，与请求 flow ${flowId} 不一致。`);
     }
     resolvedPath = first.path;
   }
   if (workflowId === undefined) {
-    return serviceFailure(WORKFLOW_CORRUPT_CODE, "workflowId 解析失败（不猜）");
+    return fail(WORKFLOW_CORRUPT_CODE, "workflowId 解析失败（不猜）");
   }
   const resolvedWorkflowId: string = workflowId;
   const wfEvents = workflowEventList(events, resolvedWorkflowId);
@@ -854,7 +909,16 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   // （含 advance/stop/重放）。在任何账本/任务写入之前 fail-closed（旧 fixed-v2.1/legacy 逐字不变）。
   const startedForProtocol = wfEvents.find((event) => event.kind === "workflow.started");
   if (startedForProtocol !== undefined && workflowProtocolOf(startedForProtocol) === WORKFLOW_PROTOCOL_APP_DISPATCH) {
-    return serviceFailure(
+    return blockServiceFailure(
+      {
+        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+        workflowId: resolvedWorkflowId,
+        flowId,
+        stage: input.stage,
+        source: "workflow-service.requestStage",
+        detailCode: "protocol-conflict",
+        engineCanRepair: true,
+      },
       "stage-request-removed",
       `workflow ${resolvedWorkflowId} 使用 app-dispatch/v1（应用侧流程驱动）；旧 stage-request 已移除，不写任何事件/任务。`,
     );
@@ -866,7 +930,7 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
     const corrupted = viewFailure(view);
     if (corrupted !== undefined) return corrupted;
     if (view.closed !== undefined) {
-      return serviceFailure("workflow-closed", `workflow ${resolvedWorkflowId} 已关闭（${view.closed.outcome}），不再接受请求。`);
+      return fail("workflow-closed", `workflow ${resolvedWorkflowId} 已关闭（${view.closed.outcome}），不再接受请求。`);
     }
   }
 
@@ -878,7 +942,7 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   // 不建任务，B1 completed/B2 pending 保持不变，并给出可直接执行的下一步（直接发 B3 advance）。
   // 首次 B2 请求（新 workflow）仍由上面的「首阶段必须 B1」拒绝；Path A/legacy/stop/rework 不经过本检查。
   if (resolvedPath === "B" && input.stage === "B2" && action === "advance") {
-    return serviceFailure(
+    return fail(
       "b2-stage-request-forbidden",
       "路径 B 不发 B2 stage-request；B1 完成后直接发 B3 advance stage-request（应用在受理 B3 时记录 B2 change.scope-decided）；B2 保持 pending。",
     );
@@ -933,7 +997,8 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
     && isStageRequestTask(record.created)
     && record.closed === undefined);
   if (openAdvance !== undefined) {
-    return serviceFailure(
+    return blockServiceFailure(
+      { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", detailCode: "protocol-conflict" },
       "stage-request-open",
       `${action === "stop" ? "stop 之前必须" : "下一 advance 之前必须"}收口当前 open advance 请求（${openAdvance.taskId}）；否则 stage-request-open。`,
     );
@@ -943,14 +1008,16 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   let idempotencyKey: string;
   if (action === "advance") {
     if (view !== undefined && !canRequestStage(view, input.stage)) {
-      return serviceFailure(
+      return blockServiceFailure(
+        { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", stateConflict: true },
         "stage-transition-invalid",
         `stage 转移非法：当前 ${view.stage}(${view.stages[view.stage].status}) 不允许推进 ${input.stage}（A10 未完成发 A11 等均拒绝）。`,
       );
     }
     // AC-09/G-1（实施前写标准）：A11 stage-request 派发实现前，A12a criteria 必须已创建（不得 pending）。
     if (view !== undefined && input.stage === "A11" && view.stages.A12a.status === "pending") {
-      return serviceFailure(
+      return blockServiceFailure(
+        { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", stateConflict: true },
         "stage-transition-invalid",
         "A11 派发前必须先创建 A12a criteria 任务（AC-09：实施前写标准）。",
       );
@@ -960,14 +1027,19 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
       .map((event) => (event.kind === "stage.requested" ? event.attempt : 0));
     attempt = input.attempt ?? (priorAttempts.length === 0 ? 1 : Math.max(...priorAttempts) + 1);
     if (!Number.isSafeInteger(attempt) || attempt < 1) {
-      return serviceFailure("stage-request-invalid", `attempt 非法：${String(attempt)}`);
+      return blockServiceFailure(
+        { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", detailCode: "parameter-misuse" },
+        "stage-request-invalid",
+        `attempt 非法：${String(attempt)}`,
+      );
     }
     idempotencyKey = stageRequestIdempotencyKey(resolvedWorkflowId, input.stage, attempt);
   } else {
     const priorStops = wfEvents.filter((event) => event.kind === "workflow.stop-requested").length;
     // stop 的 stage 必须是当前阶段（application 核验；不猜）。
     if (view !== undefined && (view.stage !== input.stage || view.stopping === true)) {
-      return serviceFailure(
+      return blockServiceFailure(
+        { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", stateConflict: true },
         "stage-transition-invalid",
         `stop 请求阶段非法：当前 ${view.stage}(${view.stages[view.stage].status})，请求 ${input.stage}${view.stopping === true ? "（stop 已在办）" : ""}。`,
       );
@@ -1121,35 +1193,68 @@ export async function recordStageDispatch(input: {
   now?: () => Date;
 }): Promise<{ ok: true; replay: boolean } | WorkflowServiceFailure> {
   const now = input.now ?? (() => new Date());
+  const fail = (code: string, message: string, missing?: string[]): WorkflowServiceFailure =>
+    blockServiceFailure(
+      {
+        protocol: WORKFLOW_PROTOCOL_FIXED_V2_1,
+        source: "workflow-service.recordStageDispatch",
+        ...(isNonEmptyText(input.workflowId) ? { workflowId: input.workflowId } : {}),
+        ...(isWorkflowStage(input.stage) ? { stage: input.stage } : {}),
+        ...(isNonEmptyText(input.taskId) ? { taskId: input.taskId } : {}),
+      },
+      code,
+      message,
+      missing,
+    );
   if (!isNonEmptyText(input.workflowId) || !isNonEmptyText(input.taskId) || !isNonEmptyText(input.targetRoleId)) {
-    return serviceFailure("stage-request-invalid", "recordStageDispatch 缺少 workflowId/taskId/targetRoleId。");
+    return fail("stage-request-invalid", "recordStageDispatch 缺少 workflowId/taskId/targetRoleId。");
   }
-  if (!isWorkflowStage(input.stage)) return serviceFailure("stage-request-invalid", `stage 非法：${String(input.stage)}`);
+  if (!isWorkflowStage(input.stage)) return fail("stage-request-invalid", `stage 非法：${String(input.stage)}`);
   const ledger = await readWorkflowLedger(input.projectRoot);
   const wfEvents = workflowEventList(ledger.events, input.workflowId);
   const started = wfEvents.find((event) => event.kind === "workflow.started");
   if (started === undefined) {
-    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+    return fail("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
   }
   // 2026-11-18（收尾修补）：app-dispatch/v1 的 stage.dispatched 只由应用驱动写（含 issuedBy/
   // executorKind）；旧入口 fail-closed，不写任何事件。
   if (workflowProtocolOf(started) === WORKFLOW_PROTOCOL_APP_DISPATCH) {
-    return serviceFailure(
+    return blockServiceFailure(
+      {
+        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+        workflowId: input.workflowId,
+        stage: input.stage,
+        taskId: input.taskId,
+        source: "workflow-service.recordStageDispatch",
+        detailCode: "protocol-conflict",
+      },
       "workflow-protocol-mismatch",
       `workflow ${input.workflowId} 使用 app-dispatch/v1；stage.dispatched 由应用驱动记录，旧 recordStageDispatch 入口拒绝。`,
     );
   }
   const tasks = await readTaskState(input.projectRoot);
   const task = tasks.records.get(input.taskId);
-  if (task?.created === undefined) return serviceFailure("stage-request-required", `任务 ${input.taskId} 不存在。`);
+  if (task?.created === undefined) return fail("stage-request-required", `任务 ${input.taskId} 不存在。`);
   if (task.created.workflowId !== input.workflowId || task.created.stage !== input.stage || task.created.to !== input.targetRoleId) {
-    return serviceFailure("stage-workflow-mismatch", `任务 ${input.taskId} 的 workflow/stage/受派人与派发事实不一致。`);
+    return fail("stage-workflow-mismatch", `任务 ${input.taskId} 的 workflow/stage/受派人与派发事实不一致。`);
   }
   const view = deriveWorkflowView(wfEvents, tasks.events);
   const vf = viewFailure(view);
   if (vf !== undefined) return vf;
   if (!canDispatchStage(view, input.stage)) {
-    return serviceFailure("stage-transition-invalid", `stage.dispatched 非法：当前 ${view.stage}(${view.stages[view.stage].status}) → ${input.stage}。`);
+    return blockServiceFailure(
+      {
+        protocol: WORKFLOW_PROTOCOL_FIXED_V2_1,
+        workflowId: input.workflowId,
+        flowId: view.flowId,
+        stage: input.stage,
+        taskId: input.taskId,
+        source: "workflow-service.recordStageDispatch",
+        stateConflict: true,
+      },
+      "stage-transition-invalid",
+      `stage.dispatched 非法：当前 ${view.stage}(${view.stages[view.stage].status}) → ${input.stage}。`,
+    );
   }
   const event: WorkflowEvent = {
     v: 1,
@@ -4633,7 +4738,7 @@ async function loadAppDispatchContext(
   }
   const taskState = await readTaskState(projectRoot);
   const view = deriveWorkflowView(wfEvents, taskState.events);
-  const vf = viewFailure(view);
+  const vf = viewFailure(view, WORKFLOW_PROTOCOL_APP_DISPATCH);
   if (vf !== undefined) return vf;
   if (view.closed !== undefined) {
     return serviceFailure("workflow-closed", `workflow ${workflowId} 已关闭（${view.closed.outcome}），不再驱动。`);
@@ -4808,10 +4913,40 @@ interface PlannedAppDispatchTask {
   readonly card?: WorkflowCardDefinition;
 }
 
-/** 验证角色解析（Q3）：roster `roles[].review===true` 优先，否则内置 verifier（不采信模型自报）。 */
-async function resolveAppDispatchReviewRole(projectRoot: string, flowId: string): Promise<string> {
-  const roster = await loadLatestRoster({ projectRoot, flowId });
-  return roster.ok === true ? reviewRoleIdOfRoster(roster.roster) : DEFAULT_REVIEW_ROLE_ID;
+type AppDispatchReviewRoleResolution =
+  | { ok: true; roleId: string }
+  | { ok: false; reason: string; blockFact: BlockFact };
+
+/**
+ * 验收角色解析（Q3）：roster `roles[].review===true` 优先，否则内置 verifier（不采信模型自报）。
+ * 2026-11-20（block resolver 地基）：**名单不可读不再静默回落 verifier**——返回明确歧义事实
+ * （`review-role-unavailable` + blockFact，B1 属主修复），由 resolver 路由；测试批覆盖。
+ */
+async function resolveAppDispatchReviewRole(input: {
+  projectRoot: string;
+  flowId: string;
+  workflowId: string;
+  stage: WorkflowStage;
+}): Promise<AppDispatchReviewRoleResolution> {
+  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId: input.flowId });
+  if (roster.ok !== true) {
+    return {
+      ok: false,
+      reason: `${roster.code}: ${roster.reason}`,
+      blockFact: blockFactFromServiceFailure({
+        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+        code: "review-role-unavailable",
+        detailCode: "roster-unreadable",
+        message: `名单不可读（${roster.code}）；不再静默回落 verifier（供 resolver 路由属主修复）。`,
+        workflowId: input.workflowId,
+        flowId: input.flowId,
+        stage: input.stage,
+        source: "workflow-service.resolveAppDispatchReviewRole",
+        ownerRoleId: "rapporteur",
+      }),
+    };
+  }
+  return { ok: true, roleId: reviewRoleIdOfRoster(roster.roster) };
 }
 
 /** 按定义规划本阶段任务（主任务一个；B1 的 rapporteur 分支由应用按 B1 报告另行直派）。 */
@@ -4828,7 +4963,21 @@ async function planAppDispatchStageTasks(input: {
     let to: string;
     let executorKind: WorkflowStageExecutorKind;
     if (defStage.executor === "review") {
-      to = await resolveAppDispatchReviewRole(input.projectRoot, input.flowId);
+      const resolved = await resolveAppDispatchReviewRole({
+        projectRoot: input.projectRoot,
+        flowId: input.flowId,
+        workflowId: input.workflowId,
+        stage: input.stage,
+      });
+      if (resolved.ok !== true) {
+        return {
+          ok: false,
+          code: "review-role-unavailable",
+          message: `阶段 ${input.stage} 验收角色不可解析：${resolved.reason}（名单不可读不再静默回落 verifier；交 block resolver 路由）。`,
+          blockFact: resolved.blockFact,
+        };
+      }
+      to = resolved.roleId;
       executorKind = "review";
     } else {
       const role = defStage.executorRole;
@@ -5359,7 +5508,7 @@ export async function driveAppDispatchStage(input: DriveAppDispatchStageInput): 
   const afterLedger = await readWorkflowLedger(input.projectRoot);
   const afterTasks = await readTaskState(input.projectRoot);
   let afterView = deriveWorkflowView(workflowEventList(afterLedger.events, input.workflowId), afterTasks.events);
-  const vfAfter = viewFailure(afterView);
+  const vfAfter = viewFailure(afterView, WORKFLOW_PROTOCOL_APP_DISPATCH);
   if (vfAfter !== undefined) return vfAfter;
   for (const receipt of receipts) {
     const dispatchKey = `stage-dispatch:${input.workflowId}:${targetStage}:${receipt.taskId}`;
@@ -5431,6 +5580,11 @@ export interface ObserveAppDispatchTaskReportReceipt {
   stageCompleted: boolean;
   retried?: { stage: WorkflowStage; attempt: number };
   blocked?: { retryBudgetExhausted: boolean; highRiskNoRedispatch: boolean };
+  /**
+   * 2026-11-20（block resolver 地基）：重试耗尽/高风险零重派时的事实出口（B9/B4；
+   * `onExhausted` v2 语义 = route-block-resolver）。本服务不写 blocks 账本，由桌面 router 消费。
+   */
+  blockFact?: BlockFact;
   /**
    * 2026-11-18（收尾修补）：显式 rework 收口成功后的返工事实（写 `stage.reworked`；
    * `reworkOf`=被返工阶段、`stage`=回落目标、`attempt`=回落阶段新尝试）。由桌面后续 advance 驱动，
@@ -5575,6 +5729,7 @@ export async function observeAppDispatchTaskReport(
   const attempt = Math.max(1, context.view.stages[stage].attempt);
   let retried: { stage: WorkflowStage; attempt: number } | undefined;
   let blocked: { retryBudgetExhausted: boolean; highRiskNoRedispatch: boolean } | undefined;
+  let blockedBlockFact: BlockFact | undefined;
   let reworked: { reworkOf: WorkflowStage; stage: WorkflowStage; attempt: number } | undefined;
   if (outcome === "rework") {
     // 2026-11-18（收尾修补）：rework 成功即成功回执——closeTask 已写 `stage.reworked`（A12b→A11）；
@@ -5594,6 +5749,21 @@ export async function observeAppDispatchTaskReport(
       retried = { stage, attempt: driveResult.attempt };
     } else {
       blocked = { retryBudgetExhausted: attempt > defStage.retry.autoRetries, highRiskNoRedispatch: highRisk };
+      // block resolver 事实出口：高风险零重派 ⇒ B4（客户主权）；预算耗尽 ⇒ B9（judge/客户）。
+      blockedBlockFact = blockFactFromServiceFailure({
+        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+        code: highRisk ? "high-risk-blocked" : "retry-budget-exhausted",
+        message: highRisk
+          ? `阶段 ${stage} 高风险零重派（Q8）；blocked 交 block resolver 路由（客户主权，judge 不可代批）。`
+          : `阶段 ${stage} 自动重试预算已耗尽（autoRetries=${defStage.retry.autoRetries}）；blocked 交 block resolver 路由。`,
+        workflowId,
+        flowId: context.view.flowId,
+        stage,
+        taskId: input.taskId,
+        attempts: attempt,
+        ...(highRisk ? { highRisk: true } : {}),
+        source: "workflow-service.observeAppDispatchTaskReport",
+      });
     }
   }
   return {
@@ -5606,6 +5776,7 @@ export async function observeAppDispatchTaskReport(
     stageCompleted,
     ...(retried !== undefined ? { retried } : {}),
     ...(blocked !== undefined ? { blocked } : {}),
+    ...(blockedBlockFact !== undefined ? { blockFact: blockedBlockFact } : {}),
     ...(reworked !== undefined ? { reworked } : {}),
     replay: closed.replay,
   };
@@ -5710,6 +5881,11 @@ export interface ReconcileWorkflowReceipt {
   errors: string[];
   corrupt?: string;
   skipped?: string;
+  /**
+   * 2026-11-20（block resolver 地基）：corrupt/errors 的可序列化 block 事实（B6 输入；
+   * 桌面 router 消费，本服务不写 blocks 账本）。
+   */
+  blockFacts?: BlockFact[];
 }
 
 export interface ReconcileFixedWorkflowReceipt {
@@ -5776,7 +5952,7 @@ export async function reconcileFixedWorkflow(input: {
     }
     let taskState = await readTaskState(input.projectRoot);
     let view = deriveWorkflowView(wfEvents, taskState.events);
-    const vf = viewFailure(view);
+    const vf = viewFailure(view, WORKFLOW_PROTOCOL_APP_DISPATCH);
     if (vf !== undefined) {
       receipt.corrupt = vf.message;
       continue;
@@ -5802,7 +5978,7 @@ export async function reconcileFixedWorkflow(input: {
     const ledgerAfter = await readWorkflowLedger(input.projectRoot);
     taskState = await readTaskState(input.projectRoot);
     view = deriveWorkflowView(workflowEventList(ledgerAfter.events, workflowId), taskState.events);
-    const vfAfter = viewFailure(view);
+    const vfAfter = viewFailure(view, WORKFLOW_PROTOCOL_APP_DISPATCH);
     if (vfAfter !== undefined) {
       receipt.corrupt = vfAfter.message;
       continue;
@@ -5843,6 +6019,17 @@ export async function reconcileFixedWorkflow(input: {
     }
     // 2026-11-18（收尾修补）：任何 corrupt 结论都不得与 driven 同时出现（避免调用方误判为已修复）。
     if (receipt.corrupt !== undefined) delete receipt.driven;
+  }
+  // 2026-11-20（block resolver 地基）：corrupt/errors ⇒ 可序列化 block 事实（B6；不改变 reconcile 结论）。
+  for (const receipt of workflows) {
+    const facts = blockFactFromReconcileReceipt({
+      workflowId: receipt.workflowId,
+      protocol: receipt.protocol,
+      ...(receipt.stage !== undefined ? { stage: receipt.stage } : {}),
+      ...(receipt.corrupt !== undefined ? { corrupt: receipt.corrupt } : {}),
+      errors: receipt.errors,
+    });
+    if (facts.length > 0) receipt.blockFacts = [...facts];
   }
   return { ok: true, workflows };
 }
