@@ -476,3 +476,70 @@ test("AC-8：轮转丢失 focus 事件后回退 derived/none（不伪造 focus�
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
+
+test("S3 地基：request 生命周期按最后一条为准——orphaned→presented 恢复等待；presented→orphaned 终态；resolved 最终态", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-project-state-request-lifecycle-"));
+  const flow = "lifecycle";
+  const createRequest = (requestId: string, at: string, extra: Record<string, unknown> = {}) => taskEvent("request.created", {
+    requestId,
+    flowId: flow,
+    cardKind: "decision",
+    sourceRoleId: "convener",
+    title: `请求 ${requestId}`,
+    options: [{ id: "a", label: "A" }],
+    ...extra,
+  }, () => new Date(at));
+  try {
+    await writeManifest(root, manifest(flow, "run-20261120-lifecycle-aaaaaaaa"));
+
+    // A) created → orphaned → presented ⇒ 恢复等待（request-pending 可见，pendingRequests=1）。
+    await appendTaskEvent(root, createRequest("req-reopen", "2026-11-20T00:00:00.000Z"));
+    await appendTaskEvent(root, taskEvent("request.orphaned", { requestId: "req-reopen", reason: "restart" },
+      () => new Date("2026-11-20T00:00:01.000Z")));
+    let view = await buildProjectStateView(root);
+    assert.equal(view.counts.pendingRequests, 0, "orphaned 当时不显示待决");
+    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-reopen"), false);
+    await appendTaskEvent(root, taskEvent("request.presented", { requestId: "req-reopen", to: "customer" },
+      () => new Date("2026-11-20T00:00:02.000Z")));
+    view = await buildProjectStateView(root);
+    assert.equal(view.counts.pendingRequests, 1, "presented 晚于 orphaned ⇒ 恢复等待");
+    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-reopen"), true,
+      "恢复后 request-pending 可见（客户可答）");
+
+    // B) created → orphaned → created（回归：新 created 清除旧 orphaned；携带 supersedesOrphanAt 同样等待）。
+    await appendTaskEvent(root, createRequest("req-recreated", "2026-11-20T00:00:03.000Z"));
+    await appendTaskEvent(root, taskEvent("request.orphaned", { requestId: "req-recreated", reason: "restart" },
+      () => new Date("2026-11-20T00:00:04.000Z")));
+    await appendTaskEvent(root, createRequest("req-recreated", "2026-11-20T00:00:05.000Z",
+      { supersedesOrphanAt: "2026-11-20T00:00:04.000Z" }));
+    view = await buildProjectStateView(root);
+    assert.equal(view.counts.pendingRequests, 2, "同 requestId 新 created 清除旧 orphaned（含 supersedesOrphanAt）");
+    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-recreated"), true);
+
+    // C) created → presented → orphaned ⇒ orphan 终态（0；presented 之后的 orphaned 重新生效）。
+    await appendTaskEvent(root, createRequest("req-orphan-final", "2026-11-20T00:00:06.000Z"));
+    await appendTaskEvent(root, taskEvent("request.presented", { requestId: "req-orphan-final", to: "customer" },
+      () => new Date("2026-11-20T00:00:07.000Z")));
+    await appendTaskEvent(root, taskEvent("request.orphaned", { requestId: "req-orphan-final", reason: "superseded" },
+      () => new Date("2026-11-20T00:00:08.000Z")));
+    view = await buildProjectStateView(root);
+    assert.equal(view.counts.pendingRequests, 2, "presented 之后的 orphaned 生效（终态，不计待决）");
+    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-orphan-final"), false);
+
+    // D) resolved 最终态：created → orphaned → presented → resolved ⇒ 不再等待。
+    await appendTaskEvent(root, createRequest("req-resolved", "2026-11-20T00:00:09.000Z"));
+    await appendTaskEvent(root, taskEvent("request.orphaned", { requestId: "req-resolved", reason: "restart" },
+      () => new Date("2026-11-20T00:00:10.000Z")));
+    await appendTaskEvent(root, taskEvent("request.presented", { requestId: "req-resolved", to: "customer" },
+      () => new Date("2026-11-20T00:00:11.000Z")));
+    await appendTaskEvent(root, taskEvent("request.resolved", {
+      requestId: "req-resolved", by: "customer", choice: "a", selectedOptionIds: ["a"],
+    }, () => new Date("2026-11-20T00:00:12.000Z")));
+    view = await buildProjectStateView(root);
+    assert.equal(view.counts.pendingRequests, 2, "resolved 是最终态（不再等待；其余两个仍在等待）");
+    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-resolved"), false);
+    assert.equal(view.errors.length, 0, JSON.stringify(view.errors));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});

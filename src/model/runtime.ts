@@ -1600,6 +1600,14 @@ export interface RequestCreatedEvent extends TaskStateEventBase {
    * （不一致 ⇒ `card-prompt-mismatch`，不发卡、不写记录）。旧卡无此字段（旧行为不变）。
    */
   promptId?: string;
+  /**
+   * 2026-11-20（SMOKE-3 S3 地基）：**同一 requestId 重新呈现**的显式取代事实。
+   * 应用在 `request.orphaned`（restart 等）之后以同 requestId 重投/重呈现时，新的
+   * `request.created` 携带**被取代 orphan 事件的 `at` 原文**（非空、可解析时间戳）；
+   * 首次创建与旧记录无此字段（兼容读取）。消费者据此区分「取代后重新等待」与
+   * 「历史 orphan 粘性」，不得把已被取代的 orphan 当作终态。
+   */
+  supersedesOrphanAt?: string;
   sourceRoleId: string;
   title: string;
   context?: string;

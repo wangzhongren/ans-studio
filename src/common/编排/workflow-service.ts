@@ -5661,6 +5661,14 @@ export interface DriveAppDispatchStageReceipt {
   dispatched: boolean;
   completed: boolean;
   replay: boolean;
+  /**
+   * 2026-11-20（SMOKE-3 S3 地基）：有界等待回执（如 A3 卡 prompt 的前置入口
+   * `docs/intents/<intentId>.md` 尚未落盘）。**成功形态、不是失败**：
+   * 检查发生在 stage.requested 等第一笔写之前 ⇒ `tasks=[]`、`requested/dispatched/completed=false`、
+   * 不写任何 workflow/task 事件、不产生 blockFact；入口出现后下一次 drive 正常走既有路径
+   * （等待期间重复 drive 仍为零事件幂等）。
+   */
+  waiting?: { code: string; message: string };
 }
 
 export type DriveAppDispatchStageResult = ({ ok: true } & DriveAppDispatchStageReceipt) | WorkflowServiceFailure;
@@ -5741,7 +5749,27 @@ async function driveAppDispatchStageLocked(input: DriveAppDispatchStageInput): P
     defStage,
     attempt,
   });
-  if (plan.ok !== true) return plan;
+  if (plan.ok !== true) {
+    // 2026-11-20（SMOKE-3 S3 地基）：卡 prompt 事实计算的入口前置检查（`docs/intents/<intentId>.md`，
+    // computeAppDispatchCardPrompt 的唯一 intent-entry-missing 出口）尚未就绪 ⇒ **有界等待回执**：
+    // 成功形态、零事件/零任务/不产生 blockFact（检查先于 stage.requested 第一笔写）。
+    // 入口出现后下一次 drive 走既有路径；等待期间重复 drive 仍返回等待、零事件。
+    if (plan.code === "intent-entry-missing") {
+      return {
+        ok: true,
+        workflowId: input.workflowId,
+        stage: targetStage,
+        attempt,
+        tasks: [],
+        requested: false,
+        dispatched: false,
+        completed: false,
+        replay: false,
+        waiting: { code: plan.code, message: plan.message },
+      };
+    }
+    return plan;
+  }
   const primary = plan.tasks[0];
   if (primary === undefined) return serviceFailure("workflow-definition-unknown", `阶段 ${targetStage} 任务计划为空（定义非法）。`);
 
@@ -6705,16 +6733,20 @@ export async function reconcileFixedWorkflow(input: {
         const driven = await driveAppDispatchStageLocked({ projectRoot: input.projectRoot, workflowId, stage: view.stage, now });
         if (driven.ok === true) {
           workflowReceipt.driven = driven;
-          const requestEvent = workflowEventList(ledgerAfter.events, workflowId).find(
-            (event): event is StageRequestedView =>
-              event.kind === "stage.requested" && event.stage === view.stage
-              && event.attempt === view.stages[view.stage].attempt,
-          );
-          if (requestEvent !== undefined
-            && !driven.tasks.some((task) => task.taskId === requestEvent.requestTaskId)) {
-            workflowReceipt.corrupt = `stage.requested ${view.stage} 的 requestTaskId ${requestEvent.requestTaskId} 与真实任务不一致`;
-            // 2026-11-18（收尾修补）：不一致 ⇒ 不把该 workflow 计入 driven（只记 corrupt/errors）。
-            delete workflowReceipt.driven;
+          // 2026-11-20（SMOKE-3 S3 地基）：有界等待（入口未就绪）不是账本不一致——本调用未建任务，
+          // 不做 requestTaskId 一致性判定；入口出现后的下一次对账正常补建并校验。
+          if (driven.waiting === undefined) {
+            const requestEvent = workflowEventList(ledgerAfter.events, workflowId).find(
+              (event): event is StageRequestedView =>
+                event.kind === "stage.requested" && event.stage === view.stage
+                && event.attempt === view.stages[view.stage].attempt,
+            );
+            if (requestEvent !== undefined
+              && !driven.tasks.some((task) => task.taskId === requestEvent.requestTaskId)) {
+              workflowReceipt.corrupt = `stage.requested ${view.stage} 的 requestTaskId ${requestEvent.requestTaskId} 与真实任务不一致`;
+              // 2026-11-18（收尾修补）：不一致 ⇒ 不把该 workflow 计入 driven（只记 corrupt/errors）。
+              delete workflowReceipt.driven;
+            }
           }
         } else if (driven.code === "workflow-corrupt") {
           // 账本一致性结论（如 requestTaskId 与确定性派生不一致）⇒ 对账 corrupt（不猜、不自动推进）。

@@ -332,6 +332,12 @@ function collectRequests(events: readonly TaskStateEvent[]): Map<string, Request
       const view = get(event.requestId);
       view.created = event;
       delete view.orphaned;
+    } else if (event.kind === "request.presented") {
+      // 2026-11-20（SMOKE-3 S3 地基）：生命周期视图按**最后一条为准**——request.presented 晚于
+      // request.orphaned 表示同一请求已重新呈卡、仍在等待；清除 orphaned（与新 request.created
+      // 清除语义一致），pendingRequests/counts/blockers 随之恢复为等待态。
+      // 与 block-router `findRequestState`、桌面 `requestViewOf` 的最终状态口径一致。
+      delete get(event.requestId).orphaned;
     } else if (event.kind === "request.resolved") get(event.requestId).resolved = event;
     else if (event.kind === "request.orphaned") get(event.requestId).orphaned = event;
   }

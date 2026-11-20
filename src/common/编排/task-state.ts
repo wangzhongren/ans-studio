@@ -652,6 +652,7 @@ export async function appendTaskEvent(
     }
   }
   if ((event.kind === "request.presented" && event.to === "chief")
+    || (event.kind === "request.created" && event.supersedesOrphanAt !== undefined)
     || (event.kind === "request.resolved" && event.by === "chief-delegated")
     || ("actionSource" in event && event.actionSource !== undefined)) {
     const checked = validateEvent(event);
@@ -751,6 +752,13 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
       // 2026-11-17（app-dispatch/v1）：可选 promptId（应用发放；旧卡缺失 = 旧行为）。
       if (rec["promptId"] !== undefined && !isNonEmptyTrimmedString(rec["promptId"])) {
         return { ok: false, message: "request.created.promptId 非法" };
+      }
+      // 2026-11-20（SMOKE-3 S3 地基）：可选的「取代 orphan」显式事实（同 requestId 重新呈现时
+      // 携带被取代 `request.orphaned.at` 原文）。给出时必须是非空、可解析时间戳；缺失 = 首次
+      // 创建/旧记录（兼容）。不改变既有必填/可选字段语义。
+      if (rec["supersedesOrphanAt"] !== undefined
+        && (!isNonEmptyTrimmedString(rec["supersedesOrphanAt"]) || Number.isNaN(Date.parse(rec["supersedesOrphanAt"])))) {
+        return { ok: false, message: "request.created.supersedesOrphanAt 非法" };
       }
     }
     if (kind === "request.presented" && rec["to"] !== "customer" && rec["to"] !== "judge" && rec["to"] !== "chief")

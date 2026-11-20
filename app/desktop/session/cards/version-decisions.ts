@@ -17,8 +17,12 @@
 
 import { createDiagnosticLogger } from "../../../../src/common/shared/diagnostics.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
-import { shortenSummary, taskEvent, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
+import { shortenSummary, taskEvent, type TaskRecord, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
 import { buildProjectStateView, deriveActiveRunFromManifests, scanRunManifestsForState, scanVersionedDocsForFlow } from "../../../../src/common/编排/project-state.ts";
+// 2026-11-20（SMOKE-3 S3 桌面批）：重启对账等待判定需读 workflow 账本视图（`deriveWorkflowView` 与
+// fixed-workflow/block-router 同源）；外部 src 依赖，不影响 session 结构分层（L4 仅约束 session 内部导入）。
+import { deriveWorkflowView, WORKFLOW_CORRUPT_CODE, type WorkflowView } from "../../../../src/common/编排/workflow-state.ts";
+import { readWorkflowLedger } from "../../../../src/common/编排/workflow-service.ts";
 import {
   buildVersionDecisionCard,
   collectResolvedWithoutExecution,
@@ -36,8 +40,8 @@ import {
 import { validateDecisionCardRequest } from "../../../../src/common/编排/decision-card.ts";
 import { closeRun, ensureDraftRun, readRunManifest } from "../../../../src/common/编排/run-manifest.ts";
 import { VERSION_DECISION_SCHEMA, type ProjectStateDocKind, type ProjectStateView, type VersionDecisionDecidedBy, type VersionDecisionErrorCode, type VersionDecisionFacts, type VersionDecisionRequest, type VersionDecisionResult } from "../../../../src/model/project-state.ts";
-import { GOVERNANCE_SLUG_PATTERN } from "../../../../src/model/runtime.ts";
-import type { CustomerInputMetadata, CustomerInputOutcome, CustomerInputRequest, TaskStateEvent, VersionDecisionEvent } from "../../../../src/model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, WORKFLOW_PROTOCOL_APP_DISPATCH, workflowProtocolOf } from "../../../../src/model/runtime.ts";
+import type { CustomerInputMetadata, CustomerInputOutcome, CustomerInputRequest, TaskStateEvent, VersionDecisionEvent, WorkflowEvent, WorkflowProtocol, WorkflowStage } from "../../../../src/model/runtime.ts";
 import { directiveIdFromOperatorId } from "../../directive-input.ts";
 import { mainT } from "../../i18n.ts";
 import type { SessionManagerDeps } from "../contracts/deps.ts";
@@ -65,6 +69,21 @@ export interface VersionDecisionPorts {
   findLiveRuntime(projectRoot: string, roleId: string): RuntimeKind | undefined;
 }
 
+/** 2026-11-20（SMOKE-3 S3 桌面批）：重启对账的账本事实（未决 created 减去 resolved/orphaned 等）。 */
+interface RestoreLedgerFacts {
+  resolved: Set<string>;
+  orphaned: Set<string>;
+  approvalDone: Set<string>;
+  createdRequests: Map<string, Extract<TaskStateEvent, { kind: "request.created" }>>;
+  createdApprovals: Map<string, { sourceRoleId: string; summary: string }>;
+}
+
+/** 2026-11-20（SMOKE-3 S3 桌面批）：单次 restore 内按 workflowId 缓存的协议与工作流视图。 */
+interface AppCardWorkflowFacts {
+  protocol?: WorkflowProtocol;
+  view?: WorkflowView;
+}
+
 /** 版本决策全链与恢复（原 SessionManager 17 方法的同签名实现）。 */
 export class VersionDecisions {
   private readonly cards: Cards;
@@ -84,6 +103,12 @@ export class VersionDecisions {
   private get lastGovernanceRuntime(): ReadonlyMap<string, RuntimeKind> { return this.refs.lastGovernanceRuntime; }
   private get versionDecisionPending(): Map<string, string> { return this.cards.state.versionDecisionPending; }
   private get versionDecisionChains(): Map<string, Promise<void>> { return this.cards.state.versionDecisionChains; }
+
+  /** 2026-11-20（SMOKE-3 S3 桌面批）：restoreRequestState 每 project 在飞去重——`listProject` 每次刷新
+   * 都会 fire-and-forget `restoreTasks`，并发调用不得写两条 orphan（SMOKE-3 13:01:59.436/.449 双写）。 */
+  private readonly requestRestoreInFlight = new Map<string, Promise<{ orphaned: number; expired: number }>>();
+  /** 2026-11-20（SMOKE-3 S3 桌面批）：waiting 诊断去重（同 project/requestId 只记一次，不刷屏）。 */
+  private readonly restoreWaitingLogged = new Set<string>();
 
   /* shared 同名同义委托（→ shared/*）。 */
   private sessionKey(projectRoot: string, roleId: string, runtime: RuntimeKind): string { return sessionKey(projectRoot, roleId, runtime); }
@@ -757,49 +782,111 @@ export class VersionDecisions {
     return { reconciled, uncertain };
   }
 
-  // —— restoreRequestState（B5 自 session.ts 逐字搬移）——
+  // —— restoreRequestState（B5 自 session.ts 逐字搬移；2026-11-20 SMOKE-3 S3 桌面批改造）——
   /**
    * C-08：重启重放申请/审批——未决 `request.created` 标 `request.orphaned`（不自动执行原动作，系统通知幕僚）；
    * 未决 `approval.created` 标 `approval.expired`（命令/写盘不重放）。已结算/已标记幂等跳过。
+   *
+   * 2026-11-20（SMOKE-3 S3 桌面批）：
+   *  · **对账不得 orphan 仍可等待的卡**（SMOKE-3 回归点）：app-dispatch/v1 card-prompt 请求（带
+   *    workflowId/stage/promptId，或能匹配到应用 card-prompt 任务）在匹配任务未收口/未报告、workflow
+   *    仍活动且阶段未迁移/未关闭时视为 waiting——**不写 request.orphaned**，只记一次去重诊断
+   *    `desktop.request.restore.waiting`（同 requestId 不刷屏）。
+   *  · 允许 orphan：无可重投（找不到 card-prompt 任务）或任务已终态（closed/reported）而请求仍开
+   *    ⇒ 既有 orphan(restart) 路径（block 扫描随后 card-prompt-orphaned → resolver）；
+   *    workflow 已关闭/停用/阶段迁移 ⇒ orphan(superseded)，按既有 superseded 语义收口（不误重投）。
+   *  · 幂等/并发：每 project 在飞去重（并发调用共用同一次执行）+ 追加前按最新账本再判定一次；
+   *    重复调用零新增（SMOKE-3 双 orphan 的直接修复）。
+   *  · legacy（非 app-dispatch）请求 `orphaned(restart)` 语义逐字不变。
    */
   async restoreRequestState(
     projectRoot: string,
     state: TaskReplay,
   ): Promise<{ orphaned: number; expired: number }> {
-    const resolved = new Set<string>();
-    const orphaned = new Set<string>();
-    const approvalDone = new Set<string>();
-    const createdRequests = new Map<string, { sourceRoleId: string; title: string }>();
-    const createdApprovals = new Map<string, { sourceRoleId: string; summary: string }>();
-    for (const event of state.events) {
-      if (event.kind === "request.resolved") resolved.add(event.requestId);
-      else if (event.kind === "request.orphaned") orphaned.add(event.requestId);
-      else if (event.kind === "request.created") createdRequests.set(event.requestId, { sourceRoleId: event.sourceRoleId, title: event.title });
-      else if (event.kind === "approval.created") createdApprovals.set(event.approvalId, { sourceRoleId: event.sourceRoleId, summary: event.summary });
-      else if (event.kind === "approval.resolved" || event.kind === "approval.expired") approvalDone.add(event.approvalId);
+    const existing = this.requestRestoreInFlight.get(projectRoot);
+    if (existing !== undefined) return existing;
+    let tracked: Promise<{ orphaned: number; expired: number }> | undefined;
+    tracked = this.restoreRequestStateLocked(projectRoot, state).finally(() => {
+      if (tracked !== undefined && this.requestRestoreInFlight.get(projectRoot) === tracked) {
+        this.requestRestoreInFlight.delete(projectRoot);
+      }
+    });
+    this.requestRestoreInFlight.set(projectRoot, tracked);
+    return tracked;
+  }
+
+  /** 重启对账主体（已在 `requestRestoreInFlight` 的 per-project 串行区内执行）。 */
+  private async restoreRequestStateLocked(
+    projectRoot: string,
+    state: TaskReplay,
+  ): Promise<{ orphaned: number; expired: number }> {
+    let events: readonly TaskStateEvent[] = state.events;
+    let facts = this.collectRestoreFacts(events);
+    let records = state.records;
+    const pendingRequests = (current: RestoreLedgerFacts): boolean =>
+      [...current.createdRequests.keys()].some((requestId) => !current.resolved.has(requestId) && !current.orphaned.has(requestId));
+    const pendingApprovals = (current: RestoreLedgerFacts): boolean =>
+      [...current.createdApprovals.keys()].some((approvalId) => !current.approvalDone.has(approvalId));
+    if (pendingRequests(facts) || pendingApprovals(facts)) {
+      // 追加前按**最新账本**再判定一次：调用方快照可能早于其它在飞路径（并发 restore / 卡裁决 /
+      // 版本决策）刚写入的 orphan/resolved/expired——以最新事实为准，不基于过期快照重复写入。
+      const latest = await this.readTasks(projectRoot);
+      events = latest.events;
+      facts = this.collectRestoreFacts(events);
+      records = latest.records;
     }
+    const appCardWorkflows = new Map<string, Promise<AppCardWorkflowFacts>>();
     let orphanedCount = 0;
-    for (const [requestId, info] of createdRequests) {
-      if (resolved.has(requestId) || orphaned.has(requestId)) continue;
-      const appended = await this.appendTaskState(projectRoot, taskEvent("request.orphaned", { requestId, reason: "restart" }, () => new Date(this.now())));
+    for (const [requestId, request] of facts.createdRequests) {
+      if (facts.resolved.has(requestId) || facts.orphaned.has(requestId)) continue;
+      const appCard = await this.appCardPromptWaitState(projectRoot, requestId, request, records, events, appCardWorkflows);
+      if (appCard.kind === "waiting") {
+        // SMOKE-3 回归点：仍可等待的卡不写 orphan；诊断按 project+requestId 去重（不刷屏）。
+        const key = `${projectRoot}\u0000${requestId}`;
+        if (!this.restoreWaitingLogged.has(key)) {
+          this.restoreWaitingLogged.add(key);
+          createDiagnosticLogger({ component: "desktop.session", projectRoot }).record("desktop.request.restore.waiting", {
+            workflowId: appCard.workflowId,
+            stage: appCard.stage,
+            requestId,
+            taskId: appCard.taskId,
+            reasonCode: "waiting",
+          });
+        }
+        continue;
+      }
+      const superseded = appCard.kind === "superseded";
+      const appended = await this.appendTaskState(projectRoot, taskEvent("request.orphaned", {
+        requestId,
+        reason: superseded ? "superseded" : "restart",
+      }, () => new Date(this.now())));
       if (!appended) continue;
       orphanedCount += 1;
       // C-08：原 tool call 已不存在——结果只作系统通知/任务回投发起角色，**不自动执行原动作**。
-      const sourceRuntime = this.findLiveRuntime(projectRoot, info.sourceRoleId) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
+      const sourceRuntime = this.findLiveRuntime(projectRoot, request.sourceRoleId) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
       this.emitDeliveryNote(
         projectRoot,
         sourceRuntime,
-        info.sourceRoleId,
+        request.sourceRoleId,
         "chief",
-        `[系统·申请] 重启后申请 #${requestId}「${shortenSummary(info.title, 80)}」未决，已标记 orphaned；不会自动执行原动作，请重新发起或人工处理。`,
+        superseded
+          ? `[系统·申请] 申请 #${requestId}「${shortenSummary(request.title, 80)}」对应流程已关闭/阶段已迁移，已标记 orphaned(superseded)；不会自动执行原动作，按实际语义收口（不重投）。`
+          : `[系统·申请] 重启后申请 #${requestId}「${shortenSummary(request.title, 80)}」未决，已标记 orphaned；不会自动执行原动作，请重新发起或人工处理。`,
       );
-      if (info.sourceRoleId !== "application") {
-        this.notifyRequest(projectRoot, requestId, info.sourceRoleId, info.title, "resolved", "重启后未决（orphaned；不自动执行原动作）");
+      if (request.sourceRoleId !== "application") {
+        this.notifyRequest(
+          projectRoot,
+          requestId,
+          request.sourceRoleId,
+          request.title,
+          "resolved",
+          superseded ? "流程已关闭/阶段迁移（orphaned(superseded)；不自动执行原动作）" : "重启后未决（orphaned；不自动执行原动作）",
+        );
       }
     }
     let expiredCount = 0;
-    for (const [approvalId, info] of createdApprovals) {
-      if (approvalDone.has(approvalId)) continue;
+    for (const [approvalId, info] of facts.createdApprovals) {
+      if (facts.approvalDone.has(approvalId)) continue;
       const appended = await this.appendTaskState(projectRoot, taskEvent("approval.expired", { approvalId, reason: "restart" }, () => new Date(this.now())));
       if (!appended) continue;
       expiredCount += 1;
@@ -816,4 +903,106 @@ export class VersionDecisions {
     return { orphaned: orphanedCount, expired: expiredCount };
   }
 
+  /** 2026-11-20（SMOKE-3 S3）：重启对账的账本事实集合（同 requestId 以最后一次 created 为准）。 */
+  private collectRestoreFacts(events: readonly TaskStateEvent[]): RestoreLedgerFacts {
+    const facts: RestoreLedgerFacts = {
+      resolved: new Set<string>(),
+      orphaned: new Set<string>(),
+      approvalDone: new Set<string>(),
+      createdRequests: new Map(),
+      createdApprovals: new Map(),
+    };
+    for (const event of events) {
+      if (event.kind === "request.resolved") facts.resolved.add(event.requestId);
+      else if (event.kind === "request.orphaned") facts.orphaned.add(event.requestId);
+      else if (event.kind === "request.created") facts.createdRequests.set(event.requestId, event);
+      else if (event.kind === "approval.created") facts.createdApprovals.set(event.approvalId, { sourceRoleId: event.sourceRoleId, summary: event.summary });
+      else if (event.kind === "approval.resolved" || event.kind === "approval.expired") facts.approvalDone.add(event.approvalId);
+    }
+    return facts;
+  }
+
+  /**
+   * 2026-11-20（SMOKE-3 S3 桌面批）：未决 app-dispatch/v1 card-prompt 请求的重启语义分类。
+   * - `waiting`：匹配任务未收口/未报告 + workflow 仍活动 + 阶段未迁移/未关闭 ⇒ **不写 orphan**；
+   * - `superseded`：workflow 已关闭/停用/阶段迁移 ⇒ 按既有 superseded 语义收口（不误重投）；
+   * - `orphan`：app 请求但无可重投（找不到 card-prompt 任务）或任务已终态 ⇒ 既有 orphan 路径；
+   * - `legacy`：非 app-dispatch card-prompt 请求 ⇒ 调用方保持逐字不变的旧语义。
+   */
+  private async appCardPromptWaitState(
+    projectRoot: string,
+    requestId: string,
+    request: Extract<TaskStateEvent, { kind: "request.created" }>,
+    records: ReadonlyMap<string, TaskRecord>,
+    taskEvents: readonly TaskStateEvent[],
+    workflowCache: Map<string, Promise<AppCardWorkflowFacts>>,
+  ): Promise<
+    | { kind: "legacy" }
+    | { kind: "orphan" }
+    | { kind: "superseded"; workflowId: string; stage: WorkflowStage }
+    | { kind: "waiting"; workflowId: string; stage: WorkflowStage; taskId: string }
+  > {
+    let matchingTask: TaskRecord | undefined;
+    for (const record of records.values()) {
+      const created = record.created;
+      if (created === undefined || created.from !== "application" || created.taskKind !== "card-prompt") continue;
+      if (created.promptId === requestId) { matchingTask = record; break; }
+    }
+    // app-dispatch card-prompt 请求的事实形状：request.created 带 workflowId/stage/promptId
+    // （workflow-service computeAppDispatchCardPrompt），或能匹配到应用 card-prompt 任务。
+    const looksAppCard = request.workflowId !== undefined && request.stage !== undefined && request.promptId !== undefined;
+    if (!looksAppCard && matchingTask === undefined) return { kind: "legacy" };
+    const workflowId = request.workflowId ?? matchingTask?.created?.workflowId;
+    const stage = request.stage ?? matchingTask?.created?.stage;
+    if (workflowId === undefined || stage === undefined) return { kind: "legacy" };
+    let workflowFacts = workflowCache.get(workflowId);
+    if (workflowFacts === undefined) {
+      workflowFacts = this.appCardWorkflowFacts(projectRoot, workflowId, taskEvents);
+      workflowCache.set(workflowId, workflowFacts);
+    }
+    const { protocol, view } = await workflowFacts;
+    if (protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH) return { kind: "legacy" };
+    const taskOpen = matchingTask !== undefined && matchingTask.closed === undefined && matchingTask.reports.length === 0;
+    if (matchingTask === undefined || !taskOpen) {
+      // 无可重投（找不到 card-prompt 任务）或任务已终态（closed/rejected/已报告）而请求仍开：
+      // 允许走既有 orphan 路径（reason 沿用冻结三值）。
+      return { kind: "orphan" };
+    }
+    if (view === undefined) {
+      // 账本不可读/缺 workflow.started：fail-closed 走旧 orphan（不把不确定当 waiting）。
+      return { kind: "orphan" };
+    }
+    if (view.blocked?.code === WORKFLOW_CORRUPT_CODE) {
+      // 账本损坏 ≠ 已关闭/阶段迁移：不判 waiting、也不冒充 superseded（交既有对账/修复路径）。
+      return { kind: "orphan" };
+    }
+    if (view.closed !== undefined || view.stopping === true || view.stage !== stage) {
+      return { kind: "superseded", workflowId, stage };
+    }
+    return { kind: "waiting", workflowId, stage, taskId: matchingTask.taskId };
+  }
+
+  /** 单次 restore 内按 workflowId 读取协议 + 视图（读失败/缺 started ⇒ 空事实，调用方 fail-closed）。 */
+  private appCardWorkflowFacts(
+    projectRoot: string,
+    workflowId: string,
+    taskEvents: readonly TaskStateEvent[],
+  ): Promise<AppCardWorkflowFacts> {
+    return (async () => {
+      try {
+        const ledger = await readWorkflowLedger(projectRoot);
+        const started = ledger.events.find(
+          (event): event is Extract<WorkflowEvent, { kind: "workflow.started" }> =>
+            event.kind === "workflow.started" && event.workflowId === workflowId,
+        );
+        if (started === undefined) return {};
+        return {
+          protocol: workflowProtocolOf(started),
+          view: deriveWorkflowView(ledger.events.filter((event) => event.workflowId === workflowId), taskEvents),
+        };
+      } catch {
+        return {};
+      }
+    })();
+  }
 }

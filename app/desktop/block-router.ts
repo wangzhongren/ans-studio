@@ -875,6 +875,8 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
     resolution?: RequestResolution;
   } => {
     // 按事件顺序取**最后一次**生命周期状态（orphaned 不是粘性：同 requestId 重呈后的新 created 表示等待中）。
+    // 2026-11-20（SMOKE-3 S3 桌面批）：与 project-state 地基补丁同口径——`request.presented` 晚于
+    // `request.orphaned` 表示同一请求已重新呈卡、仍在等待，清除 orphaned（最后一条为准）。
     let created = false;
     let orphaned = false;
     let resolution: RequestResolution | undefined;
@@ -883,6 +885,8 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
         created = true;
         orphaned = false;
         resolution = undefined;
+      } else if (event.kind === "request.presented" && event.requestId === requestId) {
+        orphaned = false;
       } else if (event.kind === "request.orphaned" && event.requestId === requestId) {
         orphaned = true;
       } else if (event.kind === "request.resolved" && event.requestId === requestId) {
