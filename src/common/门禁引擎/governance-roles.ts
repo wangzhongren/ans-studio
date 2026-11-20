@@ -223,80 +223,84 @@ const BUILT_IN_ROLE_MATRIX: Readonly<Partial<Record<BuiltInRoleId, BuiltInGovern
  *   与卡文本/模块 fixed 数据冲突时以卡文本/注册表为准并修正摘要。
  * - legacy 表 `BUILT_IN_ROLE_MATRIX` **逐字不变**（MF-IR-4/G-4）；fixed 视图只从本表生成，
  *   由 `governance-matrix` 服务按 `matrix` 参数选择（routing builder 生成 fixed 路由）。
- * - 文案口径对齐 v1.3 §3.4 fixed 分工：两条固定路径、派发分裂（幕僚只派 verifier 与
- *   stage-request；运营派生产线）、三张客户卡、固定路径不发 acceptance 卡、merge-main
- *   应用自有且仅客户本人确认、基线 3 件小事、Git 普通用法、A10→A11、A12a→A12b。
+ * - 2026-11-17（app-dispatch/v1，设计 §2.1/§2.3/§6.1）文案口径：**内置角色任务由应用按流程定义
+ *   创建并投递**（product/rapporteur/nominator/convener/verifier；A1/A2/A4/A5/A7/A8/A9/A12a/A12b）；**运营
+ *   只派项目 worker**（绑定应用 open 的 `worker-dispatch` 任务，`worker-dispatch-required`；不再派
+ *   内置角色，`convener-builtin-dispatch-forbidden`）；**幕僚只调 `select_workflow` 选流程并按应用
+ *   发放的 `card-prompt` 呈三张客户确认卡**（不再派发/收口/重派/停止/直派验收，`chief-dispatch-removed`，
+ *   呈卡不一致 `card-prompt-mismatch`）；验收（A12）由应用直派；merge-main 应用自有、仅客户本人确认。
+ *   在飞 `fixed-v2.1` workflow 继续按 v2 卡文本/资源运行直至关闭（Q10 不迁移）。
  */
 const BUILT_IN_ROLE_MATRIX_FIXED: Readonly<Partial<Record<BuiltInRoleId, BuiltInGovernanceMatrixSummary>>> =
   Object.freeze({
     chief: Object.freeze({
-      duty: "固定路径幕僚：唯一客户入口；两条固定路径（路径 A 新建 / 路径 B 修改）与三张客户确认卡的发起者。",
+      duty: "固定路径幕僚：唯一客户入口；调用 select_workflow 选择流程（路径 A 新建 / 路径 B 修改），并按应用发放的 card-prompt 呈三张客户确认卡。",
       mainChain: [
-        "两条固定路径 A1–A13 / B1–B4：按真实缺口选路；只经 taskKind:\"stage-request\" 向运营发产线调度请求，不直接派生产线角色。",
-        "三卡：意图确认/方案确认/任命确认由幕僚发起；固定路径不发 acceptance 卡；merge-main 由应用呈卡、仅客户本人确认，judge 不可代批。",
-        "A10 任命确认完成后发 A11 stage-request 派实现；A12 独立验收＝A12a criteria（实施前）→ A12b report（实施后）+ 应用 docs/acceptance 归档。",
+        "首个流程动作是 select_workflow（workflowPath:\"A\"|\"B\"、flowId、可选 acceptanceStrength）；应用校验注册表后写 workflow.started 并启动应用侧流程驱动。",
+        "内置角色任务全部由应用按流程定义创建并投递；你不再派发/收口/重派/停止/直派验收（chief-dispatch-removed；固定会话不注入 dispatch_task/close_created_task/redispatch_task/terminate_role_run）。",
+        "三卡由应用开卡、你按 prompt 逐项一致呈交（card-prompt-mismatch）；merge-main 由应用构造、仅客户本人确认，judge 不可代批。",
       ],
       cardDiscipline: [
-        "不得直接派 product/rapporteur/nominator 生产任务（chief-production-dispatch-forbidden）；不得代客户批 merge-main。",
+        "不得增删选项/改写 documentRefs/自批/代客户选；不得代客户批 merge-main；轻量验收交付时向客户披露「运行期未验证」。",
       ],
-      dispatchScope: "fixed：chief→verifier（review/preparation）与 workflow.reviewRoleId 项目验收角色（仅 review）；chief→convener 仅 purpose=stage-request（read-only、无 module/写集）；生产线由 convener 派发。",
+      dispatchScope: "fixed（app-dispatch/v1）：幕僚无任何派发目标（chief-dispatch-removed）；只选流程 + 按应用 prompt 呈三卡 + 呈现 merge-main（客户本人）。",
     }),
     product: Object.freeze({
-      duty: "固定路径产品：按意图撰写/修订 docs/product/<flowId>-intent-vN.md；报告回运营。",
+      duty: "固定路径产品：任务由应用按流程定义创建（stage-execution，from:application）；撰写/修订意图；报告回应用。",
       mainChain: [
-        "按 convener 派发撰写/修订意图（版本化，不原地改）；不写方案/名单/架构/角色卡。",
+        "按应用任务撰写/修订 docs/product/<flowId>-intent-vN.md（版本化，不原地改）；不写方案/名单/架构/角色卡。",
         "升级/变更走普通版本化文档与方案卡；固定路径不注入 VCA/版本决策工具。",
       ],
       cardDiscipline: [
-        "只写 docs/product/；不发起提案卡（方案卡由幕僚呈）；不实现、不招人。",
+        "只写 docs/product/；不发起提案卡（方案卡由应用开卡、幕僚按 prompt 呈）；不实现、不招人。",
       ],
-      dispatchScope: "fixed：convener→product 允许（production，报告回 convener）；chief→product 拒绝（chief-production-dispatch-forbidden）。",
+      dispatchScope: "fixed（app-dispatch/v1）：任务由应用创建（from:application），报告回应用（应用观察 task.reported 后收口）；任何角色→product 的内置派发均不可用（convener-builtin-dispatch-forbidden / chief-dispatch-removed）。",
     }),
     rapporteur: Object.freeze({
-      duty: "固定路径策划：出方案、名单、模块与架构/契约；不发起方案卡。",
+      duty: "固定路径策划：出方案、名单、模块与架构/契约；任务由应用按流程定义创建；不发起方案卡。",
       mainChain: [
-        "按 convener 派发出 docs/proposals/<flowId>-{proposal,modules,roster}-vN.md 与 docs/contracts/<flowId>-architecture-vN.md；roster 用 project-roster/v4（roles[].review 可选）。",
-        "文档一律新 -vN，不原地改；方案卡由幕僚发起；固定路径不发 appointment-write。",
+        "按应用任务出 docs/proposals/<flowId>-{proposal,modules,roster}-vN.md 与 docs/contracts/<flowId>-architecture-vN.md；roster 用 project-roster/v4（roles[].review 可选）。",
+        "文档一律新 -vN，不原地改；方案卡由应用开卡、幕僚按 prompt 呈；固定路径不发 appointment-write；B1 契约/结构缺口按定义由应用直派。",
       ],
       cardDiscipline: [
         "名单是人事建卡的唯一依据；不写角色卡、不招人、不实现、不改产品意图。",
       ],
-      dispatchScope: "fixed：convener→rapporteur 允许；chief→rapporteur 拒绝。",
+      dispatchScope: "fixed（app-dispatch/v1）：A4/A5 任务由应用创建（from:application），报告回应用；任何角色→rapporteur 的内置派发均不可用。",
     }),
     nominator: Object.freeze({
-      duty: "固定路径人事：任命卡由幕僚呈；人事按名单/提案决定机械建卡并激活（activate_role_documents v2）。",
+      duty: "固定路径人事：任务由应用按流程定义创建（A7/A8）；按名单/提案决定机械建卡并激活（activate_role_documents v2）。",
       mainChain: [
-        "不发起 appointment/appointment-write 卡（fixedCards 空）；按 A7 任务与 roster/提案决定写三文档并整单激活。",
+        "不发起 appointment/appointment-write 卡（fixedCards 空）；按应用 A7/A8 任务与 roster/提案决定写三文档并整单激活。",
         "激活由应用重算三文档实际字节 SHA-256（activation-hash-drift）；不写 trunk、不发 appointment-write。",
       ],
       cardDiscipline: [
         "无名单不得写卡；不招名单外角色；不批准提案/验收，不代客户决定。",
       ],
-      dispatchScope: "fixed：convener→nominator 允许；chief→nominator 拒绝。",
+      dispatchScope: "fixed（app-dispatch/v1）：A7/A8 任务由应用创建（from:application），报告回应用；任何角色→nominator 的内置派发均不可用。",
     }),
     convener: Object.freeze({
-      duty: "固定路径运营：生产线唯一派发者；执行基线 3 件小事与团队计划；不派质检。",
+      duty: "固定路径运营：只派项目 worker（绑定应用 open 的 worker-dispatch 任务）；执行 A9 团队计划+基线 3 件小事与 A13/B4 集成汇总；不再派任何内置角色。",
       mainChain: [
-        "收到 chief stage-request 后在真实回合内派 product/rapporteur/nominator 与项目实现角色（production）；不得派 verifier。",
+        "收到应用发放的 worker-dispatch 任务后，按模块清单/写集派项目生产角色；派发必须绑定该自身 open 任务（worker-dispatch-required）；内置角色任务由应用创建（convener-builtin-dispatch-forbidden）。",
         "A9 基线 3 件小事：团队计划 v4 / git init -b main（应用执行）/ .gitignore 托管块 + baseline commit + 任务分支 ans/task/<workflowId>；失败按 baseline-* fail-closed、不弹客户卡。",
-        "实现任务写集按团队计划 / 路径 B scope 派生；写任务串行；收口自己创建的任务（fixed close_created_task v2）。",
+        "实现任务写集按团队计划 / 路径 B 派生 scope；写任务串行；收口自己创建的 worker 任务（fixed close_created_task v2）；A13/B4 集成汇总后由应用构造 merge-main 卡、客户本人确认。",
       ],
       cardDiscipline: [
-        "不写卡、不招人、不改名单、不写项目源码；不批准、不验收；不得创建质检任务。",
+        "不写卡、不招人、不改名单、不写项目源码；不批准、不验收；不得创建任何内置角色任务。",
       ],
-      dispatchScope: "fixed：convener→product/rapporteur/nominator 内置与项目角色允许；convener→verifier 拒绝（convener-to-verifier-forbidden）。",
+      dispatchScope: "fixed（app-dispatch/v1）：convener→项目 worker 允许（必须绑定自身 open worker-dispatch 任务，worker-dispatch-required）；convener→任何内置角色拒绝（convener-builtin-dispatch-forbidden）。",
     }),
     verifier: Object.freeze({
-      duty: "固定路径质检：独立验收执行者（默认；roster roles[].review 项目验收角色优先）。",
+      duty: "固定路径质检：独立验收执行者（默认；roster roles[].review 项目验收角色优先）；A12 由应用直派。",
       mainChain: [
-        "A12 由幕僚直派：A12a criteria（实施前写标准）→ A12b report（实施后）；报告写 docs/quality/、证据写 docs/verification/。",
+        "A12a criteria（实施前）→ A12b report（实施后）任务由应用直派（与运营生产派发相互独立）；报告写 docs/quality/、证据写 docs/verification/。",
         "固定路径不发 acceptance 卡；docs/acceptance/<flowId>-acceptance-vN.md 归档由应用生成。",
-        "缺证或失败正式 blocked/failed 回幕僚，不静默等待；不代运营发布。",
+        "缺证或失败正式 blocked/failed 交回（应用观察 task.reported 后按完成条件收口）；不代运营发布。",
       ],
       cardDiscipline: [
         "不批准、不代客户验收；不写实现；证据最多真实运行截图，不要求录屏。",
       ],
-      dispatchScope: "fixed：chief→verifier（review/preparation）允许；convener→verifier 拒绝。",
+      dispatchScope: "fixed（app-dispatch/v1）：A12 任务由应用直派；任何角色（幕僚/运营）→verifier 的派发均不可用（chief-dispatch-removed / convener-builtin-dispatch-forbidden）。",
     }),
   });
 

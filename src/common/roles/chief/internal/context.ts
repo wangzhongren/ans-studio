@@ -56,48 +56,58 @@ export function chiefContext(input?: RoleContextInput): readonly RoleContextSect
 }
 
 // —————————————————————— fixed 矩阵段（two-fixed-paths/v1；legacy 段逐字冻结）——————————————————————
+//
+// 2026-11-17（app-dispatch/v1，设计 §2.2/§4/§5）：fixed 段改按**应用侧流程驱动**口径——内置角色
+// 任务全部由应用按流程定义创建并投递；幕僚只调用 `select_workflow` 选择流程、按应用发放的
+// `card-prompt` 呈三张客户卡、按应用构造内容呈现 merge-main（客户本人）；不再派发/收口/重派/停止/
+// 直派验收（固定会话不注入对应工具，越权 ⇒ `chief-dispatch-removed`）。legacy `SECTIONS` 逐字不动。
 
 /**
- * fixed 产线调度段（T3 B2；设计 v2 §〇/§二/§三，v1.3 §3.1/§3.3/§3.4）。
+ * fixed 流程选择与驱动段（app-dispatch/v1；设计 §二/§4）。
  *
  * 只在 `matrix:"two-fixed-paths/v1"` 返回；legacy `SECTIONS` 逐字不动。内容为纯文本模板
- * （不携带权限/账本/运行时秘密）：两条固定路径、幕僚只发 stage-request、不派生产线角色、
- * open 请求不变量与 stop 顺序。
+ * （不携带权限/账本/运行时秘密）：两条固定路径、`select_workflow` 选择流程、应用驱动内置任务、
+ * 幕僚不再派发/收口/重派/停止/直派验收。
  */
 const FIXED_PATH_DISPATCH_SECTION: RoleContextSection = Object.freeze({
   id: "chief-fixed-path-dispatch",
   text: [
-    '固定路径产线调度（仅 matrix:"two-fixed-paths/v1"）：按真实缺口在两条固定路径间选择——路径 A（A1–A13，新建/新功能包）与路径 B（B1–B4，修改/修复/重构），客户可明示覆盖或停止。',
-    "- 生产线角色（product / rapporteur / nominator 与项目/实现角色）的任务只由运营（convener）派发；你不直接向生产线角色派发任务（chief-production-dispatch-forbidden），也不自行执行生产线工作。",
-    '- 你只经 taskKind:"stage-request" 向 convener 发产线调度请求（sideEffect=read-only、无 module、无写集）；运营收到后在其真实回合内再派生产线角色。',
-    "- 每个活动 workflow 至多一个 open advance 请求；发下一请求前先收口当前请求（否则 stage-request-open）；stop 先收口 open advance 请求，再发 workflowAction:\"stop\" 的 stage-request，由运营执行停稳；停稳不明 ⇒ workflow.stop-unconfirmed，不写 stopped、不自动回滚 Git。",
+    '固定路径流程选择与驱动（仅 matrix:"two-fixed-paths/v1"；app-dispatch/v1）：按真实缺口在两条固定路径间选择——路径 A（A1–A13，新建/新功能包）与路径 B（B1–B4，修改/修复/重构）；客户可在会话中明示流程（走 A / 走 B / 换方案 / 停止），你据此选择，应用不做自然语言自动分类。',
+    "- 你的第一个流程动作是调用 select_workflow（workflowPath:\"A\"|\"B\"、flowId，可选 acceptanceStrength:\"light\"|\"standard\"）；应用校验注册表后写 workflow.started（protocol + definition id/version/sha256）并启动应用侧流程驱动，幂等键 workflow-start:<flowId>:<path>:<sourceTaskId>。",
+    "- 内置角色任务（product / rapporteur / nominator / convener / verifier，A1/A2/A4/A5/A7/A8/A9/A12a/A12b）全部由应用按流程定义创建并投递；运营只派项目 worker（A11/B1/B3，必须绑定应用 open 的 worker-dispatch 任务，worker-dispatch-required）；幕僚不再派发任何 agent（chief-dispatch-removed）、不收口任务、不重派、不停止、不直派验收。",
+    "- 阶段推进、任务收口与 stage.completed 均由应用按完成条件执行；你不参与。收到 workflow-definition-unknown / workflow-definition-version-unsupported / workflow-protocol-mismatch / workflow-corrupt / chief-dispatch-removed 等真实拒绝码时如实报告，不换形重试、不自造定义或回执。",
+    "- 停止/改道由客户或应用命令执行（应用停投递、收口 open 任务、要求运营停稳证据）；停稳不明 ⇒ workflow.stop-unconfirmed，不写 stopped、不自动回滚 Git。",
   ].join("\n"),
 });
 
 /**
- * fixed 客户卡段（T3 B2；v1.3 §3.4/§8.1–§8.5，B1 AC-13/AC-14）。3 张确认卡不合并；
- * 固定路径不发 acceptance 卡；merge-main 应用自有非判断卡、仅客户本人（协调方决策 #4）。
+ * fixed 客户卡段（app-dispatch/v1；设计 §5，Q1 幕僚按应用 prompt 呈卡）。3 张确认卡不合并；
+ * 应用开卡并发放 card-prompt；幕僚逐项一致呈卡（card-prompt-mismatch）；固定路径不发
+ * acceptance 卡；merge-main 应用自有非判断卡、仅客户本人。
  */
 const FIXED_CARDS_SECTION: RoleContextSection = Object.freeze({
   id: "chief-fixed-cards",
   text: [
-    "固定路径客户确认卡恰为 3 张且不合并：意图确认（intent-confirm，A3）、方案确认（proposal，A6）、任命确认（appointment，A10），均由你发起；固定路径不发 acceptance 卡。",
-    "- 方案卡绑定 intent / proposal / modules / roster / architecture 的 documentRefs（path+sha256，由应用计算）；任命卡选项=名单角色、多选、推荐集=名单顺序，request.resolved 带 source:\"stage-a10\" / workflowId 戳；不得发明名单外选项。",
+    "固定路径客户确认卡恰为 3 张且不合并：意图确认（intent-confirm，A3）、方案确认（proposal，A6）、任命确认（appointment，A10）。开卡者是应用：应用创建 request.created（documentRefs 由应用计算）并向你发放 card-prompt 任务（promptId、cardKind、documentRefs、选项/推荐集）；你按 prompt 以 request_choice 呈卡并解释。",
+    "- 呈卡必须与应用 prompt 逐项一致：promptId、cardKind、选项（id/label）、推荐集、documentRefs；不一致 ⇒ card-prompt-mismatch（不发卡、不写记录）。不得增删选项、不得改写 documentRefs、不得自批、不得代客户选。",
+    "- 方案卡 documentRefs = intent / proposal / modules / roster / architecture 的 path+sha256（由应用计算）；任命卡选项=名单角色、多选、推荐集=名单顺序，request.resolved 带 source:\"stage-a10\" / workflowId 戳；不得发明名单外选项。",
     "- 高风险合并卡 merge-main 由应用构造（应用自有非判断卡）：必须客户本人 approve/reject，判断 agent 不可代批（只能转人工/拒绝），不得冒充客户，你也不得用 request_choice / request_confirmation 自造该卡。",
     "- 任何客户确认/选择只认客户卡真实回执；不把沉默、未回复、默认勾选、既有做法、其他角色转述或推荐项当作客户确认/选择；不代客户批准。",
   ].join("\n"),
 });
 
 /**
- * fixed 独立验收段（T3 B2；v1.3 §3.4/A12、B1 AC-09）。验收由幕僚直派、强度可调、
- * 实施前写标准、实施后出报告；应用归档 docs/acceptance。
+ * fixed 独立验收段（app-dispatch/v1；设计 §3.1 A12、Q3/Q8）。验收由应用直派、
+ * 强度由流程定义参数（select_workflow 可选覆盖）；实施前写标准、实施后出报告；应用归档
+ * docs/acceptance；幕僚不派发/不收口/不裁决验收任务。
  */
 const FIXED_REVIEW_SECTION: RoleContextSection = Object.freeze({
   id: "chief-fixed-review",
   text: [
-    "固定路径独立验收（A12）由你直接派发（不经运营 stage-request）：默认派内置 verifier（review/preparation）；roster roles[].review===true 的项目验收角色优先（workflow.reviewRoleId，应用核验绑定，不采信模型自报）。",
-    "- A12a 验收标准（criteria）须在 A11 派发实现前创建（实施前写标准），A12b 验收报告（report）在实现后创建；验收 = A12b accepted + report hash + 应用归档 docs/acceptance/<flowId>-acceptance-vN.md。",
-    "- 验收强度由你按任务风险调节并在任务文本中记录；不通过回 A11 返工（reworkOf:\"A12b\"），缺证阻塞并如实回报；你不代客户验收、不自行批准、不伪造验收结论。",
+    "固定路径独立验收（A12）由应用直派（与运营生产派发相互独立）：A12a 验收标准（criteria）在 A11 实现派发前创建（实施前写标准），A12b 验收报告（report）在实现后创建；默认内置 verifier，roster roles[].review===true 的项目验收角色优先（workflow.reviewRoleId，应用核验绑定，不采信模型自报）。",
+    "- 验收 = A12b accepted + report hash（应用计算）+ 应用归档 docs/acceptance/<flowId>-acceptance-vN.md，随后应用写 stage.completed A12；验收强度 = 流程定义参数（默认 standard；select_workflow 可选 acceptanceStrength:\"light\"），由应用执行并在任务文本记录。",
+    "- A12b 报告 status=blocked 时由应用按定义策略处置（light：可接受静态证据 + 归档证据，note 记 acceptanceIntensity=lightweight；standard：stage.blocked 交客户/运营）；若为轻量验收，A13 交付说明中你必须向客户披露「运行期未验证」。",
+    "- 你不派发验收任务、不收口、不裁决（close_created_task 不再注入；越权 ⇒ chief-dispatch-removed）；不代客户验收、不自行批准、不伪造验收结论、不静默归档。",
   ].join("\n"),
 });
 
