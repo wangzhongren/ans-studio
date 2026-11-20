@@ -78,7 +78,13 @@ import {
 export { WRITE_PREAUTHORIZATION_OPERATOR_ID } from "./write-preauthorization.ts";
 // 分组映射（`cardKind → approval/decision`）的**单一来源**（2026-10-18 双开关评审 §3.1）：
 // 本模块与 UI/编排/测试都读同一张表，绝不在这里写第二份。
-import { governanceCardGroup } from "../../src/model/runtime.ts";
+import {
+  BLOCK_DECISION_OPTION_IDS,
+  BLOCK_OPTION_IDS,
+  BLOCK_SOVEREIGN_OPTION_IDS,
+  governanceCardGroup,
+  isBlockDecisionOptionId,
+} from "../../src/model/runtime.ts";
 // 内置治理角色判据的**单一来源**（Service 公共出口；本模块不复制角色 id 表/注册表）：
 // 仅用于桌面特有的「有推荐项但缺 cardKind」防线（不属于共享结构校验）。
 import { isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
@@ -499,6 +505,9 @@ export function isApplicationDecisionReservedForCustomer(request: CustomerInputR
   if (cardKind !== DECISION_CARD_KIND) return false;
   if ((request as { application?: unknown }).application !== true) return false;
   const offered = new Set(request.options.map((option) => option.id));
+  // 2026-11-20（block resolver 桌面批）：block 主权选项（终止本次流程/接受现状/授权例外/merge-main/
+  // stable-write）永远客户本人——卡内出现任一主权项即整卡排除 judge/委托/`@决策` 代选（I-5 不弱化）。
+  if (BLOCK_SOVEREIGN_OPTION_IDS.some((id) => offered.has(id))) return true;
   const hasAll = (ids: readonly string[]): boolean => ids.every((id) => offered.has(id));
   return (
     hasAll(RUN_CHANGE_MODE_OPTION_IDS) ||
@@ -1901,9 +1910,122 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
    * **例外（2026-11-04 客户直修）**：应用自有的 run-change 三模式卡与版本决策卡必须由客户本人选择，
    * 即使本开关开启也**永不**在这里代选（判据见 `isApplicationDecisionReservedForCustomer`）。
    */
+  /**
+   * 2026-11-20（block resolver 桌面批）：应用发行的 block 决策卡识别（选项**全部**来自 block 词表；
+   * `application:true` + `sourceRoleId:"application"` 只由应用侧构造，模型工具不转发这两个字段）。
+   */
+  const BLOCK_OPTION_ID_SET: ReadonlySet<string> = new Set(BLOCK_OPTION_IDS);
+  const BLOCK_SOVEREIGN_ID_SET: ReadonlySet<string> = new Set(BLOCK_SOVEREIGN_OPTION_IDS);
+  const isBlockDecisionCardRequest = (request: CustomerInputRequest): boolean =>
+    request.kind === "choice"
+    && request.cardKind === DECISION_CARD_KIND
+    && request.application === true
+    && request.sourceRoleId === "application"
+    && request.options.length >= 2
+    && request.options.every((option) => BLOCK_OPTION_ID_SET.has(option.id));
+
+  /**
+   * block 决策卡「替我决策」**确定性代选**（2026-11-20，复用 2026-10-26 decision 卡口径：不调用模型）。
+   *
+   * 只在路由把它标为 `metadata.blockJudgePermitted === true`（= block router 的 `judge-decision` 路由）、
+   * 「替我决策」开关开启（主进程权威）、trio、卡内全为 `block-decision` 词汇且**恰有一个**推荐项时，
+   * 以 `judge` 审计 + `operatorId:"judge:<engine>"` 结算（`request.resolved.by:"judge"` + 真实 decisionId）。
+   * 任一条件不满足 ⇒ 原卡呈客户；开关开启但因「无唯一推荐/结果行不可用」回落时附 `judgeNotice` 说明
+   * （仅 block 卡专用回落；既有三卡/验收 manual 语义不动）。**主权选项永不代选**（防御性再判一次）。
+   */
+  const tryBlockDecisionAutoSelect = (entry: ChannelEntry): boolean => {
+    if (entry.state !== "queued") return false;
+    const request = entry.request;
+    if (!isBlockDecisionCardRequest(request) || request.kind !== "choice") return false;
+    if (request.options.some((option) => BLOCK_SOVEREIGN_ID_SET.has(option.id))) return false;
+    if (entry.metadata?.blockJudgePermitted !== true) return false;
+    let enabled = false;
+    try {
+      enabled = opts.judge?.isGroupEnabled("decision") === true;
+    } catch {
+      enabled = false;
+    }
+    if (!enabled || entry.ctx.governanceModel !== "trio") return false;
+    const notice = (reason: string): void => {
+      entry.payload.judgeNotice = mainT("main.customerInput.judgeNotDelegated", {
+        label: mainT("ui.judge.mode.decision"),
+        reason: stripTrailingSentencePunct(reason),
+      });
+      presentNow(entry);
+    };
+    const recommended = request.options.filter((option) => option.recommended === true);
+    if (recommended.length !== 1 || !isBlockDecisionOptionId(recommended[0]!.id)) {
+      notice(mainT("main.customerInput.reason.notRecommended"));
+      return true;
+    }
+    const selected = recommended[0]!.id;
+    const engine = entry.ctx.runtime ?? entry.metadata?.runtime;
+    if (engine === undefined || opts.emitJudgeResult === undefined) {
+      notice(mainT("main.customerInput.reason.unavailable"));
+      return true;
+    }
+    if (entry.signals.some((signal) => signal.aborted)) return false;
+    const flowId = request.flowId ?? entry.metadata?.flowId;
+    try {
+      opts.emitJudgeResult({
+        version: 1,
+        id: `gj-${++judgeResultSeq}`,
+        requestId: entry.payload.id,
+        anchorKey: entry.payload.anchorKey,
+        toolCallId: entry.payload.toolCallId ?? "",
+        roleId: entry.payload.roleId,
+        at: new Date().toISOString(),
+        ...(request.title.trim() !== "" ? { requestTitle: request.title } : {}),
+        group: "decision",
+        cardKind: DECISION_CARD_KIND,
+        ...(typeof flowId === "string" && flowId !== "" ? { flowId } : {}),
+        engine,
+        ...(entry.payload.projectRoot !== undefined ? { projectRoot: entry.payload.projectRoot } : {}),
+        ...(entry.payload.runtime !== undefined ? { runtime: entry.payload.runtime } : {}),
+        reasonCode: "block-recommended",
+        selected: [selected],
+      });
+    } catch (error) {
+      diagnostic.error("block-decision.judge-row.failed", error, { requestId: entry.payload.id });
+      notice(mainT("main.customerInput.rowFailed"));
+      return true;
+    }
+    // 与既有 approve 路径同口径：注册 judging → 结算 answered（judge 审计）；不等模型。
+    activeByProject.set(entry.projectKey, entry.payload.id);
+    judging.set(entry.payload.id, entry);
+    entry.state = "judging";
+    entry.judged = true;
+    diagnostic.record("block-decision.judge-selected", {
+      requestId: entry.payload.id,
+      roleId: entry.payload.roleId,
+      engine,
+      selected,
+    });
+    settleEntry(
+      entry,
+      {
+        outcome: "answered",
+        value: { selected: [selected] },
+        operatorId: `judge:${engine}`,
+        judge: {
+          group: "decision",
+          cardKind: DECISION_CARD_KIND,
+          engine,
+          reasonCode: "block-recommended",
+          selected: [selected],
+        },
+      },
+      "judging",
+    );
+    return true;
+  };
+
   const isChiefBusinessCard = (entry: ChannelEntry): boolean => {
     const kind = cardKindOf(entry);
     return entry.appCard === undefined && !isApplicationDecisionReservedForCustomer(entry.request)
+      // 2026-11-20（block resolver 桌面批）：block 决策卡由本通道的确定性代选/客户卡路径处理，
+      // **不进入**幕僚委托（chief-delegated）——block 的 decided 只能由 judge/customer 结算。
+      && !isBlockDecisionCardRequest(entry.request)
       && (kind === "appointment" || kind === "acceptance" || kind === "decision" || kind === "proposal");
   };
   const delegationState = () => opts.delegation?.get() ?? { enabled: false, revision: 0 };
@@ -2207,6 +2329,10 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     // presentNow）不消费指令；若后置，非主权 decision 卡的 `@决策` 指令即为死代码
     // （2026-11-12 发布阻断 B3-1 产品回归修复：「替我审批等同于我自己审批」）。
     if (tryApplyDirectiveDecision(entry)) return;
+
+    // 2026-11-20（block resolver 桌面批）：block 决策卡的「替我决策」确定性代选/客户卡专用回落
+    // （位于幕僚委托与 planJudge 之前；仅应用发行且路由标记 judge-decision 的卡进入代选）。
+    if (tryBlockDecisionAutoSelect(entry)) return;
 
     if (isChiefBusinessCard(entry)) {
       if (tryChiefDecision(entry)) return;

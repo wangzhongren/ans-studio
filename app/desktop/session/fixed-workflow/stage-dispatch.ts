@@ -56,6 +56,10 @@ import { emitDeliveryNote } from "../shared/notifier.ts";
 import { appendRoleActivity, readTasks, taskCreators } from "../shared/tasks-store.ts";
 import { filePrint, shortenText } from "../shared/text.ts";
 import { extractDispatchReadPaths, planDispatchDelivery } from "../../../../src/common/编排/handback.ts";
+// 2026-11-20（block resolver 桌面批）：app-dispatch 事实出口（receipt.blockFact / reconcile.blockFacts /
+// 服务拒绝）→ 桌面 block router（只观察，不改阶段语义）。
+import { blockFactFromServiceFailure, type BlockFact } from "../../../../src/common/编排/block-resolution.ts";
+import type { BlockRouter } from "../../block-router.ts";
 import type { FixedWorkflowPorts, FixedWorkflowRefs } from "./route.ts";
 import type { FixedWorkflowRelease } from "./release-merge.ts";
 
@@ -152,16 +156,20 @@ export class FixedWorkflowStageDispatch {
   private readonly port: FixedWorkflowPorts;
   private readonly release: FixedWorkflowRelease;
   private readonly deps: import("../contracts/deps.ts").SessionManagerDeps;
+  /** 2026-11-20（block resolver 桌面批）：block 事实汇（缺省 ⇒ 只诊断，不路由——测试/旧宿主零变化）。 */
+  private readonly blockRouter: Pick<BlockRouter, "observeFactLater" | "observeFactListLater"> | undefined;
   constructor(
     refs: FixedWorkflowRefs,
     port: FixedWorkflowPorts,
     release: FixedWorkflowRelease,
     deps: import("../contracts/deps.ts").SessionManagerDeps,
+    blockRouter?: Pick<BlockRouter, "observeFactLater" | "observeFactListLater">,
   ) {
     this.refs = refs;
     this.port = port;
     this.release = release;
     this.deps = deps;
+    this.blockRouter = blockRouter;
   }
 
   /* —— L0 同名同义委托（与门面委托同一实现、同一入参） —— */
@@ -184,6 +192,29 @@ export class FixedWorkflowStageDispatch {
     return (await workflowProtocolForWorkflowId(projectRoot, workflowId)) === WORKFLOW_PROTOCOL_APP_DISPATCH;
   }
 
+  /** 2026-11-20（block resolver 桌面批）：服务事实 → router（只观察；错误码/消息原样）。 */
+  private noteServiceBlock(
+    projectRoot: string,
+    code: string,
+    message: string,
+    extra: {
+      workflowId?: string;
+      flowId?: string;
+      stage?: WorkflowStage;
+      taskId?: string;
+      detailCode?: string;
+      fingerprintMaterial?: readonly string[];
+    } = {},
+  ): void {
+    this.blockRouter?.observeFactLater(projectRoot, blockFactFromServiceFailure({
+      protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+      code,
+      message,
+      source: "desktop.stage-dispatch",
+      ...extra,
+    }));
+  }
+
   // —————————————— 投递桥 ——————————————
 
   /**
@@ -201,11 +232,19 @@ export class FixedWorkflowStageDispatch {
       const created = record?.created;
       if (record === undefined || created === undefined) {
         this.diagnostics(projectRoot).record("app-dispatch.deliver.task-missing", { taskId });
+        this.noteServiceBlock(projectRoot, "workflow-corrupt", `应用任务 ${taskId} 在账本不存在（投递桥不猜）`, {
+          fingerprintMaterial: ["deliver-task-missing", taskId],
+        });
         report.failed.push({ taskId, reason: "task-not-found" });
         continue;
       }
       if (created.from !== "application") {
         this.diagnostics(projectRoot).record("app-dispatch.deliver.creator-invalid", { taskId, from: String(created.from) });
+        this.noteServiceBlock(projectRoot, "workflow-corrupt", `任务 ${taskId} 不是应用创建（from=${String(created.from)}）`, {
+          ...(created.workflowId !== undefined ? { workflowId: created.workflowId } : {}),
+          taskId,
+          fingerprintMaterial: ["deliver-creator-invalid", taskId],
+        });
         report.failed.push({ taskId, reason: "creator-not-application" });
         continue;
       }
@@ -227,6 +266,12 @@ export class FixedWorkflowStageDispatch {
         );
         if (!opened.ok) {
           this.diagnostics(projectRoot).record("app-dispatch.deliver.open-failed", { taskId, roleId: targetRoleId, reasonCode: "delivery-target-open-failed" });
+          this.noteServiceBlock(projectRoot, "session-open-failed", `应用任务 ${taskId} 投递未完成：${opened.error ?? "目标会话打开失败"}`, {
+            ...(created.workflowId !== undefined ? { workflowId: created.workflowId } : {}),
+            ...(created.stage !== undefined ? { stage: created.stage } : {}),
+            taskId,
+            fingerprintMaterial: ["deliver-open-failed", taskId],
+          });
           this.emitDeliveryNote(projectRoot, runtime, targetRoleId, targetRoleId,
             `[应用·任务] #${taskId} 投递未完成（任务保留待恢复）：${shortenSummary(opened.error ?? "目标会话打开失败", 160)}`);
           report.failed.push({ taskId, reason: opened.error ?? "open-failed" });
@@ -251,6 +296,12 @@ export class FixedWorkflowStageDispatch {
       );
       if (plan.action === "reject") {
         this.diagnostics(projectRoot).record("app-dispatch.deliver.rejected", { taskId, reasonCode: "delivery-rejected" });
+        this.noteServiceBlock(projectRoot, "delivery-failed", `应用任务 ${taskId} 投递被拒：${plan.message}`, {
+          ...(created.workflowId !== undefined ? { workflowId: created.workflowId } : {}),
+          ...(created.stage !== undefined ? { stage: created.stage } : {}),
+          taskId,
+          fingerprintMaterial: ["deliver-rejected", taskId, plan.message],
+        });
         this.emitDeliveryNote(projectRoot, runtime, targetRoleId, targetRoleId,
           `[应用·任务] #${taskId} 投递被拒（任务保留待恢复）：${shortenSummary(plan.message, 160)}`);
         report.failed.push({ taskId, reason: plan.message });
@@ -313,6 +364,7 @@ export class FixedWorkflowStageDispatch {
       ...(input.acceptanceStrength !== undefined ? { acceptanceStrength: input.acceptanceStrength } : {}),
     });
     if (selected.ok !== true) {
+      if (selected.blockFact !== undefined) this.blockRouter?.observeFactLater(input.projectRoot, selected.blockFact);
       return { ok: false, code: selected.code, message: selected.message };
     }
     const taskIds = selected.tasks.map((task) => task.taskId);
@@ -345,6 +397,8 @@ export class FixedWorkflowStageDispatch {
       const driven = await driveAppDispatchStage({ projectRoot, workflowId });
       if (driven.ok !== true) {
         this.diagnostics(projectRoot).record("app-dispatch.drive.failed", { workflowId, reasonCode: driven.code });
+        // 2026-11-20（block resolver 桌面批）：服务拒绝的 block 事实 → router（不改阶段语义）。
+        if (driven.blockFact !== undefined) this.blockRouter?.observeFactLater(projectRoot, driven.blockFact);
         if (driven.code === "workflow-corrupt") {
           this.emitDeliveryNote(projectRoot, this.runtimeFor(projectRoot, "convener"), "convener", "convener",
             `[应用·工作流] ${workflowId} 账本不一致：${shortenSummary(driven.message, 160)}（停止自动推进，请核对）`);
@@ -377,6 +431,10 @@ export class FixedWorkflowStageDispatch {
       && record.created.stage === "B1"
       && record.created.taskKind !== "stage-request");
     if (b1.length === 0) {
+      this.noteServiceBlock(projectRoot, "b-change-scope-invalid", `B2 派生阻塞：缺少 B1 任务记录（不猜影响面）`, {
+        workflowId, flowId: view.flowId, stage: "B2", detailCode: "scope-tradeoff",
+        fingerprintMaterial: ["b2-derive", workflowId, "missing-b1"],
+      });
       this.emitDeliveryNote(projectRoot, this.runtimeFor(projectRoot, "convener"), "convener", "convener",
         `[应用·工作流] ${workflowId} B2 派生阻塞：缺少 B1 任务记录（不猜影响面）。`);
       return "blocked";
@@ -398,6 +456,10 @@ export class FixedWorkflowStageDispatch {
       }
     }
     if (impactReport === undefined) {
+      this.noteServiceBlock(projectRoot, "b-change-scope-invalid", `B2 派生阻塞：B1 任务 ${latest.taskId} 的 done 报告未给出可读影响面文件`, {
+        workflowId, flowId: view.flowId, stage: "B2", taskId: latest.taskId, detailCode: "scope-tradeoff",
+        fingerprintMaterial: ["b2-derive", workflowId, "no-impact", latest.taskId],
+      });
       this.emitDeliveryNote(projectRoot, this.runtimeFor(projectRoot, "convener"), "convener", "convener",
         `[应用·工作流] ${workflowId} B2 派生阻塞：B1 任务 ${latest.taskId} 的 done 报告未给出可读的项目内影响面文件（不猜）。`);
       return "blocked";
@@ -412,6 +474,10 @@ export class FixedWorkflowStageDispatch {
       .filter(isScopeFileCandidate))];
     const candidates = moduleCandidates.length > 0 ? moduleCandidates : reportCandidates;
     if (candidates.length === 0) {
+      this.noteServiceBlock(projectRoot, "b-change-scope-invalid", `B2 派生阻塞：B1 任务未记录 modulePaths 且报告无可读路径`, {
+        workflowId, flowId: view.flowId, stage: "B2", detailCode: "scope-tradeoff",
+        fingerprintMaterial: ["b2-derive", workflowId, "no-candidates"],
+      });
       this.emitDeliveryNote(projectRoot, this.runtimeFor(projectRoot, "convener"), "convener", "convener",
         `[应用·工作流] ${workflowId} B2 派生阻塞：B1 任务未记录 modulePaths 且报告无可读路径（应用不采信模型自报写集）。`);
       return "blocked";
@@ -434,6 +500,9 @@ export class FixedWorkflowStageDispatch {
       requestTaskId: requestTask.taskId,
     });
     if (!decision.ok) {
+      this.noteServiceBlock(projectRoot, decision.code, `B2 派生阻塞（${decision.code}）：${decision.message}`, {
+        workflowId, flowId: view.flowId, stage: "B2", taskId: requestTask.taskId, detailCode: "scope-tradeoff",
+      });
       this.emitDeliveryNote(projectRoot, this.runtimeFor(projectRoot, "convener"), "convener", "convener",
         `[应用·工作流] ${workflowId} B2 派生阻塞（${decision.code}）：${shortenSummary(decision.message, 160)}`);
       return "blocked";
@@ -529,8 +598,20 @@ export class FixedWorkflowStageDispatch {
         workflowId, taskId, outcome: observed.outcome, stage: observed.stage,
         stageCompleted: observed.stageCompleted, retried: observed.retried !== undefined, blocked: observed.blocked !== undefined,
       });
+      // 2026-11-20（block resolver 桌面批）：Q8 重试耗尽 / 高风险零重派 ⇒ B9/B4 事实（R1 事实出口）。
+      if (observed.blockFact !== undefined) this.blockRouter?.observeFactLater(projectRoot, observed.blockFact);
     } else {
       this.diagnostics(projectRoot).record("app-dispatch.observe.failed", { workflowId, taskId, reasonCode: observed.code });
+      // close-report-missing 等收口失败（P4/P25）→ 服务事实（B1/B8）；不改收口语义。
+      this.blockRouter?.observeFactLater(projectRoot, blockFactFromServiceFailure({
+        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
+        code: observed.code,
+        message: observed.message,
+        workflowId,
+        taskId,
+        source: "desktop.stage-dispatch.observe",
+        fingerprintMaterial: ["observe-failure", workflowId, taskId, observed.code],
+      }));
     }
   }
 
@@ -666,6 +747,7 @@ export class FixedWorkflowStageDispatch {
     }
     if (service.ok !== true) {
       summary.errors.push(`${service.code}: ${service.message}`);
+      if (service.blockFact !== undefined) this.blockRouter?.observeFactLater(projectRoot, service.blockFact);
       return summary;
     }
     summary.service = service;
@@ -673,6 +755,9 @@ export class FixedWorkflowStageDispatch {
     for (const workflow of service.workflows) {
       if (workflow.protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH) continue; // Q10：旧协议不触碰
       summary.activeWorkflows += 1;
+      if (workflow.blockFacts !== undefined && workflow.blockFacts.length > 0) {
+        this.blockRouter?.observeFactListLater(projectRoot, workflow.blockFacts);
+      }
       if (workflow.corrupt !== undefined) summary.corrupt.push(`${workflow.workflowId}: ${workflow.corrupt}`);
       summary.errors.push(...workflow.errors.map((entry) => `${workflow.workflowId}: ${entry}`));
       const drivenTaskIds = (workflow.driven?.tasks ?? []).map((task) => task.taskId);

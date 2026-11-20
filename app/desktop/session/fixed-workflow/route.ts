@@ -36,6 +36,10 @@ import { deriveWorkflowView, type WorkflowView } from "../../../../src/common/�
 import { deriveFixedModuleWriteSet, loadLatestRoster as loadLatestWorkflowRoster, reviewRoleIdOfRoster } from "../../../../src/common/编排/workflow-preconditions.ts";
 import { inspectAssignedTask as inspectWorkflowAssignedTask } from "../../../../src/common/编排/workflow-service.ts";
 import { isBuiltInGovernanceRoleId } from "../../../../src/service/boundary/resolve-boundary.ts";
+// 2026-11-20（block resolver 桌面批）：fixed 派发拒绝回执附 blockId/nextActions，事实交给 router
+// （P10–P23；拒绝语义/错误码逐字不变）。
+import { blockFactFromDispatchRejection, computeBlockId, type BlockFact } from "../../../../src/common/编排/block-resolution.ts";
+import { nextActionsForBlockCode } from "../../block-router.ts";
 import { isWorkflowPath, isWorkflowStage, WORKFLOW_PROTOCOL_APP_DISPATCH, type WorkflowProtocol } from "../../../../src/model/runtime.ts";
 import { workflowProtocolForWorkflowId } from "../../workflow.ts";
 import type { BasisEvent, DispatchReceipt, DispatchTaskPayload, TaskStateEvent, WorkflowEvent, WorkflowStage } from "../../../../src/model/runtime.ts";
@@ -80,6 +84,8 @@ export interface FixedWorkflowPorts {
   enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void;
   drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void>;
   appDispatchClientMessageId(dedupKey: string): string;
+  /** 2026-11-20（block resolver 桌面批）：派发拒绝/服务失败的 block 事实（缺省 ⇒ 旧行为零变化）。 */
+  onBlockFact?(projectRoot: string, fact: BlockFact): void;
 }
 
 /** fixed 派发路由 + 路径 B 写集/启动门（原 SessionManager 3 方法的同签名实现）。 */
@@ -175,9 +181,23 @@ export class FixedWorkflowRoute {
     source: ActualDispatchSource | undefined,
     dispatchFlowId: string,
   ): Promise<DispatchReceipt> {
-    const reject = (code: string, message: string): DispatchReceipt => {
+    const blockContext: { protocol?: WorkflowProtocol; workflowId?: string; stage?: WorkflowStage } = {};
+    const reject = (code: string, message: string, blockFact?: BlockFact): DispatchReceipt => {
       this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, `${code}：${message}`);
-      return { ok: false, message: `${code}：${message}` };
+      // 2026-11-20（block resolver 桌面批）：拒绝回执附确定性 blockId/nextActions；事实交 router。
+      // 拒绝语义/错误码/消息逐字不变（只加法字段 + 异步路由）。服务层已给事实 ⇒ 原样复用（不双造块）。
+      const fact = blockFact ?? blockFactFromDispatchRejection({
+        protocol: blockContext.protocol ?? "fixed-v2.1",
+        code,
+        message,
+        roleId: fromRoleId,
+        source: "desktop.fixed-route.reject",
+        ...(blockContext.workflowId !== undefined ? { workflowId: blockContext.workflowId } : {}),
+        ...(blockContext.stage !== undefined ? { stage: blockContext.stage } : {}),
+        fingerprintMaterial: ["fixed-dispatch-reject", code, createHash("sha256").update(task).digest("hex").slice(0, 16)],
+      });
+      this.port.onBlockFact?.(projectRoot, fact);
+      return { ok: false, message: `${code}：${message}`, blockId: computeBlockId(fact), nextActions: nextActionsForBlockCode(code) };
     };
     const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
     const convenerRoleId = this.handbackOwnerRoleId(projectRoot);
@@ -364,6 +384,11 @@ export class FixedWorkflowRoute {
       const latestBasis = basisEvents[basisEvents.length - 1];
       basisReviewRoleId = latestBasis?.reviewRoleId;
     }
+    // 2026-11-20（block resolver 桌面批）：拒绝事实的账本上下文（已绑定值；不采信模型自报）。
+    blockContext.protocol = appDispatchProtocol ?? "fixed-v2.1";
+    if (workflowId !== undefined) blockContext.workflowId = workflowId;
+    const rejectStage = effectiveStage ?? workflowView?.stage;
+    if (rejectStage !== undefined) blockContext.stage = rejectStage;
     // purpose 由**可信路由事实**派生（不信任模型自报）：stage-request＝stage-request；chief→内置 verifier＝
     // review；chief→项目角色仅当目标是本 workflow 的 `reviewRoleId`（MF-10 窄例外；唯一可信来源 =
     // `basis.recorded.reviewRoleId`，不取模型自报/投影未派生字段）＝review，其余按生产派发拒绝
@@ -472,7 +497,7 @@ export class FixedWorkflowRoute {
     // 幂等：已有 basis 记录 ⇒ no-op。非 B 路径 workflow 直接放行（零行为）。B8.2：flow 取自动绑定值。
     if (!isStageRequest && workflowId !== undefined && (effectiveStage === "B1" || effectiveStage === "B3")) {
       const pathB = await this.ensurePathBStartForDispatch(projectRoot, workflowId, effectiveFlowId);
-      if (!pathB.ok) return reject(pathB.code, pathB.message);
+      if (!pathB.ok) return reject(pathB.code, pathB.message, pathB.blockFact);
     }
     // T3 B3（AC-19/§7.2）：A11/B1/B3 实现派发前复核 basis（文档/计划 hash 漂移 ⇒ `basis-drift`，
     // `basis-missing`；不派实现）。B1 由上面的路径 B 准备先写 basis，再复核。
@@ -481,13 +506,13 @@ export class FixedWorkflowRoute {
     if (!isStageRequest && workflowId !== undefined && fromRoleId === convenerId
       && (effectiveStage === "A11" || effectiveStage === "B1" || effectiveStage === "B3")) {
       const basis = await verifyBasisForWorkflow({ projectRoot, workflowId, stage: effectiveStage });
-      if (!basis.ok) return reject(basis.code, basis.message);
+      if (!basis.ok) return reject(basis.code, basis.message, basis.blockFact);
     }
     // T3 B3（AC-10/§4.3 MF-8）：B3 写集 = B2 `change.scope-decided.scope.files` ∩ roster/边界派生；
     // 派发任务声明的模块路径必须落在该角色有效写集内（越界 ⇒ `b-change-scope-invalid`）。
     if (!isStageRequest && workflowId !== undefined && effectiveStage === "B3") {
       const writeSet = await this.checkPathBWriteSetForDispatch(projectRoot, workflowId, effectiveFlowId, targetRoleId, requestedModulePaths);
-      if (!writeSet.ok) return reject(writeSet.code, writeSet.message);
+      if (!writeSet.ok) return reject(writeSet.code, writeSet.message, writeSet.blockFact);
     }
     // B21（2026-11-11，RR16 失败修复）：fixed A11 实现任务的模块写集以 `moduleId` 为权威——应用从
     // 最新名单模块表派生该模块路径并写入任务；模型 `modulePaths` 仅作断言，跨模块/未知 moduleId
@@ -521,7 +546,7 @@ export class FixedWorkflowRoute {
           workflowId,
           ...(requestedEvidence !== undefined ? { candidateFiles: requestedEvidence } : {}),
         });
-        if (!scope.ok) return reject(scope.code, `B2 范围决定未记录：${scope.message}（B3 请求未受理）。`);
+        if (!scope.ok) return reject(scope.code, `B2 范围决定未记录：${scope.message}（B3 请求未受理）。`, scope.blockFact);
       }
       const stageRequest = await requestStage({
         projectRoot,
@@ -536,7 +561,7 @@ export class FixedWorkflowRoute {
         text: task,
         ...(reason !== undefined ? { reason } : {}),
       });
-      if (!stageRequest.ok) return reject(stageRequest.code, stageRequest.message);
+      if (!stageRequest.ok) return reject(stageRequest.code, stageRequest.message, stageRequest.blockFact);
       taskId = stageRequest.taskId;
       if (stageRequest.replay) {
         return { ok: true, message: `已受理：同一 stage-request 已存在（#${taskId}），未重复投递；受理 ≠ 完成。` };

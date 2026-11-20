@@ -373,4 +373,11 @@ export interface SessionManagerDeps {
   networkGate?: NetworkGate;
   /** **时钟（G-2；注入以便单测）**；缺省 `Date.now`。 */
   now?: () => number;
+  /**
+   * 2026-11-20（block resolver 桌面批）：「替我决策」开关的**主进程权威**读取（与 customer-input
+   * 通道的 `isGroupEnabled("decision")` 同源）。`block-router` 只用它给 block 事实标注
+   * `judgeAvailable`（决定 B3/B9 的首选路由）；最终代选仍由通道在呈卡当刻二次核验。
+   * 缺省 ⇒ 视为关闭（fail-closed；不代选）。
+   */
+  decisionDelegationEnabled?: () => boolean;
 }

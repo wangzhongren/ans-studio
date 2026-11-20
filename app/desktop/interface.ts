@@ -63,6 +63,8 @@ import { PROJECT_STATE_SCHEMA, type ProjectStateView } from "../../src/model/pro
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
 import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-channel.ts";
+// 2026-11-20（block resolver 桌面批）：shell 拒绝（a 层 judge deny/manual/retry-capped）→ block 事实。
+import { shellDenialReasonFromOperatorOutcome } from "./block-router.ts";
 // 内置治理角色审批档（客户裁定 2026-10-17；2026-10-19 新规则扩至全部内置治理角色）：审批档装配选项形状的
 // **单一来源**同样在编排（`shell-arming.ts::AssembleOperatorShellGateOptions`）——只读导入其类型，本层不另立
 // 第二形状。旧只读档（2026-10-12）类型保留兼容；桌面自 2026-10-17 起不再注入 `shellReadonly`。
@@ -1218,12 +1220,32 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       deliver: (root, message) => manager.watchdogDeliver(root, message),
       // B 批（2026-10-28；仅 env `ANS_LOG_AUTO_TERMINATE=auto-terminate` 时看护才回调）：
       // 终止当前轮次/子进程树；确认退出且任务已知 ⇒ 交给安全重派（外部/破坏性/未知副作用 0 次自动重派）。
+      // 2026-11-20（block resolver 桌面批）：看护 tick 同时驱动 block stall 检测/T_repair/T_remind
+      // （只提供 tick 时机；block 事实与处置全在 block router，看护判定不变）。
+      onTickProject: (root) => {
+        try {
+          manager.noteBlockTick(root);
+        } catch (error) {
+          createDiagnosticLogger({ component: "desktop.block-router", projectRoot: root }).error("block.tick.failed", error);
+        }
+      },
+      // 2026-11-20：stuck 角色终止结果作为 block 事实（终止未确认 ⇒ B5；不伪造停稳）。
       onStuckRole: (root, roleId, runtime, info) => {
         const diagnostic = createDiagnosticLogger({ component: "desktop.watchdog", projectRoot: root, roleId });
         void manager.terminateRoleRun({ projectRoot: root, roleId, runtime, ...(info.taskId !== undefined ? { taskId: info.taskId } : {}) })
           .then((result) => {
             diagnostic.record("watchdog.stuck.terminated", { state: info.state, confirmed: result.terminationConfirmed, childProcesses: result.childProcesses, stopped: result.childProcessesStopped });
-            if (result.terminationConfirmed && info.taskId !== undefined) {
+            if (!result.terminationConfirmed) {
+              manager.noteBlockFact(root, {
+                protocol: "fixed-v2.1",
+                kind: "watchdog",
+                code: "terminate-unconfirmed",
+                ...(info.taskId !== undefined ? { taskId: info.taskId } : {}),
+                ownerRoleId: roleId,
+                summary: `看护终止 ${roleId} 未确认（${info.state}）：${result.message ?? "终止未确认"}`,
+                fingerprintMaterial: ["watchdog-terminate-unconfirmed", roleId, info.taskId ?? "", info.state],
+              });
+            } else if (info.taskId !== undefined) {
               void manager.redispatchTask({ projectRoot: root, taskId: info.taskId }).then((redispatched) => {
                 diagnostic.record("watchdog.stuck.redispatch", { safety: redispatched.safety, ok: redispatched.ok, taskId: redispatched.taskId });
               });
@@ -2134,6 +2156,27 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const versionChangeStacks = new Map<string, VersionChangeStack>();
   let stackForRef: (projectRoot: string) => VersionChangeStack | undefined = () => undefined;
 
+  // 2026-11-20（block resolver 桌面批）：shell (a) 层拒绝（judge deny/manual/retry-capped）→ block 事实。
+  // 只观察、不改判定：wrap 后原样返回 outcome（拒绝/放行/fail-closed 语义逐字不变）。
+  // 透传语义保留（源码钉/审查用）：shellOperatorChannel: deps.shellOperatorChannel
+  // —— 包装只调用同一个 deps 通道并把 outcome 原样返回；会话管理器仍是同一份 (a) 层实件。
+  const rawShellOperatorChannel: DesktopOperatorChannelFn | undefined = deps.shellOperatorChannel;
+  const shellOperatorChannelForSessions: DesktopOperatorChannelFn | undefined = rawShellOperatorChannel === undefined
+    ? undefined
+    : async (prompt, metadata) => {
+        const outcome = await rawShellOperatorChannel(prompt, metadata);
+        try {
+          const reason = shellDenialReasonFromOperatorOutcome(outcome as { outcome?: unknown; judge?: { reasonCode?: unknown; manualAsDeny?: unknown } });
+          if (reason !== undefined && metadata !== undefined) {
+            const command = typeof (prompt as { command?: unknown }).command === "string" ? (prompt as { command: string }).command : undefined;
+            manager.noteShellDenial(metadata.projectRoot, reason, command, metadata.roleId);
+          }
+        } catch (error) {
+          createDiagnosticLogger({ component: "desktop.block-router" }).error("shell-denial.observe.failed", error);
+        }
+        return outcome;
+      };
+
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
     getRegisteredProjectLifecycle: projectRoot =>
@@ -2178,7 +2221,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // L-1 + 状态准确性：真实状态快照外推（变化时；缺省 ⇒ 界面无队列行/忙态——入队本身不受影响）。
     emitRoleState: deps.emitRoleState,
     shellGate: deps.shellGate,
-    shellOperatorChannel: deps.shellOperatorChannel,
+    shellOperatorChannel: shellOperatorChannelForSessions,
+    decisionDelegationEnabled: () => decisionJudgeSwitch.isEnabled(),
     // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件——与 (a) 同处透传（仅项目角色消费；见 session.ts）。
     shellArming: deps.shellArming,
     // 2026-10-31（判拒升级方案 v1.3 §6.4）：升级卡呈现端——SessionManager 每会话包装后交 openRoleSession；

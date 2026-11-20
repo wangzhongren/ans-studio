@@ -68,6 +68,12 @@ export interface HandbackPorts {
    * 观察 `task.reported` 并按流程定义收口/推进（不唤醒第二角色、不伪造收口）。缺省 ⇒ 不观察（防御）。
    */
   observeApplicationTaskReport?(projectRoot: string, taskId: string): Promise<void>;
+  /**
+   * 2026-11-20（block resolver 桌面批）：block 运行时事实入口——
+   * · `taskKind:"repair"` 的**应用修复任务**报告只走 block router（观察/核验/收口；不进阶段观察）；
+   * · 其余 star 任务的 blocked/failed 报告作为 block 事实（P1–P3/P24）交给 router 路由。
+   */
+  observeBlockTaskReport?(projectRoot: string, taskId: string): void;
 }
 
 /** 回交提交、回交主人路由与回交展示（原 SessionManager 4 方法的同签名实现）。 */
@@ -300,6 +306,13 @@ export class Handback {
       // 收口/推进（`observeAppDispatchTaskReport`；A12b rework 用显式策略）。不伪造收口、不唤醒第二角色。
       if (starTask && taskCreator === "application" && typeof hb.taskId === "string" && hb.taskId !== "") {
         const appRecord = (await this.readTasks(projectRoot)).records.get(hb.taskId);
+        // 2026-11-20（block resolver 桌面批）：应用修复任务（taskKind:"repair"）报告只走 block router
+        // （应用重算证据/收口/重入场），**不进**阶段观察（不触发阶段完成）。
+        if (appRecord?.created?.taskKind === "repair") {
+          this.port.observeBlockTaskReport?.(projectRoot, hb.taskId);
+          diagnostic.record("report.block-router.applied", { taskId: hb.taskId });
+          return true;
+        }
         if (appRecord?.closed === undefined) {
           try {
             await this.port.observeApplicationTaskReport?.(projectRoot, hb.taskId);
@@ -309,6 +322,14 @@ export class Handback {
         }
         diagnostic.record("report.app-dispatch.applied", { taskId: hb.taskId });
         return true;
+      }
+      // 2026-11-20（block resolver 桌面批）：star 任务 blocked/failed 报告是 block 事实（P1–P3/P24）——
+      // 应用确定性路由（修复任务/自动修复/决策卡）；报告仍只是报告，不构成收口。
+      if (starTask && typeof hb.taskId === "string" && hb.taskId !== "") {
+        const blockReportStatus = taskReportStatusOf(hb.status);
+        if (blockReportStatus === "blocked" || blockReportStatus === "failed") {
+          this.port.observeBlockTaskReport?.(projectRoot, hb.taskId);
+        }
       }
       // 2026-11-05（客户最终口径：不是自动发卡，是让运营自己选择）：star 任务报告 blocked（trio、flowId 可解析）
       // 时**首次即**给 convener 一条 delivery-note 提示——是否调用 `report_plan_escalation`
