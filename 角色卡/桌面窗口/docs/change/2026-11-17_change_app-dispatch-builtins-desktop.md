@@ -159,6 +159,9 @@
   派发入口已移除，旧形调用按此码拒绝；**旧协议 fixed-v2.1 仍走旧码（stage-request-invalid/
   stage-request-required 等逐字保留）**。同一 `taskKind dispatch` 说明行同步补充该码。
 - 仅改 `evidence.ts` 与本记录；未改测试/其它文件。`grep -n "stage-request-removed"` 已确认两处（文案 + 码表）。
+- 收尾同步时观察到测试批已在本工作树提交 `b6b7165`（更新 fixed 契约断言 + `role-module-contract` 15 项）：
+  `npm run typecheck` 现为 **0 错误**；`b71-fixed-fail-closed` 与 `role-module-contract` 复跑 **28/28 pass**
+  （§5.2 中此前记录的 2 个类型钉与 b71 预期差异已由测试批收口）。
 
 ### 5.2 目标桌面测试（`node --test --test-concurrency=1`）
 | 测试 | pass/fail | 说明 |
