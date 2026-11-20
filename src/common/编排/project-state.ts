@@ -406,9 +406,13 @@ function redispatchCounts(records: Map<string, TaskRecord>): Map<string, number>
 function projectTaskOf(record: TaskRecord, redispatchCount: number): ProjectStateTask | undefined {
   const card = taskCardOf(record);
   if (card === undefined || record.created === undefined) return undefined;
+  const creator = record.created.from;
   return {
     ...card,
-    from: record.created.from,
+    // 2026-11-17（app-dispatch/v1）：运行时如实保留 `"application"`；类型按冻结结构镜像（旧契约
+    // 仅 chief/convener）收窄以保住双向可赋值断言；需要分支的新消费者读 `creator`。
+    from: creator as "chief" | "convener",
+    creator,
     blocked: card.lastReport?.status === "blocked",
     failed: card.lastReport?.status === "failed",
     redispatchCount,
