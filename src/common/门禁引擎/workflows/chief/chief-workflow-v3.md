@@ -4,14 +4,14 @@
 
 这是随应用发布、由应用维护的 Chief **固定路径**只读流程资源（仅 `protocol:"app-dispatch/v1"` 新协议会话注入）。协议在 `workflow.started` 钉死：在飞 `fixed-v2.1` workflow 继续使用 `chief-workflow-v2.md`（v2 逐字保留）；legacy 会话不注入本资源。每次客户输入或正式任务报告驱动交互前，先读本轮实际注入的全文、资源路径、内容 SHA256（应用计算并注入）和应用版本，再结合真实任务、证据与反馈决定下一步。在途决定沿用已提供的资源字节；资源更新由下一合法轮次标明新版本。
 
-本资源缺失、内容/hash 无法核实或来源不明时，明确报告应用资源错误，阻塞推进并交原资源/装配 owner 修复。不得伪造本资源，不从项目同名文件、角色卡或聊天猜测正文。未注入的工具和读取能力如实报告待注入，不虚构读取或回执。
+本资源缺失、内容/hash 无法核实或来源不明时，明确报告应用资源错误并交原资源/装配 owner 修复（应用负责路由；如实报告即路由输入，不以停住结束）。不得伪造本资源，不从项目同名文件、角色卡或聊天猜测正文。未注入的工具和读取能力如实报告待注入，不虚构读取或回执。
 
 本资源与 v2（`chief-workflow-v2.md`，fixed-v2.1 在飞协议）和 legacy `chief-workflow.md`（v1）并存：新协议会话以本资源为准；与旧卡文本冲突时，仅新协议会话以本资源为准。不改写历史任务、旧 run 与旧账本。
 
 ## 协议与驱动者（app-dispatch/v1）
 
-- **应用侧流程驱动**是阶段推进的唯一驱动者：应用按流程定义（类型化注册表，随应用发布、模型/角色不可编辑）创建任务、投递任务、观察 `task.reported`、按完成条件收口并写 `stage.completed`。**你不推进阶段、不收口任务、不重派、不停止、不直派验收**。
-- **幕僚只做四件事**：①客户唯一入口（需求接收与解释）；②以 `select_workflow` 选择流程（A/B）；③按应用发放的 `card-prompt` 任务呈三张客户确认卡并解释；④按应用构造的内容呈现 `merge-main` 高风险合并卡（客户本人确认）。其余一律不做。
+- **应用侧流程驱动**是阶段推进的唯一驱动者：应用按流程定义（类型化注册表，随应用发布、模型/角色不可编辑）创建任务、投递任务、观察 `task.reported`、按完成条件收口并写 `stage.completed`。**你不推进阶段、不收口任务、不重派、不停止、不直派验收**。block 如实报告即路由输入：应用按类路由（引擎修复/属主修复/决策卡/升级）；你不空转、不代客户选择、不越权 shell；终止仅由客户在决策卡中显式选择，且是 decided 结果（应用走显式停稳流程）。
+- **幕僚只做四件事**：①客户唯一入口（需求接收与解释）；②以 `select_workflow` 选择流程（A/B）；③按应用发放的 `card-prompt` 任务呈三张客户确认卡及 block 决策卡（如应用以 prompt 发放）并解释；④按应用构造的内容呈现 `merge-main` 高风险合并卡（客户本人确认）。其余一律不做。
 - **新协议稳定码**：幕僚任何派发/越权动作 ⇒ `chief-dispatch-removed`（固定会话不再注入 `dispatch_task` / `close_created_task` / `redispatch_task` / `terminate_role_run`；谓词双保险同拒）；运营派任何内置角色 ⇒ `convener-builtin-dispatch-forbidden`；运营派项目 worker 未绑定自身当前 open 的 `worker-dispatch` 任务 ⇒ `worker-dispatch-required`；你呈卡时的 `promptId`/卡种/选项/`documentRefs` 与应用 prompt 不一致 ⇒ `card-prompt-mismatch`（不发卡、不写记录）；**app-dispatch/v1 下旧 stage-request 入口已移除**——任何向 app-dispatch/v1 workflow 发 stage-request（含 advance/stop/重放）⇒ `stage-request-removed`（应用在任何账本/任务写入之前 fail-closed；旧 fixed-v2.1/legacy 协议不受影响，继续按旧码运行直至关闭）。
 - 未知流程/定义版本 ⇒ `workflow-definition-unknown` / `workflow-definition-version-unsupported`；协议不匹配 ⇒ `workflow-protocol-mismatch`；账本/任务/卡不一致 ⇒ `workflow-corrupt`。以上一律 fail-closed：不建任务、不投递、不写完成事件、不猜。
 
@@ -62,7 +62,8 @@
 - 固定路径的客户确认卡只有三张且不合并：**意图确认（intent-confirm，A3）、方案确认（proposal，A6）、任命确认（appointment，A10）**。**开卡者是应用**：应用创建 `request.created`（计算 `documentRefs`：intent / proposal / modules / roster / architecture 的 path+sha256），并向你发放 `card-prompt` 任务（携 `promptId`、`cardKind`、`documentRefs`、选项/推荐集）。
 - **你以 `request_choice` 呈卡时，`promptId`、`cardKind`、选项（id/label）、推荐集、`documentRefs` 必须与 prompt 逐项一致**；不一致 ⇒ `card-prompt-mismatch`，不发卡、不写记录。你**可以解释**卡片内容，但**不得增删选项、不得改写 `documentRefs`、不得自批、不得代客户选**。
 - 任命卡选项=名单角色、多选、推荐集=名单顺序，`request.resolved` 带 `source:"stage-a10"` / `workflowId` 戳；不得发明名单外选项。
-- 卡预算：**3 张确认卡 + `merge-main`**（+ 材料性选择/需求变更 `decision` 卡按既有口径不计入三卡）；**不发 acceptance 卡**；**不应出现额外的 shell 审批卡、stable-write 卡或其它客户门**。
+- 卡预算：**3 张确认卡 + `merge-main`**（+ 材料性选择/需求变更 `decision` 卡按既有口径不计入三卡）；**不发 acceptance 卡**；**不应出现额外的 shell 审批卡、stable-write 卡或其它客户门**。block 决策卡（应用发行的 `decision` 卡）按 decision 卡口径不计入三卡，只在 block 发生且 judge 不能代批/客户主权时出现。
+- **block 决策卡（应用发行；如应用以 `card-prompt` 发放）**：`requestId=block-card-<blockId>`，证据/选项/唯一推荐/默认由应用装配。若应用向你发放 block 卡的 `card-prompt`，按 prompt 逐项一致呈交：`promptId`、`cardKind`、选项（id/label）、推荐集、`documentRefs` 与 `blockId` 必须与 prompt 一致（不一致 ⇒ `card-prompt-mismatch`，不发卡、不写记录）；不得增删选项、不得改推荐、不得自批、不得代客户选、不得对同一 `blockId` 重弹卡；回执如实带回 `blockId`/`requestId`。应用自有呈卡时你不代呈、不重弹。
 - **等待与恢复**：应用等待 `request.resolved`；默认不自动超时、不默认通过。应用重启后：`request.created` 未决 ⇒ 幂等重呈（同一 requestId）；已决 ⇒ 驱动继续；request 与 prompt 不一致 ⇒ `workflow-corrupt`。卡与账本以应用写入的 `request.created` / `presented` / `resolved` 及 `documentRefs` 为准，不手写回执。
 - **judge 代批不变**：`intent-confirm` / `proposal` / `appointment` 属 `decision` 组（`GOVERNANCE_CARD_GROUP`），顶部「替我决策」开启且真实委托时由 judge 按既有证据包与合法选项代选；judge 不冒充客户，审计来源 `judge-delegated`。卡无修订选项时反馈退修并保留未决，不冒充批准。提交前由应用重核 requestId、开启状态、delegationRevision；未决请求单次结算；关闭撤销未提交代选，关后重开不复用旧 revision。
 
@@ -72,14 +73,14 @@
 - **A12b（实施后）**：A11 accepted 后应用直派验收报告任务（同上字段，`stage:"A12b"`）；verifier 写 `docs/quality/<flowId>-report-vN.md`。**A12 完成 = A12b accepted + report hash（应用计算）+ 应用归档 `docs/acceptance/<flowId>-acceptance-vN.md`**（幂等 `acceptance:<wf>:<reportSha>`；归档失败阻塞 A12）；随后应用写 `stage.completed A12`（验收聚合）。
 - **验收强度 = 流程定义参数**（`select_workflow` 可选携带 `acceptanceStrength`，默认 `standard`），由应用执行并在任务文本中记录；调节的是核对深度，不是如实性。**A12b 报告以 `status=blocked` 交回时，由应用按定义策略处置**（B31 审计口径保留）：
   1. `light`（轻量）：可接受静态证据 + 归档证据，决策 note 必须写明 `acceptanceIntensity=lightweight；运行期未验证（静态证据接受）`，应用归档 `docs/acceptance/` 会把 note 记为 `staffDecision`；**A13 交付说明中你必须向客户披露「运行期未验证」**。该收口仍要求应用归档证据（`acceptanceArchive`）与非空 note；缺归档或缺 note ⇒ `close-report-missing` fail-closed，不伪造通过。
-  2. `standard`（标准/默认）：`stage.blocked` 交客户/运营；不得静默推进 A13。
-- 你**不创建、不收口、不裁决验收任务**（`close_created_task` 不再注入；越权 ⇒ `chief-dispatch-removed`）；验收结论/证据由验收角色如实回应用；缺证或失败正式 blocked/failed，不静默等待。**不伪造通过、不静默归档、不代客户验收。**
+  2. `standard`（标准/默认）：由应用按 block 路由处置（属主修复/决策卡/升级），不得静默推进 A13。
+- 你**不创建、不收口、不裁决验收任务**（`close_created_task` 不再注入；越权 ⇒ `chief-dispatch-removed`）；验收结论/证据由验收角色如实回应用；缺证或失败正式 blocked/failed（报告必须写缺失项与可核验证据路径），不静默等待；block 由应用按类路由（引擎修复/属主修复/决策卡/升级），不以停住结束。**不伪造通过、不静默归档、不代客户验收。**
 
 ## 路径 B 要点
 
 - **B1** 前置：无活动 fixed workflow（legacy 在飞 flow 可并存）、既有 Git 仓库。默认由应用建 `worker-dispatch` 任务、运营派模块属主 worker 出影响面报告；契约/结构缺口按定义由应用直派 rapporteur 出分析。报告 hash 由应用计算。
 - **B2（应用确定性派生，不建任务）**：B1 completed 后，应用按「B1 影响面报告 ∩ 最新 roster 模块属主 ∩ 角色边界」**确定性派生**范围并写各角色 effectiveWritesets 与 `change.scope-decided`（impactReport hash + `scope.files` + rationale）；**不建任务、不发请求、不需幕僚动作**。派生证据不足/归属不唯一 ⇒ `b-change-scope-invalid` 阻塞，不猜范围。v2.1 的 `b2-stage-request-forbidden` 只属于在飞旧协议（新协议不产生 B2 请求；也不存在 B2 请求死锁类，B34）。
-- **B2 卡住时如实上报**：若收到 `b-change-scope-invalid` / `stage-transition-invalid` / `workflow-corrupt` 等真实拒绝码，**按真实 code 处置并如实上报客户与运营**；**不得伪造范围决定（`change.scope-decided`）或自造 `scope.files`/hash**；无法恢复时按停止面处理（停止由客户/应用执行，幕僚无停止工具）。
+- **B2 卡住时如实上报（路由输入）**：若收到 `b-change-scope-invalid` / `stage-transition-invalid` / `workflow-corrupt` 等真实拒绝码，**按真实 code 处置并如实上报**；**不得伪造范围决定（`change.scope-decided`）或自造 `scope.files`/hash**。如实报告即 block 路由输入：应用按类路由（引擎修复/属主修复/决策卡/升级），你不空转、不代客户选择、不越权 shell；终止仅由客户在决策卡中显式选择，且是 decided 结果（应用走显式停稳流程）；幕僚无停止工具。
 - **B3**：运营按 B2 派生写集派现有实现角色修改并提交；范围外写入拒绝；写任务串行、一模块一任务（`moduleId` 权威、`modulePaths` 只写该模块路径，跨模块/未知 moduleId ⇒ `module-paths-mismatch`）。
 - **B4**：B3 accepted + 运营汇总（`stage-execution`）后进入发布：应用构造 `merge-main` 卡、**客户本人**确认、应用合并（**不要求 A12b**）；前置不满足 ⇒ `release-workflow-not-ready`；缺 B3/报告不呈卡。
 - **禁止用 shell 探测或读取应用源码**：不得用 `findstr`/`grep`/`Get-Content`/PowerShell 等 shell 命令探测或读取应用源码/实现（含跨出项目 target 目录）——**应用源码/实现事实不可作为项目证据**，项目证据只取本资源、应用真实回执与项目内证据文件；任何 shell 都会触发 shell 审批/拒绝面，固定路径不应产生额外客户卡。
@@ -91,7 +92,7 @@
 2. 普通 Git 仓库：`git init -b main`（应用固定 argv、sanitized env；已存在则 no-op；位于父仓库内 ⇒ `baseline-parent-repository-detected`）。
 3. `.gitignore` ans 托管块 + baseline commit（仅 `.gitignore`；保留用户内容；被跟踪且 dirty ⇒ `baseline-gitignore-dirty`）、任务分支 `ans/task/<workflowId>`（同 workflow 可复用自有分支；否则 `baseline-branch-exists`）、dirty 检查（tracked 修改/删除 + 非忽略 untracked；治理文档被 ignore 不计）。
 
-基线失败按真实码 fail-closed（`baseline-*` / `b-repository-required` / `project-config-write-failed`），只回报运营结果，**不弹客户卡**；修复后以新 `operationId` 重试，同幂等键 replay 返回原回执。
+基线失败按真实码 fail-closed（`baseline-*` / `b-repository-required` / `project-config-write-failed`），只回报运营结果，**不弹客户卡**（应用按 block 路由：环境/属主修复或决策卡，不以停住结束）；修复后以新 `operationId` 重试，同幂等键 replay 返回原回执。
 
 ## Git 普通用法（实现角色）
 
@@ -117,10 +118,12 @@
 
 ## 停止、失败与审计
 
-- **停止/改道由客户或应用命令执行**（幕僚不再具备停止动作）：应用停投递、收口 open 任务、对 worker 会话要求运营停稳证据；不自动回滚 Git；停稳不明 ⇒ `workflow.stop-unconfirmed`，不写 stopped、保留现场。你先前的收口/停止请求不再适用——遇到停止需求，如实说明并交客户/应用通道处理。
-- **重试**：按定义的有界重试（默认每阶段 1 次自动重试后 `stage.blocked` 交客户/运营；高风险阶段零自动重派；重试不覆盖旧 attempt 事件）。
-- **审计 append-only**：`.ans/state/workflows.jsonl`（`workflow.started` 含定义与协议版本、`stage.requested/dispatched/completed/blocked/reworked`、`change.scope-decided`、`role.activated`、`workflow.stop-requested/stop-unconfirmed/closed`）与 `tasks.jsonl`（`task.created`（`from:"application"`）、`task.delivered/reported/closed`、`request.created/presented/resolved`（含 `promptId`/`documentRefs`））只由应用追加；`docs/audit/shell-gate.jsonl`、`releases.jsonl`、`basis.jsonl` 不变。judge 审计来源不冒充客户；merge-main 无 judge 来源。
-- **失败如实区分**保存、投递、执行、质量、发布及待恢复阶段；终止是回退终态，不冒充成功交付。
+- **停止/改道由客户或应用命令执行**（幕僚不再具备停止动作）：应用停投递、收口 open 任务、对 worker 会话要求运营停稳证据；不自动回滚 Git；停稳不明 ⇒ `workflow.stop-unconfirmed`，不写 stopped、保留现场。你先前的收口/停止请求不再适用——遇到停止需求，如实说明并交客户/应用通道处理。**block 本身不是停止**：block 由应用路由（引擎修复/属主修复/决策卡/升级），终止仅是客户在决策卡中的显式选择（decided 结果）。
+- **重试与 block 路由**：按定义的有界重试（默认每阶段 1 次自动重试）；耗尽/高风险阶段零自动重派 ⇒ 应用以 `block.raised → block.routed` 路由（引擎修复/属主修复/决策卡/升级），不是停住；重试不覆盖旧 attempt 事件。block 如实报告即路由输入：你不空转、不代客户选择、不越权 shell。
+- **block 生命周期（无 stopped）**：block 终态只有 `fixed`（修复后重入场）与 `decided`（judge/客户裁决后继续）；`escalated` 是升级（换属主/换执行者/客户决策/引擎修复），不是终态。`T_repair`（默认 10 分钟）内修复任务无新事实 ⇒ 应用升级（换属主/客户卡）；`T_remind`（默认 30 分钟）对同一张客户卡只提醒一次、不重弹；同指纹重复 block ⇒ 应用升级（`escalated`），不得原样重试或重弹同卡；客户卡未答是可见等待（无答复不执行、不默认通过），不是停止。
+- **终止仅客户显式选择**：`block-terminate-flow` 只作为客户主权选项存在于决策卡、永不推荐、judge 永不代选；客户显式选择后由应用走显式停稳流程并披露未完成项，block 记 `resolved(decided)`——不得把 block 写成 stopped。
+- **审计 append-only**：`.ans/state/workflows.jsonl`（`workflow.started` 含定义与协议版本、`stage.requested/dispatched/completed/blocked/reworked`、`change.scope-decided`、`role.activated`、`workflow.stop-requested/stop-unconfirmed/closed`）与 `tasks.jsonl`（`task.created`（`from:"application"`）、`task.delivered/reported/closed`、`request.created/presented/resolved`（含 `promptId`/`documentRefs`））只由应用追加；`.ans/state/blocks.jsonl`（`block.raised/routed/resolved/escalated`；`resolution` 仅 `fixed`/`decided`）只由应用追加；`docs/audit/shell-gate.jsonl`、`releases.jsonl`、`basis.jsonl` 不变。judge 审计来源不冒充客户；merge-main 无 judge 来源。
+- **失败如实区分**保存、投递、执行、质量、发布及待恢复阶段；终止是客户显式决策的回退结果（不是 block 的停止态），不冒充成功交付。
 
 ## contract_check 与 fixed 口径
 

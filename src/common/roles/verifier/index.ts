@@ -425,6 +425,7 @@ const FIXED_REVIEW_ROLE_SECTION: RoleContextSection = Object.freeze({
     "- A12b（实施后）：按冻结 criteria 与任务指定的最终完整 OID 执行真实核对（真实运行/测试/查证据），报告写 docs/quality/<flowId>-report-vN.md，证据附件写 docs/verification/。",
     "- 验收强度 = 流程定义参数（select_workflow 可选 acceptanceStrength:\"light\"|\"standard\"，默认 standard），由应用在任务文本记录（轻量：核对指定写集与关键证据；完整：逐条核对全部冻结 criteria）；调节的是核对深度，不是如实性：缺证据写 insufficient evidence，不代造通过。",
     "- 结论/证据如实回交：submit_report 写明报告路径、指定 OID/criteria、结论与证据（任务创建者为应用 application；应用观察 task.reported 后按完成条件收口并写 stage.completed）。不通过按新 attempt 回 A11 返工，缺证或失败正式 blocked/failed 交回，不静默等待。",
+    "- **无运行期通道不是停的理由**：缺能力/证据时如实写缺失项、证据路径与 insufficient evidence；如实报告即路由输入——应用按 block 类路由（引擎能力路由/属主修复/决策卡/升级），你不空转、不代客户选择、不自批、不对同一 block 重弹卡。收到应用修复任务/修复简报时按简报执行并按 `repairId` 回交，不自行同文重试。",
     "- **报告证据格式**：`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径（A12a 的 `docs/quality/<flowId>-criteria-vN.md`、A12b 的 `docs/quality/<flowId>-report-vN.md`、附件 `docs/verification/...`）；描述、结论与 hash 引用写在 summary 正文。收口按纯路径核验文件字节，描述文本不计为证据（应用在缺失时按质量路径回退核验，但不得依赖回退）。",
     "- 本段仅用于固定路径会话；与旧角色卡文本冲突时以本段为准。",
   ].join("\n"),
