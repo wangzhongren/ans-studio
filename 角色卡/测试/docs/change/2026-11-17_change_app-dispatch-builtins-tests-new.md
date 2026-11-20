@@ -25,7 +25,7 @@
 | `test/编排/app-dispatch-b2.test.ts` | 新增（建议项） | 3 | B2 派生 fail-closed：无名单/无边界、歧义属主、治理文档属主非策划/产品、`.ans/**`/`角色卡/**` 拒绝；正例 effectiveWritesets 精确（按角色/路径排序）；影响面 hash 漂移拒绝且零事件写入；`recordChangeScopeDecision` 幂等 replay |
 | `test/桌面应用/app-dispatch-tool-surface.test.ts` | 新增 | 4 | fixed+app-dispatch/v1 幕僚：无 dispatch_task/close_created_task(v2)/redispatch_task/terminate_role_run、有 select_workflow、request_choice（customerInput）与只读工具保留、v3 资源注入（版本/磁盘 SHA256/字节）；fixed-v2.1 在飞快照（旧工具面在、select_workflow 不在、v2 资源注入）；legacy 快照不变；convener dispatch_task 在但内置目标 `convener-builtin-dispatch-forbidden`、项目 worker 绑定 open worker-dispatch（正例/未绑定/旧 stage-request/已关闭/workflow 不符/非 production）、chief 任意派发 `chief-dispatch-removed`、旧协议矩阵逐字 |
 | `test/桌面应用/app-dispatch-delivery.test.ts` | 新增 | 5 | `select_workflow` 真实轮次捕获/缺失拒绝、首阶段任务投递（taskId+forced fixed、starTaskIds/taskCreators=application）、幂等重放、目标忙时只入队不打断/释放后补投递；application 报告只落 task.reported、不路由角色、自动收口推进；三卡 promptId 全链（匹配发卡一次/request.created 不重复/不一致 notPresented/已收口拒重呈/裁决后 prompt 应用收口+下一阶段投递）；A12b done 归档+A12 聚合+A13 任务、标准 blocked rework、light blocked accept-with-archive、A13 done 不完成阶段/前置不足不弹 merge-main；worker-dispatch 路由正负例；启动对账（已报告未收口、未送达补投递、旧协议不触碰） |
-| `test/门禁引擎/chief-workflow-v3-resource.test.ts` | 新增 | 4 | v3 版本行恰一处/身份行/≤256 KiB/无 BOM/NUL；v1/v2/v3 git blob SHA（LF 归一）逐字稳定（v1 `53d7167…`、v2 `d528c6c…`、v3 `0318486…`，2026-11-20 `stage-request-removed` 稳定码同步后刷新）；关键语义段（select_workflow/应用建任务/运营只派 worker/三卡按 prompt/A12 直派/B2 派生/merge-main/judge 不弱化/B13.2/B14/B23/B24/B27/B28/B32/停止/审计）；v3 明示旧动作面移除、v2 旧口径段仍在 |
+| `test/门禁引擎/chief-workflow-v3-resource.test.ts` | 新增 | 4 | v3 版本行恰一处/身份行/≤256 KiB/无 BOM/NUL；v1/v2/v3 git blob SHA（LF 归一）逐字稳定（v1 `53d7167…`、v2 `d528c6c…`、v3 `0318486…`，2026-11-20 `stage-request-removed` 稳定码同步后刷新）；关键语义段（select_workflow/应用建任务/运营只派 worker/三卡按 prompt/A12 直派/B2 派生/merge-main/judge 不弱化/stage-request-removed/B13.2/B14/B23/B24/B27/B28/B32/停止/审计）；v3 明示旧动作面移除、v2 旧口径段仍在 |
 | `test/测试/fixed-path-full-chain.test.ts` | **扩展** | +2（原 3 保留） | 新增 app-dispatch/v1 路径 A 全链（select_workflow→A1–A13：三卡 prompt、worker-dispatch、A12a/A12b、归档、merge-main 客户本人、无 stage-request/无 trunk/run）与路径 B 全链（B1 worker-dispatch→B2 应用派生 change.scope-decided→B3→B4→merge-main）；原 fixed-v2.1/legacy 全链断言保留（协议分拆见 §四） |
 
 - 合计：**48 个 T2 用例**（新增 43 + 全链新增 2 + 原全链 3 保留）。2026-11-18 收尾修补后 service 由 16 → 19 用例。
@@ -67,14 +67,15 @@ tests 48 / pass 48 / fail 0 / skipped 0 / duration 17302.00ms
 | 套 | 运行范围 | tests / pass / fail | 冻结名命中 |
 | --- | --- | --- | --- |
 | runtime-core-33 | `test/runtime-core/**/*.test.ts` | 607 / 603 / 0（4 skipped） | **0** |
-| gates-5 | `test/门禁引擎/**/*.test.ts` | 581 / 571 / 9（1 skipped；移开并发会话空目录后） | **0** |
+| gates-5 | `test/门禁引擎/**/*.test.ts` | 581 / 571 / 9（1 skipped；9 项既有 CRLF 环境差异，LF 净树 0 fail） | **0** |
 | orchestration-24 | `test/编排/**/*.test.ts` | 1419 / 1417 / 0（2 skipped；收尾修补后复跑） | **0** |
 
 - gates 的 9 个失败均为**既有 CRLF 环境差异**（B7.1 ×2、B9.1 ×2、B9.2 ×2、B32、B34、`Chief资源正文独立…`），
   按门禁批记录 §6.5 口径：测试以 LF 冻结常量比较 CRLF 检出，与本批无关；冻结 `gates-5` 名单 0 命中。
-- 另：工作树存在并发会话留下的**未跟踪目录 `角色卡/策划/`**（含策划/规划记录，无 role-card.md），会让
-  `test/门禁引擎/list-project.test.ts` 出现额外 warning（冻结名单第 3 名）。核对该名单时把该目录临时移出
-  （同卷临时路径）+ 运行 + 原样移回（mv 保留全部内容）；移出后 `list-project.test.ts` 18/18 全绿，冻结名单命中 **0**。T2 未删除/改动该目录内容。
+- 另：并发会话曾留下未跟踪目录 `角色卡/策划/`（含策划/规划记录，无 role-card.md），会让
+  `test/门禁引擎/list-project.test.ts` 出现额外 warning（冻结名单第 3 名）。核对该名单时曾临时移出并原样移回；
+  复核末轮该目录已由并发会话移走，最终 gates 运行（无该目录）`list-project.test.ts` 通过，冻结名单命中 **0**。
+  T2 未删除/改动该目录内容。
 
 ### 3.4 2026-11-18 收尾修补回归（rework 回执 + 3 条回归）
 编排批收尾修补落地后，T2 同步更新并回归（均为 `test/编排/app-dispatch-service.test.ts`）：
@@ -88,8 +89,14 @@ tests 48 / pass 48 / fail 0 / skipped 0 / duration 17302.00ms
    零 workflow/task 事件新增、无 request.created、无 A3 任务。
 4. **reconcile corrupt 不记 driven**：requestTaskId 不一致 / stage.dispatched 引用缺失两种不一致均
    `corrupt` 非空且 `driven === undefined`（不误判为已修复）。
+5. **v3 资源冻结 SHA 随 2026-11-20 稳定码同步刷新**：v3 文本新增 `stage-request-removed` 段后，
+   git blob（LF 归一）由 `1aad6d7…` 变为 **`0318486…`**（`03184869960c9a8dd03067f21a9451612f1d987b`；
+   工作树 CRLF 26481 字节 / LF 26348 字节，仍 ≤256 KiB）；v1（`53d7167…`）/v2（`d528c6c…`）逐字不变。
+   v3 资源测试同步更新期望 SHA 并新增 `stage-request-removed` 语义段断言；
+   `test/门禁引擎/chief-workflow-v3-resource.test.ts` **4/4 pass**。
 - 验证：typecheck 0；T2 7 文件 **48/48**（service 19/19），duration 17302ms；收尾修补后 `test/编排` 复跑
-  **1419 / 1417 / 0**（2 skipped，known-red 24 名 0 命中）。
+  **1419 / 1417 / 0**（2 skipped，known-red 24 名 0 命中）；v3 同步后 `test/门禁引擎` 复跑
+  **581 / 571 / 9**（1 skipped；9 项均为既有 CRLF 环境差异，冻结 gates-5 名单 **0 命中**；LF 净树 0 fail）。
 
 ## 四、对既有全链文件的协议分拆（预期变更，非放宽）
 
