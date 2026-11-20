@@ -55,6 +55,8 @@ import {
   WORKFLOW_DEFINITIONS,
   getWorkflowDefinition,
 } from "../../src/common/编排/workflow-definitions.ts";
+import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
+import { classifyBlock } from "../../src/common/编排/block-resolution.ts";
 import { deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
 import {
   appendTaskEvent,
@@ -96,6 +98,69 @@ async function writeIntent(root: string): Promise<void> {
     "---\nschema: project-intent/v1\nflowId: snake\nversion: 1\nintentId: snake-intent\ngoal: 贪吃蛇游戏\n---\n# 意图\n");
   await writeFile(root, "docs/intents/snake-intent.md",
     "---\nintentId: snake-intent\nflowId: snake\ngoal: 贪吃蛇游戏\n---\n# 意图入口\n");
+}
+
+/**
+ * 2026-11-20（block resolver 地基 / R1）：review 阶段（A12a/A12b）现在要求名单可读——
+ * 名单不可读不再静默回落 verifier（`review-role-unavailable` + blockFact，B1 属主 rapporteur）。
+ * 本夹具提供一份**可读且无 roles[].review** 的 project-roster/v4（⇒ 按既有 Q3 默认 verifier），
+ * 用于保留 A12a/A12b 的正向任务形状断言；名单不可读的负例另测。
+ */
+const REVIEW_ROSTER_FIXTURE = [
+  "---",
+  "schema: project-roster/v4",
+  "flowId: snake",
+  "version: 1",
+  "intent: docs/product/snake-intent-v1.md",
+  "proposal: docs/proposals/snake-proposal-v1.md",
+  "architecture: docs/contracts/snake-architecture-v1.md",
+  "envBootstrap:",
+  "  omitted: true",
+  "  omissionReason: 测试夹具省略装配/入口角色",
+  "roles:",
+  "  - id: implementer",
+  "    displayName: 实现者",
+  "    purpose: 实现",
+  "    capability: TS",
+  "    modules:",
+  "      - impl-core",
+  "modules:",
+  "  - id: impl-core",
+  "    name: 实现",
+  "    purpose: 实现 CLI",
+  "    path: src/",
+  "    category: core",
+  "    publicContract: src/index.js",
+  "    architectureSource: docs/contracts/snake-architecture-v1.md",
+  "---",
+  "# 名单",
+  "## 人员+模块拓扑图",
+  "```topology",
+  "schema: project-topology/v2",
+  "modules:",
+  "  - id: impl-core",
+  "    path: src/",
+  "    roleId: implementer",
+  "roles:",
+  "  - id: implementer",
+  "    modules: [impl-core]",
+  "management: [convener, implementer]",
+  "```",
+].join("\n");
+
+/** 写可读名单 + 被引用的 intent/proposal/architecture/modules 文档（loadLatestRoster 全链通过）。 */
+async function writeReviewRoster(root: string): Promise<void> {
+  await writeIntent(root);
+  await writeFile(root, "docs/proposals/snake-proposal-v1.md",
+    "---\nschema: project-proposal/v2\nflowId: snake\nversion: 1\nintent: docs/product/snake-intent-v1.md\n---\n# 提案\n");
+  await writeFile(root, "docs/contracts/snake-architecture-v1.md",
+    "---\nflowId: snake\nversion: 1\nproposal: docs/proposals/snake-proposal-v1.md\n---\n# 架构\n");
+  await writeFile(root, "docs/proposals/snake-roster-v1.md", REVIEW_ROSTER_FIXTURE);
+  const parsed = parseProjectRoster(REVIEW_ROSTER_FIXTURE, "snake");
+  if (!parsed.ok) throw new Error(`fixture roster invalid: ${parsed.reason}`);
+  await writeFile(root, "docs/proposals/snake-modules-v1.md",
+    ["---", "schema: project-modules/v2", "flowId: snake", "version: 1",
+      `modules: ${JSON.stringify(parsed.roster.modules)}`, "---", "# 模块清单"].join("\n"));
 }
 
 type StartedEvent = Extract<WorkflowEvent, { kind: "workflow.started" }>;
@@ -209,7 +274,7 @@ test("selectWorkflow(A)：workflow.started 协议/定义/参数 + A1 stage-execu
     assert.equal(selected.workflowPath, "A");
     assert.equal(selected.acceptanceStrength, "standard");
     assert.deepEqual(selected.definition, {
-      id: "add", version: 1, sha256: WORKFLOW_DEFINITION_HASHES.add,
+      id: "add", version: 2, sha256: WORKFLOW_DEFINITION_HASHES.add,
     });
     assert.equal(getWorkflowDefinition("add")!.ok, true, "引用的定义必须在注册表内");
     assert.equal(selected.stage, "A1");
@@ -226,7 +291,7 @@ test("selectWorkflow(A)：workflow.started 协议/定义/参数 + A1 stage-execu
     const started: StartedEvent = starts[0]!;
     assert.equal(started.protocol, WORKFLOW_PROTOCOL_APP_DISPATCH);
     assert.equal(started.definition?.id, "add");
-    assert.equal(started.definition?.version, 1);
+    assert.equal(started.definition?.version, 2);
     assert.equal(started.definition?.sha256, WORKFLOW_DEFINITION_HASHES.add);
     assert.deepEqual(started.parameters, { acceptanceStrength: "standard" });
     assert.equal(started.sourceTaskId, "turn-customer-1");
@@ -283,7 +348,7 @@ test("selectWorkflow(B)：首阶段 B1 worker-dispatch→convener；幂等重放
   try {
     const selected = await startB(root);
     assert.equal(selected.stage, "B1");
-    assert.deepEqual(selected.definition, { id: "modify", version: 1, sha256: WORKFLOW_DEFINITION_HASHES.modify });
+    assert.deepEqual(selected.definition, { id: "modify", version: 2, sha256: WORKFLOW_DEFINITION_HASHES.modify });
     const receipt = selected.tasks[0]!;
     assert.equal(receipt.taskKind, "worker-dispatch");
     assert.equal(receipt.to, "convener");
@@ -334,7 +399,7 @@ test("selectWorkflow 拒绝面：sourceTaskId 缺失/flowId 非法/path 非法/�
     assert.equal(unknownDef.ok, false);
     if (!unknownDef.ok) assert.equal(unknownDef.code, "workflow-definition-unknown");
     const badVersion = await selectWorkflow({
-      projectRoot: root, flowId: FLOW, workflowPath: "A", sourceTaskId: "t", definitionVersion: 2,
+      projectRoot: root, flowId: FLOW, workflowPath: "A", sourceTaskId: "t", definitionVersion: 3,
     });
     assert.equal(badVersion.ok, false);
     if (!badVersion.ok) assert.equal(badVersion.code, "workflow-definition-version-unsupported");
@@ -533,7 +598,9 @@ test("drive 任务形状矩阵：A4/A5/A7/A8/A9/A12a/A12b（from=application、�
     assert.equal(a9.tasks[0]!.idempotencyKey, stageExecutionIdempotencyKey(WF, "A9", "convener", 1));
     assert.equal((await taskOf(root, WF, "A9")).created!.sideEffect, "docs");
 
-    // A12a：review 执行者（缺省 roster 不可读 ⇒ verifier），executorKind=review。
+    // A12a：review 执行者（名单可读但无 roles[].review ⇒ 既有 Q3 默认 verifier），executorKind=review。
+    // 2026-11-20：名单不可读不再静默回落 verifier；本用例补可读名单 fixture 保留正向形状断言。
+    await writeReviewRoster(root);
     await seedCompleted(root, WF, "A", ["A9", "A10"]);
     const a12a = await driveOk(root, WF);
     assert.equal(a12a.stage, "A12a");
@@ -576,6 +643,38 @@ test("drive 任务形状矩阵：A4/A5/A7/A8/A9/A12a/A12b（from=application、�
 });
 
 // —————————————— 3) 报告观察 ——————————————
+
+test("review 阶段名单不可读 ⇒ review-role-unavailable + blockFact（B1/roster-unreadable，属主 rapporteur；不静默回落 verifier）", async () => {
+  const root = await makeRoot();
+  try {
+    const selected = await startA(root);
+    const WF = selected.workflowId;
+    await seedCompleted(root, WF, "A", ["A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"]);
+    const drove = await drive(root, WF, "A12a");
+    assert.equal(drove.ok, false);
+    if (!drove.ok) {
+      assert.equal(drove.code, "review-role-unavailable");
+      assert.match(drove.message, /名单不可读/);
+      assert.match(drove.message, /不再静默回落/);
+      const fact = drove.blockFact;
+      assert.ok(fact !== undefined, "review-role-unavailable 必须携 blockFact（事实出口，供 resolver 路由）");
+      assert.equal(fact!.protocol, "app-dispatch/v1");
+      assert.equal(fact!.code, "review-role-unavailable");
+      assert.equal(fact!.detailCode, "roster-unreadable");
+      assert.equal(fact!.ownerRoleId, "rapporteur", "B1 属主 = 名单属主 rapporteur");
+      assert.equal(fact!.stage, "A12a");
+      assert.equal(fact!.workflowId, WF);
+      const classification = classifyBlock(fact!);
+      assert.equal(classification.class, "missing-resource", "roster-unreadable ⇒ B1 缺文件/资源");
+      assert.equal(classification.classCode, "B1");
+    }
+    // fail-closed：拒绝不建 review 任务、不写 stage.dispatched（事实交 block resolver 路由）。
+    assert.equal((await tasksOfStage(root, WF, "A12a")).length, 0);
+    assert.equal((await ofKind(root, WF, "stage.dispatched")).some((event) => event.stage === "A12a"), false);
+  } finally {
+    await cleanup(root);
+  }
+});
 
 test("observe：done⇒accepted+stage.completed（应用收口 by=application）；重放幂等；无报告/非应用任务/worker-dispatch 拒绝", async () => {
   const root = await makeRoot();
@@ -718,6 +817,7 @@ test("observe A12b：light + blocked + 归档 ⇒ accepted + A12 聚合（B31）
   try {
     const selected = await startA(root, { acceptanceStrength: "light" });
     const WF = selected.workflowId;
+    await writeReviewRoster(root);
     await seedCompleted(root, WF, "A", ["A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A12a", "A11"]);
     const a12b = await driveOk(root, WF, "A12b");
     const taskId = a12b.tasks[0]!.taskId;
@@ -740,6 +840,7 @@ test("observe A12b：light + blocked + 归档 ⇒ accepted + A12 聚合（B31）
     const rootNoArchive = await makeRoot();
     try {
       const selectedNo = await startA(rootNoArchive, { acceptanceStrength: "light" });
+      await writeReviewRoster(rootNoArchive);
       await seedCompleted(rootNoArchive, selectedNo.workflowId, "A", ["A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A12a", "A11"]);
       const driven = await driveOk(rootNoArchive, selectedNo.workflowId, "A12b");
       const noArchiveTask = driven.tasks[0]!.taskId;
@@ -765,6 +866,7 @@ test("observe standard blocked + decision=rework：写 stage.reworked A12b→A11
   try {
     const selected = await startA(root);
     const WF = selected.workflowId;
+    await writeReviewRoster(root);
     await seedCompleted(root, WF, "A", ["A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A12a", "A11"]);
     const a12b = await driveOk(root, WF, "A12b");
     const taskId = a12b.tasks[0]!.taskId;
@@ -1240,7 +1342,7 @@ test("app 工作流自身只产生 app 协议事件：无 stage-request 任务�
     }
     const requested = await ofKind(root, WF, "stage.requested");
     assert.equal(requested.every((event) => event.issuedBy === "application"), true, "新协议 stage.requested 全部由应用签发");
-    // workflow 定义引用已钉死 add@1 的 hash（不静默迁移）。
+    // workflow 定义引用已钉死当前版本 add@2 的 hash（不静默迁移；v1 旧值见 WORKFLOW_DEFINITION_HASHES_BY_VERSION）。
     const started = (await ofKind(root, WF, "workflow.started"))[0]!;
     assert.equal(started.definition?.sha256, WORKFLOW_DEFINITION_HASHES.add);
     assert.equal(WORKFLOW_DEFINITIONS.add.version, started.definition?.version);

@@ -85,6 +85,7 @@ const FIXED_REPORT_TEXT = [
   "- 任务完成或阻塞必须用 `submit_report` 回真实创建者（`task.created.from`；固定路径任务创建者为应用 application）——应用观察 `task.reported` 后按完成条件收口并写 `stage.completed`；报告不是任务关闭，不能自行收口任务。",
   "- 不得自报他人身份、伪造客户批准/决定或把准备/通知当作生效；真实回执原样转达。",
   "- 回退与恢复：保留依据文档版本/hash、拒绝码与真实错误证据，交应用与责任 owner；缺证据不补造批准或结论，不新派、不自行降级。",
+  "- 阻塞报告必须写缺失项与可核验证据路径（`evidence[]` 纯路径）及已尝试动作；如实报告即路由输入——应用按 block 类路由（属主修复/决策卡/升级），不空转、不代客户选择、不对同一 block 重弹卡。收到应用修复任务/修复简报时按简报执行并按 `repairId` 回交，不自行同文重试。",
 ].join("\n");
 
 const SECTION_FIXED_ROLE = Object.freeze({ id: "rapporteur-fixed-role", text: FIXED_ROLE_TEXT });

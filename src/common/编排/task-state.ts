@@ -525,6 +525,27 @@ export async function appendTaskEvent(
   event: TaskStateEvent,
   options: { allowLegacyRun?: boolean } = {},
 ): Promise<AppendResult> {
+  // 2026-11-20（block resolver 桌面批）：repair 任务形状/blockId 引用（写侧 fail-closed）。
+  if (event.kind === "task.created" && (event.taskKind === "repair" || event.blockId !== undefined)) {
+    if (event.blockId !== undefined && !/^[a-f0-9]{24}$/.test(event.blockId)) {
+      return { ok: false, code: "invalid-task-binding", message: "task.created.blockId 非法：必须是 24 位小写 hex" };
+    }
+    if (event.taskKind === "repair") {
+      if (event.from !== "application") {
+        return { ok: false, code: "invalid-task-binding", message: "task.created repair 只允许 from=application（应用创建/收口的属主修复任务）" };
+      }
+      if (event.blockId === undefined) {
+        return { ok: false, code: "invalid-task-binding", message: "task.created repair 必须携带 blockId（block 反向引用）" };
+      }
+      if (!event.idempotencyKey.startsWith("block-repair:")) {
+        return { ok: false, code: "invalid-task-binding", message: "task.created repair 幂等键必须为 block-repair:<blockId>:<attempt>" };
+      }
+      if (event.promptId !== undefined || event.cardKind !== undefined || event.cardDocumentRefs !== undefined
+        || event.cardOptions !== undefined || event.cardRecommended !== undefined) {
+        return { ok: false, code: "invalid-task-binding", message: "task.created repair 不得携带 card-prompt 字段" };
+      }
+    }
+  }
   if ((event.kind === "request.presented" && event.to === "chief")
     || (event.kind === "request.resolved" && event.by === "chief-delegated")
     || ("actionSource" in event && event.actionSource !== undefined)) {
@@ -1171,6 +1192,21 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     const sideEffect = rec["sideEffect"];
     if (typeof sideEffect !== "string" || !(SIDE_EFFECTS as readonly string[]).includes(sideEffect)) return { ok: false, message: "sideEffect 非法" };
     if (typeof rec["idempotencyKey"] !== "string" || rec["idempotencyKey"] === "") return { ok: false, message: "缺 idempotencyKey" };
+    // 2026-11-20（block resolver 桌面批）：repair 任务/blockId 读侧同 fail-closed（坏行计数跳过，不猜）。
+    if (rec["blockId"] !== undefined && (typeof rec["blockId"] !== "string" || !/^[a-f0-9]{24}$/.test(rec["blockId"]))) {
+      return { ok: false, message: "task.created.blockId 非法" };
+    }
+    if (rec["taskKind"] === "repair") {
+      if (rec["from"] !== "application") return { ok: false, message: "task.created repair 只允许 from=application" };
+      if (rec["blockId"] === undefined) return { ok: false, message: "task.created repair 缺 blockId" };
+      if (!(rec["idempotencyKey"] as string).startsWith("block-repair:")) {
+        return { ok: false, message: "task.created repair 幂等键前缀非法" };
+      }
+      if (rec["promptId"] !== undefined || rec["cardKind"] !== undefined || rec["cardDocumentRefs"] !== undefined
+        || rec["cardOptions"] !== undefined || rec["cardRecommended"] !== undefined) {
+        return { ok: false, message: "task.created repair 不得携带 card-prompt 字段" };
+      }
+    }
     // 2026-10-29（F3）：可选治理字段——flowId/stepId 给出时必须是合法 slug（缺失 = 旧记录，兼容）。
     if (rec["flowId"] !== undefined && !isTaskSlug(rec["flowId"])) return { ok: false, message: "task.created.flowId 非法" };
     if (rec["stepId"] !== undefined && !isTaskSlug(rec["stepId"])) return { ok: false, message: "task.created.stepId 非法" };

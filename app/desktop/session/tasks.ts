@@ -25,6 +25,8 @@ import { extractDispatchReadPaths, planDispatchDelivery } from "../../../src/com
 import { buildProjectStateView, renderProjectStateSummary } from "../../../src/common/编排/project-state.ts";
 import { redispatchCountOf, redispatchTaskId, shortenSummary, taskCards, taskEvent, type TaskReplay } from "../../../src/common/编排/task-state.ts";
 import { evaluateRedispatchSafety, type WatchdogToolResult } from "../../../src/common/编排/watchdog.ts";
+// 2026-11-20（block resolver 桌面批）：重派安全门/终止未确认/升级耗尽 → block 事实（B5/B7/B9）。
+import { blockFactFromDispatchRejection, type BlockFact } from "../../../src/common/编排/block-resolution.ts";
 import { GOVERNANCE_SLUG_PATTERN, type CustomerInputMetadata, type CustomerInputOutcome, type CustomerInputRequest, type RoleActivityLogPayload, type TaskStateEvent } from "../../../src/model/runtime.ts";
 import type { OrchestrationEvent } from "../../../src/common/编排/handback.ts";
 import { PROJECT_NOTE_BLOCKER_TEXT_MAX, PROJECT_NOTE_KEY_MAX, PROJECT_NOTE_NEXT_STEP_DEFAULT_KEY, PROJECT_NOTE_NEXT_STEP_TEXT_MAX, PROJECT_NOTE_REFS_MAX, type ProjectNoteInput, type ProjectNoteResult, type ProjectStateToolResult, type ProjectStateView } from "../../../src/model/project-state.ts";
@@ -75,6 +77,22 @@ export interface TasksPorts {
     requestIdOverride?: string,
     lifecycle?: { notify?: "default" | "resolved-only" | "none"; signal?: AbortSignal; judgeNotice?: string; onPresented?: () => void },
   ): Promise<CustomerInputOutcome | null | undefined>;
+  /** 2026-11-20（block resolver 桌面批）：block 事实入口（安全门/终止未确认等；返回落账链以便调用方等待）。 */
+  noteBlockFact?(projectRoot: string, fact: BlockFact): Promise<void> | void;
+  /**
+   * 2026-11-20（P26–P29）：重派耗尽的升级卡接入 block 卡体系；`handled:false` ⇒ 回退既有
+   * `escalateStuckTask`（兼容旧行为/无 block 通道）。
+   */
+  escalateRedispatchBlock?(projectRoot: string, input: {
+    taskId: string;
+    rootTaskId: string;
+    attempts: number;
+    taskFlowId?: string;
+    targetRoleId?: string;
+    targetRuntime?: RuntimeKind;
+  }): Promise<{ handled: boolean; requestId?: string; selected?: "continue" | "redispatch" | "replace" | "terminate"; message: string }>;
+  /** 2026-11-20：启动/打开项目时恢复 open blocks（重投/升级/重呈现；不伪造完成）。 */
+  recoverBlocks?(projectRoot: string): Promise<void>;
 }
 
 /** tasks 方法读取的 deps 切片（原 `this.deps` 的两项只读查询）。 */
@@ -385,6 +403,13 @@ export class Tasks {
       report.taskIds.push(record.taskId);
       void this.drainQueue(projectRoot, created.to, runtime);
     }
+    // 2026-11-20（block resolver 桌面批）：启动/打开项目时恢复 open blocks（重投/升级/重呈现；
+    // 只读账本事实、不伪造完成）。失败只记诊断——恢复不阻塞任务恢复。
+    try {
+      await this.port.recoverBlocks?.(projectRoot);
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot }).error("tasks.restore.blocks.failed", error);
+    }
     return report;
   }
 
@@ -640,6 +665,69 @@ export class Tasks {
     const maxRaw = Number(process.env["ANS_LOG_REDISPATCH_MAX"]);
     const redispatchMax = Number.isFinite(maxRaw) && maxRaw > 0 ? Math.floor(maxRaw) : 2;
     if (attempts >= redispatchMax) {
+      // 2026-11-20（P27）：优先接入 block 升级卡（block-card-<blockId>；推荐修复向、terminate 非默认）。
+      // 收尾修补 R4b：同链结果按链缓存（`escalationRequests` 的 block 命名空间）——已裁决/已 fixed 时
+      // **绝不回退旧 `task-escalation-*` 卡**，也不重复执行终止/失败报告等落地动作。
+      const blockCacheKey = `${projectRoot}\u0000block-escalation\u0000${root}`;
+      const cachedBlock = this.escalationRequests.get(blockCacheKey);
+      if (cachedBlock !== undefined) {
+        const cachedResult = await cachedBlock;
+        if (cachedResult.escalated) {
+          return {
+            ok: false,
+            safety: "needs-review",
+            autoAllowed: false,
+            reasons: [`同链已重派 ${attempts} 次（上限 ${redispatchMax}）；复用既有 block 升级裁决`],
+            message: cachedResult.message,
+            escalated: true,
+            ...(cachedResult.requestId !== undefined ? { requestId: cachedResult.requestId } : {}),
+            ...(cachedResult.selected !== undefined ? { selected: cachedResult.selected } : {}),
+          };
+        }
+        this.escalationRequests.delete(blockCacheKey);
+      }
+      const blockPromise = (async (): Promise<{ escalated: boolean; requestId?: string; selected?: string; message: string }> => {
+        const blockEscalation = await this.port.escalateRedispatchBlock?.(projectRoot, {
+          taskId: record.taskId,
+          rootTaskId: root,
+          attempts,
+          ...(created.flowId !== undefined ? { taskFlowId: created.flowId } : {}),
+          ...(created.to !== undefined ? { targetRoleId: created.to } : {}),
+        });
+        if (blockEscalation?.handled !== true || blockEscalation.requestId === undefined) {
+          return { escalated: false, message: blockEscalation?.message ?? "block 升级卡不可用（回退既有升级通道）。" };
+        }
+        const applied = await this.finishStuckEscalation(projectRoot, {
+          taskId: record.taskId,
+          chiefRoleId: this.chiefTaskRoleIdOf(projectRoot),
+          runtime: this.findLiveRuntime(projectRoot, created.to) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo",
+          requestId: blockEscalation.requestId,
+          ...(blockEscalation.selected !== undefined ? { selected: blockEscalation.selected } : {}),
+          outcomeLabel: "block-card",
+          ...(created.to !== undefined ? { targetRoleId: created.to } : {}),
+        });
+        return {
+          escalated: true,
+          requestId: blockEscalation.requestId,
+          ...(applied.selected !== undefined ? { selected: applied.selected } : {}),
+          message: blockEscalation.message,
+        };
+      })();
+      this.escalationRequests.set(blockCacheKey, blockPromise);
+      const blockResult = await blockPromise;
+      if (blockResult.escalated && blockResult.requestId !== undefined) {
+        return {
+          ok: false,
+          safety: "needs-review",
+          autoAllowed: false,
+          reasons: [`同链已重派 ${attempts} 次（上限 ${redispatchMax}）；block 升级卡已提交（修复向推荐）`],
+          message: blockResult.message,
+          escalated: true,
+          requestId: blockResult.requestId,
+          ...(blockResult.selected !== undefined ? { selected: blockResult.selected } : {}),
+        };
+      }
+      this.escalationRequests.delete(blockCacheKey);
       const escalation = await this.escalateStuckTask(
         projectRoot,
         record.taskId,
@@ -683,6 +771,18 @@ export class Tasks {
       inFlightTool,
     });
     if (!safety.autoAllowed) {
+      // 2026-11-20（P26）：安全门零自动重派是 block 事实（B5/B8）——应用路由修复/换人/客户卡，不是停住。
+      // 属主 = 任务创建者（不是被卡死的执行者）；落账链有界等待，避免清理窗口内的后台写。
+      await this.port.noteBlockFact?.(projectRoot, blockFactFromDispatchRejection({
+        protocol: "fixed-v2.1",
+        code: "redispatch-safety-gate",
+        message: `任务 #${record.taskId} 不自动重派：${safety.reasons.join("；")}`,
+        taskId: record.taskId,
+        ...(created.flowId !== undefined ? { flowId: created.flowId } : {}),
+        ...(created.from !== "application" ? { ownerRoleId: created.from } : {}),
+        autoFixForbidden: true,
+        fingerprintMaterial: ["redispatch-safety-gate", record.taskId, safety.safety, ...safety.reasons],
+      }));
       this.appendRoleActivity(projectRoot, "chief", {
         kind: "task.redispatch.blocked",
         summary: `任务 #${record.taskId} 不自动重派：${safety.reasons.join("；")}`,
@@ -799,6 +899,67 @@ export class Tasks {
   }
 
   /**
+   * 2026-11-20（P27）：升级裁决后的**既有**落地动作（terminate/record failure/人工处置说明）。
+   * 由 legacy 升级卡与 block 升级卡共用（单一实现；不新增第二条重派/终止路径）。
+   */
+  private async finishStuckEscalation(
+    projectRoot: string,
+    input: {
+      taskId: string;
+      chiefRoleId: string | null;
+      runtime: RuntimeKind;
+      requestId: string;
+      selected?: "continue" | "redispatch" | "replace" | "terminate";
+      outcomeLabel: string;
+      targetRoleId?: string;
+      targetRuntime?: RuntimeKind;
+    },
+  ): Promise<{ escalated: boolean; requestId?: string; selected?: string; message: string }> {
+    const { taskId, chiefRoleId, runtime, requestId, selected } = input;
+    await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+      kind: "task.escalation",
+      summary: `任务 #${taskId} 连续卡死升级：${input.outcomeLabel}${selected !== undefined ? `（${selected}）` : ""}`,
+      taskId,
+      status: selected ?? input.outcomeLabel,
+    });
+    if (selected === "terminate") {
+      if (input.targetRoleId !== undefined && input.targetRoleId !== "") {
+        await this.terminateRoleRun({
+          projectRoot,
+          roleId: input.targetRoleId,
+          runtime: input.targetRuntime ?? runtime,
+          taskId,
+        });
+      }
+      await this.recordTaskFailure(projectRoot, taskId, "stuck-escalation:terminate");
+    } else if (selected === "continue" || selected === "redispatch" || selected === "replace") {
+      // C 批（协调者放行前置）：continue/redispatch/replace 不自动执行第二条危险路径，但**必须定义并
+      // 落地人工处置**——写角色日志 + 向幕僚发系统行，任务保持未收口（不伪造完成、不重复副作用）。
+      const manual: Record<typeof selected, string> = {
+        continue: "保持观察：不自动重派、不终止；巡检继续，需要收口时由幕僚手动终止或派新任务。",
+        redispatch: "自动重派上限已到，不再自动重派；请人工核对部分产物后新建/重派任务（可先终止原任务）。",
+        replace: "不自动换人；请人工选择替代角色并派新任务（必要时先终止原角色运行）。",
+      };
+      const text = `任务 #${taskId} 升级裁决「${selected}」：${manual[selected]}`;
+      await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+        kind: "task.escalation.manual",
+        summary: text,
+        taskId,
+        status: selected,
+      });
+      this.emitDeliveryNote(projectRoot, runtime, chiefRoleId ?? "chief", "chief", `[系统·升级] ${text}`);
+    }
+    return {
+      escalated: true,
+      requestId,
+      ...(selected !== undefined ? { selected } : {}),
+      message: selected !== undefined
+        ? `升级卡已提交并获得裁决：${selected}。`
+        : "升级卡已提交，未获明确裁决（不代选）。",
+    };
+  }
+
+  /**
    * B-07：连续 2 次重派仍卡死 ⇒ 经应用既有客户交互/决策通道提交「继续 / 重派 / 换人 / 终止」唯一推荐卡。
    * 不伪造客户决定：通道不可用/被取消 ⇒ 如实返回未执行；同一链只提交一次（watchdog 重复 tick 不刷屏）。
    */
@@ -810,14 +971,23 @@ export class Tasks {
     taskFlowId?: string,
     targetRoleId?: string,
     targetRuntime?: RuntimeKind,
+    preselected?: { selected: "continue" | "redispatch" | "replace" | "terminate"; requestId: string },
   ): Promise<{ escalated: boolean; requestId?: string; selected?: string; message: string }> {
     const key = `${projectRoot}\u0000${rootTaskId}`;
     const existing = this.escalationRequests.get(key);
     if (existing !== undefined) return existing;
     const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
     const runtime = this.findLiveRuntime(projectRoot, chiefRoleId ?? "") ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
-    const requestId = `task-escalation-${rootTaskId}-${attempts}`;
+    const requestId = preselected?.requestId ?? `task-escalation-${rootTaskId}-${attempts}`;
     const promise = (async () => {
+      if (preselected !== undefined) {
+        return this.finishStuckEscalation(projectRoot, {
+          taskId, chiefRoleId, runtime, requestId, selected: preselected.selected,
+          outcomeLabel: "block-card",
+          ...(targetRoleId !== undefined ? { targetRoleId } : {}),
+          ...(targetRuntime !== undefined ? { targetRuntime } : {}),
+        });
+      }
       const channel = this.deps.customerInput;
       if (channel === undefined) {
         this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
@@ -871,49 +1041,19 @@ export class Tasks {
         return { escalated: false, requestId, message: "升级卡提交失败（未获客户裁决）。" };
       }
       const selected = outcome?.outcome === "answered"
-        ? (outcome.value.selected ?? []).find((id) => ["continue", "redispatch", "replace", "terminate"].includes(id))
+        ? (outcome.value.selected ?? []).find((id): id is "continue" | "redispatch" | "replace" | "terminate" =>
+            id === "continue" || id === "redispatch" || id === "replace" || id === "terminate")
         : undefined;
-      await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
-        kind: "task.escalation",
-        summary: `任务 #${taskId} 连续卡死升级：${outcome?.outcome ?? "unavailable"}${selected !== undefined ? `（${selected}）` : ""}`,
+      return this.finishStuckEscalation(projectRoot, {
         taskId,
-        status: selected ?? outcome?.outcome ?? "unavailable",
-      });
-      if (selected === "terminate") {
-        if (targetRoleId !== undefined && targetRoleId !== "") {
-          await this.terminateRoleRun({
-            projectRoot,
-            roleId: targetRoleId,
-            runtime: targetRuntime ?? runtime,
-            taskId,
-          });
-        }
-        await this.recordTaskFailure(projectRoot, taskId, "stuck-escalation:terminate");
-      } else if (selected === "continue" || selected === "redispatch" || selected === "replace") {
-        // C 批（协调者放行前置）：continue/redispatch/replace 不自动执行第二条危险路径，但**必须定义并
-        // 落地人工处置**——写角色日志 + 向幕僚发系统行，任务保持未收口（不伪造完成、不重复副作用）。
-        const manual: Record<typeof selected, string> = {
-          continue: "保持观察：不自动重派、不终止；巡检继续，需要收口时由幕僚手动终止或派新任务。",
-          redispatch: "自动重派上限已到，不再自动重派；请人工核对部分产物后新建/重派任务（可先终止原任务）。",
-          replace: "不自动换人；请人工选择替代角色并派新任务（必要时先终止原角色运行）。",
-        };
-        const text = `任务 #${taskId} 升级裁决「${selected}」：${manual[selected]}`;
-        await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
-          kind: "task.escalation.manual",
-          summary: text,
-          taskId,
-          status: selected,
-        });
-        this.emitDeliveryNote(projectRoot, runtime, chiefRoleId ?? "chief", "chief", `[系统·升级] ${text}`);
-      }
-      return {
-        escalated: true,
+        chiefRoleId,
+        runtime,
         requestId,
         ...(selected !== undefined ? { selected } : {}),
-        message: selected !== undefined
-          ? `升级卡已提交并获得裁决：${selected}。`
-          : "升级卡已提交，未获明确裁决（不代选）。",
-      };
+        outcomeLabel: outcome?.outcome ?? "unavailable",
+        ...(targetRoleId !== undefined ? { targetRoleId } : {}),
+        ...(targetRuntime !== undefined ? { targetRuntime } : {}),
+      });
     })();
     this.escalationRequests.set(key, promise);
     // 同一链只提交一次（watchdog 重复 tick 直接返回同一结果，不重复弹卡）。

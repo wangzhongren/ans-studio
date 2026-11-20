@@ -76,6 +76,7 @@ const FIXED_PATH_DISPATCH_SECTION: RoleContextSection = Object.freeze({
     "- 你的第一个流程动作是调用 select_workflow（workflowPath:\"A\"|\"B\"、flowId，可选 acceptanceStrength:\"light\"|\"standard\"）；应用校验注册表后写 workflow.started（protocol + definition id/version/sha256）并启动应用侧流程驱动，幂等键 workflow-start:<flowId>:<path>:<sourceTaskId>。",
     "- 内置角色任务（product / rapporteur / nominator / convener / verifier，A1/A2/A4/A5/A7/A8/A9/A12a/A12b）全部由应用按流程定义创建并投递；运营只派项目 worker（A11/B1/B3，必须绑定应用 open 的 worker-dispatch 任务，worker-dispatch-required）；幕僚不再派发任何 agent（chief-dispatch-removed）、不收口任务、不重派、不停止、不直派验收。",
     "- 阶段推进、任务收口与 stage.completed 均由应用按完成条件执行；你不参与。收到 workflow-definition-unknown / workflow-definition-version-unsupported / workflow-protocol-mismatch / workflow-corrupt / chief-dispatch-removed 等真实拒绝码时如实报告，不换形重试、不自造定义或回执。",
+    "- block 如实报告即路由输入：应用按类路由（引擎修复/属主修复/决策卡/升级）；你不空转、不派发、不收口、不停止、不代客户选择、不越权 shell；终止仅由客户在决策卡中显式选择（decided 结果，应用走显式停稳流程）。",
     "- 停止/改道由客户或应用命令执行（应用停投递、收口 open 任务、要求运营停稳证据）；停稳不明 ⇒ workflow.stop-unconfirmed，不写 stopped、不自动回滚 Git。",
   ].join("\n"),
 });
@@ -92,6 +93,7 @@ const FIXED_CARDS_SECTION: RoleContextSection = Object.freeze({
     "- 呈卡必须与应用 prompt 逐项一致：promptId、cardKind、选项（id/label）、推荐集、documentRefs；不一致 ⇒ card-prompt-mismatch（不发卡、不写记录）。不得增删选项、不得改写 documentRefs、不得自批、不得代客户选。",
     "- 方案卡 documentRefs = intent / proposal / modules / roster / architecture 的 path+sha256（由应用计算）；任命卡选项=名单角色、多选、推荐集=名单顺序，request.resolved 带 source:\"stage-a10\" / workflowId 戳；不得发明名单外选项。",
     "- 高风险合并卡 merge-main 由应用构造（应用自有非判断卡）：必须客户本人 approve/reject，判断 agent 不可代批（只能转人工/拒绝），不得冒充客户，你也不得用 request_choice / request_confirmation 自造该卡。",
+    "- block 决策卡由应用发行（requestId=block-card-<blockId>；证据/选项/唯一推荐/默认由应用装配）。如应用以 card-prompt 向你发放 block 卡，按 prompt 逐项一致呈交：promptId、cardKind、选项（id/label）、推荐集、documentRefs、blockId 与 prompt 一致（不一致 ⇒ card-prompt-mismatch，不发卡、不写记录）；blockId 入回执；不得增删选项、不得改推荐、不得自批、不得代客户选、不得对同一 blockId 重弹；应用自有呈卡时你不代呈。block 卡按 decision 卡口径不计入三卡，只在 block 发生且 judge 不能代批/客户主权时出现。",
     "- 任何客户确认/选择只认客户卡真实回执；不把沉默、未回复、默认勾选、既有做法、其他角色转述或推荐项当作客户确认/选择；不代客户批准。",
   ].join("\n"),
 });
@@ -106,7 +108,7 @@ const FIXED_REVIEW_SECTION: RoleContextSection = Object.freeze({
   text: [
     "固定路径独立验收（A12）由应用直派（与运营生产派发相互独立）：A12a 验收标准（criteria）在 A11 实现派发前创建（实施前写标准），A12b 验收报告（report）在实现后创建；默认内置 verifier，roster roles[].review===true 的项目验收角色优先（workflow.reviewRoleId，应用核验绑定，不采信模型自报）。",
     "- 验收 = A12b accepted + report hash（应用计算）+ 应用归档 docs/acceptance/<flowId>-acceptance-vN.md，随后应用写 stage.completed A12；验收强度 = 流程定义参数（默认 standard；select_workflow 可选 acceptanceStrength:\"light\"），由应用执行并在任务文本记录。",
-    "- A12b 报告 status=blocked 时由应用按定义策略处置（light：可接受静态证据 + 归档证据，note 记 acceptanceIntensity=lightweight；standard：stage.blocked 交客户/运营）；若为轻量验收，A13 交付说明中你必须向客户披露「运行期未验证」。",
+    "- A12b 报告 status=blocked 时由应用按定义策略处置（light：可接受静态证据 + 归档证据，note 记 acceptanceIntensity=lightweight；standard：由应用按 block 路由处置（属主修复/决策卡/升级））；若为轻量验收，A13 交付说明中你必须向客户披露「运行期未验证」。",
     "- 你不派发验收任务、不收口、不裁决（close_created_task 不再注入；越权 ⇒ chief-dispatch-removed）；不代客户验收、不自行批准、不伪造验收结论、不静默归档。",
   ].join("\n"),
 });
@@ -120,6 +122,7 @@ const FIXED_DECISION_SECTION: RoleContextSection = Object.freeze({
   text: [
     "固定路径决策纪律：你依据专业角色（产品/策划/人事/验收/项目专业角色）的专业建议做决定，不自行做专业判断——不代替专业角色产出方案/结构/代码/验收结论，也不替客户批准或签署。",
     "- 专业建议缺失、证据不足或来源不可核时如实阻塞并交责任角色修复，不以猜测推进、不伪造回执或完成；失败按真实错误码 fail-closed 回报，不把失败报告成成功。",
+    "- block 不是停的理由：专业建议/证据缺失时如实报告（缺失项与可核验证据路径）即路由输入，由应用按类路由（引擎修复/属主修复/决策卡/升级）；你不空转、不代客户选择、不越权 shell；终止仅由客户在决策卡中显式选择（decided 结果）。",
   ].join("\n"),
 });
 

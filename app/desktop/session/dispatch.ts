@@ -32,6 +32,9 @@ import { ensureDraftRun, findActiveRun, loadPinnedRoster, readRunManifest, RUN_P
 import { collectDispatchBaselineFacts, freezeExecutionRun, inspectAssignedTask, prepareControllerResume, prepareParentTaskRef, prepareRoleDispatch, beginGitHostAction, endGitHostAction, recordTaskObservation } from "../../../src/pipeline/orchestration/trunk-runtime.ts";
 import { readRoleCapabilityProtectionScope, type RoleSessionHandle } from "../../../src/pipeline/orchestration/run-role.ts";
 import { isTaskWorkSourceRef, isWorkflowPath, isWorkflowStage } from "../../../src/model/runtime.ts";
+// 2026-11-20（block resolver 桌面批）：source 门/评审派发拒绝附 block 事实（P10/P21；回执语义不变）。
+import { blockFactFromDispatchRejection, computeBlockId, type BlockFact } from "../../../src/common/编排/block-resolution.ts";
+import { nextActionsForBlockCode } from "../block-router.ts";
 import type { DispatchReceipt, DispatchTaskPayload, GovernanceCardKind, TaskStateEvent, TaskWorkSourceRef } from "../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../src/common/shared/runtime-shared.ts";
 import type { GovernanceModel } from "../../../src/model/role.ts";
@@ -73,6 +76,8 @@ export interface DispatchPorts {
   runTaskIsFenced(projectRoot: string, taskId?: string, runId?: string): boolean;
   /** 星形路由端口：门面箭头 → 门面同名薄委托 → 本模块实现。经门面中转保持实例级覆盖（测试桩）语义。 */
   routeStarDispatch(projectRoot: string, runtime: RuntimeKind, fromRoleId: string, d: DispatchTaskPayload, targetRoleId: string, task: string, source: ActualDispatchSource | undefined): Promise<DispatchReceipt>;
+  /** 2026-11-20（block resolver 桌面批）：派发拒绝的 block 事实（缺省 ⇒ 旧行为零变化）。 */
+  onBlockFact?(projectRoot: string, fact: BlockFact): void;
 }
 
 /** 星形/legacy 派发路由、五步链事实与幕僚控制器恢复（原 SessionManager 5 方法的同签名实现）。 */
@@ -657,14 +662,48 @@ export class Dispatch {
     source?: ActualDispatchSource,
   ): Promise<DispatchReceipt> {
     const fail = (message: string, row: string, rejection?: MechanicalRejection): DispatchReceipt => {
+      // 2026-11-20（block resolver 桌面批）：已知 source/评审拒绝码附确定性 blockId/nextActions 并交 router。
+      const knownCodes = [
+        "worker-dispatch-source-unavailable", "worker-dispatch-source-changed", "worker-dispatch-flow-mismatch",
+        "document-planning-source-unavailable", "document-planning-source-changed", "chief-hub-flow-unavailable",
+        "review-target-invalid", "review-source-unavailable", "review-source-changed", "worker-module-scope-unavailable",
+        "worker-pinned-roster-unavailable", "task-parent-unavailable", "planning-source-unavailable",
+        "role-preparation-source-unavailable", "assigned-child-unavailable-before-enqueue",
+      ];
+      const blockCode = knownCodes.find((code) => message.startsWith(`${code}：`) || message.startsWith(`${code} `));
+      let blockId: string | undefined;
+      let nextActions: string[] | undefined;
+      if (blockCode !== undefined) {
+        const fact = blockFactFromDispatchRejection({
+          protocol: "legacy",
+          code: blockCode,
+          message,
+          roleId: fromRoleId,
+          source: "desktop.star-dispatch.reject",
+          fingerprintMaterial: ["star-dispatch-reject", blockCode, createHash("sha256").update(task).digest("hex").slice(0, 16)],
+        });
+        this.port.onBlockFact?.(projectRoot, fact);
+        blockId = computeBlockId(fact);
+        nextActions = nextActionsForBlockCode(blockCode);
+      }
       if (rejection !== undefined) {
         this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, `${humanRejection(rejection)} ${technicalRejectionCode(rejection)}`);
         const formatted = formatMechanicalRejection(rejection);
-        return { ok: false, message: formatted.includes(message) ? formatted : `${message}
-${formatted}` };
+        return {
+          ok: false,
+          message: formatted.includes(message) ? formatted : `${message}
+${formatted}`,
+          ...(blockId !== undefined ? { blockId } : {}),
+          ...(nextActions !== undefined ? { nextActions } : {}),
+        };
       }
       this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, row);
-      return { ok: false, message };
+      return {
+        ok: false,
+        message,
+        ...(blockId !== undefined ? { blockId } : {}),
+        ...(nextActions !== undefined ? { nextActions } : {}),
+      };
     };
     const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
     if (d.resumeController !== undefined) return this.resumeChiefController(projectRoot, runtime, fromRoleId, d, source);

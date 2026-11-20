@@ -32,8 +32,16 @@ import {
 export const WORKFLOW_DEFINITION_SCHEMA = "ans-workflow-definition/v1" as const;
 /** 注册表导出 schema token（JSON Schema 导出用）。 */
 export const WORKFLOW_DEFINITION_REGISTRY_SCHEMA = "ans-workflow-definitions/v1" as const;
-/** 定义版本（当前注册表内全部定义为 v1；新增语义变更走 version+1，不静默迁移）。 */
-export const WORKFLOW_DEFINITION_VERSION = 1 as const;
+/**
+ * 当前定义版本（2026-11-20 block resolver 地基：v2）。
+ * - v1 = 旧 app-dispatch 在飞语义（`retry.onExhausted:"blocked"`），**逐字保留**、不静默迁移（Q5/Q10）；
+ * - v2 = `retry.onExhausted:"route-block-resolver"`（重试耗尽交 block resolver；阶段状态机不变）；
+ * - 新 `select_workflow` 缺省解析到 v2；`workflow.started.definition.version` 钉死，旧 workflow 按 v1 解释。
+ */
+export const WORKFLOW_DEFINITION_VERSION = 2 as const;
+/** 注册表支持的版本（升序；`getWorkflowDefinition` 双版本解析来源）。 */
+export const WORKFLOW_DEFINITION_VERSIONS = Object.freeze([1, 2] as const);
+export type WorkflowDefinitionVersion = (typeof WORKFLOW_DEFINITION_VERSIONS)[number];
 
 /** 默认内置流程 id：`add`＝新增（路径 A）；`modify`＝修改（路径 B）。 */
 export const WORKFLOW_DEFINITION_IDS = Object.freeze(["add", "modify"] as const);
@@ -65,12 +73,17 @@ export type WorkflowStageCompletion =
   | "aggregate-acceptance" // A12b accepted + 归档 ⇒ A12 聚合完成
   | "release-or-close"; // release.merged 或 workflow.closed（A13/B4）
 
-/** 阶段重试策略（Q8：每阶段 1 次自动重试后 stage.blocked；高风险零重派）。 */
+/** 阶段重试策略（Q8 算术不变；2026-11-20 block resolver：`onExhausted` 按定义版本语义）。 */
 export interface WorkflowStageRetryPolicy {
   /** 自动重试次数（0..2；实现类高风险阶段为 0）。 */
   readonly autoRetries: number;
-  /** 重试耗尽后的处置（固定 blocked 交客户/运营；不自动跳过）。 */
-  readonly onExhausted: "blocked";
+  /**
+   * 重试耗尽后的处置：
+   * - `"blocked"`（v1，旧 app-dispatch 在飞逐字保留）：保持 `stage.blocked` 交客户/运营；
+   * - `"route-block-resolver"`（v2）：`stage.blocked` 事件仍是账本事实锚点，应用在该锚点上创建
+   *   block 生命周期并路由（修复/决策/升级），不得以停住结束。
+   */
+  readonly onExhausted: "blocked" | "route-block-resolver";
   /** true = 高风险阶段零自动重派（沿用 watchdog 语义）。 */
   readonly highRiskNoRedispatch: boolean;
 }
@@ -623,38 +636,109 @@ export function workflowDefinitionHash(definition: WorkflowDefinition): string {
 
 // —————————————— 注册表（只读） ——————————————
 
-const ADD_DEFINITION: WorkflowDefinition = deepFreeze({
-  schema: WORKFLOW_DEFINITION_SCHEMA,
-  id: "add" as const,
-  version: WORKFLOW_DEFINITION_VERSION,
-  path: "A" as const,
+const ADD_DRIVE_ORDER: readonly WorkflowStage[] = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A12a", "A11", "A12b", "A12", "A13"];
+const MODIFY_DRIVE_ORDER: readonly WorkflowStage[] = ["B1", "B2", "B3", "B4"];
+
+/**
+ * 按目标版本派生阶段数组：v1 逐字保留旧数据；v2 仅把 `retry.onExhausted` 更名
+ * `"route-block-resolver"`（其余字段/顺序/文本逐字不变；Q5/Q10 不静默迁移）。
+ */
+function versionedStages(
+  stages: readonly WorkflowStageDefinition[],
+  version: WorkflowDefinitionVersion,
+): readonly WorkflowStageDefinition[] {
+  if (version === 1) return stages;
+  return stages.map((stage) => ({
+    ...stage,
+    retry: { ...stage.retry, onExhausted: "route-block-resolver" as const },
+  }));
+}
+
+function buildDefinition(input: {
+  id: WorkflowDefinitionId;
+  version: WorkflowDefinitionVersion;
+  path: WorkflowPath;
+  title: string;
+  stages: readonly WorkflowStageDefinition[];
+  driveOrder: readonly WorkflowStage[];
+}): WorkflowDefinition {
+  return deepFreeze({
+    schema: WORKFLOW_DEFINITION_SCHEMA,
+    id: input.id,
+    version: input.version,
+    path: input.path,
+    title: input.title,
+    acceptance: COMMON_ACCEPTANCE,
+    driveOrder: input.driveOrder,
+    stages: versionedStages(input.stages, input.version),
+  });
+}
+
+const ADD_DEFINITION_V1: WorkflowDefinition = buildDefinition({
+  id: "add",
+  version: 1,
+  path: "A",
   title: "新增（路径 A：A1–A13）",
-  acceptance: COMMON_ACCEPTANCE,
-  driveOrder: ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A12a", "A11", "A12b", "A12", "A13"] as const,
   stages: ADD_STAGES,
+  driveOrder: ADD_DRIVE_ORDER,
 });
 
-const MODIFY_DEFINITION: WorkflowDefinition = deepFreeze({
-  schema: WORKFLOW_DEFINITION_SCHEMA,
-  id: "modify" as const,
-  version: WORKFLOW_DEFINITION_VERSION,
-  path: "B" as const,
+const ADD_DEFINITION_V2: WorkflowDefinition = buildDefinition({
+  id: "add",
+  version: 2,
+  path: "A",
+  title: "新增（路径 A：A1–A13）",
+  stages: ADD_STAGES,
+  driveOrder: ADD_DRIVE_ORDER,
+});
+
+const MODIFY_DEFINITION_V1: WorkflowDefinition = buildDefinition({
+  id: "modify",
+  version: 1,
+  path: "B",
   title: "修改（路径 B：B1–B4）",
-  acceptance: COMMON_ACCEPTANCE,
-  driveOrder: ["B1", "B2", "B3", "B4"] as const,
   stages: MODIFY_STAGES,
+  driveOrder: MODIFY_DRIVE_ORDER,
 });
 
-/** 应用内流程定义注册表（只读；模型/角色不可编辑；`select_workflow` 枚举来源）。 */
+const MODIFY_DEFINITION_V2: WorkflowDefinition = buildDefinition({
+  id: "modify",
+  version: 2,
+  path: "B",
+  title: "修改（路径 B：B1–B4）",
+  stages: MODIFY_STAGES,
+  driveOrder: MODIFY_DRIVE_ORDER,
+});
+
+/**
+ * 双版本注册表（只读、深度冻结）：`[id][version]`。
+ * 旧 app-dispatch 在飞按 v1 语义（`onExhausted:"blocked"`）继续；新 select 用 v2。
+ */
+export const WORKFLOW_DEFINITION_BY_VERSION: Readonly<
+  Record<WorkflowDefinitionId, Readonly<Record<WorkflowDefinitionVersion, WorkflowDefinition>>>
+> = Object.freeze({
+  add: Object.freeze({ 1: ADD_DEFINITION_V1, 2: ADD_DEFINITION_V2 }),
+  modify: Object.freeze({ 1: MODIFY_DEFINITION_V1, 2: MODIFY_DEFINITION_V2 }),
+});
+
+/** 应用内流程定义注册表（**当前版本 v2**；只读；模型/角色不可编辑；`select_workflow` 枚举来源）。 */
 export const WORKFLOW_DEFINITIONS: Readonly<Record<WorkflowDefinitionId, WorkflowDefinition>> = Object.freeze({
-  add: ADD_DEFINITION,
-  modify: MODIFY_DEFINITION,
+  add: ADD_DEFINITION_V2,
+  modify: MODIFY_DEFINITION_V2,
 });
 
-/** 注册表定义 hash 表（启动即可用；与 `workflow.started.definition.sha256` 对照）。 */
+/** 注册表定义 hash 表（当前版本 v2；与 `workflow.started.definition.sha256` 对照）。 */
 export const WORKFLOW_DEFINITION_HASHES: Readonly<Record<WorkflowDefinitionId, string>> = Object.freeze({
-  add: workflowDefinitionHash(ADD_DEFINITION),
-  modify: workflowDefinitionHash(MODIFY_DEFINITION),
+  add: workflowDefinitionHash(ADD_DEFINITION_V2),
+  modify: workflowDefinitionHash(MODIFY_DEFINITION_V2),
+});
+
+/** 逐版本定义 hash（v1 值 = 旧发布值，供在飞 workflow 对账；不静默迁移）。 */
+export const WORKFLOW_DEFINITION_HASHES_BY_VERSION: Readonly<
+  Record<WorkflowDefinitionId, Readonly<Record<WorkflowDefinitionVersion, string>>>
+> = Object.freeze({
+  add: Object.freeze({ 1: workflowDefinitionHash(ADD_DEFINITION_V1), 2: WORKFLOW_DEFINITION_HASHES.add }),
+  modify: Object.freeze({ 1: workflowDefinitionHash(MODIFY_DEFINITION_V1), 2: WORKFLOW_DEFINITION_HASHES.modify }),
 });
 
 /** 按路径取默认定义 id（A→add；B→modify）。 */
@@ -670,35 +754,51 @@ export type WorkflowDefinitionLookupResult =
   | { ok: true; definition: WorkflowDefinition; hash: string }
   | { ok: false; code: WorkflowDefinitionLookupFailureCode; message: string };
 
+function isSupportedDefinitionVersion(version: unknown): version is WorkflowDefinitionVersion {
+  return version === 1 || version === 2;
+}
+
 /**
- * 按 id/version 取定义（fail-closed）：
+ * 按 id/version 取定义（fail-closed，**双版本解析**）：
  * - 未知 id ⇒ `workflow-definition-unknown`；
- * - 显式 version 与注册表版本不符 ⇒ `workflow-definition-version-unsupported`（不静默迁移）。
+ * - version 缺省 ⇒ 当前版本 v2（新 select 用 v2）；
+ * - 显式 version 仅接受 1/2；其它 ⇒ `workflow-definition-version-unsupported`（不静默迁移）；
+ * - 返回的 `hash` 对应该版本（v1 = 旧发布 hash，在飞 workflow 对账兼容）。
  */
 export function getWorkflowDefinition(id: unknown, version?: unknown): WorkflowDefinitionLookupResult {
-  const definition = typeof id === "string" && Object.hasOwn(WORKFLOW_DEFINITIONS, id)
-    ? WORKFLOW_DEFINITIONS[id as WorkflowDefinitionId]
-    : undefined;
-  if (definition === undefined) {
+  const idKnown = typeof id === "string" && Object.hasOwn(WORKFLOW_DEFINITION_BY_VERSION, id);
+  if (!idKnown) {
     return {
       ok: false,
       code: "workflow-definition-unknown",
       message: `未知流程定义：${String(id)}（注册表仅含 ${WORKFLOW_DEFINITION_IDS.join("/")}）。`,
     };
   }
-  if (version !== undefined && version !== definition.version) {
+  const definitionId = id as WorkflowDefinitionId;
+  const resolvedVersion: unknown = version === undefined ? WORKFLOW_DEFINITION_VERSION : version;
+  if (!isSupportedDefinitionVersion(resolvedVersion)) {
     return {
       ok: false,
       code: "workflow-definition-version-unsupported",
-      message: `流程定义 ${definition.id} 仅支持 version ${definition.version}（收到 ${String(version)}；不静默迁移）。`,
+      message: `流程定义 ${definitionId} 仅支持 version ${WORKFLOW_DEFINITION_VERSIONS.join("/")}（收到 ${String(version)}；不静默迁移）。`,
     };
   }
-  return { ok: true, definition, hash: WORKFLOW_DEFINITION_HASHES[definition.id] };
+  const definition = WORKFLOW_DEFINITION_BY_VERSION[definitionId][resolvedVersion];
+  return {
+    ok: true,
+    definition,
+    hash: WORKFLOW_DEFINITION_HASHES_BY_VERSION[definitionId][resolvedVersion],
+  };
 }
 
-/** 注册表全部定义（只读、按固定顺序：add、modify）。 */
+/** 注册表当前版本定义（只读、按固定顺序：add、modify）。 */
 export function listWorkflowDefinitions(): readonly WorkflowDefinition[] {
   return WORKFLOW_DEFINITION_IDS.map((id) => WORKFLOW_DEFINITIONS[id]);
+}
+
+/** 某 id 的逐版本定义（升序：v1、v2；只读）。 */
+export function workflowDefinitionVersionsOf(id: WorkflowDefinitionId): readonly WorkflowDefinition[] {
+  return WORKFLOW_DEFINITION_VERSIONS.map((version) => WORKFLOW_DEFINITION_BY_VERSION[id][version]);
 }
 
 // —————————————— JSON Schema 导出（Q9；纯函数、无依赖） ——————————————
@@ -749,7 +849,7 @@ export function workflowDefinitionJsonSchema(definition: WorkflowDefinition): Re
         required: ["autoRetries", "onExhausted", "highRiskNoRedispatch"],
         properties: {
           autoRetries: { type: "integer", minimum: 0, maximum: 2 },
-          onExhausted: { const: "blocked" },
+          onExhausted: { enum: ["blocked", "route-block-resolver"] },
           highRiskNoRedispatch: { type: "boolean" },
         },
       },
@@ -851,88 +951,104 @@ function sameStringArray(a: readonly string[], b: readonly string[]): boolean {
 export function validateWorkflowDefinitions(): readonly string[] {
   const errors: string[] = [];
   for (const id of WORKFLOW_DEFINITION_IDS) {
-    const definition = WORKFLOW_DEFINITIONS[id];
-    const label = `definition ${id}`;
-    if (definition.id !== id) errors.push(`${label}: id 字段不一致（${definition.id}）`);
-    if (definition.schema !== WORKFLOW_DEFINITION_SCHEMA) errors.push(`${label}: schema 非 ${WORKFLOW_DEFINITION_SCHEMA}`);
-    if (!Number.isInteger(definition.version) || definition.version < 1) errors.push(`${label}: version 非正整数`);
-    const expectedPath: WorkflowPath = id === "add" ? "A" : "B";
-    if (definition.path !== expectedPath) errors.push(`${label}: path 必须为 ${expectedPath}`);
-
-    const expectedStages: readonly WorkflowStage[] = id === "add"
-      ? ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A12a", "A12b", "A13"]
-      : ["B1", "B2", "B3", "B4"];
-    const actualStages = definition.stages.map((stage) => stage.stage);
-    if (actualStages.length !== new Set(actualStages).size) errors.push(`${label}: 阶段重复`);
-    const missing = expectedStages.filter((stage) => !actualStages.includes(stage));
-    const extra = actualStages.filter((stage) => !expectedStages.includes(stage));
-    if (missing.length > 0) errors.push(`${label}: 缺阶段 ${missing.join(",")}`);
-    if (extra.length > 0) errors.push(`${label}: 多余阶段 ${extra.join(",")}`);
-
-    for (const stage of definition.stages) {
-      const stageLabel = `${label}/${stage.stage}`;
-      const canonicalNext = WORKFLOW_STAGE_TRANSITIONS[stage.stage];
-      if (!sameStringArray(stage.next, canonicalNext)) {
-        errors.push(`${stageLabel}: next=[${stage.next.join(",")}] 与转移表 [${canonicalNext.join(",")}] 不一致`);
+    for (const version of WORKFLOW_DEFINITION_VERSIONS) {
+      const definition = WORKFLOW_DEFINITION_BY_VERSION[id][version];
+      const label = `definition ${id}@${version}`;
+      if (definition === undefined) {
+        errors.push(`${label}: 注册表缺该版本定义`);
+        continue;
       }
-      const canonicalRework = WORKFLOW_REWORK_FALLBACKS[stage.stage];
-      if (canonicalRework === undefined) {
-        if (stage.reworkFallback !== undefined) {
-          errors.push(`${stageLabel}: 转移表无返工边但定义给出 ${stage.reworkFallback}`);
+      if (definition.id !== id) errors.push(`${label}: id 字段不一致（${definition.id}）`);
+      if (definition.schema !== WORKFLOW_DEFINITION_SCHEMA) errors.push(`${label}: schema 非 ${WORKFLOW_DEFINITION_SCHEMA}`);
+      if (definition.version !== version) errors.push(`${label}: version 字段不一致（${definition.version}）`);
+      const expectedPath: WorkflowPath = id === "add" ? "A" : "B";
+      if (definition.path !== expectedPath) errors.push(`${label}: path 必须为 ${expectedPath}`);
+      if (version === WORKFLOW_DEFINITION_VERSION && WORKFLOW_DEFINITIONS[id] !== definition) {
+        errors.push(`${label}: 当前注册表项必须指向 v${WORKFLOW_DEFINITION_VERSION}`);
+      }
+      const expectedOnExhausted = version === 1 ? "blocked" : "route-block-resolver";
+
+      const expectedStages: readonly WorkflowStage[] = id === "add"
+        ? ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A12a", "A12b", "A13"]
+        : ["B1", "B2", "B3", "B4"];
+      const actualStages = definition.stages.map((stage) => stage.stage);
+      if (actualStages.length !== new Set(actualStages).size) errors.push(`${label}: 阶段重复`);
+      const missing = expectedStages.filter((stage) => !actualStages.includes(stage));
+      const extra = actualStages.filter((stage) => !expectedStages.includes(stage));
+      if (missing.length > 0) errors.push(`${label}: 缺阶段 ${missing.join(",")}`);
+      if (extra.length > 0) errors.push(`${label}: 多余阶段 ${extra.join(",")}`);
+
+      for (const stage of definition.stages) {
+        const stageLabel = `${label}/${stage.stage}`;
+        const canonicalNext = WORKFLOW_STAGE_TRANSITIONS[stage.stage];
+        if (!sameStringArray(stage.next, canonicalNext)) {
+          errors.push(`${stageLabel}: next=[${stage.next.join(",")}] 与转移表 [${canonicalNext.join(",")}] 不一致`);
         }
-      } else if (stage.reworkFallback !== canonicalRework) {
-        errors.push(`${stageLabel}: reworkFallback=${String(stage.reworkFallback)} 与冻结映射 ${canonicalRework} 不一致`);
+        const canonicalRework = WORKFLOW_REWORK_FALLBACKS[stage.stage];
+        if (canonicalRework === undefined) {
+          if (stage.reworkFallback !== undefined) {
+            errors.push(`${stageLabel}: 转移表无返工边但定义给出 ${stage.reworkFallback}`);
+          }
+        } else if (stage.reworkFallback !== canonicalRework) {
+          errors.push(`${stageLabel}: reworkFallback=${String(stage.reworkFallback)} 与冻结映射 ${canonicalRework} 不一致`);
+        }
+        const hasTask = stage.taskKind !== "none";
+        const needsApplication = stage.executor === "application" || stage.executor === "customer";
+        if (needsApplication && hasTask) errors.push(`${stageLabel}: application/customer 阶段不得建任务`);
+        if (stage.executor === "worker-dispatch" && stage.taskKind !== "worker-dispatch") {
+          errors.push(`${stageLabel}: worker-dispatch 执行者必须用 worker-dispatch 任务`);
+        }
+        if (stage.executor === "card-prompt" && stage.taskKind !== "card-prompt") {
+          errors.push(`${stageLabel}: card-prompt 执行者必须用 card-prompt 任务`);
+        }
+        if ((stage.executor === "built-in" || stage.executor === "review") && stage.taskKind !== "stage-execution") {
+          errors.push(`${stageLabel}: built-in/review 执行者必须用 stage-execution 任务`);
+        }
+        if (stage.taskKind === "card-prompt" && stage.card === undefined) {
+          errors.push(`${stageLabel}: card-prompt 阶段缺少 card 定义`);
+        }
+        if (stage.card !== undefined && stage.card.appOwned === true && stage.card.cardKind !== "merge-main") {
+          errors.push(`${stageLabel}: appOwned 卡只允许 merge-main`);
+        }
+        if (!Number.isInteger(stage.retry.autoRetries) || stage.retry.autoRetries < 0 || stage.retry.autoRetries > 2) {
+          errors.push(`${stageLabel}: autoRetries 必须在 0..2`);
+        }
+        if (stage.retry.highRiskNoRedispatch && stage.retry.autoRetries !== 0) {
+          errors.push(`${stageLabel}: 高风险零重派阶段 autoRetries 必须为 0`);
+        }
+        // 2026-11-20：版本化语义自检——v1 必须 `blocked`；v2 必须 `route-block-resolver`。
+        if (stage.retry.onExhausted !== expectedOnExhausted) {
+          errors.push(`${stageLabel}: onExhausted=${String(stage.retry.onExhausted)}（v${version} 应为 ${expectedOnExhausted}）`);
+        }
+        if (stage.taskText.summary.trim() === "" || stage.taskText.details.length === 0) {
+          errors.push(`${stageLabel}: taskText 模板不得为空`);
+        }
       }
-      const hasTask = stage.taskKind !== "none";
-      const needsApplication = stage.executor === "application" || stage.executor === "customer";
-      if (needsApplication && hasTask) errors.push(`${stageLabel}: application/customer 阶段不得建任务`);
-      if (stage.executor === "worker-dispatch" && stage.taskKind !== "worker-dispatch") {
-        errors.push(`${stageLabel}: worker-dispatch 执行者必须用 worker-dispatch 任务`);
-      }
-      if (stage.executor === "card-prompt" && stage.taskKind !== "card-prompt") {
-        errors.push(`${stageLabel}: card-prompt 执行者必须用 card-prompt 任务`);
-      }
-      if ((stage.executor === "built-in" || stage.executor === "review") && stage.taskKind !== "stage-execution") {
-        errors.push(`${stageLabel}: built-in/review 执行者必须用 stage-execution 任务`);
-      }
-      if (stage.taskKind === "card-prompt" && stage.card === undefined) {
-        errors.push(`${stageLabel}: card-prompt 阶段缺少 card 定义`);
-      }
-      if (stage.card !== undefined && stage.card.appOwned === true && stage.card.cardKind !== "merge-main") {
-        errors.push(`${stageLabel}: appOwned 卡只允许 merge-main`);
-      }
-      if (!Number.isInteger(stage.retry.autoRetries) || stage.retry.autoRetries < 0 || stage.retry.autoRetries > 2) {
-        errors.push(`${stageLabel}: autoRetries 必须在 0..2`);
-      }
-      if (stage.retry.highRiskNoRedispatch && stage.retry.autoRetries !== 0) {
-        errors.push(`${stageLabel}: 高风险零重派阶段 autoRetries 必须为 0`);
-      }
-      if (stage.taskText.summary.trim() === "" || stage.taskText.details.length === 0) {
-        errors.push(`${stageLabel}: taskText 模板不得为空`);
-      }
-    }
 
-    const driveOrder = definition.driveOrder;
-    if (driveOrder.length !== actualStages.length || new Set(driveOrder).size !== driveOrder.length) {
-      errors.push(`${label}: driveOrder 必须恰覆盖全部阶段且不重复`);
-    }
-    for (const stage of driveOrder) {
-      if (!actualStages.includes(stage)) errors.push(`${label}: driveOrder 含未定义阶段 ${stage}`);
-    }
-    for (let index = 0; index + 1 < driveOrder.length; index += 1) {
-      const from = driveOrder[index]!;
-      const to = driveOrder[index + 1]!;
-      if (!WORKFLOW_STAGE_TRANSITIONS[from].includes(to)) {
-        errors.push(`${label}: driveOrder 相邻边 ${from}→${to} 非法`);
+      const driveOrder = definition.driveOrder;
+      if (driveOrder.length !== actualStages.length || new Set(driveOrder).size !== driveOrder.length) {
+        errors.push(`${label}: driveOrder 必须恰覆盖全部阶段且不重复`);
+      }
+      for (const stage of driveOrder) {
+        if (!actualStages.includes(stage)) errors.push(`${label}: driveOrder 含未定义阶段 ${stage}`);
+      }
+      for (let index = 0; index + 1 < driveOrder.length; index += 1) {
+        const from = driveOrder[index]!;
+        const to = driveOrder[index + 1]!;
+        if (!WORKFLOW_STAGE_TRANSITIONS[from].includes(to)) {
+          errors.push(`${label}: driveOrder 相邻边 ${from}→${to} 非法`);
+        }
       }
     }
   }
-  // 全项目阶段覆盖：每个 WorkflowStage 恰属一条定义。
-  for (const stage of WORKFLOW_STAGES) {
-    const owners = WORKFLOW_DEFINITION_IDS.filter((id) =>
-      WORKFLOW_DEFINITIONS[id].stages.some((entry) => entry.stage === stage));
-    if (owners.length !== 1) {
-      errors.push(`stage ${stage}: 注册表归属数 ${owners.length}（应恰为 1）`);
+  // 全项目阶段覆盖：每个 WorkflowStage 在**每个版本**恰属一条定义。
+  for (const version of WORKFLOW_DEFINITION_VERSIONS) {
+    for (const stage of WORKFLOW_STAGES) {
+      const owners = WORKFLOW_DEFINITION_IDS.filter((id) =>
+        WORKFLOW_DEFINITION_BY_VERSION[id][version].stages.some((entry) => entry.stage === stage));
+      if (owners.length !== 1) {
+        errors.push(`stage ${stage}@v${version}: 注册表归属数 ${owners.length}（应恰为 1）`);
+      }
     }
   }
   return errors;

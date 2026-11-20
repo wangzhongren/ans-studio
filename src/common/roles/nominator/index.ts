@@ -864,6 +864,7 @@ const FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
       "## 报告期望（fixed）",
       "任务完成或阻塞必须用 `submit_report` 回交，报告回 `task.created.from`（固定路径任务创建者为应用 application；应用观察 `task.reported` 后按完成条件收口）。",
       "报告至少含：完成/阻塞状态、真实证据（名单/提案决定、三文档摘要、`activate_role_documents` 回执与 activationDigest）、遗留项。",
+      "阻塞报告必须写缺失项与可核验证据路径及已尝试动作；如实报告即路由输入——应用按 block 类路由（属主修复/决策卡/升级），不空转、不代客户选择、不对同一 block 重弹卡。收到应用修复任务/修复简报时按简报执行并按 `repairId` 回交，不自行同文重试。",
       "阻塞先报原创建者，不猜、不伪造批准/激活/完成；不要只结束回合。",
     ].join("\n"),
   }),

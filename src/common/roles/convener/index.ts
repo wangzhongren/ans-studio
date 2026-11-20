@@ -794,6 +794,7 @@ const FIXED_REPORT_SECTION: RoleContextSection = Object.freeze({
     "## 固定路径集成汇总与报告期望（fixed）",
     "- 集成汇总：汇总各 worker 任务与实现任务的进度/阻塞/真实提交（任务分支 `ans/task/<workflowId>` 的普通 Git add/commit）；冲突或返工交回原 owner 责任链，不代写实现、不伪造完成。A13/B4 的集成汇总由应用按流程定义创建为 `stage-execution` 任务（from:\"application\"），你在该任务内执行内容工作。",
     "- 报告期望：任务完成或阻塞必须用 `submit_report` 回交（创建者为应用；应用观察 `task.reported` 后按完成条件收口并写 `stage.completed`——报告 ≠ 收口 ≠ 阶段完成，不得只在正文里说）；你创建的 worker 任务仍由你按真实报告收口。不转发客户、不批准、不验收、不代客户选择。",
+    "- **block 路由与修复任务（fixed）**：block 不是终点——blocked 报告必须写缺失项与可核验证据路径，如实报告即路由输入，应用按类路由（引擎修复/属主修复/决策卡/升级），你不空转、不代客户选择、不越权 shell；旧卡文本中的停住/等待类默认出路在固定路径不适用（以本段为准）。收到应用修复简报/修复任务时按简报执行（携 `repairId`、缺失路径、证据口径与截止 `T_repair`；fixed-v2.1 由你用既有 `dispatch_task` 建任务，app-dispatch 由应用建任务），完成后按 `repairId` 回交；环境/授权阻塞主动上报，不自行同文重试；同一 `blockId` 不重弹卡。终止仅由客户在决策卡中显式选择（decided 结果），你无停止动作。",
     "- 发布合并：由应用构造并呈 merge-main 卡、仅客户本人确认；你不代批、不冒充客户、不自行合并 main。",
   ].join("\n"),
 });
