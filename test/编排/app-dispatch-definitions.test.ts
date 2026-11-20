@@ -59,21 +59,21 @@ function stageOf(definition: WorkflowDefinition, stage: WorkflowStage): Workflow
   return found!;
 }
 
-test("注册表覆盖：add=A1–A13（含 A12a/A12b/A12 聚合）、modify=B1–B4；当前版本 v2、双版本 v1/v2；全项目阶段恰归属一条定义", () => {
+test("注册表覆盖：add=A1–A13（含 A12a/A12b/A12 聚合）、modify=B1–B4；当前版本 v3、三版本 v1/v2/v3；全项目阶段恰归属一条定义", () => {
   assert.deepEqual([...WORKFLOW_DEFINITION_IDS], ["add", "modify"]);
-  // 2026-11-20（block resolver 地基 / 设计 §6.5 Q5）：定义版本 1→2；v2 仅 onExhausted 语义更名，
-  // v1 逐字保留给在飞 app-dispatch/v1 workflow（不静默迁移）。
-  assert.equal(WORKFLOW_DEFINITION_VERSION, 2);
-  assert.deepEqual([...WORKFLOW_DEFINITION_VERSIONS], [1, 2]);
+  // 2026-11-20（block resolver 地基 v2 → SMOKE-2 S2 v3）：定义版本 2→3；v3 = v2 + A2/A3 任务文本与
+  // 角色边界对齐；v1/v2 逐字保留给在飞 app-dispatch/v1 workflow（按各自 hash 解释，不静默迁移）。
+  assert.equal(WORKFLOW_DEFINITION_VERSION, 3);
+  assert.deepEqual([...WORKFLOW_DEFINITION_VERSIONS], [1, 2, 3]);
   const add = WORKFLOW_DEFINITIONS.add;
   const modify = WORKFLOW_DEFINITIONS.modify;
   assert.equal(add.schema, WORKFLOW_DEFINITION_SCHEMA);
   assert.equal(add.id, "add");
-  assert.equal(add.version, 2);
+  assert.equal(add.version, 3);
   assert.equal(add.path, "A");
   assert.equal(modify.schema, WORKFLOW_DEFINITION_SCHEMA);
   assert.equal(modify.id, "modify");
-  assert.equal(modify.version, 2);
+  assert.equal(modify.version, 3);
   assert.equal(modify.path, "B");
   assert.deepEqual(add.stages.map((entry) => entry.stage).sort(), [...ADD_STAGES].sort(), "add 阶段集合 = A1–A13（15 阶段）");
   assert.equal(add.stages.length, 15);
@@ -136,12 +136,14 @@ test("定义 hash：canonical JSON 键排序、SHA-256 稳定、注册表常量�
     const again = getWorkflowDefinition(id);
     assert.equal(again.ok, true);
     if (again.ok) assert.equal(again.hash, hash, "getWorkflowDefinition 返回同一 hash");
-    // 逐版本 hash：v2 = 当前注册表常量；v1 仍可解析且 hash 独立（旧发布值口径，供在飞对账）。
-    assert.deepEqual(workflowDefinitionVersionsOf(id).map((entry) => entry.version), [1, 2]);
+    // 逐版本 hash：v3 = 当前注册表常量；v1/v2 仍可解析且逐版本 hash 独立（旧发布值口径，供在飞对账）。
+    assert.deepEqual(workflowDefinitionVersionsOf(id).map((entry) => entry.version), [1, 2, 3]);
     const v1 = getWorkflowDefinition(id, 1);
     const v2 = getWorkflowDefinition(id, 2);
+    const v3 = getWorkflowDefinition(id, 3);
     assert.equal(v1.ok, true);
     assert.equal(v2.ok, true);
+    assert.equal(v3.ok, true);
     if (v1.ok) {
       assert.equal(v1.definition.version, 1);
       assert.equal(v1.hash, workflowDefinitionHash(v1.definition), "v1 hash 与重算一致");
@@ -149,10 +151,19 @@ test("定义 hash：canonical JSON 键排序、SHA-256 稳定、注册表常量�
     }
     if (v2.ok) {
       assert.equal(v2.definition.version, 2);
-      assert.equal(v2.hash, WORKFLOW_DEFINITION_HASHES[id], "v2 hash = 当前注册表常量");
-      assert.equal(v2.hash, WORKFLOW_DEFINITION_HASHES_BY_VERSION[id][2]);
+      assert.equal(v2.hash, workflowDefinitionHash(v2.definition), "v2 hash 与重算一致");
+      assert.equal(v2.hash, WORKFLOW_DEFINITION_HASHES_BY_VERSION[id][2], "v2 hash 走逐版本常量（在飞 v2 按 v2 解释）");
     }
-    if (v1.ok && v2.ok) assert.notEqual(v1.hash, v2.hash, "v1/v2 hash 必须不同（语义已版本化）");
+    if (v3.ok) {
+      assert.equal(v3.definition.version, 3);
+      assert.equal(v3.hash, WORKFLOW_DEFINITION_HASHES[id], "v3 hash = 当前注册表常量");
+      assert.equal(v3.hash, WORKFLOW_DEFINITION_HASHES_BY_VERSION[id][3]);
+    }
+    if (v1.ok && v2.ok && v3.ok) {
+      assert.notEqual(v1.hash, v2.hash, "v1/v2 hash 必须不同（语义已版本化）");
+      assert.notEqual(v2.hash, v3.hash, "v2/v3 hash 必须不同（任务文本已版本化）");
+      assert.notEqual(v1.hash, v3.hash, "v1/v3 hash 必须不同");
+    }
   }
   // 两条定义 hash 不同（不是复制冒充）。
   assert.notEqual(WORKFLOW_DEFINITION_HASHES.add, WORKFLOW_DEFINITION_HASHES.modify);
@@ -166,9 +177,9 @@ test("定义只读：注册表/定义/嵌套数组深度冻结；篡改抛错且
   assert.equal(Object.isFrozen(add.stages[0]), true);
   assert.equal(Object.isFrozen(add.stages[0]!.next), true);
   assert.equal(Object.isFrozen(add.stages[0]!.taskText.details), true);
-  assert.throws(() => { (add as { version: number }).version = 3; }, TypeError);
+  assert.throws(() => { (add as { version: number }).version = 4; }, TypeError);
   assert.throws(() => { (add.stages[0] as { title: string }).title = "篡改"; }, TypeError);
-  assert.equal(add.version, 2);
+  assert.equal(add.version, 3);
   // hash 在篡改尝试后仍等于注册表常量（不含外部可变引用）。
   assert.equal(workflowDefinitionHash(add), WORKFLOW_DEFINITION_HASHES.add);
 });
@@ -212,18 +223,24 @@ test("JSON Schema：单定义/注册表可生成；draft 2020-12、stage 枚举�
   assert.doesNotThrow(() => JSON.stringify(registry));
 });
 
-test("getWorkflowDefinition fail-closed：未知 id/版本不符稳定码；v1/v2 合法、version 3 非法；A→add、B→modify", () => {
+test("getWorkflowDefinition fail-closed：未知 id/版本不符稳定码；v1/v2/v3 合法、version 4 非法；A→add、B→modify", () => {
   const unknown = getWorkflowDefinition("delete");
   assert.equal(unknown.ok, false);
   if (!unknown.ok) assert.equal(unknown.code, "workflow-definition-unknown");
   const missing = getWorkflowDefinition(undefined);
   assert.equal(missing.ok, false);
   if (!missing.ok) assert.equal(missing.code, "workflow-definition-unknown");
-  // 2026-11-20：v2 为当前合法版本；仅 v1/v2 可解析，version 3（及其它）才非法（不静默迁移）。
+  // 2026-11-20（SMOKE-2 S2）：v3 为当前合法版本；v1/v2/v3 均可解析，version 4（及其它）才非法（不静默迁移）。
   const explicitV2 = getWorkflowDefinition("add", 2);
   assert.equal(explicitV2.ok, true);
   if (explicitV2.ok) assert.equal(explicitV2.definition.version, 2);
-  const badVersion = getWorkflowDefinition("add", 3);
+  const explicitV3 = getWorkflowDefinition("add", 3);
+  assert.equal(explicitV3.ok, true);
+  if (explicitV3.ok) {
+    assert.equal(explicitV3.definition.version, 3);
+    assert.equal(explicitV3.hash, WORKFLOW_DEFINITION_HASHES.add, "v3 hash = 当前注册表常量");
+  }
+  const badVersion = getWorkflowDefinition("add", 4);
   assert.equal(badVersion.ok, false);
   if (!badVersion.ok) {
     assert.equal(badVersion.code, "workflow-definition-version-unsupported");
@@ -319,7 +336,7 @@ test("关键语义冻结：on-dispatch/review/release-or-close/高风险零重�
   assert.equal(a6.reworkFallback, "A5");
   assert.equal(a10.reworkFallback, undefined);
 
-  // Q8（2026-11-20 版本化）：默认每阶段 1 次自动重试；v2 耗尽 ⇒ `route-block-resolver`（交应用路由，不再停住）；
+  // Q8（2026-11-20 版本化）：默认每阶段 1 次自动重试；v2/v3 耗尽 ⇒ `route-block-resolver`（交应用路由，不再停住）；
   // v1 逐字保留 `blocked`（在飞 workflow 按旧定义解释，不静默迁移）；高风险零重派；应用派生/聚合无任务无重试。
   assert.equal(stageOf(add, "A2").retry.autoRetries, 1);
   assert.equal(stageOf(add, "A2").retry.onExhausted, "route-block-resolver");
@@ -334,7 +351,7 @@ test("关键语义冻结：on-dispatch/review/release-or-close/高风险零重�
     }
   }
   for (const entry of add.stages) {
-    assert.equal(entry.retry.onExhausted, "route-block-resolver", `v2 ${entry.stage} 必须交 block resolver`);
+    assert.equal(entry.retry.onExhausted, "route-block-resolver", `v3 ${entry.stage} 必须交 block resolver`);
   }
   assert.equal(a12.retry.autoRetries, 0);
 
@@ -385,4 +402,88 @@ test("关键语义冻结：on-dispatch/review/release-or-close/高风险零重�
   assert.equal(a10.sideEffect, "read-only");
   assert.equal(stageOf(add, "A11").sideEffect, "read-only");
   assert.equal(stageOf(modify, "B1").sideEffect, "read-only");
+});
+
+// —————————————— 2026-11-20（SMOKE-2 S2）：定义 v3 任务文本与角色边界一致 ——————————————
+
+test("S2 定义文本 v3：A2 只写 docs/product 且 docs/intents 由幕僚创建/核对（B24）；A3 呈卡前核对入口；v1/v2 逐字保留、hash 冻结", () => {
+  // 1) v3（当前注册表）A2：根因修复——product 只写 docs/product；docs/intents 入口由幕僚（chief，唯一写者）
+  //    在 A3 呈卡前创建/核对；product 写 docs/intents ⇒ 越界 fail-closed。
+  const add = WORKFLOW_DEFINITIONS.add;
+  const a2Text = [stageOf(add, "A2").taskText.summary, ...stageOf(add, "A2").taskText.details].join("\n");
+  assert.match(a2Text, /docs\/product\/<flowId>-intent-vN\.md/, "v3 A2 必须给出 product 写区路径");
+  assert.match(a2Text, /docs\/intents\/<intentId>\.md/, "v3 A2 必须写明 docs/intents 入口文件");
+  assert.match(a2Text, /幕僚/, "v3 A2 必须写明 docs/intents 的唯一写者是幕僚（chief）");
+  assert.match(a2Text, /B24/);
+  assert.match(a2Text, /不得写 docs\/intents/, "v3 A2 必须 fail-closed 禁止 product 写 docs/intents");
+  assert.match(a2Text, /path-outside-boundary/, "越界必须落到角色边界拒绝语义");
+  assert.equal(a2Text.includes("同时写 docs/intents"), false, "v3 A2 不得再要求 product 同时写 docs/intents（SMOKE-2 根因）");
+  // 2) v3 A3：幕僚呈卡前创建/核对入口（B24；应用校验入口与 intent 一致）。
+  const a3Text = [stageOf(add, "A3").taskText.summary, ...stageOf(add, "A3").taskText.details].join("\n");
+  assert.match(a3Text, /docs\/intents\/<intentId>\.md/, "v3 A3 必须写明意图入口文件");
+  assert.match(a3Text, /幕僚/, "v3 A3 必须写明由幕僚创建/核对入口");
+  assert.match(a3Text, /B24/);
+  assert.match(a3Text, /呈卡前|呈卡/, "v3 A3 入口核对必须在呈卡前");
+  // 呈卡/回传/裁决语义逐字保留（v3 只在 details 追加入口一行，其余文本不变）。
+  assert.match(a3Text, /request_choice/);
+  assert.match(a3Text, /card-prompt-mismatch/);
+  assert.match(a3Text, /finalizeIntent/);
+
+  // 3) v1/v2 逐字保留：v2 A2 仍保留旧 docs/intents 要求（证明 v2 未被静默修改给在飞 workflow）。
+  const ADD_A2_TEXT_V2 = {
+    summary: "撰写产品意图意图文件与意图入口",
+    details: [
+      "产出 docs/product/<flowId>-intent-vN.md（frontmatter schema=project-intent/v1，version 与文件名一致）",
+      "同时写 docs/intents/<intentId>.md 入口（B24：呈 A3 卡前应用校验入口）",
+      "报告后由应用重算字节 SHA-256 并收口；hash/入口缺失 ⇒ 不收口",
+    ],
+  } as const;
+  const ADD_A3_TEXT_V2 = {
+    summary: "按应用 prompt 呈意图确认卡（intent-confirm）",
+    details: [
+      "应用计算 documentRefs[intent]（path+version+sha256）并发放 promptId",
+      "幕僚以 request_choice 原样回传 promptId/cardKind/选项/documentRefs；不一致 ⇒ card-prompt-mismatch（不发卡）",
+      "confirm ⇒ 应用 finalizeIntent 完成 A3；revise ⇒ stage.reworked A3→A2；卡属 decision 组（judge 代批语义不变）",
+    ],
+  } as const;
+  for (const version of [1, 2] as const) {
+    const def = getWorkflowDefinition("add", version);
+    assert.equal(def.ok, true);
+    if (!def.ok) continue;
+    assert.deepEqual(stageOf(def.definition, "A2").taskText, ADD_A2_TEXT_V2, `add v${version} A2 文本必须逐字保留（旧 docs/intents 要求）`);
+    assert.deepEqual(stageOf(def.definition, "A3").taskText, ADD_A3_TEXT_V2, `add v${version} A3 文本必须逐字保留`);
+    assert.notDeepEqual(stageOf(def.definition, "A2").taskText, stageOf(add, "A2").taskText, "v3 不得回写旧版本");
+  }
+  // 版本语义：v1 必须 blocked；v2/v3 必须 route-block-resolver；注册表自检零错误。
+  const v1 = getWorkflowDefinition("add", 1);
+  const v2 = getWorkflowDefinition("add", 2);
+  if (v1.ok) assert.equal(v1.definition.stages.every((entry) => entry.retry.onExhausted === "blocked"), true);
+  for (const def of [v2, getWorkflowDefinition("add", 3)] as const) {
+    if (def.ok) assert.equal(def.definition.stages.every((entry) => entry.retry.onExhausted === "route-block-resolver"), true);
+  }
+  assert.deepEqual(validateWorkflowDefinitions(), []);
+
+  // 4) 定义 hash 冻结（记录 §二表格值；canonical JSON SHA-256）——v1/v2 在飞对账依据、v3 新 select。
+  const FROZEN_HASHES = {
+    add: {
+      1: "ef7720c112c76c8d77882118af8a331b06c16aa634246aa263b0a8ce871ecbee",
+      2: "9718975bc34780b4ea0be49f99890388ff21a36b87455d023392fd088b72a1e2",
+      3: "c9e87ad6772a2d61149c5d1e006c58b01c2c653781f41ab409a7d167406f3d08",
+    },
+    modify: {
+      1: "4bea23eb0b1c00c849aff0990aefefa0b045759bdbea1331ff2f932540594bb6",
+      2: "41bbe743738569defa85e2295744c56545cf8d9f97c679a7025c1cfe25968445",
+      3: "4ac0513401bab5a9a8f95bf157fb4cb4baffeb2975ecbf114f6b40a02aa9e539",
+    },
+  } as const;
+  for (const id of WORKFLOW_DEFINITION_IDS) {
+    for (const version of [1, 2, 3] as const) {
+      const expected = FROZEN_HASHES[id][version];
+      assert.equal(WORKFLOW_DEFINITION_HASHES_BY_VERSION[id][version], expected, `${id} v${version} 逐版本 hash 冻结`);
+      const lookup = getWorkflowDefinition(id, version);
+      assert.equal(lookup.ok, true);
+      if (lookup.ok) assert.equal(lookup.hash, expected, `${id} v${version} 解析 hash = 冻结值（无静默迁移）`);
+    }
+    assert.equal(WORKFLOW_DEFINITION_HASHES[id], FROZEN_HASHES[id][3], `${id} 当前 hash = v3 冻结值`);
+  }
 });

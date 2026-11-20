@@ -59,7 +59,7 @@ import {
   taskEvent,
 } from "../../src/common/编排/task-state.ts";
 import {
-  WORKFLOW_DEFINITION_HASHES,
+  WORKFLOW_DEFINITION_HASHES_BY_VERSION,
 } from "../../src/common/编排/workflow-definitions.ts";
 import {
   appendWorkflowEvent,
@@ -268,8 +268,9 @@ async function seedWorkflow(input: {
   const path = input.path ?? "A";
   const flowId = input.flowId ?? `flow-${input.workflowId}`;
   const definition = input.definition
+    // 手工播种 = 在飞 workflow 夹具：按 v2 定义 + v2 hash 解释（当前注册表 v3；不静默迁移）。
     ?? (input.protocol === "app-dispatch/v1"
-      ? { id: path === "B" ? "modify" : "add", version: 2, sha256: path === "B" ? WORKFLOW_DEFINITION_HASHES.modify : WORKFLOW_DEFINITION_HASHES.add }
+      ? { id: path === "B" ? "modify" : "add", version: 2, sha256: path === "B" ? WORKFLOW_DEFINITION_HASHES_BY_VERSION.modify[2] : WORKFLOW_DEFINITION_HASHES_BY_VERSION.add[2] }
       : undefined);
   const event: WorkflowEvent = {
     v: 1,
@@ -1517,7 +1518,7 @@ test("review 名单不可读：driveAppDispatchStage 返回 review-role-unavaila
     });
     assert.equal(selected.ok, true, selected.ok === false ? `${selected.code}: ${selected.message}` : "");
     if (!selected.ok) return;
-    assert.equal(selected.definition.version, 2, "新 select 使用 v2 定义");
+    assert.equal(selected.definition.version, 3, "新 select 使用 v3 定义");
     for (const stage of ["A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"] as WorkflowStage[]) {
       await seedStageCompleted({ root, workflowId: selected.workflowId, flowId: "snake", stage, at: new Date(T0 + 1000).toISOString() });
     }

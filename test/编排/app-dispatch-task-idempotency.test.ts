@@ -45,7 +45,7 @@ import {
   type CreateAppDispatchTaskInput,
   type DriveAppDispatchStageResult,
 } from "../../src/common/编排/workflow-service.ts";
-import { WORKFLOW_DEFINITION_HASHES } from "../../src/common/编排/workflow-definitions.ts";
+import { WORKFLOW_DEFINITION_HASHES_BY_VERSION } from "../../src/common/编排/workflow-definitions.ts";
 import {
   appendTaskEvent,
   readTaskState,
@@ -345,7 +345,8 @@ test("createAppDispatchTask API 收紧：stage-execution/card-prompt ⇒ app-dis
       trigger: { by: "chief", reason: "seam test" },
       sourceTaskId: "turn-worker-api",
       protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-      definition: { id: "modify", version: 2, sha256: WORKFLOW_DEFINITION_HASHES.modify },
+      // 在飞 v2 workflow：按 v2 定义 hash 解释（HASHES 现指 v3；不静默迁移）。
+      definition: { id: "modify", version: 2, sha256: WORKFLOW_DEFINITION_HASHES_BY_VERSION.modify[2] },
       parameters: { acceptanceStrength: "standard" },
     };
     const startedAppend = await appendWorkflowEvent(root, started);

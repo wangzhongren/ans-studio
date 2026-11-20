@@ -274,7 +274,7 @@ test("selectWorkflow(A)：workflow.started 协议/定义/参数 + A1 stage-execu
     assert.equal(selected.workflowPath, "A");
     assert.equal(selected.acceptanceStrength, "standard");
     assert.deepEqual(selected.definition, {
-      id: "add", version: 2, sha256: WORKFLOW_DEFINITION_HASHES.add,
+      id: "add", version: 3, sha256: WORKFLOW_DEFINITION_HASHES.add,
     });
     assert.equal(getWorkflowDefinition("add")!.ok, true, "引用的定义必须在注册表内");
     assert.equal(selected.stage, "A1");
@@ -291,7 +291,7 @@ test("selectWorkflow(A)：workflow.started 协议/定义/参数 + A1 stage-execu
     const started: StartedEvent = starts[0]!;
     assert.equal(started.protocol, WORKFLOW_PROTOCOL_APP_DISPATCH);
     assert.equal(started.definition?.id, "add");
-    assert.equal(started.definition?.version, 2);
+    assert.equal(started.definition?.version, 3);
     assert.equal(started.definition?.sha256, WORKFLOW_DEFINITION_HASHES.add);
     assert.deepEqual(started.parameters, { acceptanceStrength: "standard" });
     assert.equal(started.sourceTaskId, "turn-customer-1");
@@ -348,7 +348,7 @@ test("selectWorkflow(B)：首阶段 B1 worker-dispatch→convener；幂等重放
   try {
     const selected = await startB(root);
     assert.equal(selected.stage, "B1");
-    assert.deepEqual(selected.definition, { id: "modify", version: 2, sha256: WORKFLOW_DEFINITION_HASHES.modify });
+    assert.deepEqual(selected.definition, { id: "modify", version: 3, sha256: WORKFLOW_DEFINITION_HASHES.modify });
     const receipt = selected.tasks[0]!;
     assert.equal(receipt.taskKind, "worker-dispatch");
     assert.equal(receipt.to, "convener");
@@ -398,8 +398,9 @@ test("selectWorkflow 拒绝面：sourceTaskId 缺失/flowId 非法/path 非法/�
     });
     assert.equal(unknownDef.ok, false);
     if (!unknownDef.ok) assert.equal(unknownDef.code, "workflow-definition-unknown");
+    // 2026-11-20（SMOKE-2 S2）：v3 现为合法版本（成功语义见 selectWorkflow(A)/(B)）；version 4 保留拒绝面。
     const badVersion = await selectWorkflow({
-      projectRoot: root, flowId: FLOW, workflowPath: "A", sourceTaskId: "t", definitionVersion: 3,
+      projectRoot: root, flowId: FLOW, workflowPath: "A", sourceTaskId: "t", definitionVersion: 4,
     });
     assert.equal(badVersion.ok, false);
     if (!badVersion.ok) assert.equal(badVersion.code, "workflow-definition-version-unsupported");
@@ -1362,7 +1363,7 @@ test("app 工作流自身只产生 app 协议事件：无 stage-request 任务�
     }
     const requested = await ofKind(root, WF, "stage.requested");
     assert.equal(requested.every((event) => event.issuedBy === "application"), true, "新协议 stage.requested 全部由应用签发");
-    // workflow 定义引用已钉死当前版本 add@2 的 hash（不静默迁移；v1 旧值见 WORKFLOW_DEFINITION_HASHES_BY_VERSION）。
+    // workflow 定义引用已钉死当前版本 add@3 的 hash（不静默迁移；v1/v2 旧值见 WORKFLOW_DEFINITION_HASHES_BY_VERSION）。
     const started = (await ofKind(root, WF, "workflow.started"))[0]!;
     assert.equal(started.definition?.sha256, WORKFLOW_DEFINITION_HASHES.add);
     assert.equal(WORKFLOW_DEFINITIONS.add.version, started.definition?.version);

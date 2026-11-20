@@ -48,9 +48,11 @@ import {
   type TaskReplay,
 } from "../../src/common/编排/task-state.ts";
 import {
+  BLOCK_STAGE_REENTRY_OPTION_IDS,
   confirmStop,
   driveAppDispatchStage,
   readWorkflowLedger,
+  type ReenterBlockedStageAfterResolutionResult,
 } from "../../src/common/编排/workflow-service.ts";
 import { deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
 import {
@@ -154,6 +156,19 @@ export interface DesktopBlockRouterHost {
    * B5 target-busy/投递停摆 + 同 requestId orphan 重呈现）。缺省 ⇒ 不扫描（测试/旧宿主零变化）。
    */
   scanAppCardPromptFacts?(projectRoot: string, options: { stallMs: number; maxAutoFixAttempts: number }): Promise<readonly BlockFact[]>;
+  /**
+   * 2026-11-20（S1/S2 编排批）：block `resolved(fixed|decided)` 后阶段重入场（服务 API
+   * `reenterBlockedStageAfterResolution`；只对 app-dispatch/v1 生效，fixed-v2.1 零迁移）。
+   * 幂等：同 (blockId, stage) 只一条 `stage.reworked`；重复调用复跑确定性 drive。
+   * 缺省 ⇒ 不重入（按既有 advance/修复行为，旧宿主零变化）。
+   */
+  reenterBlockedStage?(projectRoot: string, input: {
+    workflowId: string;
+    stage: WorkflowStage;
+    blockId: string;
+    resolution: "fixed" | "decided";
+    reason?: string;
+  }): Promise<ReenterBlockedStageAfterResolutionResult>;
 }
 
 /** block 卡等待的提醒去重/卡 promise 等进程内状态（不持久化；账本才是事实源）。 */
@@ -1135,6 +1150,39 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
 
   // —————————————— 裁决后的选项执行 + 重入场 ——————————————
 
+  /**
+   * 2026-11-20（S1/S2 编排批）：block 终态后的**阶段重入场**（服务 API 唯一实现）。
+   * 只把可重入场的服务结果归一为桌面可判的 outcome；账本校验/幂等/锁全在服务层。
+   */
+  type ReenterOutcome =
+    | { status: "reentered"; receipt: Extract<ReenterBlockedStageAfterResolutionResult, { ok: true }> }
+    | { status: "already-completed"; receipt: Extract<ReenterBlockedStageAfterResolutionResult, { ok: true }> }
+    | { status: "already-in-flight"; receipt: Extract<ReenterBlockedStageAfterResolutionResult, { ok: true }> }
+    | { status: "drive-error"; receipt: Extract<ReenterBlockedStageAfterResolutionResult, { ok: true }> }
+    | { status: "skipped"; code?: string; message?: string }
+    | { status: "failed"; code: string; message: string };
+
+  const tryReenterBlockedStage = async (
+    projectRoot: string,
+    input: { workflowId: string; stage: WorkflowStage; blockId: string; resolution: "fixed" | "decided"; reason?: string },
+  ): Promise<ReenterOutcome> => {
+    if (host.reenterBlockedStage === undefined) return { status: "skipped", message: "宿主未接线重入场端口" };
+    const receipt = await host.reenterBlockedStage(projectRoot, input);
+    if (receipt.ok !== true) {
+      // 硬失败：账本损坏/流程已关等如实上报，不回落第二套动作。
+      if (receipt.code === "workflow-closed" || receipt.code === "workflow-stopping" || receipt.code === "workflow-corrupt"
+        || receipt.code === "block-ledger-corrupt" || receipt.code === "workflow-ledger-write-failed") {
+        return { status: "failed", code: receipt.code, message: receipt.message };
+      }
+      // 不适用（非 blocked/非 app-dispatch/绑定不一致/选项不属重入类）⇒ 调用方按既有语义回退。
+      return { status: "skipped", code: receipt.code, message: receipt.message };
+    }
+    if (receipt.driveError !== undefined) return { status: "drive-error", receipt };
+    if (receipt.alreadyCompleted === true) return { status: "already-completed", receipt };
+    if (receipt.alreadyInFlight === true) return { status: "already-in-flight", receipt };
+    return { status: "reentered", receipt };
+  };
+
   const executeChosenOption = async (
     projectRoot: string,
     blockId: string,
@@ -1147,6 +1195,57 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
     if (fact.kind === "redispatch") {
       systemRow(projectRoot, `[Block] ${blockId} 重派升级裁决：${option.id}（${option.label}）；动作按既有重派/终止路径执行。`);
       return;
+    }
+    // 2026-11-20（S1/S2 编排批）：B9 客户/judge 裁决为「重入场类」选项时，先走服务重入场
+    // （stage.reworked 带 blockId + 新 attempt 任务；幂等/并发由服务锁 + 账本保证）。成功即不再
+    // 安排第二套修复/重派（避免 17 次 drive.failed 与双动作）。
+    if (fact.protocol === WORKFLOW_PROTOCOL_APP_DISPATCH && fact.workflowId !== undefined
+      && BLOCK_STAGE_REENTRY_OPTION_IDS.includes(option.id) && host.reenterBlockedStage !== undefined) {
+      const lifecycle = await readLifecycle(projectRoot, blockId);
+      const stage = fact.stage ?? lifecycle?.stage;
+      if (stage !== undefined) {
+        const outcome = await tryReenterBlockedStage(projectRoot, {
+          workflowId: fact.workflowId,
+          stage,
+          blockId,
+          resolution: "decided",
+          reason: `block ${blockId} decided(${option.id})`,
+        });
+        if (outcome.status === "reentered") {
+          const reentry = outcome.receipt.reentry;
+          systemRow(projectRoot,
+            `[Block·重入场] ${blockId} 裁决「${option.label}」（${option.id}）：${stage} 已重入场（第 ${reentry?.attempt ?? "?"} 次尝试${reentry?.taskId !== undefined ? `，#${reentry.taskId}` : ""}；同 block 只一条 rework）。`);
+          diagnosticFor(projectRoot).record("block.reentry.decided", {
+            blockId, stage, optionId: option.id, attempt: reentry?.attempt ?? null, replay: outcome.receipt.replay === true,
+          });
+          // 新 attempt 任务需要桌面投递桥投递/续驱（服务 drive 只建任务；幂等，不写第二条 rework）。
+          if (host.advanceAppDispatch !== undefined && !(await host.advanceAppDispatch(projectRoot, fact.workflowId))) {
+            systemRow(projectRoot, `[Block·重入场] ${blockId} 新 attempt 已建但投递/续驱未成功（reconcile 可补；不伪造）。`);
+          }
+          return;
+        }
+        if (outcome.status === "already-in-flight") {
+          systemRow(projectRoot, `[Block·重入场] ${blockId}：${stage} 已有在飞尝试（引擎重试/先前重入），不写第二条 rework/任务。`);
+          return;
+        }
+        if (outcome.status === "drive-error") {
+          systemRow(projectRoot,
+            `[Block·重入场] ${blockId}：重入场已记录但驱动未成功（${outcome.receipt.driveError?.code ?? "?"}：${outcome.receipt.driveError?.message ?? ""}）；reconcile/再次恢复可补驱动（不伪造完成）。`);
+          return;
+        }
+        if (outcome.status === "failed") {
+          systemRow(projectRoot, `[Block·重入场] ${blockId} 重入场失败：${outcome.code}：${outcome.message}（不伪造阶段推进）。`);
+          return;
+        }
+        if (outcome.status === "already-completed") {
+          systemRow(projectRoot, `[Block·重入场] ${blockId}：阶段 ${stage} 已由引擎重试完成；继续既有推进。`);
+          if (host.advanceAppDispatch !== undefined && !(await host.advanceAppDispatch(projectRoot, fact.workflowId))) {
+            systemRow(projectRoot, `[Block·重入场] ${blockId} 阶段已完成但续驱未成功（不伪造）。`);
+          }
+          return;
+        }
+        // skipped（非 blocked/绑定不一致/选项不属重入类）⇒ 按既有选项语义回退。
+      }
     }
     switch (option.id) {
       case "block-terminate-flow":
@@ -1251,12 +1350,57 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
     const lifecycle = await readLifecycle(projectRoot, blockId);
     if (lifecycle === undefined) return;
     const workflowId = lifecycle.workflowId;
-    if (lifecycle.protocol === WORKFLOW_PROTOCOL_APP_DISPATCH && workflowId !== undefined && host.advanceAppDispatch !== undefined) {
-      const advanced = await host.advanceAppDispatch(projectRoot, workflowId);
-      if (!advanced) {
-        systemRow(projectRoot, `[Block·系统] ${blockId} 修复已核验，但 app-dispatch 重驱动未成功（新事实将另行成块，不伪造完成）。`);
+    if (lifecycle.protocol === WORKFLOW_PROTOCOL_APP_DISPATCH && workflowId !== undefined) {
+      // 2026-11-20（S1/S2 编排批）：fixed 后阶段**仍 blocked** ⇒ 先显式重入场（stage.reworked 带
+      // blockId + 新 attempt 任务），而不是反复 drive 被 Q8 预算拒绝（SMOKE-2 S1：17 次 drive.failed）。
+      const stage = lifecycle.stage;
+      if (stage !== undefined && host.reenterBlockedStage !== undefined) {
+        const outcome = await tryReenterBlockedStage(projectRoot, {
+          workflowId,
+          stage,
+          blockId,
+          resolution: "fixed",
+          reason: `block ${blockId} resolved(fixed)`,
+        });
+        if (outcome.status === "reentered") {
+          const reentry = outcome.receipt.reentry;
+          systemRow(projectRoot,
+            `[Block·重入场] ${blockId} 已 resolved(fixed)：${stage} 重入场（第 ${reentry?.attempt ?? "?"} 次尝试${reentry?.taskId !== undefined ? `，#${reentry.taskId}` : ""}；同 block 只一条 rework）。`);
+          diagnosticFor(projectRoot).record("block.reentry.fixed", {
+            blockId, stage, attempt: reentry?.attempt ?? null, replay: outcome.receipt.replay === true,
+          });
+          // 投递/续驱新 attempt（幂等；服务已完成 drive，advance 只补投递；不写第二条 rework）。
+          if (host.advanceAppDispatch !== undefined && !(await host.advanceAppDispatch(projectRoot, workflowId))) {
+            systemRow(projectRoot, `[Block·重入场] ${blockId} 新 attempt 已建但投递/续驱未成功（reconcile 可补；不伪造）。`);
+          }
+          return;
+        }
+        if (outcome.status === "already-in-flight") {
+          systemRow(projectRoot, `[Block·重入场] ${blockId}：${stage} 已有在飞尝试（引擎重试/先前重入），不写第二条 rework/任务。`);
+          return;
+        }
+        if (outcome.status === "drive-error") {
+          systemRow(projectRoot,
+            `[Block·重入场] ${blockId}：重入场已记录但驱动未成功（${outcome.receipt.driveError?.code ?? "?"}：${outcome.receipt.driveError?.message ?? ""}）；reconcile/再次恢复可补驱动（不伪造完成）。`);
+          return;
+        }
+        if (outcome.status === "failed") {
+          systemRow(projectRoot, `[Block·重入场] ${blockId} 重入场失败：${outcome.code}：${outcome.message}（不伪造阶段推进）。`);
+          return;
+        }
+        if (outcome.status === "already-completed") {
+          // 引擎重试已完成阶段 ⇒ 不写 rework；继续既有 advance 推进下一阶段（服务文档语义）。
+          systemRow(projectRoot, `[Block·重入场] ${blockId}：阶段 ${stage} 已由引擎重试完成；继续推进下一阶段。`);
+        }
+        // skipped（stage pending/绑定不一致/非 blocked）⇒ 保持既有 advance 行为（幂等）。
       }
-      return;
+      if (host.advanceAppDispatch !== undefined) {
+        const advanced = await host.advanceAppDispatch(projectRoot, workflowId);
+        if (!advanced) {
+          systemRow(projectRoot, `[Block·系统] ${blockId} 修复已核验，但 app-dispatch 重驱动未成功（新事实将另行成块，不伪造完成）。`);
+        }
+        return;
+      }
     }
     const ownerRoleId = host.governanceOwner(projectRoot) ?? "chief";
     enqueueSystemText(projectRoot, ownerRoleId,
@@ -1719,6 +1863,58 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
     }
   };
 
+  /**
+   * 2026-11-20（S1/S2 编排批）：恢复补重入场——block 已 `resolved(fixed)`（进程可能在 `resolveBlock`
+   * 与 `stage.reworked` 之间崩溃），workflow 投影仍停在同一 blocked 阶段且**尚无该 block 的重入场事件**
+   * ⇒ 走同一服务重入场（幂等）；已有重入场事件的旧 block 跳过（后续失败由新 block 处理）。
+   */
+  const reenterResolvedFixedBlocks = async (projectRoot: string): Promise<void> => {
+    if (host.reenterBlockedStage === undefined) return;
+    const ledger = await readBlockLedger(projectRoot);
+    if (ledger.badLines > 0) return;
+    const replay = replayBlockLifecycles(ledger.events);
+    const workflowCache = new Map<string, { events: readonly WorkflowEvent[]; view: ReturnType<typeof deriveWorkflowView> }>();
+    for (const lifecycle of replay.records.values()) {
+      if (lifecycle.status !== "resolved" || lifecycle.resolution !== "fixed") continue;
+      if (lifecycle.protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH) continue;
+      const workflowId = lifecycle.workflowId;
+      const stage = lifecycle.stage;
+      if (workflowId === undefined || stage === undefined) continue;
+      let cached = workflowCache.get(workflowId);
+      if (cached === undefined) {
+        const wfLedger = await readWorkflowLedger(projectRoot);
+        if (wfLedger.badLines > 0) continue;
+        const taskState = await readTaskState(projectRoot);
+        const events = wfLedger.events.filter((event) => event.workflowId === workflowId);
+        cached = { events, view: deriveWorkflowView(events, taskState.events) };
+        workflowCache.set(workflowId, cached);
+      }
+      if (cached.view.closed !== undefined || cached.view.stopping === true) continue;
+      if (cached.view.stages[stage].status !== "blocked") continue;
+      // 该 block 的重入场已写过（例如之后的新尝试又失败成新 block）⇒ 不再按旧 block 重入。
+      const alreadyReentered = cached.events.some((event) =>
+        event.kind === "stage.reworked" && event.blockId === lifecycle.blockId
+        && event.stage === stage && event.reworkOf === stage);
+      if (alreadyReentered) continue;
+      const outcome = await tryReenterBlockedStage(projectRoot, {
+        workflowId, stage, blockId: lifecycle.blockId, resolution: "fixed",
+        reason: `recover: block ${lifecycle.blockId} resolved(fixed) but stage still blocked`,
+      });
+      if (outcome.status === "reentered") {
+        systemRow(projectRoot,
+          `[Block·重入场] 恢复：${lifecycle.blockId} 已 resolved(fixed) 且 ${stage} 仍 blocked；已重入场（第 ${outcome.receipt.reentry?.attempt ?? "?"} 次尝试）。`);
+        if (host.advanceAppDispatch !== undefined) await host.advanceAppDispatch(projectRoot, workflowId);
+      } else if (outcome.status === "already-in-flight" || outcome.status === "already-completed") {
+        if (host.advanceAppDispatch !== undefined) await host.advanceAppDispatch(projectRoot, workflowId);
+      } else if (outcome.status === "drive-error" || outcome.status === "failed") {
+        systemRow(projectRoot,
+          `[Block·重入场] 恢复：${lifecycle.blockId} 重入场未成功（${outcome.status === "failed"
+            ? `${outcome.code}：${outcome.message}`
+            : `${outcome.receipt.driveError?.code ?? "?"}：${outcome.receipt.driveError?.message ?? ""}`}）；不伪造阶段推进。`);
+      }
+    }
+  };
+
   const recover = async (projectRoot: string): Promise<void> => {
     await serialize(projectRoot, async () => {
       await scanStageBlockedFacts(projectRoot);
@@ -1732,6 +1928,7 @@ export function createDesktopBlockRouter(host: DesktopBlockRouterHost, options: 
       for (const lifecycle of open) {
         await recoverBlock(projectRoot, lifecycle);
       }
+      await reenterResolvedFixedBlocks(projectRoot);
       await checkRepairTimeoutsAndReminders(projectRoot);
     });
   };

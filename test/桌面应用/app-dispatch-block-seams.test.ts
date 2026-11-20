@@ -51,7 +51,7 @@ import {
   type BlockLifecycle,
 } from "../../src/common/编排/block-ledger.ts";
 import { buildProjectStateView } from "../../src/common/编排/project-state.ts";
-import { WORKFLOW_DEFINITION_HASHES } from "../../src/common/编排/workflow-definitions.ts";
+import { WORKFLOW_DEFINITION_HASHES_BY_VERSION } from "../../src/common/编排/workflow-definitions.ts";
 import {
   WORKFLOW_LEDGER_SCHEMA,
   WORKFLOW_PROTOCOL_APP_DISPATCH,
@@ -192,7 +192,8 @@ async function seedWorkflow(root: string, workflowId: string, flowId: string, at
     trigger: { by: "chief", reason: "seam test" },
     sourceTaskId: `turn-${workflowId}`,
     protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-    definition: { id: "add", version: 2, sha256: WORKFLOW_DEFINITION_HASHES.add },
+    // 手工播种 = 在飞 workflow 夹具：v2 定义按 v2 hash 解释（当前注册表 v3；不静默迁移）。
+    definition: { id: "add", version: 2, sha256: WORKFLOW_DEFINITION_HASHES_BY_VERSION.add[2] },
     parameters: { acceptanceStrength: "standard" },
   };
   const appended = await appendWorkflowEvent(root, started);
