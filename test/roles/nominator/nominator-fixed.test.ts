@@ -96,21 +96,26 @@ test("fixed context：matrix=two-fixed-paths/v1 返回固定段（3 sections；�
   assert.equal(Object.isFrozen(fixedSections), true);
 });
 
-test("fixed context 口径：按运营派发、按名单机械建卡/激活、不自行增删角色、不发起任命卡/不派发", () => {
+test("fixed context 口径：任务由应用创建、按名单机械建卡/激活、不自行增删角色、不发起任命卡/不派发", () => {
   const fixedSections = nominatorRoleModule.context({ governanceModel: "trio", matrix: FIXED });
   const duty = fixedSections.find((section) => section.id === "nominator-fixed-duty")?.text ?? "";
   const activation =
     fixedSections.find((section) => section.id === "nominator-fixed-activation")?.text ?? "";
   const report = fixedSections.find((section) => section.id === "nominator-fixed-report")?.text ?? "";
 
-  // 派发口径：人事任务由运营（convener）派发；人事不派发。
-  assert.match(duty, /运营（convener）派发/);
+  // 任务来源（app-dispatch/v1）：人事任务由应用按流程定义创建并投递（stage-execution）；人事不派发。
+  assert.match(duty, /由应用按流程定义创建并投递/);
+  assert.match(duty, /stage-execution/);
+  assert.match(duty, /from:"application"/);
   assert.match(duty, /人事不派发任何任务/);
-  // 任命卡归幕僚；fixed 不发 appointment / appointment-write。
-  assert.match(duty, /任命确认卡由幕僚/);
+  // 任命卡由应用开卡、幕僚按 prompt 呈；fixed 不发 appointment / appointment-write。
+  assert.match(duty, /任命确认卡由应用开卡、幕僚（chief）按应用 prompt 在 A10 呈交/);
   assert.match(duty, /不发起 appointment \/ appointment-write 卡/);
   assert.match(duty, /fixedCards 空/);
   assert.match(duty, /不自行增删角色/);
+  // 负例防「旧句删除后子串假绿」：旧运营派发/幕僚自行开卡口径必须整体消失。
+  assert.equal(duty.includes("运营（convener）派发"), false, "fixed duty 不得保留旧「运营派发」口径");
+  assert.equal(duty.includes("任命确认卡由幕僚"), false, "fixed duty 不得保留旧「任命卡由幕僚」口径");
   // 名单 + 提案决定驱动的机械建卡/边界/激活。
   assert.match(activation, /A7\/A8/);
   assert.match(activation, /名单/);
@@ -126,8 +131,10 @@ test("fixed context 口径：按运营派发、按名单机械建卡/激活、�
   assert.match(activation, /hash 由应用在激活前按实际字节计算并回填/);
   assert.match(activation, /不猜 hash、不得用 shell 计算/);
   assert.match(activation, /A6 documentRefs 一致性/);
-  // 报告回任务真实创建者（固定路径 = 运营）。
+  // 报告回任务真实创建者（固定路径 = 应用 application；应用观察 task.reported 后收口）。
   assert.match(report, /task\.created\.from/);
+  assert.match(report, /application/);
+  assert.match(report, /task\.reported/);
   assert.match(report, /submit_report/);
 });
 

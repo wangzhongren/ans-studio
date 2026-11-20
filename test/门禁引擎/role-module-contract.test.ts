@@ -116,8 +116,9 @@ type _PreflightOptional = Assert<Equal<undefined extends BuiltInRoleModule["pref
 type _PreflightInput = Assert<Equal<Parameters<RolePreflightHooks["checkAction"]>[0], RolePreflightInput>>;
 type _PreflightOutput = Assert<Equal<ReturnType<RolePreflightHooks["checkAction"]>, RolePolicyDecision>>;
 
-// —— E0.2 D1：RoleToolId 14 id 闭集 + RoleToolName 14 snake_case 闭集；RoleToolPolicy.tools 保持 RoleToolId[] —— //
-
+// —— E0.2 D1：RoleToolId 15 id 闭集 + RoleToolName 15 snake_case 闭集；RoleToolPolicy.tools 保持 RoleToolId[] —— //
+// 2026-11-17（app-dispatch/v1，设计 §6.1）：第 15 项 `selectWorkflow`/`select_workflow`（仅 chief；幕僚显式
+// 选择流程）。前 14 项逐字保留；本闭集只声明 id→name，不授予调用权。
 type _ToolIdSet = Assert<
   Equal<
     RoleToolId,
@@ -135,6 +136,7 @@ type _ToolIdSet = Assert<
     | "submitRefactor"
     | "requestStableWrite"
     | "decidePendingRequest"
+    | "selectWorkflow"
   >
 >;
 type _ToolNameSet = Assert<
@@ -154,6 +156,7 @@ type _ToolNameSet = Assert<
     | "submit_refactor"
     | "request_stable_write"
     | "decide_pending_request"
+    | "select_workflow"
   >
 >;
 type _ToolPolicyTools = Assert<Equal<RoleToolPolicy["tools"], readonly RoleToolId[]>>;
@@ -718,11 +721,13 @@ test("X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐�
   assert.doesNotMatch(facadeSource, /CHIEF_CARD_TEXT\s*=/);
 });
 
-// —————————————————————— E0.2 D1：14 项 id→name→允许角色表 ——————————————————————
+// —————————————————————— E0.2 D1：15 项 id→name→允许角色表 ——————————————————————
 
 /**
  * 契约 §3.1 冻结表的**测试侧逐字副本**（测试 oracle，不是第二份生产来源；生产唯一来源是
  * `role-tool-registry.ts::ROLE_TOOL_CATALOG`）。顺序/名字/允许角色必须与 E0.2 逐项一致。
+ * 2026-11-17（app-dispatch/v1）：第 15 项 `selectWorkflow`/`select_workflow`（仅 chief）追加在表尾；
+ * 前 14 项顺序/允许角色逐字保留。
  */
 const EXPECTED_ROLE_TOOL_TABLE = [
   { id: "roleActivityLog", name: "role_activity_log", allowedRoleIds: ["chief"] },
@@ -744,6 +749,7 @@ const EXPECTED_ROLE_TOOL_TABLE = [
     allowedRoleIds: ["chief"],
     chiefIndependentDecisionOnly: true,
   },
+  { id: "selectWorkflow", name: "select_workflow", allowedRoleIds: ["chief"] },
 ] as const satisfies readonly {
   id: RoleToolId;
   name: RoleToolName;
@@ -751,9 +757,9 @@ const EXPECTED_ROLE_TOOL_TABLE = [
   chiefIndependentDecisionOnly?: true;
 }[];
 
-test("D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致", () => {
-  assert.equal(EXPECTED_ROLE_TOOL_TABLE.length, 14);
-  assert.equal(ROLE_TOOL_CATALOG.length, 14);
+test("D1：15 项 id→name→允许角色与 E0.2 §3.1 表（前 14 项 + app-dispatch/v1 第 15 项）逐项一致", () => {
+  assert.equal(EXPECTED_ROLE_TOOL_TABLE.length, 15);
+  assert.equal(ROLE_TOOL_CATALOG.length, 15);
   for (let index = 0; index < EXPECTED_ROLE_TOOL_TABLE.length; index += 1) {
     const expected = EXPECTED_ROLE_TOOL_TABLE[index];
     const actual = ROLE_TOOL_CATALOG[index];
@@ -765,12 +771,18 @@ test("D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致", () =>
     assert.equal(actual.chiefIndependentDecisionOnly === true, expectedIndependent);
     assert.equal(roleToolCatalogEntryOf(expected.id)?.name, expected.name);
   }
-  // 唯一性：14 个 id、14 个运行时工具名，无重复/无遗漏。
-  assert.equal(new Set(ROLE_TOOL_CATALOG.map((entry) => entry.id)).size, 14);
-  assert.equal(new Set(ROLE_TOOL_CATALOG.map((entry) => entry.name)).size, 14);
+  // 唯一性：15 个 id、15 个运行时工具名，无重复/无遗漏。
+  assert.equal(new Set(ROLE_TOOL_CATALOG.map((entry) => entry.id)).size, 15);
+  assert.equal(new Set(ROLE_TOOL_CATALOG.map((entry) => entry.name)).size, 15);
+  // 第 15 项只在 chief 允许集；不是独立决策专用工具（注入开关由会话协议/桌面控制）。
+  const selectWorkflow = roleToolCatalogEntryOf("selectWorkflow");
+  assert.ok(selectWorkflow !== undefined);
+  assert.deepEqual([...selectWorkflow.allowedRoleIds], ["chief"]);
+  assert.equal(selectWorkflow.chiefIndependentDecisionOnly, undefined);
   // 未知/错形 id 不猜、不兜底（snake_case 运行时名不能当 id 用）。
   assert.equal(roleToolCatalogEntryOf("dispatch_task"), undefined);
   assert.equal(roleToolCatalogEntryOf("decide_pending_request"), undefined);
+  assert.equal(roleToolCatalogEntryOf("select_workflow"), undefined);
   assert.equal(roleToolCatalogEntryOf(""), undefined);
 });
 

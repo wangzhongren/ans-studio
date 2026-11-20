@@ -37,12 +37,14 @@ import type {
   RoleSession,
   RuntimeAdapter,
   SessionEvent,
+  WorkflowProtocol,
   WriteGate,
 } from "../../src/model/runtime.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RUN_ROLE = path.join(REPO_ROOT, "src", "pipeline", "orchestration", "run-role.ts");
 const V2_RESOURCE = path.join(REPO_ROOT, "src", "common", "门禁引擎", "workflows", "chief", "chief-workflow-v2.md");
+const V3_RESOURCE = path.join(REPO_ROOT, "src", "common", "门禁引擎", "workflows", "chief", "chief-workflow-v3.md");
 const WF = "wf-0123456789abcdef01234567";
 
 interface Captured {
@@ -90,7 +92,10 @@ interface OpenOptions {
   roleId: string;
   mode: "fixed" | "legacy";
   builtInRoles?: string[];
+  workflowProtocol?: WorkflowProtocol;
   customerInput?: CustomerInputFn;
+  dispatchTask?: AdapterCapabilities["dispatchTask"];
+  selectWorkflow?: AdapterCapabilities["selectWorkflow"];
   closeCreatedTask?: CloseCreatedTaskFn;
   activateRoleDocuments?: ActivateRoleDocumentsFn;
   completeTeamPlan?: AdapterCapabilities["completeTeamPlan"];
@@ -118,7 +123,10 @@ async function withSession<T>(
       project: projectOf(root, options.builtInRoles ?? [options.roleId]),
       runtime: "pi",
       workflowMode: options.mode,
+      ...(options.workflowProtocol !== undefined ? { workflowProtocol: options.workflowProtocol } : {}),
       ...(options.customerInput !== undefined ? { customerInput: options.customerInput } : {}),
+      ...(options.dispatchTask !== undefined ? { dispatchTask: options.dispatchTask } : {}),
+      ...(options.selectWorkflow !== undefined ? { selectWorkflow: options.selectWorkflow } : {}),
       ...(options.closeCreatedTask !== undefined ? { closeCreatedTask: options.closeCreatedTask } : {}),
       ...(options.activateRoleDocuments !== undefined ? { activateRoleDocuments: options.activateRoleDocuments } : {}),
       ...(options.completeTeamPlan !== undefined ? { completeTeamPlan: options.completeTeamPlan } : {}),
@@ -207,15 +215,15 @@ test("cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm 
   );
 });
 
-// ————————————————————————— ② chief-workflow-v2 注入 —————————————————————————
+// ————————————————————————— ② chief-workflow 资源注入（协议分流） —————————————————————————
 
-test("fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入", async () => {
+test("fixed-v2.1（缺省 protocol）chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入", async () => {
   const bytes = fs.readFileSync(V2_RESOURCE);
   const expectedSha = createHash("sha256").update(bytes).digest("hex");
   await withSession({ roleId: "chief", mode: "fixed" }, async ({ caps }) => {
     const sections = caps.contextSections ?? [];
     const v2 = sections.find((section) => section.includes("chief-workflow/v2"));
-    assert.ok(v2 !== undefined, "fixed chief 必须注入 chief-workflow-v2.md");
+    assert.ok(v2 !== undefined, "fixed chief（缺省 protocol = fixed-v2.1）必须注入 chief-workflow-v2.md");
     assert.match(v2!, /^## 应用内置 Chief workflow v2（fixed 固定路径；本段优先于任何 legacy chief-workflow v1 段）/);
     assert.ok(v2!.includes("# Chief 工作流（两条固定路径 v2）"), "注入 v2 资源正文");
     const metadataLine = v2!.split("\n")[1]!;
@@ -223,14 +231,59 @@ test("fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘�
     assert.equal(metadata["resourceVersion"], "chief-workflow/v2");
     assert.equal(metadata["sha256"], expectedSha, "资源 SHA-256 必须是磁盘实测值");
     assert.equal(metadata["bytes"], bytes.length);
-    // 模块 fixed context 段同批注入（v1.3 §3.4）。
-    assert.ok(sections.some((section) => section.includes("固定路径产线调度")), "chief 模块 fixed context 段必须注入");
+    // 模块 fixed context 段同批注入（v1.3 §3.4；2026-11-17 app-dispatch/v1 改写后仍为固定段）。
+    assert.ok(
+      sections.some((section) => section.includes("固定路径流程选择与驱动")),
+      "chief 模块 fixed context 段必须注入",
+    );
   });
   await withSession({ roleId: "chief", mode: "legacy" }, async ({ caps }) => {
     const sections = caps.contextSections ?? [];
     assert.equal(sections.some((section) => section.includes("chief-workflow/v2")), false, "legacy chief 不得注入 v2 资源");
-    assert.equal(sections.some((section) => section.includes("固定路径产线调度")), false, "legacy chief 不得注入 fixed context 段");
+    assert.equal(sections.some((section) => section.includes("固定路径流程选择与驱动")), false, "legacy chief 不得注入 fixed context 段");
   });
+});
+
+test("app-dispatch/v1 chief 注入 chief-workflow-v3 + select_workflow；不注入 dispatch_task（工具面收窄）", async () => {
+  const bytes = fs.readFileSync(V3_RESOURCE);
+  const expectedSha = createHash("sha256").update(bytes).digest("hex");
+  const dispatchTaskFixture = (async () => ({ ok: false })) as never as AdapterCapabilities["dispatchTask"];
+  const selectWorkflowFixture = (async () => ({ ok: false, code: "fixture", message: "fixture" })) as never;
+  await withSession(
+    {
+      roleId: "chief",
+      mode: "fixed",
+      workflowProtocol: "app-dispatch/v1",
+      dispatchTask: dispatchTaskFixture,
+      selectWorkflow: selectWorkflowFixture as never,
+    },
+    async ({ caps }) => {
+      const sections = caps.contextSections ?? [];
+      const v3 = sections.find((section) => section.includes("chief-workflow/v3"));
+      assert.ok(v3 !== undefined, "app-dispatch/v1 chief 必须注入 chief-workflow-v3.md");
+      assert.match(v3!, /^## 应用内置 Chief workflow v3（app-dispatch\/v1 应用流程驱动）/);
+      assert.ok(v3!.includes("# Chief 工作流（两条固定路径 v3 / 应用流程驱动）"), "注入 v3 资源正文");
+      const metadataLine = v3!.split("\n")[1]!;
+      const metadata = JSON.parse(metadataLine) as Record<string, unknown>;
+      assert.equal(metadata["resourceVersion"], "chief-workflow/v3");
+      assert.equal(metadata["sha256"], expectedSha, "v3 资源 SHA-256 必须是磁盘实测值");
+      assert.equal(metadata["bytes"], bytes.length);
+      assert.equal(sections.some((section) => section.includes("chief-workflow/v2")), false, "app-dispatch 不再注入 v2");
+      assert.ok(sections.some((section) => section.includes("固定路径流程选择与驱动")), "fixed context 段仍注入");
+      // 工具面：幕僚不派发（dispatch_task 不注入），select_workflow 注入（注入才注册）。
+      assert.equal(caps.dispatchTask, undefined, "app-dispatch/v1 幕僚不得注入 dispatch_task");
+      assert.equal(caps.selectWorkflow, selectWorkflowFixture, "app-dispatch/v1 幕僚注入 select_workflow 能力");
+      assert.equal(caps.closeCreatedTaskFixed, undefined, "app-dispatch/v1 幕僚不注入 fixed close_created_task");
+    },
+  );
+  // fixed-v2.1 在飞：旧工具面逐字保留（dispatch_task 照常注入；select_workflow 不注入）。
+  await withSession(
+    { roleId: "chief", mode: "fixed", dispatchTask: dispatchTaskFixture, selectWorkflow: selectWorkflowFixture as never },
+    async ({ caps }) => {
+      assert.equal(caps.dispatchTask, dispatchTaskFixture, "fixed-v2.1 幕僚保留 dispatch_task");
+      assert.equal(caps.selectWorkflow, undefined, "fixed-v2.1 不注入 select_workflow");
+    },
+  );
 });
 
 test("fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入", async () => {
@@ -449,7 +502,11 @@ test("governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 
     assert.equal(result.ok, true, result.ok === false ? result.message : "");
     if (result.ok) {
       assert.match(result.message, /固定路径幕僚/, "fixed 会话矩阵必须展示 fixed 摘要");
-      assert.match(result.message, /两条固定路径|stage-request/, "fixed 视图含派发分裂口径");
+      // 2026-11-17（app-dispatch/v1）：fixed 视图展示「幕僚只选流程 + 按 prompt 呈卡 / 应用建内置任务」。
+      assert.match(result.message, /select_workflow/, "fixed 视图含幕僚只选流程口径");
+      assert.match(result.message, /card-prompt/, "fixed 视图含按应用 prompt 呈卡口径");
+      assert.match(result.message, /worker-dispatch/, "fixed 视图含运营只派项目 worker 口径");
+      assert.equal(result.message.includes("stage-request"), false, "fixed 视图不得混入旧 stage-request 摘要");
     }
   });
   await withSession({ roleId: "chief", mode: "legacy" }, async ({ caps }) => {
