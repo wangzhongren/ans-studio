@@ -40,6 +40,7 @@ import {
   stageExecutionIdempotencyKey,
 } from "../../src/common/编排/workflow-service.ts";
 import { deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
+import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
 import { appendTaskEvent, readTaskState, taskEvent, type TaskRecord } from "../../src/common/编排/task-state.ts";
 import { WORKFLOW_LEDGER_SCHEMA, type CustomerInputOutcome, type CustomerInputRequest, type WorkflowEvent, type WorkflowStage } from "../../src/model/runtime.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -206,6 +207,68 @@ async function writeIntent(root: string): Promise<void> {
     "---\nschema: project-intent/v1\nflowId: snake\nversion: 1\nintentId: snake-intent\ngoal: 贪吃蛇游戏\n---\n# 意图\n");
   await writeFile(root, "docs/intents/snake-intent.md",
     "---\nintentId: snake-intent\nflowId: snake\ngoal: 贪吃蛇游戏\n---\n# 意图入口\n");
+}
+
+/**
+ * 2026-11-20（block resolver 地基 / R1）：A12a/A12b 的 review 角色解析现在要求名单可读
+ * （名单不可读 ⇒ `review-role-unavailable` + blockFact，不再静默回落 verifier）。
+ * 本夹具提供可读的 project-roster/v4（无 roles[].review ⇒ 既有 Q3 默认 verifier），
+ * 保留 A12b 应用直派/收口/归档/聚合的正向全链断言。
+ */
+const REVIEW_ROSTER_FIXTURE = [
+  "---",
+  "schema: project-roster/v4",
+  "flowId: snake",
+  "version: 1",
+  "intent: docs/product/snake-intent-v1.md",
+  "proposal: docs/proposals/snake-proposal-v1.md",
+  "architecture: docs/contracts/snake-architecture-v1.md",
+  "envBootstrap:",
+  "  omitted: true",
+  "  omissionReason: 测试夹具省略装配/入口角色",
+  "roles:",
+  "  - id: implementer",
+  "    displayName: 实现者",
+  "    purpose: 实现",
+  "    capability: TS",
+  "    modules:",
+  "      - impl-core",
+  "modules:",
+  "  - id: impl-core",
+  "    name: 实现",
+  "    purpose: 实现 CLI",
+  "    path: src/",
+  "    category: core",
+  "    publicContract: src/index.js",
+  "    architectureSource: docs/contracts/snake-architecture-v1.md",
+  "---",
+  "# 名单",
+  "## 人员+模块拓扑图",
+  "```topology",
+  "schema: project-topology/v2",
+  "modules:",
+  "  - id: impl-core",
+  "    path: src/",
+  "    roleId: implementer",
+  "roles:",
+  "  - id: implementer",
+  "    modules: [impl-core]",
+  "management: [convener, implementer]",
+  "```",
+].join("\n");
+
+async function writeReviewRoster(root: string): Promise<void> {
+  await writeIntent(root);
+  await writeFile(root, "docs/proposals/snake-proposal-v1.md",
+    "---\nschema: project-proposal/v2\nflowId: snake\nversion: 1\nintent: docs/product/snake-intent-v1.md\n---\n# 提案\n");
+  await writeFile(root, "docs/contracts/snake-architecture-v1.md",
+    "---\nflowId: snake\nversion: 1\nproposal: docs/proposals/snake-proposal-v1.md\n---\n# 架构\n");
+  await writeFile(root, "docs/proposals/snake-roster-v1.md", REVIEW_ROSTER_FIXTURE);
+  const parsed = parseProjectRoster(REVIEW_ROSTER_FIXTURE, "snake");
+  if (!parsed.ok) throw new Error(`fixture roster invalid: ${parsed.reason}`);
+  await writeFile(root, "docs/proposals/snake-modules-v1.md",
+    ["---", "schema: project-modules/v2", "flowId: snake", "version: 1",
+      `modules: ${JSON.stringify(parsed.roster.modules)}`, "---", "# 模块清单"].join("\n"));
 }
 
 async function openRole(h: H, root: string, roleId: string, taskId?: string): Promise<CapturedInput> {
@@ -463,6 +526,8 @@ test("A12b done ⇒ 应用归档 + A12 聚合 + A13 任务；标准 blocked ⇒ 
     const root = await tempRoot("ans-delivery-a12b-done-");
     const h = harness(root);
     try {
+      // review 角色解析要求名单可读（不再静默回落 verifier）；补可读名单夹具。
+      await writeReviewRoster(root);
       const selected = await selectWorkflow({ projectRoot: root, flowId: FLOW, workflowPath: "A", sourceTaskId: "turn-1" });
       assert.equal(selected.ok, true);
       const WF = selected.workflowId;
@@ -513,6 +578,7 @@ test("A12b done ⇒ 应用归档 + A12 聚合 + A13 任务；标准 blocked ⇒ 
     const root = await tempRoot("ans-delivery-a12b-rework-");
     const h = harness(root);
     try {
+      await writeReviewRoster(root);
       const selected = await selectWorkflow({ projectRoot: root, flowId: FLOW, workflowPath: "A", sourceTaskId: "turn-2" });
       assert.equal(selected.ok, true);
       const WF = selected.workflowId;
@@ -542,6 +608,7 @@ test("A12b done ⇒ 应用归档 + A12 聚合 + A13 任务；标准 blocked ⇒ 
     const root = await tempRoot("ans-delivery-a12b-light-");
     const h = harness(root);
     try {
+      await writeReviewRoster(root);
       const selected = await selectWorkflow({
         projectRoot: root, flowId: FLOW, workflowPath: "A", sourceTaskId: "turn-3", acceptanceStrength: "light",
       });

@@ -52,15 +52,16 @@ test("v3 资源：版本行恰一处 chief-workflow/v3、身份行、≤256 KiB�
   assert.ok(text.includes("app-dispatch/v1"), "资源必须声明新协议");
 });
 
-test("v1/v2/v3 字节稳定性：v1/v2 blob SHA 逐字不变（53d7167…/d528c6c…）；v3 独立（0318486…，2026-11-20 稳定码同步）", () => {
+test("v1/v2/v3 字节稳定性：v1/v2 blob SHA 逐字不变（53d7167…/d528c6c…）；v3 独立（f3ee151…，2026-11-20 block resolver 文本批）", () => {
   const v1 = readFileSync(V1_PATH);
   const v2 = readFileSync(V2_PATH);
   const v3 = readFileSync(V3_PATH);
-  // 冻结值来自 git hash-object（HEAD 逐字）与门禁批记录 §6.2；LF 归一口径保证 CRLF 检出同样通过。
-  // v3 于 2026-11-20 收尾同步新增 `stage-request-removed` 稳定码段（1aad6d7… → 0318486…）；v1/v2 不动。
+  // 冻结值来自 git hash-object（HEAD 逐字）与门禁批记录；LF 归一口径保证 CRLF 检出同样通过。
+  // v3 于 2026-11-20 先同步 `stage-request-removed` 稳定码段（1aad6d7… → 0318486…），
+  // 再按 block resolver 文本批新增 block 语义段（0318486… → f3ee151…）；v1/v2 不动。
   assert.equal(gitBlobSha(v1), "53d71670ef9f403c027f6e39c0ffd1db92553992", "legacy v1 资源字节不得变化");
   assert.equal(gitBlobSha(v2), "d528c6ce5655b2a9916574f4a4477e035aef42a6", "v2 资源逐字保留（fixed-v2.1 在飞）");
-  assert.equal(gitBlobSha(v3), "03184869960c9a8dd03067f21a9451612f1d987b", "v3 资源字节（稳定码同步后冻结）");
+  assert.equal(gitBlobSha(v3), "f3ee15156ebf40a959961ef29811922204e18d45", "v3 资源字节（block resolver 文本批后冻结）");
   // 版本行互不串扰：v1 只有 v1、v2 只有 v2。
   assert.deepEqual(resourceVersions(v1.toString("utf8")), ["chief-workflow/v1"]);
   assert.deepEqual(resourceVersions(v2.toString("utf8")), ["chief-workflow/v2"]);
@@ -68,7 +69,7 @@ test("v1/v2/v3 字节稳定性：v1/v2 blob SHA 逐字不变（53d7167…/d528c6
   assert.notDeepEqual(v3, v1, "v3 不得复制 v1 字节冒充");
 });
 
-test("v3 关键语义段齐全：select_workflow / 应用建任务 / 运营只派 worker / 三卡按 prompt / A12 直派 / B2 派生 / merge-main / judge 不弱化", () => {
+test("v3 关键语义段齐全：select_workflow / 应用建任务 / 运营只派 worker / 三卡按 prompt / A12 直派 / B2 派生 / merge-main / judge 不弱化 / block 路由与决策卡", () => {
   const text = readFileSync(V3_PATH, "utf8");
   const topics: ReadonlyArray<readonly [string, RegExp]> = [
     ["协议与驱动者", /## 协议与驱动者（app-dispatch\/v1）/],
@@ -118,9 +119,32 @@ test("v3 关键语义段齐全：select_workflow / 应用建任务 / 运营只�
     ["审计 append-only", /append-only/],
     ["contract_check 新口径", /## contract_check 与 fixed 口径/],
     ["请示与真实委托", /## 请示与真实委托/],
+    // 2026-11-20（block resolver 文本批）：block 是路由输入，无 stopped 终态；终止仅客户显式选择（decided 结果）。
+    ["block 如实报告即路由输入", /block 如实报告即路由输入/],
+    ["应用按类路由", /应用按类路由/],
+    ["block.raised → block.routed", /block\.raised → block\.routed/],
+    ["block 决策卡 requestId", /requestId=block-card-<blockId>/],
+    ["block 生命周期（无 stopped）", /block 生命周期（无 stopped）/],
+    ["block 终态 fixed/decided", /block 终态只有 `fixed`[^\n]*`decided`/],
+    ["escalated 非终态", /`escalated` 是升级[^\n]*不是终态/],
+    ["T_repair 升级", /T_repair/],
+    ["T_remind 同卡提醒", /T_remind/],
+    ["block-terminate-flow", /block-terminate-flow/],
+    ["终止仅客户显式选择", /终止仅由客户在决策卡中显式选择/],
+    ["decided 结果", /decided 结果/],
+    ["blocks.jsonl 审计", /\.ans\/state\/blocks\.jsonl/],
   ];
   for (const [label, pattern] of topics) {
     assert.match(text, pattern, `chief-workflow-v3 须覆盖：${label}`);
+  }
+  // block 文本批的减法：旧「停住」出路句不得残留（按具体旧句，不做 blanket「停止」误杀）。
+  const removedStops: ReadonlyArray<readonly [string, RegExp]> = [
+    ["stage.blocked 交客户/运营", /`stage\.blocked`[^\n]*交客户\/运营/],
+    ["无法恢复时按停止面处理", /无法恢复时按停止面处理/],
+    ["阻塞推进并交原资源/装配 owner 修复", /阻塞推进并交原资源\/装配 owner 修复/],
+  ];
+  for (const [label, pattern] of removedStops) {
+    assert.doesNotMatch(text, pattern, `v3 旧停住句必须已被 block 路由语义取代：${label}`);
   }
   // v3 不得指示模型请求未批准的新工具（G-IR）。
   assert.doesNotMatch(text, /requestReleaseMerge|request_release_merge/);

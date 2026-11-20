@@ -114,13 +114,15 @@ async function seed(root: string, taskId: string, sideEffect: "code" | "external
   await appendTaskEvent(root, taskEvent("task.delivered", { taskId, to: "worker" }, () => OLD));
 }
 
-/** C 批：造出「同链已重派 2 次仍卡死」的状态（下一次 redispatchTask 进入升级卡路径）。 */
+/** C 批：造出「同链已重派 2 次仍卡死」的状态（下一次 redispatchTask 进入升级卡路径）。
+ * 2026-11-20（block resolver）：任务带 flowId——block 决策卡走既有 decision 卡通道，
+ * 该通道要求 flowId 合法 slug（见本文件披露）。 */
 async function seedMaxChain(root: string, tag: string): Promise<void> {
   await seed(root, tag);
   await appendTaskEvent(root, taskEvent("task.redispatch", { taskId: `${tag}-r1`, retryOf: tag, to: "worker", reason: "stuck", safety: "safe" }, () => OLD));
-  await appendTaskEvent(root, taskEvent("task.created", { taskId: `${tag}-r1`, from: "chief", to: "worker", text: "实现功能", sideEffect: "code", idempotencyKey: `key-${tag}` }, () => OLD));
+  await appendTaskEvent(root, taskEvent("task.created", { taskId: `${tag}-r1`, from: "chief", to: "worker", text: "实现功能", sideEffect: "code", idempotencyKey: `key-${tag}`, flowId: "snake", runId: "run-test", runState: "legacy" }, () => OLD));
   await appendTaskEvent(root, taskEvent("task.redispatch", { taskId: `${tag}-r2`, retryOf: `${tag}-r1`, to: "worker", reason: "stuck", safety: "safe" }, () => OLD));
-  await appendTaskEvent(root, taskEvent("task.created", { taskId: `${tag}-r2`, from: "chief", to: "worker", text: "实现功能", sideEffect: "code", idempotencyKey: `key-${tag}` }, () => OLD));
+  await appendTaskEvent(root, taskEvent("task.created", { taskId: `${tag}-r2`, from: "chief", to: "worker", text: "实现功能", sideEffect: "code", idempotencyKey: `key-${tag}`, flowId: "snake", runId: "run-test", runState: "legacy" }, () => OLD));
 }
 
 test("safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递", async () => {
@@ -279,47 +281,61 @@ test("B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩
   }
 });
 
-test("B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）", async () => {
+test("B-07 升级卡（block 卡）：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交修复向选项/客户主权终止（唯一推荐修复向）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-redispatch-escalate-"));
   const captured: CustomerInputRequest[] = [];
   const customerInput: DesktopCustomerInputFn = async (request) => {
     captured.push(request);
-    return { outcome: "answered", value: { selected: ["terminate"] }, operatorId: "customer" };
+    // 2026-11-20（block resolver P27）：block 主权选项 block-terminate-flow 只能客户显式选择；
+    // 桌面映射到既有 terminate 落地动作（finishStuckEscalation 单一实现）。
+    return { outcome: "answered", value: { selected: ["block-terminate-flow"] }, operatorId: "customer" };
   };
   const h = harness(root, { customerInput });
   try {
     await seed(root, "t-esc");
     await appendTaskEvent(root, taskEvent("task.redispatch", { taskId: "t-esc-r1", retryOf: "t-esc", to: "worker", reason: "stuck", safety: "safe" }, () => OLD));
-    await appendTaskEvent(root, taskEvent("task.created", { taskId: "t-esc-r1", from: "chief", to: "worker", text: "实现功能", sideEffect: "code", idempotencyKey: "key-t-esc" }, () => OLD));
+    await appendTaskEvent(root, taskEvent("task.created", { taskId: "t-esc-r1", from: "chief", to: "worker", text: "实现功能", sideEffect: "code", idempotencyKey: "key-t-esc", flowId: "snake", runId: "run-test", runState: "legacy" }, () => OLD));
     await appendTaskEvent(root, taskEvent("task.redispatch", { taskId: "t-esc-r2", retryOf: "t-esc-r1", to: "worker", reason: "stuck", safety: "safe" }, () => OLD));
-    await appendTaskEvent(root, taskEvent("task.created", { taskId: "t-esc-r2", from: "chief", to: "worker", text: "实现功能", sideEffect: "code", idempotencyKey: "key-t-esc" }, () => OLD));
+    await appendTaskEvent(root, taskEvent("task.created", { taskId: "t-esc-r2", from: "chief", to: "worker", text: "实现功能", sideEffect: "code", idempotencyKey: "key-t-esc", flowId: "snake", runId: "run-test", runState: "legacy" }, () => OLD));
     const result = await h.mgr.redispatchTask({ projectRoot: root, taskId: "t-esc-r2" });
     assert.equal(result.ok, false);
     assert.equal(result.escalated, true, result.message);
     assert.equal(result.selected, "terminate");
-    assert.equal(result.requestId, "task-escalation-t-esc-2");
+    // requestId 改为 block 卡体系（block-card-<blockId>），不再是旧 task-escalation-*。
+    assert.match(result.requestId ?? "", /^block-card-[0-9a-f]{24}$/, `block 升级卡 requestId（实际 ${String(result.requestId)}）`);
     assert.equal(captured.length, 1);
     const request = captured[0];
     assert.equal(request.kind, "choice");
     assert.equal(request.cardKind, "decision");
     assert.equal(request.application, true, "应用直接发起（不借角色槽位）");
-    assert.equal(typeof request.flowId, "string");
+    assert.equal(request.sourceRoleId, "application");
+    assert.match(request.title, /^\[Block\]/, "block 卡标题 `[Block] <类名> · <flow>/<stage>`");
+    assert.equal(request.flowId, "snake", "block 卡带任务 flowId（decision 卡通道要求合法 slug）");
     const options = request.kind === "choice" ? request.options : [];
-    assert.deepEqual(options.map((option) => option.id), ["continue", "redispatch", "replace", "terminate"]);
-    assert.deepEqual(options.filter((option) => option.recommended === true).map((option) => option.id), ["terminate"], "恰一个推荐项");
+    assert.deepEqual(options.map((option) => option.id),
+      ["block-revise-scope", "block-retry-with-cap", "block-accept-current-state", "block-terminate-flow"],
+      "P27 ⇒ B9 选项：修复向 + 限次重试 + 客户主权（接受现状/终止）");
+    assert.deepEqual(options.filter((option) => option.recommended === true).map((option) => option.id),
+      ["block-revise-scope"], "恰一个推荐项且为修复向（terminate 不是默认）");
+    assert.equal(options.some((option) => option.id === "block-terminate-flow" && option.recommended === true), false,
+      "block-terminate-flow 永不推荐");
     const gate = evaluateDecisionCardRequest({ request, roleId: "application", governanceModel: "trio" });
     assert.equal(gate.action, "allow", "应用自有 decision 卡通过校验（不扩大角色允许集）");
-    if (gate.action === "allow") assert.equal(gate.recommendedOptionId, "terminate");
+    if (gate.action === "allow") assert.equal(gate.recommendedOptionId, "block-revise-scope");
     const state = await readTaskState(root);
     // e71501c 起：terminate 不写 task.closed/rejected，而由 recordTaskFailure 写 failed 报告（保持未收口）。
     assert.equal(state.records.get("t-esc-r2")?.closed, undefined, "terminate 不再 close/rejected（当前语义：失败报告）");
     const failed = state.records.get("t-esc-r2")?.reports.at(-1);
     assert.equal(failed?.status, "failed");
     assert.match(failed?.summary ?? "", /stuck-escalation:terminate/);
-    // 同一链重复 tick 不重复发卡（升级请求按 root 幂等复用 ⇒ 直接返回升级结果，captured 不增）。
+    // 同一链重复调用不重复呈现 block 卡（blockId 幂等/已结算 ⇒ 不再弹 block 卡）。
+    // 注：block 卡已 decided 后，重复调用会落入 R2 既有的 legacy 升级卡回退面（本文件披露，待 R2 收敛）；
+    // 本断言只钉 block 卡不重弹这一契约。
     const again = await h.mgr.redispatchTask({ projectRoot: root, taskId: "t-esc-r2" });
     assert.equal(again.ok, false);
-    assert.equal(captured.length, 1);
+    const blockCards = captured.filter((entry) => entry.kind === "choice"
+      && entry.options.some((option) => option.id === "block-revise-scope"));
+    assert.equal(blockCards.length, 1, "同一 block 的 block 卡不得重弹");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true });
@@ -344,13 +360,15 @@ test("C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，�
     const pushedRequest = pushed[0]!.request;
     assert.equal(pushedRequest.kind, "choice");
     const pushedOptions = pushedRequest.kind === "choice" ? pushedRequest.options : [];
-    assert.deepEqual(pushedOptions.map((option) => option.id), ["continue", "redispatch", "replace", "terminate"]);
+    assert.deepEqual(pushedOptions.map((option) => option.id),
+      ["block-revise-scope", "block-retry-with-cap", "block-accept-current-state", "block-terminate-flow"]);
     assert.deepEqual(
       pushedOptions.filter((option) => option.recommended !== undefined).map((option) => option.id),
-      ["terminate"],
-      "恰一个唯一推荐项",
+      ["block-revise-scope"],
+      "恰一个唯一推荐项（修复向）",
     );
-    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["continue"] } }).ok, true);
+    // 客户主权选项 block-accept-current-state 对应既有 continue 落地动作；终止只能客户显式选择。
+    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["block-accept-current-state"] } }).ok, true);
     const result = await settledWithin(pending, "C-04 升级卡裁决后 redispatchTask 未在有界窗口内返回", () => ({ pushed: pushed.length }));
     assert.equal(result.escalated, true, result.message);
     assert.equal(result.selected, "continue");
@@ -368,7 +386,7 @@ test("C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，�
   }
 });
 
-test("C-04 decision 开关开启（真实 channel）：v2.0.0 decision 卡不经 judge 代选（0 结果行）；客户作答 terminate ⇒ 失败报告、不自动收口", async () => {
+test("C-04 decision 开关开启（真实 channel）：block 卡为 customer-decision 路由 ⇒ 不经 judge 代选（0 结果行）；客户作答 block-terminate-flow ⇒ 失败报告、不自动收口", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-escalation-switch-on-"));
   const pushed: OperatorRequestPayload[] = [];
   const rows: OperatorJudgeResultPayload[] = [];
@@ -385,7 +403,7 @@ test("C-04 decision 开关开启（真实 channel）：v2.0.0 decision 卡不经
         cardKind: "decision",
         engine: request.runtime,
         reasonCode: "recommended-default",
-        selected: ["terminate"],
+        selected: ["block-terminate-flow"],
         durationMs: 1,
       }),
     },
@@ -395,18 +413,19 @@ test("C-04 decision 开关开启（真实 channel）：v2.0.0 decision 卡不经
   try {
     await seedMaxChain(root, "t-switch-on");
     const pending = h.mgr.redispatchTask({ projectRoot: root, taskId: "t-switch-on-r2" });
-    // v2.0.0（e71501c）删除了 `tryAutoSelectDecision`：decision 卡在 `planJudge` 直接 undefined
-    // （本文件 C-04 switch-off 钉同一语义），「替我决策」开关开启不再让 judge 代选；卡片按既有
-    // 客户通道呈现，必须由客户本人作答（主权卡最后防线也会拒绝 judge/directive 结算）。
+    // 2026-11-20（block resolver P27）：重派耗尽是 B9 customer-decision 路由，`metadata.blockJudgePermitted=false`；
+    // 即使「替我决策」开关开启，block 卡也不经 judge 代选（主权词汇在卡面），必须客户本人作答。
     await until(() => pushed.length === 1);
-    assert.equal(pushed.length, 1, "开关开启不再代选 ⇒ 原卡呈现客户");
-    assert.equal(rows.length, 0, "decision 卡不进入 judge ⇒ 零 judge 结果行");
+    assert.equal(pushed.length, 1, "block 卡不代选 ⇒ 原卡呈现客户");
+    assert.equal(rows.length, 0, "block 卡不进 judge ⇒ 零 judge 结果行");
     assert.equal(pushed[0]!.request.cardKind, "decision");
     const pushedRequest = pushed[0]!.request;
     assert.equal(pushedRequest.kind, "choice");
     const pushedOptions = pushedRequest.kind === "choice" ? pushedRequest.options : [];
-    assert.deepEqual(pushedOptions.filter((option) => option.recommended === true).map((option) => option.id), ["terminate"], "唯一推荐项仍在卡面上（仅作展示/推荐，不触发代选）");
-    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["terminate"] } }).ok, true);
+    assert.deepEqual(pushedOptions.filter((option) => option.recommended === true).map((option) => option.id),
+      ["block-revise-scope"], "唯一推荐项为修复向（仅作展示/推荐，不触发代选）");
+    assert.equal(pushedOptions.some((option) => option.id === "block-terminate-flow"), true, "客户主权终止选项在卡面");
+    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["block-terminate-flow"] } }).ok, true);
     const result = await settledWithin(pending,
       "C-04 decision 开关开启：客户作答后 redispatchTask 未在有界窗口内结算", () => ({ pushed: pushed.length, rows: rows.length }));
     assert.equal(result.escalated, true, result.message);
@@ -427,12 +446,18 @@ test("C-04 decision 开关开启（真实 channel）：v2.0.0 decision 卡不经
   }
 });
 
-test("C-04 升级卡 redispatch/replace：不自动执行危险动作，写人工处置系统行且任务保持未收口", async () => {
-  for (const selected of ["redispatch", "replace"] as const) {
+test("C-04 升级卡修复向选项（block-revise-scope / block-retry-with-cap）：不自动执行危险动作，写人工处置系统行且任务保持未收口", async () => {
+  // 2026-11-20（block resolver P27）：B9 升级卡选项为修复向（revise-scope/retry-with-cap）+ 主权项
+  // （accept-current-state/terminate）；既有 replace 不再是本卡选项（设计 §三 B9 选项），
+  // 其落地映射仍保留在 router 的单一动作表供其它类（B2/B7/B8）使用。
+  for (const [optionId, selected] of [
+    ["block-revise-scope", "redispatch"],
+    ["block-retry-with-cap", "redispatch"],
+  ] as const) {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), `ans-escalation-${selected}-`));
     const customerInput: DesktopCustomerInputFn = async () => ({
       outcome: "answered",
-      value: { selected: [selected] },
+      value: { selected: [optionId] },
       operatorId: "customer",
     });
     const h = harness(root, { customerInput });
@@ -442,11 +467,11 @@ test("C-04 升级卡 redispatch/replace：不自动执行危险动作，写人�
       assert.equal(result.escalated, true, result.message);
       assert.equal(result.selected, selected);
       const state = await readTaskState(root);
-      assert.equal(state.records.get(`t-${selected}-r2`)?.closed, undefined, `${selected} 不自动收口/不自动换人`);
+      assert.equal(state.records.get(`t-${selected}-r2`)?.closed, undefined, `${optionId} 不自动收口/不自动换人`);
       const log = await readRoleLog(root, { roleId: "chief", limit: 30 });
       assert.ok(
         log.entries.some((entry) => entry.kind === "task.escalation.manual" && entry.status === selected),
-        `${selected} 必须留下人工处置记录`,
+        `${optionId} 必须留下人工处置记录`,
       );
     } finally {
       await h.mgr.stop(null);
