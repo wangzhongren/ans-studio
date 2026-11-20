@@ -107,7 +107,7 @@ export class DeliveryStore {
   private now(): number { return now(this.deps); }
   private queueKey(projectRoot: string, targetRoleId: string, runtime: RuntimeKind): string { return queueKey(projectRoot, targetRoleId, runtime); }
   private async readTasks(projectRoot: string): ReturnType<typeof readTasks> { return readTasks(projectRoot); }
-  private rememberTaskCreator(taskId: string, created: { from?: "chief" | "convener" } | undefined): void { rememberTaskCreator(taskId, created); }
+  private rememberTaskCreator(taskId: string, created: { from?: "chief" | "convener" | "application" } | undefined): void { rememberTaskCreator(taskId, created); }
   private publishDeliveryInventory(reason: string): void { publishDeliveryInventory(reason, this.port.inventoryState()); }
 
   /* 尚未迁出的门面方法端口（参数逐位原样转发）。 */

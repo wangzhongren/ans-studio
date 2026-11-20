@@ -11,7 +11,7 @@
 // 参数形状全部取自现行方法签名（不新造业务语义）；仅做命名提取。
 // 依赖规则：L3 只可导入 L0（contracts/shared）与外部 src/app 类型；不得导入 feature 模块。
 
-import type { CustomerInputMetadata, CustomerInputOutcome, CustomerInputRequest, PlanEscalationInput, PlanEscalationResult, TaskStateEvent, WorkflowDocumentRef } from "../../../src/model/runtime.ts";
+import type { CustomerInputMetadata, CustomerInputOutcome, CustomerInputRequest, PlanEscalationInput, PlanEscalationResult, TaskStateEvent, WorkflowDocumentRef, WorkflowStage } from "../../../src/model/runtime.ts";
 import type { NewerContractDoc, RunManifest } from "../../../src/common/编排/run-manifest.ts";
 import type { MechanicalRejection } from "../../../src/common/编排/mechanical-rejection.ts";
 import type { WorkflowServiceFailure } from "../../../src/common/编排/workflow-service.ts";
@@ -89,6 +89,18 @@ export interface FixedCardHooks {
     | WorkflowServiceFailure
   >;
   recordFixedCardWorkflowResolution(input: FixedCardResolutionInput): Promise<void>;
+  /**
+   * 2026-11-17（app-dispatch/v1）：应用卡 prompt 裁决后的应用驱动钩子（关闭 card-prompt 任务 +
+   * `driveAppDispatchStage`；旧协议卡片不调用/字段缺席即 no-op）。cards 只转发事实，不实现驱动。
+   */
+  afterAppDispatchCardResolved?(input: {
+    projectRoot: string;
+    workflowId: string;
+    stage: WorkflowStage;
+    promptId: string;
+    requestId: string;
+    resolved: boolean;
+  }): Promise<void>;
 }
 
 /** run-change 的精确控制器停止端口（tasks/上层模块可经门面注入使用；参数逐位原样转发）。 */

@@ -101,7 +101,7 @@ export class Tasks {
   private queueKey(projectRoot: string, targetRoleId: string, runtime: RuntimeKind): string { return queueKey(projectRoot, targetRoleId, runtime); }
   private now(): number { return now(this.deps); }
   private async readTasks(projectRoot: string): Promise<TaskReplay> { return readTasks(projectRoot); }
-  private rememberTaskCreator(taskId: string, created: { from?: "chief" | "convener" } | undefined): void { rememberTaskCreator(taskId, created); }
+  private rememberTaskCreator(taskId: string, created: { from?: "chief" | "convener" | "application" } | undefined): void { rememberTaskCreator(taskId, created); }
   private async appendTaskState(projectRoot: string, event: TaskStateEvent): Promise<boolean> { return appendTaskState(projectRoot, event); }
   private async recordTaskFailure(projectRoot: string, taskId: string, summary: string): Promise<boolean> { return recordTaskFailure(projectRoot, taskId, summary, () => this.now()); }
   private appendRoleActivity(projectRoot: string, roleId: string, input: { kind: string; summary: string; tool?: string; status?: string; taskId?: string; turnId?: string; ref?: string }): Promise<void> {
@@ -330,6 +330,12 @@ export class Tasks {
     for (const record of state.unclosed) {
       const created = record.created;
       if (created === undefined) continue;
+      // 2026-11-17（app-dispatch/v1）：应用创建的任务（from:"application"）不走 legacy 星形恢复投递
+      // （来源/来源会话/forced fixed 由应用驱动对账 `reconcileFixedWorkflow` + 投递桥唯一处理）。
+      if (created.from === "application") {
+        report.skipped += 1;
+        continue;
+      }
       if (record.delivered !== undefined || record.reports.length > 0) {
         report.skipped += 1;
         continue;

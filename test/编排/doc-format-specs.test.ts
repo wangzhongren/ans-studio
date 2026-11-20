@@ -1314,6 +1314,13 @@ const SCHEMA_WHITELIST: ReadonlyArray<{ literal: string; reason: string }> = [
   { literal: "ans-workflow/v1", reason: "fixed 路径账本 schema（model/runtime.ts；common/编排/workflow-service.ts 写入）；应用内部状态，非项目文档格式" },
   { literal: "ans-task-git-shell/v1", reason: "任务级 Git shell 分类器 kind（pipeline/orchestration/run-role.ts）；运行期匹配标识，非文档格式" },
   { literal: "chief-workflow/v2", reason: "应用内置 Chief workflow 资源版本（run-role.ts fixed 资源校验）；资源元数据，非项目文档格式" },
+  // 2026-11-17（app-dispatch/v1，设计 §4.4/§6.2）：应用侧流程定义注册表与协议标识。
+  // 均为应用内部契约/协议字面量（schema id、workflow.started.protocol 与资源版本），不是目标项目文档格式；
+  // 扫描覆盖面不变，只登记并写明理由。chief-workflow/v3 与 v2 同口径（app-dispatch/v1 注入的资源版本）。
+  { literal: "chief-workflow/v3", reason: "应用内置 Chief workflow v3 资源版本（run-role.ts app-dispatch/v1 资源校验）；资源元数据，非项目文档格式" },
+  { literal: "ans-workflow-definition/v1", reason: "应用内流程定义 JSON Schema 标识（common/编排/workflow-definitions.ts 导出）；应用内部契约，非目标项目文档格式" },
+  { literal: "ans-workflow-definitions/v1", reason: "应用内流程定义注册表 JSON Schema 标识（workflow-definitions.ts 注册表导出）；应用内部契约，非目标项目文档格式" },
+  { literal: "app-dispatch/v1", reason: "工作流协议标识（workflow.started.protocol；model/runtime.ts + common/编排/workflow-service.ts）；应用内部协议，非目标项目文档格式" },
   { literal: "legacy/v1", reason: "派发/工作流矩阵 schema 枚举（model/role.ts 与角色模块 context）；运行期矩阵标识，非项目文档格式" },
   { literal: "two-fixed-paths/v1", reason: "fixed 两路径派发/工作流矩阵枚举（model/role.ts、run-role.ts、角色模块 context）；运行期矩阵标识，非文档格式" },
 ];

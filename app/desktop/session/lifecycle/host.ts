@@ -84,7 +84,7 @@ import {
 } from "../../version-change.ts";
 import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "../../watchdog.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage } from "../../../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage, WorkflowProtocol } from "../../../../src/model/runtime.ts";
 import type { PlanEscalationFn, PlanEscalationInput, PlanEscalationResult } from "../../../../src/model/runtime.ts";
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn, WorkflowEvent, WorkflowArtifactRef, BasisEvent } from "../../../../src/model/runtime.ts";
 import type { InstallSkillFn, InstallSkillPayload, InstallSkillReceipt, UninstallSkillFn, ReportHandbackMetadata } from "../../../../src/model/runtime.ts";
@@ -194,6 +194,20 @@ export interface LifecycleHost {
   ): Promise<void>;
   appTaskClientMessageId(projectRoot: string, roleId: string, runtime: RuntimeKind, text: string): string;
   appTaskClientMessageIdFromSeed(seed: string): string;
+  /**
+   * 2026-11-17（app-dispatch/v1）：`select_workflow` 应用实现（宿主捕获 chief 当前真实轮次）；
+   * 只选流程/启动驱动，不派发、不授权（失败稳定码原样返回）。
+   */
+  appDispatchSelectWorkflow(input: {
+    projectRoot: string;
+    runtime: RuntimeKind;
+    workflowPath: "A" | "B";
+    flowId: string;
+    acceptanceStrength?: "light" | "standard";
+    sourceTaskId?: string;
+  }): Promise<{ ok: boolean; message: string; workflowId?: string; stage?: WorkflowStage; taskIds?: string[]; code?: string }>;
+  /** 2026-11-17：驱动指定 app-dispatch/v1 workflow（A8 激活后等；旧协议 no-op；失败只诊断）。 */
+  appDispatchDriveWorkflow(projectRoot: string, workflowId: string): Promise<void>;
   appendRoleActivity(
     projectRoot: string,
     roleId: string,
@@ -235,7 +249,7 @@ export interface LifecycleHost {
     signal?: AbortSignal): Promise<Awaited<ReturnType<CompleteTeamPlanFn>>>;
   consume(key: string, entry: LiveSession): void;
   contextInfo(handle: RoleSessionHandle): Pick<OpenResult, "contextSource" | "contextWarning">;
-  contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput, mode?: WorkflowMode): Promise<string>;
+  contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput, mode?: WorkflowMode, protocol?: WorkflowProtocol): Promise<string>;
   currentSkillPaths(projectRoot: string, roleId: string): Promise<string[] | null>;
   deliveryIsStopped(key: string): boolean;
   deliveryLifecycle(key: string): string;

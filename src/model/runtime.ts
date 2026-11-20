@@ -992,6 +992,12 @@ export const GOVERNANCE_CARD_KINDS: readonly GovernanceCardKind[] = Object.freez
 export interface GovernanceCardMetadata extends GovernanceFlowMetadata {
   cardKind?: GovernanceCardKind;
   /**
+   * 2026-11-17（app-dispatch/v1）：应用发放的卡 prompt 标识。仅当应用以 `card-prompt` 任务
+   * 发放该卡时由幕僚在 `request_choice` 中**原样回传**；应用逐项校验卡种/选项/documentRefs，
+   * 不一致 ⇒ `card-prompt-mismatch`。缺省＝旧卡（旧行为不变；应用不要求 promptId）。
+   */
+  promptId?: string;
+  /**
    * C 批（2026-10-28）：**应用自有申请/决策卡**（不是角色模型发起）。仅应用侧可设置；decision 卡校验
    * 据此放行，不扩大 `DECISION_CARD_ALLOWED_ROLES`。角色工具载荷即使夹带本字段也不得获得额外权限
    * （工具层不读取/不转发；应用侧入口自行构造）。
@@ -1378,9 +1384,12 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   flowId?: string;
   /**
    * 2026-10-29（方案 v2.1 §5.4，F2/F3）：任务创建者——幕僚派发主链 / 运营派发实现任务。
-   * 报告按本字段路由回创建者（M9）。
+   * 2026-11-17（app-dispatch/v1，编排水线 app-dispatch builtins）：新增 `"application"`——应用侧
+   * 流程驱动按流程定义创建的内置角色任务（`stage-execution` / `worker-dispatch` / `card-prompt`）。
+   * 旧值原样保留（旧记录读取不变）。报告按本字段路由回创建者（M9）；application 任务的报告只
+   * 写入账本，由应用观察 `task.reported` 后按定义收口（`reportTargetForTaskCreator` 返回 null）。
    */
-  from: "chief" | "convener";
+  from: "chief" | "convener" | "application";
   to: string;
   text: string;
   expectedOutput?: string;
@@ -1420,10 +1429,28 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   workflowId?: string;
   /** fixed 阶段（A1–A13 含 A12a/A12b；B1–B4）。 */
   stage?: WorkflowStage;
-  /** fixed 任务种类：`"stage-request"`＝幕僚→运营的产线调度请求；普通生产任务缺省。 */
-  taskKind?: "stage-request" | string;
+  /**
+   * fixed 任务种类：`"stage-request"`＝幕僚→运营的产线调度请求（v2.1 兼容，保留）；普通生产任务缺省。
+   * 2026-11-17（app-dispatch/v1）：新增 `"stage-execution"`（应用→内置执行者内容任务）、
+   * `"worker-dispatch"`（应用→运营请派 worker）、`"card-prompt"`（应用→幕僚呈客户卡）。
+   */
+  taskKind?: FixedTaskKind | (string & {});
   /** fixed 路径（A/B）；首次 stage-request 写入，后续可省略（从账本解析）。 */
   workflowPath?: WorkflowPath;
+  /**
+   * 2026-11-17（app-dispatch/v1）：`card-prompt` 任务携带的应用卡 prompt 标识
+   * （与 `request.created.promptId` 同一值；幕僚呈卡时原样回传，应用逐项校验）。
+   * 旧任务无此字段（读取不变）。
+   */
+  promptId?: string;
+  /** app-dispatch/v1：`card-prompt` 任务的卡种（白名单 = `GovernanceCardKind`）。 */
+  cardKind?: GovernanceCardKind;
+  /** app-dispatch/v1：应用计算的卡文档引用（path+字节 SHA-256；旧卡无此字段）。 */
+  cardDocumentRefs?: WorkflowDocumentRef[];
+  /** app-dispatch/v1：应用生成的卡面选项（与 `request.created.options` 逐项一致）。 */
+  cardOptions?: { id: string; label: string; recommended?: boolean }[];
+  /** app-dispatch/v1：应用给定的推荐项 id 集（与 `request.created.recommended` 一致）。 */
+  cardRecommended?: string[];
 }
 
 export interface TaskDeliveredEvent extends TaskStateEventBase {
@@ -1447,8 +1474,12 @@ export interface TaskReportedEvent extends TaskStateEventBase {
 export interface TaskClosedEvent extends TaskStateEventBase {
   kind: "task.closed";
   taskId: string;
-  /** 2026-10-29（方案 v2.1 §5.4，F2）：任务创建者收口自己的任务（chief / convener）。 */
-  by: "chief" | "convener";
+  /**
+   * 2026-10-29（方案 v2.1 §5.4，F2）：任务创建者收口自己的任务（chief / convener）。
+   * 2026-11-17（app-dispatch/v1）：新增 `"application"`——应用侧驱动收口自己创建的
+   * `stage-execution` / `card-prompt` 任务（`worker-dispatch` 由运营收口，Q6）。旧值原样保留。
+   */
+  by: "chief" | "convener" | "application";
   outcome: TaskClosedOutcome;
   note?: string;
   /** Application-bound direct-close provenance; absent on historical events. */
@@ -1498,6 +1529,12 @@ export interface RequestCreatedEvent extends TaskStateEventBase {
   /** T3：fixed 工作流/阶段绑定；旧事件无此字段（兼容读取）。 */
   workflowId?: string;
   stage?: WorkflowStage;
+  /**
+   * 2026-11-17（app-dispatch/v1）：应用发放的卡 prompt 标识（`card-prompt` 任务同值）。
+   * 幕僚以 `request_choice` 呈卡时原样回传；应用校验卡种/选项/documentRefs 逐项一致
+   * （不一致 ⇒ `card-prompt-mismatch`，不发卡、不写记录）。旧卡无此字段（旧行为不变）。
+   */
+  promptId?: string;
   sourceRoleId: string;
   title: string;
   context?: string;
@@ -1981,6 +2018,94 @@ export type StageStatus = "pending" | "requested" | "dispatched" | "in-progress"
 export type WorkflowAction = "advance" | "stop";
 
 /**
+ * 2026-11-17（app-dispatch builtins 第一步）：fixed 任务种类（单一来源）。
+ * - `stage-request`：v2.1 幕僚→运营 stage-request（**兼容保留**，新协议不再产生）；
+ * - `stage-execution`：应用侧流程驱动 → 内置执行者（product/rapporteur/nominator/convener/verifier）；
+ * - `worker-dispatch`：应用 → 运营（请为某阶段派 worker；由运营收口，Q6）；
+ * - `card-prompt`：应用 → 幕僚（请按应用 prompt 呈客户卡）。
+ */
+export const FIXED_TASK_KINDS = Object.freeze([
+  "stage-request", "stage-execution", "worker-dispatch", "card-prompt",
+] as const);
+export type FixedTaskKind = (typeof FIXED_TASK_KINDS)[number];
+
+/** fixed/app-dispatch 任务种类守卫（值域单一来源 = `FIXED_TASK_KINDS`）。 */
+export function isFixedTaskKind(value: unknown): value is FixedTaskKind {
+  return typeof value === "string" && (FIXED_TASK_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * 工作流驱动协议（2026-11-17）：
+ * - `fixed-v2.1`：v2.1.0 在飞协议（chief stage-request 驱动；**旧记录缺省值**）；
+ * - `app-dispatch/v1`：应用侧流程驱动（幕僚只选流程；内置任务由应用按定义创建；worker 仍由运营派）。
+ * 协议在 `workflow.started` 钉死；禁止同一 workflow 中途切换（读取缺省 = fixed-v2.1）。
+ */
+export const WORKFLOW_PROTOCOL_FIXED_V2_1 = "fixed-v2.1" as const;
+export const WORKFLOW_PROTOCOL_APP_DISPATCH = "app-dispatch/v1" as const;
+export type WorkflowProtocol = typeof WORKFLOW_PROTOCOL_FIXED_V2_1 | typeof WORKFLOW_PROTOCOL_APP_DISPATCH;
+
+/** 协议值域守卫。 */
+export function isWorkflowProtocol(value: unknown): value is WorkflowProtocol {
+  return value === WORKFLOW_PROTOCOL_FIXED_V2_1 || value === WORKFLOW_PROTOCOL_APP_DISPATCH;
+}
+
+/** `workflow.started.protocol` 缺省解释（旧记录 = fixed-v2.1；不迁移，Q10）。 */
+export function workflowProtocolOf(
+  started: { protocol?: WorkflowProtocol } | undefined,
+): WorkflowProtocol {
+  return started?.protocol ?? WORKFLOW_PROTOCOL_FIXED_V2_1;
+}
+
+/**
+ * 流程定义引用（app-dispatch/v1）：随 `workflow.started` 钉死定义 id/version/定义 hash；
+ * 新版本只影响新 workflow，不做静默迁移。定义本体 = 编排 `workflow-definitions.ts` 注册表。
+ */
+export interface WorkflowDefinitionRef {
+  id: string;
+  version: number;
+  sha256: string;
+}
+
+/** 流程定义引用守卫（纯形状：id 非空、version 正整数、sha256 64 hex）。 */
+export function isWorkflowDefinitionRef(value: unknown): value is WorkflowDefinitionRef {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const ref = value as Record<string, unknown>;
+  return Object.keys(ref).length === 3
+    && typeof ref["id"] === "string" && ref["id"].trim() !== "" && ref["id"].length <= 64
+    && typeof ref["version"] === "number" && Number.isInteger(ref["version"]) && ref["version"] >= 1
+    && typeof ref["sha256"] === "string" && /^[a-f0-9]{64}$/i.test(ref["sha256"]);
+}
+
+/**
+ * 验收强度（Q2 定义参数；`select_workflow` 可选携带，应用执行）：
+ * - `light`：轻量验收（A12b blocked 报告 + 应用归档证据时可接受，保留 B31 审计口径）；
+ * - `standard`：标准验收（默认；blocked 按定义策略处置）。
+ */
+export const WORKFLOW_ACCEPTANCE_STRENGTHS = Object.freeze(["light", "standard"] as const);
+export type WorkflowAcceptanceStrength = (typeof WORKFLOW_ACCEPTANCE_STRENGTHS)[number];
+
+/** 验收强度值域守卫。 */
+export function isWorkflowAcceptanceStrength(value: unknown): value is WorkflowAcceptanceStrength {
+  return value === "light" || value === "standard";
+}
+
+/**
+ * `stage.dispatched.executorKind`（app-dispatch/v1 审计字段）：
+ * `built-in`＝内置角色 stage-execution；`worker-dispatch`＝运营 worker 派发请求；
+ * `review`＝应用直派验收（verifier / reviewRoleId）；`card-prompt`＝应用卡 prompt；
+ * `application`＝应用确定性阶段（无任务，如 B2 派生）。旧记录无此字段（读取不变）。
+ */
+export const WORKFLOW_STAGE_EXECUTOR_KINDS = Object.freeze([
+  "built-in", "worker-dispatch", "review", "card-prompt", "application",
+] as const);
+export type WorkflowStageExecutorKind = (typeof WORKFLOW_STAGE_EXECUTOR_KINDS)[number];
+
+/** executorKind 值域守卫。 */
+export function isWorkflowStageExecutorKind(value: unknown): value is WorkflowStageExecutorKind {
+  return typeof value === "string" && (WORKFLOW_STAGE_EXECUTOR_KINDS as readonly string[]).includes(value);
+}
+
+/**
  * 文档引用（应用计算 path+字节 SHA-256；kind 可选）。
  * 用于 `request.created`/`request.resolved` 的 `documentRefs`（裁决事件一次写入，不由模型自报）。
  * T3 B2（MF-IR-5 / v1.3 §4.2 A3）：追加**可选** `version`（意图/提案文档版本号）；旧形状
@@ -2018,6 +2143,15 @@ export interface WorkflowStartedEvent extends WorkflowEventBase {
   sourceTaskId: string;
   /** 旧 trunk/run 历史存在但被忽略时为 true（如实记录，不迁移）。 */
   legacyStateIgnored?: boolean;
+  /**
+   * 2026-11-17（app-dispatch/v1）：驱动协议。**缺省（旧记录）= `fixed-v2.1`**；
+   * 新协议 = `app-dispatch/v1`（应用侧流程驱动）。协议钉死，禁止同一 workflow 中途切换（Q10）。
+   */
+  protocol?: WorkflowProtocol;
+  /** app-dispatch/v1：流程定义引用（id/version/sha256；随 workflow 钉死，不静默迁移）。 */
+  definition?: WorkflowDefinitionRef;
+  /** app-dispatch/v1：选流程时给定的定义参数（Q2 验收强度；应用执行；旧记录无此字段）。 */
+  parameters?: { acceptanceStrength?: WorkflowAcceptanceStrength };
 }
 
 /** `stage.requested`（幂等键 `stage-request:<workflowId>:<stage>:<attempt>`）。 */
@@ -2028,6 +2162,11 @@ export interface StageRequestedEvent extends WorkflowEventBase {
   requestTaskId: string;
   requestDigest: string;
   attempt: number;
+  /**
+   * 2026-11-17（app-dispatch/v1）：`"application"` = 应用侧流程驱动直接请求
+   * （不再由 chief stage-request 触发）。旧记录无此字段（= 旧 chief 驱动，读取不变）。
+   */
+  issuedBy?: "application";
 }
 
 /** `stage.dispatched`（幂等键 `stage-dispatch:<workflowId>:<stage>:<taskId>`）。 */
@@ -2037,6 +2176,10 @@ export interface StageDispatchedEvent extends WorkflowEventBase {
   taskId: string;
   targetRoleId: string;
   moduleId?: string;
+  /** app-dispatch/v1：`"application"` = 应用建任务时记录（旧记录无此字段）。 */
+  issuedBy?: "application";
+  /** app-dispatch/v1：执行者类别审计（旧记录无此字段，读取不变）。 */
+  executorKind?: WorkflowStageExecutorKind;
 }
 
 /** 阶段完成产物引用（path 必填；sha256/kind 由应用附）。 */
@@ -2369,7 +2512,22 @@ function isWorkflowEventBody(value: Record<string, unknown>): boolean {
   switch (kind) {
     case "workflow.started": {
       const trigger = value["trigger"];
-      return ledgerRecord(trigger) && trigger["by"] === "chief" && typeof trigger["reason"] === "string"
+      const protocol = value["protocol"];
+      const definition = value["definition"];
+      const parameters = value["parameters"];
+      // 2026-11-17（app-dispatch/v1）：protocol 缺省（旧记录）= fixed-v2.1；definition 只在
+      // app-dispatch/v1 下允许且必填；parameters 仅可选 acceptanceStrength（Q2）。
+      const protocolOk = protocol === undefined
+        ? definition === undefined && parameters === undefined
+        : isWorkflowProtocol(protocol)
+          && (protocol === WORKFLOW_PROTOCOL_APP_DISPATCH
+            ? isWorkflowDefinitionRef(definition)
+            : definition === undefined && parameters === undefined);
+      const parametersOk = parameters === undefined
+        || (ledgerRecord(parameters)
+          && (parameters["acceptanceStrength"] === undefined || isWorkflowAcceptanceStrength(parameters["acceptanceStrength"])));
+      return protocolOk && parametersOk
+        && ledgerRecord(trigger) && trigger["by"] === "chief" && typeof trigger["reason"] === "string"
         && (trigger["customerOverride"] === undefined || typeof trigger["customerOverride"] === "boolean")
         && ledgerText(value["sourceTaskId"])
         && (value["legacyStateIgnored"] === undefined || typeof value["legacyStateIgnored"] === "boolean");
@@ -2377,10 +2535,13 @@ function isWorkflowEventBody(value: Record<string, unknown>): boolean {
     case "stage.requested":
       return isWorkflowStage(value["stage"])
         && (value["fromStage"] === undefined || isWorkflowStage(value["fromStage"]))
+        && (value["issuedBy"] === undefined || value["issuedBy"] === "application")
         && ledgerText(value["requestTaskId"]) && ledgerDigest(value["requestDigest"]) && ledgerAttempt(value["attempt"]);
     case "stage.dispatched":
       return isWorkflowStage(value["stage"]) && ledgerText(value["taskId"]) && ledgerText(value["targetRoleId"])
-        && (value["moduleId"] === undefined || ledgerText(value["moduleId"]));
+        && (value["moduleId"] === undefined || ledgerText(value["moduleId"]))
+        && (value["issuedBy"] === undefined || value["issuedBy"] === "application")
+        && (value["executorKind"] === undefined || isWorkflowStageExecutorKind(value["executorKind"]));
     case "stage.completed": {
       const cause = value["cause"], artifacts = value["artifacts"];
       return isWorkflowStage(value["stage"]) && ledgerRecord(cause) && ledgerText(cause["kind"]) && ledgerText(cause["ref"])

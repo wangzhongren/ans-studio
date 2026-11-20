@@ -33,7 +33,9 @@ import {
 import { canCompleteStage, deriveWorkflowView } from "../../../../src/common/编排/workflow-state.ts";
 import { loadLatestRoster as loadLatestWorkflowRoster } from "../../../../src/common/编排/workflow-preconditions.ts";
 import type { CompleteTeamPlanFn, CustomerInputRequest, TaskStateEvent, WorkflowDocumentRef, WorkflowEvent } from "../../../../src/model/runtime.ts";
-import { WORKFLOW_LEDGER_SCHEMA } from "../../../../src/model/runtime.ts";
+import { WORKFLOW_PROTOCOL_APP_DISPATCH, WORKFLOW_LEDGER_SCHEMA } from "../../../../src/model/runtime.ts";
+import { workflowProtocolForWorkflowId } from "../../workflow.ts";
+import { closeApplicationTaskDirect, type FixedWorkflowStageDispatch } from "./stage-dispatch.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
 import type { RoleSessionHandle } from "../../../../src/pipeline/orchestration/run-role.ts";
 import { isFixedReleaseTriggerStage, type FixedReleaseTriggerStage } from "../../workflow.ts";
@@ -52,11 +54,13 @@ export class FixedWorkflowCards {
   private readonly refs: FixedWorkflowRefs;
   private readonly port: FixedWorkflowPorts;
   private readonly release: FixedWorkflowRelease;
+  private readonly stageDispatch: FixedWorkflowStageDispatch;
   private readonly deps: SessionManagerDeps;
-  constructor(refs: FixedWorkflowRefs, port: FixedWorkflowPorts, release: FixedWorkflowRelease, deps: SessionManagerDeps) {
+  constructor(refs: FixedWorkflowRefs, port: FixedWorkflowPorts, release: FixedWorkflowRelease, stageDispatch: FixedWorkflowStageDispatch, deps: SessionManagerDeps) {
     this.refs = refs;
     this.port = port;
     this.release = release;
+    this.stageDispatch = stageDispatch;
     this.deps = deps;
   }
 
@@ -202,6 +206,10 @@ export class FixedWorkflowCards {
       ...(request.runId !== undefined ? { runId: request.runId } : {}),
       ...(request.baseDigest !== undefined ? { baseDigest: request.baseDigest } : {}),
     });
+    if (completed.ok === true && assigned.task.workflowId !== undefined) {
+      // 2026-11-17（app-dispatch/v1）：A9「团队计划 + 基线」完成（stage.completed A9 由服务写）⇒ 驱动 A10 卡 prompt。
+      void this.stageDispatch.advance(projectRoot, assigned.task.workflowId, runtime);
+    }
     // B29：成功/失败都**原样返回 fixed 服务形状**——成功 `{ok:true,operationId,flowId,workflowId,
     // basisId,plan,documents,replay,stageCompleted}`；失败 `{ok:false,code,message[,missing]}`。
     // 不再包装成 legacy `DirectActionReceipt`（工具层 B25 校验要求 fixed 形状；包装后的 `bas-…`
@@ -222,6 +230,46 @@ export class FixedWorkflowCards {
   ): Promise<Awaited<ReturnType<typeof closeFixedWorkflowTask>>> {
     if (signal?.aborted) {
       return { ok: false, code: "close-task-invalid", message: "本轮已中止，未执行收口。" };
+    }
+    // 2026-11-17（app-dispatch/v1，Q6）：**运营收口应用创建的 worker-dispatch 任务**——任务真实创建者
+    // 是应用；运营的 close_created_task 触发应用以真实创建者身份写 `task.closed(by:"application")`，
+    // **不写阶段事件**（阶段完成只按完成条件由 worker 任务收口/聚合判定）。其它 application 任务不得
+    // 经本工具收口（stage-execution/card-prompt 由应用观察/卡裁决收口）。
+    const taskState = await readTaskState(projectRoot);
+    const appRecord = taskState.records.get(input.taskId);
+    const appCreated = appRecord?.created;
+    if (appCreated?.from === "application") {
+      const protocol = appCreated.workflowId !== undefined ? await workflowProtocolForWorkflowId(projectRoot, appCreated.workflowId) : undefined;
+      if (protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH) {
+        return { ok: false, code: "workflow-protocol-mismatch", message: "应用任务收口只适用于 app-dispatch/v1（旧协议应用任务不存在）。" };
+      }
+      if (appCreated.taskKind !== "worker-dispatch" || appCreated.to !== actorRoleId) {
+        return { ok: false, code: "close-identity-invalid", message: "只有受派运营可以收口应用创建的 worker-dispatch 任务；其它应用任务由应用观察/卡裁决收口。" };
+      }
+      if (input.outcome === "accepted" && appRecord?.reports[appRecord.reports.length - 1]?.status !== "done") {
+        return { ok: false, code: "close-report-missing", message: "worker-dispatch 任务 accepted 收口要求已有 task.reported(status=done)；报告只是报告，不是收口。" };
+      }
+      const closed = await closeApplicationTaskDirect({
+        projectRoot,
+        taskId: input.taskId,
+        outcome: input.outcome,
+        operationId: input.operationId,
+        note: input.note ?? `worker-dispatch closed by ${actorRoleId}`,
+      });
+      if (!closed.ok) return closed;
+      const workflowId = appCreated.workflowId;
+      if (workflowId !== undefined) void this.stageDispatch.afterWorkerDispatchClosed(projectRoot, workflowId, actorRoleId);
+      return {
+        ok: true,
+        taskId: input.taskId,
+        outcome: input.outcome,
+        ...(workflowId !== undefined ? { workflowId } : {}),
+        ...(appCreated.stage !== undefined ? { stage: appCreated.stage } : {}),
+        eventId: "",
+        operationId: input.operationId,
+        replay: closed.replay,
+        stageCompleted: false,
+      };
     }
     // T3 B2.1（AC-19/T-08；MF-B2-02）：fixed verifier 的 A12a/A12b accepted 收口（criteria/report
     // 收口，含 A12b 应用验收归档）前 basis drift 复核——A12a/A12b 为 chief→verifier 直派，
@@ -244,6 +292,11 @@ export class FixedWorkflowCards {
     });
     if (closed.ok) {
       void this.drainAllQueuesFor(projectRoot);
+      // 2026-11-17（app-dispatch/v1）：A11/B3 全部实现任务 accepted ⇒ 阶段完成（服务已写 stage.completed）
+      // ⇒ 驱动下一阶段（A12b / B4）；旧协议下 advance 内部跳过（只处理 app-dispatch/v1）。
+      if (closed.stageCompleted && closed.workflowId !== undefined) {
+        void this.stageDispatch.advance(projectRoot, closed.workflowId, this.refs.lastGovernanceRuntime.get(projectRoot) ?? "pi");
+      }
       // T3 B3.1（AC-11/AC-14/AC-22；MF-IR-8）：fixed **A12b accepted（A13 前）/ B3 accepted（B4 前）**
       // ⇒ 应用自动调用 `prepareReleaseMerge` 并呈 merge-main 客户卡（不新增工具/客户门）。
       // 异步执行：收口工具立即返回；前置不满足 ⇒ 只回运营/幕僚（不弹注定失败卡）；同一 workflow/tip 幂等。

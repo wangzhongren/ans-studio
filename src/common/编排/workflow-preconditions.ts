@@ -1734,9 +1734,11 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
  * 任务绑定报告的接收者：**按 `task.created.from` 回创建者**（项目 worker/质检 → 运营或幕僚；
  * 产品/策划/人事/运营由幕僚派发 → 幕僚）。
  * 返回 null = 找不到创建者（调用方保持既有防御路由，不猜）。
+ * 2026-11-17（app-dispatch/v1）：`creator:"application"` ⇒ **null**——应用创建的任务报告只写账本，
+ * 由应用观察 `task.reported` 后按流程定义收口（不唤醒第二个角色，不形成「应用→角色→应用」消息面）。
  */
 export function reportTargetForTaskCreator(input: {
-  creator: "chief" | "convener" | undefined;
+  creator: "chief" | "convener" | "application" | undefined;
   chiefRoleId: string | null;
   convenerRoleId: string | null;
 }): string | null {

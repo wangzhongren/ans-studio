@@ -36,7 +36,8 @@ import { deriveWorkflowView, type WorkflowView } from "../../../../src/common/�
 import { deriveFixedModuleWriteSet, loadLatestRoster as loadLatestWorkflowRoster, reviewRoleIdOfRoster } from "../../../../src/common/编排/workflow-preconditions.ts";
 import { inspectAssignedTask as inspectWorkflowAssignedTask } from "../../../../src/common/编排/workflow-service.ts";
 import { isBuiltInGovernanceRoleId } from "../../../../src/service/boundary/resolve-boundary.ts";
-import { isWorkflowPath, isWorkflowStage } from "../../../../src/model/runtime.ts";
+import { isWorkflowPath, isWorkflowStage, WORKFLOW_PROTOCOL_APP_DISPATCH, type WorkflowProtocol } from "../../../../src/model/runtime.ts";
+import { workflowProtocolForWorkflowId } from "../../workflow.ts";
 import type { BasisEvent, DispatchReceipt, DispatchTaskPayload, TaskStateEvent, WorkflowEvent, WorkflowStage } from "../../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
 import type { RoleDispatchPurpose } from "../../../../src/model/role.ts";
@@ -264,15 +265,34 @@ export class FixedWorkflowRoute {
         assignedTaskFlowId = assigned.task.flowId;
       }
     }
+    // 2026-11-17（app-dispatch/v1，设计 §2.1/Q10）：驱动协议从 `workflow.started.protocol` 解析
+    // （显式 workflowId 或受派任务的账本绑定；缺省/未知 = fixed-v2.1 ⇒ 下方旧矩阵逐字不变）。
+    const protocolWorkflowId = workflowId ?? (typeof assignedTaskEvidence?.workflowId === "string" && assignedTaskEvidence.workflowId !== "" ? assignedTaskEvidence.workflowId : undefined);
+    const appDispatchProtocol: WorkflowProtocol | undefined = protocolWorkflowId !== undefined
+      ? await workflowProtocolForWorkflowId(projectRoot, protocolWorkflowId)
+      : undefined;
+    const appDispatch = appDispatchProtocol === WORKFLOW_PROTOCOL_APP_DISPATCH;
     if (!isStageRequest && fromRoleId === convenerId) {
-      const assignedReady = assignedTaskEvidence !== undefined
-        && assignedTaskEvidence.open === true
-        && assignedTaskEvidence.stopped !== true
-        && assignedTaskEvidence.from === "chief"
-        && assignedTaskEvidence.to === convenerId
-        && assignedTaskEvidence.taskKind === "stage-request"
-        && typeof assignedTaskEvidence.workflowId === "string" && assignedTaskEvidence.workflowId !== ""
-        && assignedTaskEvidence.stage !== undefined;
+      // 2026-11-17（app-dispatch/v1，设计 §2.1/§4.1）：运营派项目 worker 必须绑定自身 open 的
+      // `worker-dispatch` 任务（from=application/to=运营/未停止/workflow+stage 一致），
+      // 不再绑定幕僚 stage-request（旧协议 Q10 逐字保留）。
+      const assignedReady = appDispatch
+        ? assignedTaskEvidence !== undefined
+          && assignedTaskEvidence.open === true
+          && assignedTaskEvidence.stopped !== true
+          && assignedTaskEvidence.from === "application"
+          && assignedTaskEvidence.to === convenerId
+          && assignedTaskEvidence.taskKind === "worker-dispatch"
+          && typeof assignedTaskEvidence.workflowId === "string" && assignedTaskEvidence.workflowId !== ""
+          && assignedTaskEvidence.stage !== undefined
+        : assignedTaskEvidence !== undefined
+          && assignedTaskEvidence.open === true
+          && assignedTaskEvidence.stopped !== true
+          && assignedTaskEvidence.from === "chief"
+          && assignedTaskEvidence.to === convenerId
+          && assignedTaskEvidence.taskKind === "stage-request"
+          && typeof assignedTaskEvidence.workflowId === "string" && assignedTaskEvidence.workflowId !== ""
+          && assignedTaskEvidence.stage !== undefined;
       const needsBinding = workflowId === undefined || effectiveStage === undefined || effectiveFlowId === "";
       if (needsBinding) {
         if (!assignedReady) {
@@ -280,17 +300,21 @@ export class FixedWorkflowRoute {
             ? "缺少当前真实受派任务（source.origin.taskId）"
             : assignedTaskEvidence === undefined
               ? "当前受派任务不可读"
-              : "当前受派任务不是 open 的 fixed stage-request（须 chief→convener、taskKind=stage-request、workflowId/stage 齐全）";
-          return reject(
-            "workflow-binding-unavailable",
-            `运营生产派发无法从受派任务自动绑定 workflowId/stage：${why}。未创建任务、未写 trunk/run，且不回落 legacy 星形派发。`,
-          );
+              : appDispatch
+                ? "当前受派任务不是 open 的 worker-dispatch 任务（须 application→convener、read-only、workflowId/stage 齐全）"
+                : "当前受派任务不是 open 的 fixed stage-request（须 chief→convener、taskKind=stage-request、workflowId/stage 齐全）";
+          return appDispatch
+            ? reject("worker-dispatch-required", `运营生产派发无法绑定 open 的 worker-dispatch 任务：${why}。未创建任务；不回落 legacy 星形派发。`)
+            : reject(
+                "workflow-binding-unavailable",
+                `运营生产派发无法从受派任务自动绑定 workflowId/stage：${why}。未创建任务、未写 trunk/run，且不回落 legacy 星形派发。`,
+              );
         }
         const boundWorkflowId = assignedTaskEvidence?.workflowId;
         const boundStage = assignedTaskEvidence?.stage;
         if (boundWorkflowId === undefined || boundWorkflowId === "" || boundStage === undefined
           || assignedTaskFlowId === undefined || assignedTaskFlowId === "") {
-          return reject("workflow-binding-unavailable", `受派任务 ${assignedTaskId} 缺少 workflowId/stage/flowId，无法绑定 fixed 生产派发。`);
+          return reject(appDispatch ? "worker-dispatch-required" : "workflow-binding-unavailable", `受派任务 ${assignedTaskId} 缺少 workflowId/stage/flowId，无法绑定 fixed 生产派发。`);
         }
         if (workflowId !== undefined && workflowId !== boundWorkflowId) {
           return reject("stage-request-invalid", `显式 workflowId ${workflowId} 与当前受派任务（${boundWorkflowId}）不一致；不采信模型自报、不回落 legacy。`);
@@ -300,7 +324,7 @@ export class FixedWorkflowRoute {
         // 显式 stage 是本次生产派发的目标阶段（A7 请求之后派 A8 等），允许与父任务 stage 不同；仅缺失时绑定。
         const bindingLedger = await readWorkflowLedger(projectRoot);
         if (!bindingLedger.events.some((event) => event.workflowId === boundWorkflowId)) {
-          return reject("workflow-binding-unavailable", `受派任务 ${assignedTaskId} 绑定的 workflow ${boundWorkflowId} 在账本不存在（不猜、不伪造视图）。`);
+          return reject(appDispatch ? "worker-dispatch-required" : "workflow-binding-unavailable", `受派任务 ${assignedTaskId} 绑定的 workflow ${boundWorkflowId} 在账本不存在（不猜、不伪造视图）。`);
         }
         workflowId = boundWorkflowId;
         if (effectiveStage === undefined) effectiveStage = boundStage;
@@ -389,6 +413,8 @@ export class FixedWorkflowRoute {
     // convener 生产派发的受派任务证据与 workflowId/stage/flowId 自动绑定已在 workflow 事实之前完成
     // （B8.2；绑定失败的 fail-closed 拒绝发生在那一步，不落到此处）。
     const authorization = evaluateFixedPathDispatchAuthorization({
+      // 2026-11-17（app-dispatch/v1）：显式传递协议（undefined/固定-v2.1 ⇒ 旧矩阵逐字不变）。
+      ...(appDispatchProtocol !== undefined ? { protocol: appDispatchProtocol } : {}),
       sourceRoleId: fromRoleId,
       chiefRoleId: chiefId,
       convenerRoleId: convenerId,

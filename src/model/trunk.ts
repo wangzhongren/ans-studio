@@ -552,7 +552,10 @@ export const DIRECT_ROLE_ACTIONS: readonly DirectRoleAction[] = Object.freeze([
 export const DIRECT_ACTION_ACTORS: Readonly<Record<DirectRoleAction, readonly string[]>> = Object.freeze({
   "version-upgrade": Object.freeze(["product"]), "detail-amendment": Object.freeze(["rapporteur"]),
   "select-run-change": Object.freeze(["rapporteur"]), "complete-team-plan": Object.freeze(["convener"]),
-  "activate-role-documents": Object.freeze(["nominator"]), "close-created-task": Object.freeze(["chief", "convener"]),
+  "activate-role-documents": Object.freeze(["nominator"]),
+  // 2026-11-17（app-dispatch/v1）：应用侧流程驱动收口自己创建的 stage-execution / card-prompt 任务
+  // （`task.closed.by="application"`）；chief/convener 旧值原样保留。
+  "close-created-task": Object.freeze(["chief", "convener", "application"]),
 });
 /** Application-built evidence. Never accept this object from model tool arguments. */
 export type DirectActionSource =

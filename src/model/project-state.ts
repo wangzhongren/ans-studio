@@ -194,7 +194,14 @@ export interface ProjectStateTask {
   lastReport?: ProjectStateReportedEvent;
   closed?: { outcome: ProjectStateClosedOutcome; note?: string; at: string };
   reports: ProjectStateReportedEvent[];
+  /**
+   * 任务创建者（冻结结构镜像字段：与 `TaskCardView` 双向可赋值的旧契约只含 chief/convener）。
+   * 2026-11-17（app-dispatch/v1）：应用创建的 fixed 任务运行时值可为 `"application"`（如实保留）；
+   * 需要按创建者分支的新消费者请读可选 `creator`（含 application）；旧消费者按未知来源 fail-closed/忽略。
+   */
   from: "chief" | "convener";
+  /** 2026-11-17（app-dispatch/v1）：真实任务创建者（含 `"application"`）；旧记录缺省 = `from`。 */
+  creator?: "chief" | "convener" | "application";
   blocked: boolean;
   failed: boolean;
   redispatchCount: number;

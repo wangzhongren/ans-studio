@@ -1,5 +1,5 @@
 // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
-import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX, WORKFLOW_STAGES } from "../../model/runtime.ts";
+import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX, WORKFLOW_ACCEPTANCE_STRENGTHS, WORKFLOW_STAGES } from "../../model/runtime.ts";
 import {
   AMENDMENT_ID_PATTERN,
   REFACTOR_REASON_MAX,
@@ -521,6 +521,32 @@ export function describeTool(name: string): ToolDescription {
             maxItems: 20,
             description: "2026-10-29 (v2.20): module path array for the choice card; application verifies against the roster.",
           },
+          promptId: {
+            type: "string",
+            description:
+              "2026-11-17 (app-dispatch/v1): optional card prompt id issued by the application (`card-prompt` task). " +
+              "Echo it unchanged; the application verifies promptId/cardKind/options/documentRefs item-by-item " +
+              "(mismatch ⇒ `card-prompt-mismatch`, no card is presented). Missing = legacy card (no prompt binding).",
+          },
+          documentRefs: {
+            type: "array",
+            maxItems: 16,
+            description:
+              "2026-11-17 (app-dispatch/v1): optional echo of the application-issued card documentRefs " +
+              "(path + 64-hex sha256 + kind + version?). The application compares them with the prompt/request " +
+              "record; mismatch ⇒ `card-prompt-mismatch` (no card).",
+            items: {
+              type: "object",
+              properties: {
+                path: { type: "string", description: "Project-relative document path" },
+                sha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Byte SHA-256 of the document" },
+                kind: { type: "string", description: "Document kind (intent/proposal/modules/roster/architecture…)" },
+                version: { type: "integer", minimum: 1, description: "Optional document version" },
+              },
+              required: ["path", "sha256", "kind"],
+              additionalProperties: false,
+            },
+          },
           flowId: {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
@@ -565,7 +591,10 @@ export function describeTool(name: string): ToolDescription {
         "由客户本人回答，或在其开启「替我决策」时由判断 agent 代批 `confirm`（`revise` 仍交回客户/发起角色，判断 agent 不替客户修改）。" +
         "`cardKind=decision`（材料性选择卡）**仅运营（Steward）直接调用 `request_choice` 发出**：产品发现材料性选择（演示/验收证据方式、范围、标准/契约偏离、成本或客户可见行为）时**不自行决定**，交运营发本卡；需求变更审批 decision 卡由应用在 `request_requirement_change` 成功后自动经发起方会话呈现，发起方不得再调用 `request_choice` 重复发卡；" +
         "卡内必须有**恰一个** `recommended: true` 推荐项；客户开启「替我决策」时判断 agent 默认选推荐项。" +
-        "decision 卡**独立于提案/任命/验收**——**不等于验收/客户批准，不触发门禁/验收**；`pass` 选项不适用（不设）。",
+        "decision 卡**独立于提案/任命/验收**——**不等于验收/客户批准，不触发门禁/验收**；`pass` 选项不适用（不设）。" +
+        "**app-dispatch/v1（固定流程应用驱动）**：幕僚收到应用 `card-prompt` 任务时，本调用须原样回传 `promptId`（可选同时回传 `documentRefs`），" +
+        "并保持 `cardKind`/`options`/`documentRefs` 与 prompt 逐项一致；应用先 `verifyCardPrompt` 校验，不一致 ⇒ `card-prompt-mismatch`（不发卡、不写记录）。" +
+        "三卡内容/时序/文档引用由应用生成，幕僚只呈卡与解释，不得增删选项或改写 documentRefs。",
       promptGuidelines: [
         "需要客户在若干选项中做选择时用 request_choice；未获明确回答 → 不要据此写盘，也不得假设客户的选择。",
         "`cardKind=appointment` 是**任命**卡：由 Convener 依客户确认的团队计划发起；Crew 收到客户任命后才按名单写卡（appointment-write），不自行任命、不自行选角色。",
@@ -780,6 +809,55 @@ export function describeTool(name: string): ToolDescription {
         "`taskKind:\"stage-request\"` 是工作流调度请求，不是生产线派发：它固定 read-only、无 module/写集；收到请求的一方须在真实受派回合内再派发实际生产任务。",
         "`workflowAction:\"stop\"` 只表达暂停/改道请求；停派发、关 open 生产任务、停稳 live 会话由收到请求的一方执行并如实报告，不自动回滚 Git。",
       ],
+    };
+  }
+  if (name === "select_workflow") {
+    // 2026-11-17（app-dispatch/v1，设计 §2.2/§4.4/§6.1）：幕僚显式选择流程。仅 chief、仅 fixed
+    // 会话注入（注入开关与 handler 由桌面批接线；legacy `dispatch_task` schema 保持兼容不变）。
+    // 参数只表达选择意图：应用校验类型化流程定义注册表（id/version/hash）、阶段与幂等后写
+    // `workflow.started` 并启动应用侧流程驱动；字段本身不构成派发/授权，内置任务仍由应用创建。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          workflowPath: {
+            type: "string",
+            enum: ["A", "B"],
+            description:
+              "Workflow path: `A` = add (A1–A13), `B` = modify/fix/refactor (B1–B4). " +
+              "The application validates the typed workflow-definition registry and pins definition id/version/sha256 in `workflow.started` (protocol app-dispatch/v1).",
+          },
+          flowId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description:
+              "Governance flow id (slug) for this workflow; used with the path in the idempotency key `workflow-start:<flowId>:<path>:<sourceTaskId>`.",
+          },
+          acceptanceStrength: {
+            type: "string",
+            enum: [...WORKFLOW_ACCEPTANCE_STRENGTHS],
+            description:
+              "Optional acceptance strength override (Q2): `light` = lightweight (A12b blocked + archive evidence may be accepted, B31 audit), " +
+              "`standard` = standard (default). The application executes it per the workflow definition; the field alone grants nothing.",
+          },
+        },
+        required: ["workflowPath", "flowId"],
+        additionalProperties: false,
+      },
+      description:
+        "选择固定路径工作流（app-dispatch/v1；仅 fixed 幕僚会话）。" +
+        "参数：`workflowPath`（`A` 新增 / `B` 修改）+ `flowId`，可选 `acceptanceStrength`（`light`/`standard`，默认 standard）。" +
+        "应用据此校验类型化流程定义注册表（未知 id ⇒ `workflow-definition-unknown`；版本不符 ⇒ `workflow-definition-version-unsupported`；" +
+        "协议不符 ⇒ `workflow-protocol-mismatch`），通过后写 `workflow.started`（含 `protocol:\"app-dispatch/v1\"` 与 `definition:{id,version,sha256}`）并启动应用侧流程驱动。" +
+        "**本工具只选择流程，不派发任何 agent、不创建任务、不授权写盘**：内置角色任务（product/rapporteur/nominator/convener/verifier）由应用按流程定义创建；" +
+        "运营只派项目 worker；幕僚不再派发/收口/重派/停止/直派验收（`chief-dispatch-removed`）。客户明示流程时按客户明示选择（应用不做自然语言自动分类）。",
+      promptGuidelines: [
+        "首个流程动作调用 select_workflow；它只是**选择流程**，不是派发、不是授权、不创建任务。",
+        "客户在会话中明确「走 A / 走 B / 换方案 / 停止」时按其明示选择；否则按真实缺口判断，应用不做自然语言自动分类。",
+        "被拒时如实报告真实 code（workflow-definition-unknown / workflow-definition-version-unsupported / workflow-protocol-mismatch / workflow-corrupt），不换形重试、不自造定义或回执。",
+        "启动后不再逐阶段发请求/收口：阶段任务由应用按定义创建并投递；你的动作只剩按应用 card-prompt 呈三张客户卡与呈现 merge-main（客户本人）。",
+      ],
+      executionMode: "sequential",
     };
   }
   if (name === "report_shell_verdict") {

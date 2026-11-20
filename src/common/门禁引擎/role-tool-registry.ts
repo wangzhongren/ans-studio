@@ -1,10 +1,13 @@
 // 门禁引擎私有：角色专属工具装配表（`RoleToolId` → 运行时工具名 → 允许角色）与 fail-closed 校验。
 //
 // 契约来源：`docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md`（E0.2）§3.1 的
-// 14 行表 + §10.2 D1。该表是 **id→name→允许角色** 的唯一冻结清单；本文件是它在代码里的唯一承载：
+// 14 行表 + §10.2 D1，以及 2026-11-17 `docs/planning/2026-11-17_design_app-dispatch-builtins.md`
+// §6.1 的新增项 `select_workflow`（app-dispatch/v1；仅 chief；实际 handler 由桌面批接线）。
+// 该表是 **id→name→允许角色** 的唯一冻结清单；本文件是它在代码里的唯一承载：
 //  - `src/model/role.ts` 只定义 `RoleToolId` / `RoleToolName` 字面量闭集（类型，不承载映射值）；
-//  - 本文件定义 14 项逐项映射与允许角色集合，供 E1 引擎装配在角色模块 `tools()` 输出上校验；
-//  - 契约测试 `test/门禁引擎/role-module-contract.test.ts` 逐项断言本表与 §3.1 表一致。
+//  - 本文件定义 15 项逐项映射与允许角色集合，供 E1 引擎装配在角色模块 `tools()` 输出上校验；
+//  - 契约测试 `test/门禁引擎/role-module-contract.test.ts` 逐项断言本表与 §3.1 表一致（前 14 项；
+//    第 15 项按 app-dispatch/v1 设计断言）。
 // 新增/改名必须先走契约 §4.4 接口评审并更新 §3.1 表，再同步 Model 类型、本表与契约测试；不得只改一处。
 //
 // fail-closed 口径（契约 §3.1 R-1、§10.2 D1）：
@@ -48,7 +51,14 @@ function catalogEntry(
   });
 }
 
-/** 14 项唯一来源（顺序与契约 §3.1 表一致；冻结防运行时改写）。 */
+/**
+ * 15 项唯一来源（前 14 项顺序与契约 §3.1 表一致；第 15 项 `selectWorkflow` 为 2026-11-17
+ * app-dispatch/v1 新增，仅 chief；冻结防运行时改写）。
+ *
+ * `selectWorkflow`（`select_workflow`）：app-dispatch/v1 固定流程选择工具（workflowPath A/B +
+ * flowId，可选 acceptanceStrength）——只由 fixed/chief 会话注入（注入开关与 handler 由桌面批
+ * 接线；`tools()` 声明与否由角色模块决定，legacy `CHIEF_TOOL_IDS` 保持冻结不变）。
+ */
 export const ROLE_TOOL_CATALOG: readonly RoleToolCatalogEntry[] = Object.freeze([
   catalogEntry("roleActivityLog", "role_activity_log", ["chief"]),
   catalogEntry("terminateRoleRun", "terminate_role_run", ["chief"]),
@@ -64,6 +74,9 @@ export const ROLE_TOOL_CATALOG: readonly RoleToolCatalogEntry[] = Object.freeze(
   catalogEntry("submitRefactor", "submit_refactor", ["convener"]),
   catalogEntry("requestStableWrite", "request_stable_write", ["convener"]),
   catalogEntry("decidePendingRequest", "decide_pending_request", ["chief"], true),
+  // 2026-11-17（app-dispatch/v1，设计 §6.1）：幕僚显式选择流程（A/B）；仅 chief。固定会话注入
+  // 由桌面批按协议控制（legacy 会话不注入；本表只定义 id→name→允许角色，不授予调用权）。
+  catalogEntry("selectWorkflow", "select_workflow", ["chief"]),
 ]);
 
 /** 按 id 查装配项；未知 id 返回 `undefined`（调用方必须 fail-closed，不得兜底）。 */

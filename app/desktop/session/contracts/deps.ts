@@ -11,7 +11,7 @@ import type {
   NetworkGate, OperatorChannelFn, ProjectNoteFn, ProjectStateFn, RequestRequirementChangeFn, RequestRequirementChangeInput,
   RequestRequirementChangeResult, RequestStableWriteFn, RequestVersionDecisionFn, RuntimeAdapter, SelectRunChangeFn,
   ShellEscalationPresentFn, ShellGate, ShellJudgeFn, SubmitRefactorFn, SubmitVersionChangeFn, UninstallMcpFn,
-  UninstallSkillFn, ViewImageFn, WriteGate,
+  UninstallSkillFn, ViewImageFn, WorkflowProtocol, WorkflowStage, WriteGate,
 } from "../../../../src/model/runtime.ts";
 import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../../../src/pipeline/orchestration/shell-arming.ts";
 import type { RoleSessionHandle, RuntimeAdapterFactory, RuntimeAdapterFactoryBuilder, RuntimeAdapterFactoryOptions, TaskGitShellRuntimeInput } from "../../../../src/pipeline/orchestration/run-role.ts";
@@ -67,6 +67,22 @@ export interface SessionManagerDeps {
       requestDownload?: RequestDownloadFn;
       /** **派发任务能力**（H-1）：仅内置治理角色（su）会话注入（见 SessionManager.open 与 routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
+      /**
+       * 2026-11-17（app-dispatch/v1 第一步）：fixed 会话驱动协议（宿主从 `workflow.started.protocol`
+       * 解析；缺省 = fixed-v2.1 ⇒ 旧工具面逐字保留，Q10 在飞不迁移）。
+       */
+      workflowProtocol?: WorkflowProtocol;
+      /**
+       * 2026-11-17：`select_workflow` 能力（仅 app-dispatch/v1 fixed chief 会话注入；未注入 ⇒ 工具不注册）。
+       * 形状与 provider `SelectWorkflowFn` 结构一致（contracts 层不导入 provider；按值形状镜像）。
+       */
+      selectWorkflow?: (
+        input: { workflowPath: "A" | "B"; flowId: string; acceptanceStrength?: "light" | "standard" },
+        metadata?: { turnId?: string; roleId?: string },
+      ) => Promise<{ ok: boolean; message: string; workflowId?: string; stage?: WorkflowStage; taskIds?: string[]; code?: string }>
+        | { ok: boolean; message: string; workflowId?: string; stage?: WorkflowStage; taskIds?: string[]; code?: string };
+      /** 2026-11-17：fixed 阶段动作完成应用回调（A8 激活成功后 drive；仅 app-dispatch/v1）。 */
+      afterFixedStageAction?: (input: { projectRoot: string; workflowId: string; action: "activate-role-documents" }) => void;
       /**
        * **view_image 投递能力**（2026-10-26）：工具读取的图片作为**下一轮用户提示的图片附件**排队给
        * 同一角色（全部角色会话注入；目标在开会话时定格）。实现经既有 `SessionManager.send`：角色忙
