@@ -38,9 +38,11 @@ import {
   readWorkflowLedger,
   reconcileFixedWorkflow,
   recordChangeScopeDecision,
+  reenterBlockedStageAfterResolution,
   selectWorkflow,
   type DriveAppDispatchStageReceipt,
   type ReconcileFixedWorkflowReceipt,
+  type ReenterBlockedStageAfterResolutionResult,
   type WorkflowServiceFailure,
 } from "../../../../src/common/编排/workflow-service.ts";
 import { getWorkflowDefinition } from "../../../../src/common/编排/workflow-definitions.ts";
@@ -446,6 +448,25 @@ export class FixedWorkflowStageDispatch {
       note: `任务 ${taskId} 已重新入队（目标 ${targetRoleId}${busy && existingFixed ? "，忙时等待其空闲" : ""}；同 taskId 幂等）`,
       reEntry: `redeliver:${taskId}`,
     };
+  }
+
+  /**
+   * 2026-11-20（S1/S2 编排批）：block `resolved(fixed|decided)` 后阶段重入场（唯一实现 = 编排服务
+   * `reenterBlockedStageAfterResolution`；桌面只透传账本事实，不自报裁决/终态）。
+   * 只对 app-dispatch/v1 生效（服务对旧协议 fail-closed）；fixed-v2.1 由调用方保持既有简报语义。
+   */
+  async reenterBlockedStage(
+    projectRoot: string,
+    input: { workflowId: string; stage: WorkflowStage; blockId: string; resolution: "fixed" | "decided"; reason?: string },
+  ): Promise<ReenterBlockedStageAfterResolutionResult> {
+    return reenterBlockedStageAfterResolution({
+      projectRoot,
+      workflowId: input.workflowId,
+      stage: input.stage,
+      blockId: input.blockId,
+      resolution: input.resolution,
+      ...(input.reason !== undefined ? { reason: input.reason } : {}),
+    });
   }
 
   /**
