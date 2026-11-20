@@ -33,14 +33,16 @@ export const WORKFLOW_DEFINITION_SCHEMA = "ans-workflow-definition/v1" as const;
 /** 注册表导出 schema token（JSON Schema 导出用）。 */
 export const WORKFLOW_DEFINITION_REGISTRY_SCHEMA = "ans-workflow-definitions/v1" as const;
 /**
- * 当前定义版本（2026-11-20 block resolver 地基：v2）。
+ * 当前定义版本（2026-11-20 SMOKE-2 S2：v3）。
  * - v1 = 旧 app-dispatch 在飞语义（`retry.onExhausted:"blocked"`），**逐字保留**、不静默迁移（Q5/Q10）；
  * - v2 = `retry.onExhausted:"route-block-resolver"`（重试耗尽交 block resolver；阶段状态机不变）；
- * - 新 `select_workflow` 缺省解析到 v2；`workflow.started.definition.version` 钉死，旧 workflow 按 v1 解释。
+ * - v3 = v2 + 任务文本与角色边界对齐（A2 只让 product 写 `docs/product`；`docs/intents` 入口由幕僚
+ *   在 A3 呈卡前创建/核对，B24），v1/v2 文本逐字保留给在飞 workflow（按各自 hash 解释）；
+ * - 新 `select_workflow` 缺省解析到 v3；`workflow.started.definition.version` 钉死，旧 workflow 按旧版本解释。
  */
-export const WORKFLOW_DEFINITION_VERSION = 2 as const;
-/** 注册表支持的版本（升序；`getWorkflowDefinition` 双版本解析来源）。 */
-export const WORKFLOW_DEFINITION_VERSIONS = Object.freeze([1, 2] as const);
+export const WORKFLOW_DEFINITION_VERSION = 3 as const;
+/** 注册表支持的版本（升序；`getWorkflowDefinition` 多版本解析来源）。 */
+export const WORKFLOW_DEFINITION_VERSIONS = Object.freeze([1, 2, 3] as const);
 export type WorkflowDefinitionVersion = (typeof WORKFLOW_DEFINITION_VERSIONS)[number];
 
 /** 默认内置流程 id：`add`＝新增（路径 A）；`modify`＝修改（路径 B）。 */
@@ -640,18 +642,51 @@ const ADD_DRIVE_ORDER: readonly WorkflowStage[] = ["A1", "A2", "A3", "A4", "A5",
 const MODIFY_DRIVE_ORDER: readonly WorkflowStage[] = ["B1", "B2", "B3", "B4"];
 
 /**
- * 按目标版本派生阶段数组：v1 逐字保留旧数据；v2 仅把 `retry.onExhausted` 更名
- * `"route-block-resolver"`（其余字段/顺序/文本逐字不变；Q5/Q10 不静默迁移）。
+ * v3 任务文本覆盖（SMOKE-2 S2：与角色边界一致；仅 v3 生效，v1/v2 逐字保留）。
+ * - A2：product 只写 `docs/product/<flowId>-intent-vN.md`；`docs/intents/<intentId>.md` 入口由幕僚
+ *   （chief，唯一写者）在 A3 呈卡前按产品 frontmatter 创建/核对（B24）；product 写 docs/intents ⇒ 越界 fail-closed。
+ * - A3：幕僚呈卡前按产品意图 frontmatter 创建/核对 `docs/intents/<intentId>.md`（B24；应用校验入口与 intent 一致）。
+ */
+const V3_TASK_TEXT_OVERRIDES: Readonly<Partial<Record<WorkflowStage, WorkflowStageDefinition["taskText"]>>> =
+  Object.freeze({
+    A2: Object.freeze({
+      summary: "撰写产品意图文件（意图入口由幕僚创建/核对）",
+      details: Object.freeze([
+        "只写 docs/product/<flowId>-intent-vN.md（frontmatter schema=project-intent/v1，version 与文件名一致；product 边界只允许 docs/product）",
+        "docs/intents/<intentId>.md 由幕僚（chief，唯一写者）在 A3 呈卡前按产品意图 frontmatter 创建/核对（B24；应用校验入口与 intent 一致）",
+        "product 不得写 docs/intents（越界 ⇒ path-outside-boundary fail-closed）",
+        "报告后由应用重算字节 SHA-256 并收口；hash/入口缺失 ⇒ 不收口",
+      ]),
+    }),
+    A3: Object.freeze({
+      summary: "按应用 prompt 呈意图确认卡（intent-confirm）",
+      details: Object.freeze([
+        "应用计算 documentRefs[intent]（path+version+sha256）并发放 promptId",
+        "幕僚呈卡前按产品意图 frontmatter 创建/核对 docs/intents/<intentId>.md（B24；应用校验入口与 intent 一致）",
+        "幕僚以 request_choice 原样回传 promptId/cardKind/选项/documentRefs；不一致 ⇒ card-prompt-mismatch（不发卡）",
+        "confirm ⇒ 应用 finalizeIntent 完成 A3；revise ⇒ stage.reworked A3→A2；卡属 decision 组（judge 代批语义不变）",
+      ]),
+    }),
+  });
+
+/**
+ * 按目标版本派生阶段数组：v1 逐字保留旧数据；v2 起把 `retry.onExhausted` 更名
+ * `"route-block-resolver"`（其余字段/顺序逐字不变）；v3 另按 `V3_TASK_TEXT_OVERRIDES`
+ * 替换与角色边界不一致的任务文本（仅 A2/A3；Q5/Q10 不静默迁移）。
  */
 function versionedStages(
   stages: readonly WorkflowStageDefinition[],
   version: WorkflowDefinitionVersion,
 ): readonly WorkflowStageDefinition[] {
   if (version === 1) return stages;
-  return stages.map((stage) => ({
-    ...stage,
-    retry: { ...stage.retry, onExhausted: "route-block-resolver" as const },
-  }));
+  return stages.map((stage) => {
+    const override = version >= 3 ? V3_TASK_TEXT_OVERRIDES[stage.stage] : undefined;
+    return {
+      ...stage,
+      retry: { ...stage.retry, onExhausted: "route-block-resolver" as const },
+      ...(override !== undefined ? { taskText: override } : {}),
+    };
+  });
 }
 
 function buildDefinition(input: {
@@ -692,6 +727,15 @@ const ADD_DEFINITION_V2: WorkflowDefinition = buildDefinition({
   driveOrder: ADD_DRIVE_ORDER,
 });
 
+const ADD_DEFINITION_V3: WorkflowDefinition = buildDefinition({
+  id: "add",
+  version: 3,
+  path: "A",
+  title: "新增（路径 A：A1–A13）",
+  stages: ADD_STAGES,
+  driveOrder: ADD_DRIVE_ORDER,
+});
+
 const MODIFY_DEFINITION_V1: WorkflowDefinition = buildDefinition({
   id: "modify",
   version: 1,
@@ -710,35 +754,53 @@ const MODIFY_DEFINITION_V2: WorkflowDefinition = buildDefinition({
   driveOrder: MODIFY_DRIVE_ORDER,
 });
 
+const MODIFY_DEFINITION_V3: WorkflowDefinition = buildDefinition({
+  id: "modify",
+  version: 3,
+  path: "B",
+  title: "修改（路径 B：B1–B4）",
+  stages: MODIFY_STAGES,
+  driveOrder: MODIFY_DRIVE_ORDER,
+});
+
 /**
- * 双版本注册表（只读、深度冻结）：`[id][version]`。
- * 旧 app-dispatch 在飞按 v1 语义（`onExhausted:"blocked"`）继续；新 select 用 v2。
+ * 多版本注册表（只读、深度冻结）：`[id][version]`。
+ * 旧 app-dispatch 在飞按各自版本语义继续（v1=`blocked`；v2=`route-block-resolver`；
+ * v3=任务文本与角色边界对齐）；新 select 用 v3。
  */
 export const WORKFLOW_DEFINITION_BY_VERSION: Readonly<
   Record<WorkflowDefinitionId, Readonly<Record<WorkflowDefinitionVersion, WorkflowDefinition>>>
 > = Object.freeze({
-  add: Object.freeze({ 1: ADD_DEFINITION_V1, 2: ADD_DEFINITION_V2 }),
-  modify: Object.freeze({ 1: MODIFY_DEFINITION_V1, 2: MODIFY_DEFINITION_V2 }),
+  add: Object.freeze({ 1: ADD_DEFINITION_V1, 2: ADD_DEFINITION_V2, 3: ADD_DEFINITION_V3 }),
+  modify: Object.freeze({ 1: MODIFY_DEFINITION_V1, 2: MODIFY_DEFINITION_V2, 3: MODIFY_DEFINITION_V3 }),
 });
 
-/** 应用内流程定义注册表（**当前版本 v2**；只读；模型/角色不可编辑；`select_workflow` 枚举来源）。 */
+/** 应用内流程定义注册表（**当前版本 v3**；只读；模型/角色不可编辑；`select_workflow` 枚举来源）。 */
 export const WORKFLOW_DEFINITIONS: Readonly<Record<WorkflowDefinitionId, WorkflowDefinition>> = Object.freeze({
-  add: ADD_DEFINITION_V2,
-  modify: MODIFY_DEFINITION_V2,
+  add: ADD_DEFINITION_V3,
+  modify: MODIFY_DEFINITION_V3,
 });
 
-/** 注册表定义 hash 表（当前版本 v2；与 `workflow.started.definition.sha256` 对照）。 */
+/** 注册表定义 hash 表（当前版本 v3；与 `workflow.started.definition.sha256` 对照）。 */
 export const WORKFLOW_DEFINITION_HASHES: Readonly<Record<WorkflowDefinitionId, string>> = Object.freeze({
-  add: workflowDefinitionHash(ADD_DEFINITION_V2),
-  modify: workflowDefinitionHash(MODIFY_DEFINITION_V2),
+  add: workflowDefinitionHash(ADD_DEFINITION_V3),
+  modify: workflowDefinitionHash(MODIFY_DEFINITION_V3),
 });
 
-/** 逐版本定义 hash（v1 值 = 旧发布值，供在飞 workflow 对账；不静默迁移）。 */
+/** 逐版本定义 hash（v1/v2 = 旧发布值，供在飞 workflow 对账；不静默迁移）。 */
 export const WORKFLOW_DEFINITION_HASHES_BY_VERSION: Readonly<
   Record<WorkflowDefinitionId, Readonly<Record<WorkflowDefinitionVersion, string>>>
 > = Object.freeze({
-  add: Object.freeze({ 1: workflowDefinitionHash(ADD_DEFINITION_V1), 2: WORKFLOW_DEFINITION_HASHES.add }),
-  modify: Object.freeze({ 1: workflowDefinitionHash(MODIFY_DEFINITION_V1), 2: WORKFLOW_DEFINITION_HASHES.modify }),
+  add: Object.freeze({
+    1: workflowDefinitionHash(ADD_DEFINITION_V1),
+    2: workflowDefinitionHash(ADD_DEFINITION_V2),
+    3: WORKFLOW_DEFINITION_HASHES.add,
+  }),
+  modify: Object.freeze({
+    1: workflowDefinitionHash(MODIFY_DEFINITION_V1),
+    2: workflowDefinitionHash(MODIFY_DEFINITION_V2),
+    3: WORKFLOW_DEFINITION_HASHES.modify,
+  }),
 });
 
 /** 按路径取默认定义 id（A→add；B→modify）。 */
@@ -755,15 +817,15 @@ export type WorkflowDefinitionLookupResult =
   | { ok: false; code: WorkflowDefinitionLookupFailureCode; message: string };
 
 function isSupportedDefinitionVersion(version: unknown): version is WorkflowDefinitionVersion {
-  return version === 1 || version === 2;
+  return version === 1 || version === 2 || version === 3;
 }
 
 /**
- * 按 id/version 取定义（fail-closed，**双版本解析**）：
+ * 按 id/version 取定义（fail-closed，**多版本解析**）：
  * - 未知 id ⇒ `workflow-definition-unknown`；
- * - version 缺省 ⇒ 当前版本 v2（新 select 用 v2）；
- * - 显式 version 仅接受 1/2；其它 ⇒ `workflow-definition-version-unsupported`（不静默迁移）；
- * - 返回的 `hash` 对应该版本（v1 = 旧发布 hash，在飞 workflow 对账兼容）。
+ * - version 缺省 ⇒ 当前版本 v3（新 select 用 v3）；
+ * - 显式 version 仅接受 1/2/3；其它 ⇒ `workflow-definition-version-unsupported`（不静默迁移）；
+ * - 返回的 `hash` 对应该版本（v1/v2 = 旧发布 hash，在飞 workflow 对账兼容）。
  */
 export function getWorkflowDefinition(id: unknown, version?: unknown): WorkflowDefinitionLookupResult {
   const idKnown = typeof id === "string" && Object.hasOwn(WORKFLOW_DEFINITION_BY_VERSION, id);
@@ -796,7 +858,7 @@ export function listWorkflowDefinitions(): readonly WorkflowDefinition[] {
   return WORKFLOW_DEFINITION_IDS.map((id) => WORKFLOW_DEFINITIONS[id]);
 }
 
-/** 某 id 的逐版本定义（升序：v1、v2；只读）。 */
+/** 某 id 的逐版本定义（升序：v1、v2、v3；只读）。 */
 export function workflowDefinitionVersionsOf(id: WorkflowDefinitionId): readonly WorkflowDefinition[] {
   return WORKFLOW_DEFINITION_VERSIONS.map((version) => WORKFLOW_DEFINITION_BY_VERSION[id][version]);
 }
@@ -1016,9 +1078,29 @@ export function validateWorkflowDefinitions(): readonly string[] {
         if (stage.retry.highRiskNoRedispatch && stage.retry.autoRetries !== 0) {
           errors.push(`${stageLabel}: 高风险零重派阶段 autoRetries 必须为 0`);
         }
-        // 2026-11-20：版本化语义自检——v1 必须 `blocked`；v2 必须 `route-block-resolver`。
+        // 2026-11-20：版本化语义自检——v1 必须 `blocked`；v2/v3 必须 `route-block-resolver`。
         if (stage.retry.onExhausted !== expectedOnExhausted) {
           errors.push(`${stageLabel}: onExhausted=${String(stage.retry.onExhausted)}（v${version} 应为 ${expectedOnExhausted}）`);
+        }
+        // 2026-11-20（SMOKE-2 S2）：v3 任务文本必须与角色边界一致——A2 只让 product 写 docs/product，
+        // docs/intents 入口由幕僚在 A3 呈卡前创建/核对（B24）；v1/v2 文本逐字保留、不受此检约束。
+        if (version === 3 && stage.stage === "A2") {
+          const text = [stage.taskText.summary, ...stage.taskText.details].join("\n");
+          if (!text.includes("docs/product/<flowId>-intent-vN.md")) {
+            errors.push(`${stageLabel}: v3 A2 任务文本必须给出 docs/product/<flowId>-intent-vN.md`);
+          }
+          if (!text.includes("docs/intents/<intentId>.md") || !text.includes("幕僚")) {
+            errors.push(`${stageLabel}: v3 A2 任务文本必须写明 docs/intents 入口由幕僚创建/核对（B24）`);
+          }
+          if (!text.includes("不得写 docs/intents")) {
+            errors.push(`${stageLabel}: v3 A2 任务文本必须 fail-closed 禁止 product 写 docs/intents（边界一致）`);
+          }
+        }
+        if (version === 3 && stage.stage === "A3") {
+          const text = [stage.taskText.summary, ...stage.taskText.details].join("\n");
+          if (!text.includes("docs/intents/<intentId>.md") || !text.includes("幕僚")) {
+            errors.push(`${stageLabel}: v3 A3 任务文本必须写明幕僚呈卡前创建/核对 docs/intents 入口（B24）`);
+          }
         }
         if (stage.taskText.summary.trim() === "" || stage.taskText.details.length === 0) {
           errors.push(`${stageLabel}: taskText 模板不得为空`);

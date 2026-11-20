@@ -2278,10 +2278,19 @@ export interface StageBlockedEvent extends WorkflowEventBase {
 export interface StageReworkedEvent extends WorkflowEventBase {
   kind: "stage.reworked";
   stage: WorkflowStage;
-  /** 被打回的具体阶段（A12b→A11、A6→A5、A3→A2、B2→B1）。 */
+  /**
+   * 被打回的具体阶段（A12b→A11、A6→A5、A3→A2、B2→B1）。
+   * 2026-11-20（SMOKE-2 S1 block 重入场）：带 `blockId` 时 `stage === reworkOf === 当前 blocked 阶段`
+   * （同阶段重入场，新 attempt）；无 `blockId` 的旧事件逐字沿用 MF-IR-1 回落语义。
+   */
   reworkOf: WorkflowStage;
   reason: string;
   attempt: number;
+  /**
+   * 2026-11-20（SMOKE-2 S1）：block 重入场标记——block（`blocks.jsonl`）已 `resolved(fixed|decided)` 后
+   * 以新 attempt 重入原 blocked 阶段。旧记录/旧事件无此字段（读取不变）。
+   */
+  blockId?: string;
 }
 
 /** `change.scope-decided`（B2；幂等键 `scope:<workflowId>:<impactSha>:<scopeDigest>`）。 */
@@ -2620,7 +2629,9 @@ function isWorkflowEventBody(value: Record<string, unknown>): boolean {
         && (value["taskId"] === undefined || ledgerText(value["taskId"])) && ledgerAttempt(value["attempt"]);
     case "stage.reworked":
       return isWorkflowStage(value["stage"]) && isWorkflowStage(value["reworkOf"])
-        && typeof value["reason"] === "string" && ledgerAttempt(value["attempt"]);
+        && typeof value["reason"] === "string" && ledgerAttempt(value["attempt"])
+        // 2026-11-20（SMOKE-2 S1）：block 重入场标记可选；出现时必须是非空文本（旧记录无字段）。
+        && (value["blockId"] === undefined || ledgerText(value["blockId"]));
     case "change.scope-decided": {
       const report = value["impactReport"], scope = value["scope"], writesets = value["effectiveWritesets"];
       return ledgerRecord(report) && ledgerText(report["path"]) && ledgerDigest(report["sha256"])

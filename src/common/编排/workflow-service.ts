@@ -130,6 +130,7 @@ import {
   type BlockFact,
   type BlockDispatchRejectionInput,
 } from "./block-resolution.ts";
+import { readBlockLedger, replayBlockLifecycles } from "./block-ledger.ts";
 
 // —————————————— 账本路径 / schema / 轮转 ——————————————
 
@@ -5911,6 +5912,273 @@ async function driveAppDispatchStageLocked(input: DriveAppDispatchStageInput): P
   };
 }
 
+// —————————————— 2026-11-20（SMOKE-2 S1）：block resolved 后阶段重入场 ——————————————
+//
+// B8 owner-repair / B9 决策在 block 记 `resolved(fixed|decided)` 之后，阶段仍停在 `stage.blocked`；
+// `driveAppDispatchStage` 对 blocked 阶段的预算拒绝只约束**普通自动重试**（Q8）。block 的解法是
+// 既成事实（blocks.jsonl，应用写入），阶段重入必须是一条显式账本事件：
+// `stage.reworked`（带 `blockId`，`stage === reworkOf === 当前 blocked 阶段`，新 attempt），随后才 drive。
+// 幂等：同一 (blockId, stage) 只写一条 rework；attempt/幂等键由账本确定性派生；重复调用复跑
+// drive（同 attempt/同任务键 ⇒ replay）；并发由 projectRoot+workflowId 锁串行（与 drive/reconcile 共用）。
+
+/** 允许阶段重入场的 block 决策选项（修订/返工/换执行者/限次重试；设计 §7.3）。 */
+export const BLOCK_STAGE_REENTRY_OPTION_IDS: readonly string[] = Object.freeze([
+  "block-revise-scope",
+  "block-rework",
+  "block-replace-executor",
+  "block-retry-with-cap",
+]);
+
+/** block 终态后阶段重入场输入（桌面 `executeChosenOption` / `reEnterAfterFixed` 调用）。 */
+export interface ReenterBlockedStageAfterResolutionInput {
+  projectRoot: string;
+  workflowId: string;
+  /** 当前 blocked 的阶段（与 block 账本记录的 stage 一致，若账本有记录）。 */
+  stage: WorkflowStage;
+  /** blocks.jsonl 中已 `block.resolved` 的 block id。 */
+  blockId: string;
+  /** 调用方期望的终态；必须与账本事实一致（应用事实，不采信调用方自报）。 */
+  resolution: "fixed" | "decided";
+  reason?: string;
+  now?: () => Date;
+}
+
+/** 已写入/已存在的同阶段重入场事实。 */
+export interface BlockStageReentryReceipt {
+  stage: WorkflowStage;
+  attempt: number;
+  /** `stage.reworked` 事件幂等键（账本内 id）。 */
+  eventId: string;
+  /** 新 attempt 的应用任务 id（drive 成功后回填）。 */
+  taskId?: string;
+}
+
+export interface ReenterBlockedStageAfterResolutionReceipt {
+  workflowId: string;
+  stage: WorkflowStage;
+  /** `already-completed` / `already-in-flight` 时缺省（不写 rework）。 */
+  reentry?: BlockStageReentryReceipt;
+  /** drive 回执（新 attempt 任务创建/复用 + stage.requested/dispatched）。 */
+  driven?: DriveAppDispatchStageReceipt;
+  /** 阶段已由引擎重试完成：不写 rework；调用方继续 advance 下一阶段。 */
+  alreadyCompleted?: boolean;
+  /** 阶段已有在飞尝试（引擎重试/先前重入已驱动）：不写第二条 rework、不建第二个任务。 */
+  alreadyInFlight?: boolean;
+  /** 重入场事件已写、但同锁 drive 未成功（如实返回；可重试本 API 或由 reconcile 补驱动）。 */
+  driveError?: { code: string; message: string };
+  replay: boolean;
+}
+
+export type ReenterBlockedStageAfterResolutionResult =
+  | ({ ok: true } & ReenterBlockedStageAfterResolutionReceipt)
+  | WorkflowServiceFailure;
+
+type StageReworkedEventView = Extract<WorkflowEvent, { kind: "stage.reworked" }>;
+
+/** 指定 block 已写入的同阶段重入场事件（幂等判定；无 ⇒ undefined）。 */
+function findBlockReentryEvent(
+  events: readonly WorkflowEvent[],
+  stage: WorkflowStage,
+  blockId: string,
+): StageReworkedEventView | undefined {
+  return events.find((event): event is StageReworkedEventView =>
+    event.kind === "stage.reworked" && event.blockId === blockId
+    && event.stage === stage && event.reworkOf === stage);
+}
+
+/** 最近一条同阶段 block 重入场事件的 attempt（对账补驱动判定；无 ⇒ undefined）。 */
+function latestBlockReentryAttempt(events: readonly WorkflowEvent[], stage: WorkflowStage): number | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]!;
+    if (event.kind === "stage.reworked" && event.blockId !== undefined
+      && event.stage === stage && event.reworkOf === stage) {
+      return event.attempt;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * block `resolved(fixed|decided)` 后重入原 blocked 阶段（SMOKE-2 S1）：
+ * 1. 校验 block 账本事实：block 存在、已 resolved、resolution 与请求一致；decided 的裁决选项必须属于
+ *    修订/返工/换执行者/限次重试类（终止/接受现状等按既有语义，不重入场）；
+ * 2. 阶段已 completed ⇒ `alreadyCompleted`（引擎重试已成功，调用方继续 advance；不写 rework）；
+ *    阶段已在飞 ⇒ `alreadyInFlight`（不并列第二条 rework/任务）；
+ * 3. 写 `stage.reworked`（stage=reworkOf=stage、attempt=max 已有 attempt+1、blockId、reason；
+ *    幂等键 `stage-rework:<wf>:<stage>:<attempt>`），随后**同锁**调用 drive 生成新 attempt 任务；
+ * 4. 重复调用/并发：同 (blockId, stage) 只一条 rework、一条新 attempt 任务（drive/账本 guard 归一）；
+ *    drive 失败如实返回 `driveError`，不伪造完成。
+ */
+export async function reenterBlockedStageAfterResolution(
+  input: ReenterBlockedStageAfterResolutionInput,
+): Promise<ReenterBlockedStageAfterResolutionResult> {
+  return withServiceLock(
+    workflowLockKey(input.projectRoot, input.workflowId),
+    () => reenterBlockedStageAfterResolutionLocked(input),
+  );
+}
+
+async function reenterBlockedStageAfterResolutionLocked(
+  input: ReenterBlockedStageAfterResolutionInput,
+): Promise<ReenterBlockedStageAfterResolutionResult> {
+  const now = input.now ?? (() => new Date());
+  if (!isNonEmptyText(input.workflowId)) return serviceFailure("stage-request-invalid", "workflowId 缺失。");
+  if (!isWorkflowStage(input.stage)) {
+    return serviceFailure("stage-transition-invalid", `stage 非法：${String(input.stage)}。`);
+  }
+  if (!isNonEmptyText(input.blockId)) {
+    return serviceFailure("block-reentry-invalid", "blockId 缺失（block 重入场必须携带 blockId）。");
+  }
+  if (input.resolution !== "fixed" && input.resolution !== "decided") {
+    return serviceFailure("block-reentry-invalid", `resolution 只允许 fixed/decided（收到 ${String(input.resolution)}）。`);
+  }
+  // 1) block 账本事实（应用写入；不采信调用方自报）。
+  const blocks = await readBlockLedger(input.projectRoot);
+  if (blocks.badLines > 0) {
+    return serviceFailure(
+      "block-ledger-corrupt",
+      `blocks.jsonl 存在 ${blocks.badLines} 条坏行；fail-closed：不猜、不重入场（先按审计修复账本）。`,
+    );
+  }
+  const lifecycle = replayBlockLifecycles(blocks.events).records.get(input.blockId);
+  if (lifecycle === undefined) {
+    return serviceFailure("block-not-found", `block ${input.blockId} 不存在（blocks.jsonl 无 block.raised）。`);
+  }
+  if (lifecycle.workflowId !== undefined && lifecycle.workflowId !== input.workflowId) {
+    return serviceFailure(
+      "block-resolution-mismatch",
+      `block ${input.blockId} 绑定 workflow ${lifecycle.workflowId}，与请求 ${input.workflowId} 不一致。`,
+    );
+  }
+  if (lifecycle.stage !== undefined && lifecycle.stage !== input.stage) {
+    return serviceFailure(
+      "block-resolution-mismatch",
+      `block ${input.blockId} 绑定阶段 ${lifecycle.stage}，与请求 ${input.stage} 不一致。`,
+    );
+  }
+  if (lifecycle.status !== "resolved") {
+    return serviceFailure(
+      "block-not-resolved",
+      `block ${input.blockId} 尚未 resolved（当前 ${lifecycle.status}）；raised→routed→resolved 后才允许重入场。`,
+    );
+  }
+  if (lifecycle.resolution !== input.resolution) {
+    return serviceFailure(
+      "block-resolution-mismatch",
+      `block ${input.blockId} 终态为 ${String(lifecycle.resolution)}，与请求 ${input.resolution} 不一致。`,
+    );
+  }
+  if (input.resolution === "decided") {
+    const option = lifecycle.reEntry;
+    if (option === undefined || !BLOCK_STAGE_REENTRY_OPTION_IDS.includes(option)) {
+      return serviceFailure(
+        "block-reentry-inapplicable",
+        `block ${input.blockId} 的裁决选项 ${option ?? "（未记录）"} 不属于修订/返工/换执行者/限次重试类；按既有语义不重入场。`,
+      );
+    }
+  }
+  // 2) workflow 上下文（协议/定义/投影；loadAppDispatchContext 已对 closed/stopping/corrupt fail-closed）。
+  const context = await loadAppDispatchContext(input.projectRoot, input.workflowId);
+  if (context.ok !== true) return context;
+  const defStage = context.definition.stages.find((entry) => entry.stage === input.stage);
+  if (defStage === undefined) {
+    return serviceFailure(
+      "stage-transition-invalid",
+      `阶段 ${input.stage} 不在流程定义 ${context.definition.id}@${context.definition.version} 内。`,
+    );
+  }
+  if (defStage.taskKind === "none") {
+    return serviceFailure(
+      "stage-transition-invalid",
+      `阶段 ${input.stage} 无任务（应用派生/聚合）；其重入走各自确定性路径，不写 stage.reworked。`,
+    );
+  }
+  const status = context.view.stages[input.stage].status;
+  if (status === "completed") {
+    // 引擎重试（engine-auto-fix）已成功完成阶段：不写 rework；调用方继续 advance 下一阶段。
+    return { ok: true, workflowId: input.workflowId, stage: input.stage, alreadyCompleted: true, replay: false };
+  }
+  // 3) 幂等：同一 block 的重入场事件已存在 ⇒ 复跑确定性 drive（同 attempt/同任务键 ⇒ replay）。
+  const existingReentry = findBlockReentryEvent(context.wfEvents, input.stage, input.blockId);
+  if (existingReentry !== undefined) {
+    const driven = await driveAppDispatchStageLocked({
+      projectRoot: input.projectRoot,
+      workflowId: input.workflowId,
+      stage: input.stage,
+      now,
+    });
+    const taskId = driven.ok === true ? driven.tasks[0]?.taskId : undefined;
+    return {
+      ok: true,
+      workflowId: input.workflowId,
+      stage: input.stage,
+      reentry: {
+        stage: input.stage,
+        attempt: existingReentry.attempt,
+        eventId: existingReentry.idempotencyKey,
+        ...(taskId !== undefined ? { taskId } : {}),
+      },
+      ...(driven.ok === true ? { driven } : { driveError: { code: driven.code, message: driven.message } }),
+      replay: true,
+    };
+  }
+  if (status === "requested" || status === "dispatched" || status === "in-progress") {
+    // 阶段已有在飞尝试（如引擎自动重试已成功驱动）：不得并列第二条 rework/任务。
+    return { ok: true, workflowId: input.workflowId, stage: input.stage, alreadyInFlight: true, replay: false };
+  }
+  if (status !== "blocked") {
+    return serviceFailure(
+      "stage-transition-invalid",
+      `阶段 ${input.stage} 当前 ${status}；block 重入场只接受 blocked 阶段（completed/在飞分别返回 alreadyCompleted/alreadyInFlight）。`,
+    );
+  }
+  // 4) 写重入场事件（stage=reworkOf=当前 blocked 阶段；attempt=已有最大 attempt+1；带 blockId）。
+  const priorAttempts = context.wfEvents
+    .filter((event): event is StageRequestedView => event.kind === "stage.requested" && event.stage === input.stage)
+    .map((event) => event.attempt);
+  const attempt = Math.max(0, context.view.stages[input.stage].attempt, ...priorAttempts) + 1;
+  const reworkEvent: WorkflowEvent = {
+    v: 1,
+    at: now().toISOString(),
+    schema: WORKFLOW_LEDGER_SCHEMA,
+    kind: "stage.reworked",
+    workflowId: input.workflowId,
+    flowId: context.view.flowId,
+    path: context.view.path,
+    idempotencyKey: `stage-rework:${input.workflowId}:${input.stage}:${attempt}`,
+    stage: input.stage,
+    reworkOf: input.stage,
+    reason: isNonEmptyText(input.reason) ? input.reason.trim() : `block ${input.blockId} resolved(${input.resolution})`,
+    attempt,
+    blockId: input.blockId,
+  };
+  const appended = await appendWorkflowEvent(input.projectRoot, reworkEvent);
+  if (appended.ok !== true) {
+    return serviceFailure("workflow-ledger-write-failed", `stage.reworked（block 重入场）写入失败：${appended.message}`);
+  }
+  // 5) 同锁驱动新 attempt（drive 幂等；失败如实返回，不伪造完成）。
+  const driven = await driveAppDispatchStageLocked({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    stage: input.stage,
+    now,
+  });
+  const taskId = driven.ok === true ? driven.tasks[0]?.taskId : undefined;
+  return {
+    ok: true,
+    workflowId: input.workflowId,
+    stage: input.stage,
+    reentry: {
+      stage: input.stage,
+      attempt,
+      eventId: appended.event.idempotencyKey,
+      ...(taskId !== undefined ? { taskId } : {}),
+    },
+    ...(driven.ok === true ? { driven } : { driveError: { code: driven.code, message: driven.message } }),
+    replay: appended.replay === true,
+  };
+}
+
 /** 应用收口决策（缺省确定性派生；应用策略可显式覆盖，A12b `rework` 驱动 stage.reworked A12b→A11）。 */
 export type AppDispatchClosureDecision = "accept" | "rework" | "reject";
 
@@ -6426,7 +6694,14 @@ export async function reconcileFixedWorkflow(input: {
         return workflowReceipt;
       }
       const status = view.stages[view.stage].status;
-      if (status === "requested" || status === "dispatched" || status === "in-progress") {
+      // 2026-11-20（SMOKE-2 S1）：block 重入场后若进程在「已写 stage.reworked、未驱动」之间中断，
+      // 阶段为 pending 且账本有对应 block rework（attempt 一致）⇒ 对账补驱动同一 attempt（不新开尝试）。
+      const reentryAttempt = status === "pending"
+        ? latestBlockReentryAttempt(workflowEventList(ledgerAfter.events, workflowId), view.stage)
+        : undefined;
+      const awaitingBlockReentryDrive = reentryAttempt !== undefined
+        && view.stages[view.stage].attempt === reentryAttempt;
+      if (status === "requested" || status === "dispatched" || status === "in-progress" || awaitingBlockReentryDrive) {
         const driven = await driveAppDispatchStageLocked({ projectRoot: input.projectRoot, workflowId, stage: view.stage, now });
         if (driven.ok === true) {
           workflowReceipt.driven = driven;
