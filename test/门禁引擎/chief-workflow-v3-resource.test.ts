@@ -52,14 +52,15 @@ test("v3 资源：版本行恰一处 chief-workflow/v3、身份行、≤256 KiB�
   assert.ok(text.includes("app-dispatch/v1"), "资源必须声明新协议");
 });
 
-test("v1/v2/v3 字节稳定性：v1/v2 blob SHA 逐字不变（53d7167…/d528c6c…）；v3 独立（1aad6d7…）", () => {
+test("v1/v2/v3 字节稳定性：v1/v2 blob SHA 逐字不变（53d7167…/d528c6c…）；v3 独立（0318486…，2026-11-20 稳定码同步）", () => {
   const v1 = readFileSync(V1_PATH);
   const v2 = readFileSync(V2_PATH);
   const v3 = readFileSync(V3_PATH);
   // 冻结值来自 git hash-object（HEAD 逐字）与门禁批记录 §6.2；LF 归一口径保证 CRLF 检出同样通过。
+  // v3 于 2026-11-20 收尾同步新增 `stage-request-removed` 稳定码段（1aad6d7… → 0318486…）；v1/v2 不动。
   assert.equal(gitBlobSha(v1), "53d71670ef9f403c027f6e39c0ffd1db92553992", "legacy v1 资源字节不得变化");
   assert.equal(gitBlobSha(v2), "d528c6ce5655b2a9916574f4a4477e035aef42a6", "v2 资源逐字保留（fixed-v2.1 在飞）");
-  assert.equal(gitBlobSha(v3), "1aad6d7972d61436ce60a35d2a87254961bba74a", "v3 资源字节（本批冻结）");
+  assert.equal(gitBlobSha(v3), "03184869960c9a8dd03067f21a9451612f1d987b", "v3 资源字节（稳定码同步后冻结）");
   // 版本行互不串扰：v1 只有 v1、v2 只有 v2。
   assert.deepEqual(resourceVersions(v1.toString("utf8")), ["chief-workflow/v1"]);
   assert.deepEqual(resourceVersions(v2.toString("utf8")), ["chief-workflow/v2"]);
@@ -86,6 +87,7 @@ test("v3 关键语义段齐全：select_workflow / 应用建任务 / 运营只�
     ["convener-builtin-dispatch-forbidden", /convener-builtin-dispatch-forbidden/],
     ["chief-dispatch-removed", /chief-dispatch-removed/],
     ["card-prompt-mismatch", /card-prompt-mismatch/],
+    ["stage-request-removed", /stage-request-removed/],
     ["三张客户确认卡", /## 三张客户确认卡/],
     ["intent-confirm", /intent-confirm/],
     ["proposal", /proposal/],
