@@ -63,6 +63,37 @@ jobs:
       - name: Install exact locked dependencies
         working-directory: .release/source
         run: npm ci
+      - name: Prepare the locked Windows Electron runtime
+        if: matrix.platform == 'win'
+        working-directory: .release/source
+        shell: pwsh
+        run: |
+          node node_modules/electron/install.js
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Electron installation failed' }
+          $verifyElectron = @'
+          import { execFileSync } from 'node:child_process';
+          import { lstatSync, readFileSync } from 'node:fs';
+          import { join, resolve } from 'node:path';
+
+          const root = resolve('node_modules/electron');
+          const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+          const expected = lock.packages['node_modules/electron']?.version;
+          const installed = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+          const distributed = readFileSync(join(root, 'dist/version'), 'utf8').trim().replace(/^v/, '');
+          const executable = join(root, 'dist/electron.exe');
+          const info = lstatSync(executable);
+          if (!expected || installed !== expected || distributed !== expected || !info.isFile() || info.size <= 0) {
+            throw new Error('Windows Electron files do not match the frozen dependency lock');
+          }
+          const running = execFileSync(executable, ['-p', 'process.versions.electron'], {
+            env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+            encoding: 'utf8', timeout: 45000, windowsHide: true,
+          }).trim();
+          if (running !== expected) throw new Error('Running Windows Electron does not match the frozen dependency lock');
+          console.log(`Verified Windows Electron ${running}.`);
+          '@
+          node --input-type=module -e $verifyElectron
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Electron verification failed' }
       - name: Typecheck
         working-directory: .release/source
         run: npm run typecheck
