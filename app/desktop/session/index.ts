@@ -22,7 +22,7 @@ import { appendWorkflowEvent, closeTask as closeFixedWorkflowTask, completeTeamP
 import { deriveWorkflowView, canCompleteStage, type WorkflowView } from "../../../src/common/编排/workflow-state.ts";
 import { activeFixedWorkflowIdFor, dispatchFlowIdOf, ensureFixedPathStarted, isFixedPathEnabledForFlow, isFixedReleaseTriggerStage, markFixedProposalCardRequested, recordFixedPathBScopeDecisionForDispatch, recordFixedStageDispatchForTask, resolveFixedPathMode, resolveProjectFixedPanelMode, sessionWorkflowModeForChat, sessionWorkflowModeForTask, shouldRecordFixedStageDispatch, workflowModeForFlowResolver, type FixedReleaseTriggerStage, type WorkflowMode, } from "../workflow.ts";
 import { createDesktopBaselineGitPort, createDesktopReleaseGitPort, createDesktopTaskGitShellPort } from "../workflow-git.ts";
-import { applyRunChange, buildRunChangeCard, closeRun, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, readRunManifest, validateRunManifest, verifyPinnedRun, RUN_PENDING_FLOW_ID, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../../src/common/编排/run-manifest.ts";
+import { applyRunChange, buildRunChangeCard, closeRun, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, readRunManifest, validateRunManifest, verifyPinnedRun, RUN_PENDING_FLOW_ID, type RunManifest, type RunChangeMode } from "../../../src/common/编排/run-manifest.ts";
 import { buildVersionDecisionCard, collectResolvedWithoutExecution, computeTargetVersions, mapVersionDecisionAnswer, planVersionDecisionExecution, supersededCloseReason, validateVersionDecisionContext, validateVersionDecisionRequest, versionDecisionAttempt, versionDecisionCardToRequest, versionDecisionRequestId, type VersionDecisionCardLabels, type VersionDecisionRequestSubject, } from "../../../src/common/编排/version-decision.ts";
 import { PROJECT_NOTE_BLOCKER_TEXT_MAX, PROJECT_NOTE_KEY_MAX, PROJECT_NOTE_NEXT_STEP_DEFAULT_KEY, PROJECT_NOTE_NEXT_STEP_TEXT_MAX, PROJECT_NOTE_REFS_MAX, PROJECT_STATE_SCHEMA, VERSION_DECISION_SCHEMA, type ProjectNoteInput, type ProjectNoteResult, type ProjectStateDocKind, type ProjectStateToolResult, type ProjectStateView, type VersionDecisionErrorCode, type VersionDecisionDecidedBy, type VersionDecisionFacts, type VersionDecisionRequest, type VersionDecisionResult, } from "../../../src/model/project-state.ts";
 import { docsForFlow, formatMechanicalRejection, humanRejection, makeMechanicalRejection, technicalRejectionCode, type MechanicalRejection } from "../../../src/common/编排/mechanical-rejection.ts";
@@ -39,7 +39,7 @@ import type { PlanEscalationFn, PlanEscalationInput, PlanEscalationResult } from
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn, WorkflowEvent, WorkflowArtifactRef, BasisEvent } from "../../../src/model/runtime.ts";
 import type { InstallSkillFn, InstallSkillPayload, InstallSkillReceipt, UninstallSkillFn, ReportHandbackMetadata } from "../../../src/model/runtime.ts";
 import type { InstallMcpFn, InstallMcpPayload, InstallMcpReceipt, UninstallMcpFn } from "../../../src/model/runtime.ts";
-import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn, ChiefDecisionBasis, ChiefDecisionExecutor, ChiefDecisionHost } from "../customer-input.ts";
+import type { AcceptanceReportDisplayV1, ChiefDecisionBasis, ChiefDecisionExecutor, ChiefDecisionHost } from "../customer-input.ts";
 import type { ProjectListing } from "../../../src/service/role/resolve-role.ts";
 import { loadEffectiveConfig as defaultLoadEffectiveConfig, type ConfigSourceKind, type LoadConfigOptions, type LoadedConfig } from "../../../src/common/shared/config-loader.ts";
 import { RUNTIME_KINDS, type RuntimeKind } from "../../../src/common/shared/runtime-shared.ts";
@@ -472,11 +472,7 @@ export class SessionManager {
   /** 薄委托 → `session/cards/cards.ts`（JSDoc/方法体见模块）。 */
   private async pendingVersionChangesFor( projectRoot: string, ): Promise<{ ok: true; pending: Array<{ applicationId: string; status: string }> } | { ok: false; reason: string }> { return this.cards.pendingVersionChangesFor(projectRoot); }
   /** 薄委托 → `session/cards/cards.ts`（JSDoc/方法体见模块）。 */
-  private async offerRunChangeOnFrozenContract(input: { projectRoot: string; flowId: string; manifest: RunManifest; newer: NewerContractDoc[]; reason: string;
-  /** 三段式 missing 用（「拒绝：缺少 …」通顺的名词短语）；缺省回退 reason。 */
-  missing?: string; requestedBy?:"convener" | "planner" | "product";
-  /** AC-17：系统行落位（来源角色；缺省 chief）。 */
-  noteRoleId?: string; }): Promise<{ rejection: MechanicalRejection; presented: boolean }> { return this.cards.offerRunChangeOnFrozenContract(input); }
+  private async offerRunChangeOnFrozenContract(input: Parameters<Cards["offerRunChangeOnFrozenContract"]>[0]): Promise<{ rejection: MechanicalRejection; presented: boolean }> { return this.cards.offerRunChangeOnFrozenContract(input); }
   /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   governanceOwnerRoleId(projectRoot: string): string | null { return this.diagnostics.governanceOwnerRoleId(projectRoot); }
   /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
@@ -542,11 +538,7 @@ export class SessionManager {
   /** 薄委托 → `session/cards/acceptance-facts.ts`（JSDoc/方法体见模块）。 */
   private async enrichAcceptanceJudgeContext( projectRoot: string, request: CustomerInputRequest, metadata: CustomerInputMetadata | undefined, sourceRoleId: string, ): Promise<{ metadata: CustomerInputMetadata | undefined; display?: AcceptanceReportDisplayV1 }> { return this.acceptanceFacts.enrichAcceptanceJudgeContext(projectRoot, request, metadata, sourceRoleId); }
   /** 薄委托 → `session/cards/cards.ts`（JSDoc/方法体见模块）。 */
-  private async withRequestLifecycle( projectRoot: string, sourceRoleId: string, request: CustomerInputRequest, metadata: CustomerInputMetadata | undefined, raw: (request: CustomerInputRequest, context: Parameters<DesktopCustomerInputFn>[1], metadata?: CustomerInputMetadata) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined, buildContext: (request: CustomerInputRequest, extras?: { onPresented?: () => void; acceptanceReport?: AcceptanceReportDisplayV1; judgeNotice?: string }) => Parameters<DesktopCustomerInputFn>[1], requestIdOverride?: string, lifecycle?: { notify?:"default" | "resolved-only" | "none"; signal?: AbortSignal;
-  /** 下载卡事实不可用时附在客户卡上的提示（其他卡种不传）。 */
-  judgeNotice?: string;
-  /** 卡片实际呈现（客户或 judge）后回调一次（下载 presenter 用它上报 requestId）。 */
-  onPresented?: () => void; }, ): Promise<CustomerInputOutcome | null | undefined> { return this.cards.withRequestLifecycle(projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle); }
+  private async withRequestLifecycle( projectRoot: string, sourceRoleId: string, request: CustomerInputRequest, metadata: CustomerInputMetadata | undefined, raw: Parameters<Cards["withRequestLifecycle"]>[4], buildContext: Parameters<Cards["withRequestLifecycle"]>[5], requestIdOverride?: string, lifecycle?: Parameters<Cards["withRequestLifecycle"]>[7]): Promise<CustomerInputOutcome | null | undefined> { return this.cards.withRequestLifecycle(projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle); }
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async readRoleActivityLog(projectRoot: string, query: RoleActivityLogPayload): Promise<WatchdogToolResult> { return this.tasks.readRoleActivityLog(projectRoot, query); }
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */

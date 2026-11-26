@@ -3,17 +3,18 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: Frozen application source tag
+        description: Release tag to create after verification
         required: true
-        default: v2.0.0
-      publish:
-        description: Publish draft after all native gates pass
-        type: boolean
-        default: false
+        default: v2.2.0
+        type: string
+      source_sha:
+        description: Full SHA of the release commit at the selected workflow ref
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
-  group: release-v2.0.0
+  group: release-v2.2.0
   cancel-in-progress: false
 jobs:
   build:
@@ -31,8 +32,18 @@ jobs:
             platform: win
             arch: x64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # Allow the existing full serial regression on the slower native runners.
+    timeout-minutes: 120
     steps:
+      - name: Validate release inputs
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+          RELEASE_SOURCE_SHA: ${{ inputs.source_sha }}
+        shell: bash
+        run: |
+          test "$SOURCE_REF" = v2.2.0
+          [[ "$RELEASE_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$RELEASE_SOURCE_SHA" = "$GITHUB_SHA"
       - name: Preserve repository byte identity on native runners
         run: |
           git config --global core.autocrlf false
@@ -45,9 +56,10 @@ jobs:
         with:
           node-version: 24.14.0
           registry-url: https://registry.npmjs.org
-      - name: Assemble frozen source and explicit overlay
+      - name: Assemble the exact frozen release source
         env:
           SOURCE_REF: ${{ inputs.source_ref }}
+          RELEASE_SOURCE_SHA: ${{ inputs.source_sha }}
         run: node src/common/装配/release-prepare.mjs
       - name: Install exact locked dependencies
         working-directory: .release/source
@@ -55,6 +67,9 @@ jobs:
       - name: Typecheck
         working-directory: .release/source
         run: npm run typecheck
+      - name: Typecheck renderer
+        working-directory: .release/source
+        run: npm run typecheck:renderer
       - name: Ensure cross-platform ripgrep for POSIX integration tests
         shell: bash
         run: |
@@ -82,7 +97,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run package -- --${{ matrix.platform }} --${{ matrix.arch }} --publish never
-      - name: Verify extracted archive and actual packaged UI
+      - name: Verify the extracted archive, packaged UI and bundled Dapr
         working-directory: .release/source
         run: node src/common/装配/release-verify.mjs release-output ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
@@ -93,6 +108,12 @@ jobs:
             .release/source/release-output/manifest-*.json
             .release/source/release-output/SHA256SUMS-*.txt
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-tests-${{ matrix.platform }}-${{ matrix.arch }}
+          path: .release/source/release-output/native-*.tap
+          if-no-files-found: ignore
       - name: Flatten provenance artifact layout
         if: always()
         run: node src/common/装配/release-provenance.mjs
@@ -108,6 +129,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
@@ -118,20 +142,58 @@ jobs:
           pattern: provenance-*
           path: release-provenance
       - name: Verify full native artifact set and source bindings
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+          RELEASE_SOURCE_SHA: ${{ inputs.source_sha }}
         run: node src/common/装配/release-assets.mjs release-assets release-provenance
-      - name: Verify and upload only passing assets
+      - name: Create the verified tag and upload a draft
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_PUBLISH: ${{ inputs.publish }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          RELEASE_SOURCE_SHA: ${{ inputs.source_sha }}
         shell: bash
         run: |
+          set -euo pipefail
+          test "$SOURCE_REF" = v2.2.0
+          test "$RELEASE_SOURCE_SHA" = "$GITHUB_SHA"
           cd release-assets
-          test "$(find . -name '*.zip' | wc -l)" -eq 3
+          files=(./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch)
+          test "$(find . -maxdepth 1 -name '*.zip' | wc -l)" -eq 3
           for sums in SHA256SUMS-*.txt; do sha256sum -c "$sums"; done
-          if gh release view v2.0.0 --json isDraft --jq '.isDraft' > draft-state.txt; then
-            test "$(cat draft-state.txt)" = true
-          else
-            gh release create v2.0.0 --verify-tag --draft --title 'ANS Studio 2.0.0' --notes '基于固定 v2.0.0 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本版新增：两条固定工作流路径——新增（产品意图 → 幕僚三张客户确认卡 → 策划方案与人员名单 → 人事建卡 → 运营团队计划与基线准备 → 实现 → 独立验收 → 交付合并）与修改（幕僚判定 → 专业角色只读影响面分析 → 运营派实现 → 交付合并）；运营成为生产线唯一派发者，幕僚负责产线调度、独立验收派发与验收强度调节；Git 回归普通用法——默认路径不再使用 trunk ref、bootstrap、冻结闭包、候选 ref、run pin、stable-write 许可，治理状态走应用账本与应用计算的 SHA-256；合并 main 仍为客户本人高风险确认卡（judge 不可代批）。另含自 v1.9.2 以来的全部修复：B29 团队计划回执形状、B30 只读 Git 与应用自写身份兼容、B31 轻量验收决策路径、B32 提交引号与 argv 形状错误码、B34 修改路径 B2 死结修复；以及 judge 代批、文档格式规范、提案卡绑定、团队计划 run 绑定、bootstrap 闭包等既有能力。真机验证：贪吃蛇空项目全链 A1–A13 与真实浏览器可玩性验证、独立验收 B2 整体通过（AC 30/30、T 20/20、RR 6/6、EV 8/8）；武侠肉鸽（Brotato 式）Path A 全链产出并经修改路径修复，九项可玩性全过。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。发布包不包含任何凭据，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
+
+          tag_ref="refs/tags/$SOURCE_REF"
+          tag_sha() {
+            local matching
+            matching="$(git ls-remote origin "$tag_ref" "$tag_ref^{}")" || return
+            awk -v ref="$tag_ref" '$2 == ref { direct = $1 } $2 == ref "^{}" { peeled = $1 }
+              END { print (peeled != "" ? peeled : direct) }' <<< "$matching"
+          }
+          existing_sha="$(tag_sha)"
+          if test -z "$existing_sha"; then
+            git push origin "$RELEASE_SOURCE_SHA:$tag_ref"
           fi
-          gh release upload v2.0.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
-          if test "$RELEASE_PUBLISH" = true; then gh release edit v2.0.0 --draft=false; fi
+          test "$(tag_sha)" = "$RELEASE_SOURCE_SHA"
+
+          metadata="$(mktemp)"
+          if gh release view "$SOURCE_REF" --json isDraft,assets > "$metadata"; then
+            test "$(jq -r .isDraft "$metadata")" = true
+          else
+            gh release create "$SOURCE_REF" --verify-tag --draft --title 'ANS Studio 2.2.0' --notes '本版引入随桌面包分发的本地 Dapr Workflow 和 SQLite，支持 YAML 定义的任务派发、审批与逐步恢复，并增加卡点决策和验收证据链。Windows x64、macOS Apple Silicon 和 Intel 的归档均由原生运行器构建、解包验证并提供 SHA-256 校验。安装包未签名和公证。请按同平台校验文件验证下载。'
+            gh release view "$SOURCE_REF" --json isDraft,assets > "$metadata"
+          fi
+          test "$(jq -r .isDraft "$metadata")" = true
+
+          while IFS= read -r existing; do
+            test -f "./$existing"
+          done < <(jq -r '.assets[].name' "$metadata")
+          for file in "${files[@]}"; do
+            name="${file#./}"
+            if jq -e --arg name "$name" 'any(.assets[]; .name == $name)' "$metadata" > /dev/null; then
+              copy="$(mktemp)"
+              gh release download "$SOURCE_REF" --pattern "$name" --output "$copy" --clobber
+              cmp "$file" "$copy"
+            else
+              gh release upload "$SOURCE_REF" "$file"
+            fi
+          done
+          gh release view "$SOURCE_REF" --json isDraft,url,assets

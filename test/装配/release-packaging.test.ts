@@ -411,12 +411,162 @@ test('release overlay returns v1.8.2 test-cleanup entries to fail-closed or excl
   assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
 });
 
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+
+const releaseVersion = '2.2.0';
+const releaseSourceRef = `v${releaseVersion}`;
+const releaseWorkflowFiles = ['path-a.yaml', 'path-b.yaml', 'read-only-example.yaml'];
+const sha256 = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
+
+function releaseGit(root: string, ...args: string[]): string {
+  const result = spawnSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=Release Fixture',
+    '-c', 'user.email=release-fixture@example.invalid', ...args], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
+async function exactReleaseRepo(dir: string) {
+  const root = path.join(dir, 'repository');
+  await mkdir(path.join(root, 'docs/workflows'), { recursive: true });
+  releaseGit(root, 'init', '--quiet');
+  await writeFile(path.join(root, 'package.json'), JSON.stringify({ version: releaseVersion }));
+  for (const file of releaseWorkflowFiles) {
+    await writeFile(path.join(root, 'docs/workflows', file), `fixture: ${file}\n`);
+  }
+  const lock = path.join(root, 'package-lock.json');
+  const writeLock = (version: string) => writeFile(lock, JSON.stringify({
+    version: releaseVersion, packages: { '': { version } },
+  }));
+  await writeLock('2.1.0');
+  releaseGit(root, 'add', '.');
+  releaseGit(root, 'commit', '--quiet', '-m', 'Version-mismatch fixture');
+  const wrongVersion = releaseGit(root, 'rev-parse', 'HEAD');
+  await writeLock(releaseVersion);
+  releaseGit(root, 'add', 'package-lock.json');
+  releaseGit(root, 'commit', '--quiet', '-m', 'Frozen release fixture');
+  return { root, wrongVersion, commit: releaseGit(root, 'rev-parse', 'HEAD'),
+    tree: releaseGit(root, 'rev-parse', 'HEAD^{tree}'), lock };
+}
+
+test('v2.2.0 preparation requires matching SHA, root versions and existing tag', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'ans-v22-release-freeze-'));
+  try {
+    const { root, wrongVersion, commit, tree } = await exactReleaseRepo(dir);
+    const target = path.join(root, '.release/source');
+    const prepare = fileURLToPath(new URL('../../src/common/装配/release-prepare.mjs', import.meta.url));
+    const run = (source = commit, workflow = commit) => spawnSync(process.execPath, [prepare], {
+      cwd: root, encoding: 'utf8',
+      env: { ...process.env, SOURCE_REF: releaseSourceRef, RELEASE_SOURCE_SHA: source, GITHUB_SHA: workflow },
+    });
+    assert.match(run(wrongVersion).stderr, /workflow SHA and checkout HEAD must match/);
+    assert.match(run(commit, wrongVersion).stderr, /workflow SHA and checkout HEAD must match/);
+    releaseGit(root, 'checkout', '--quiet', '--detach', wrongVersion);
+    assert.match(run(wrongVersion, wrongVersion).stderr, /lockfile root versions/);
+    releaseGit(root, 'checkout', '--quiet', '--detach', commit);
+    releaseGit(root, 'tag', releaseSourceRef, wrongVersion);
+    assert.match(run().stderr, /points to a different commit/);
+    assert.deepEqual(await stat(target).catch(error => error.code), 'ENOENT');
+    // This tag belongs to the isolated fixture, never to the publishing repository.
+    releaseGit(root, 'tag', '--delete', releaseSourceRef);
+    const prepared = run();
+    assert.equal(prepared.status, 0, prepared.stderr);
+    assert.equal((await stat(path.join(target, '.git'))).isDirectory(), true);
+    assert.equal(releaseGit(target, 'rev-parse', 'HEAD'), commit);
+    assert.equal(releaseGit(target, 'write-tree'), tree);
+    assert.equal(releaseGit(root, 'tag', '--list', releaseSourceRef), '');
+    const proof = JSON.parse(await readFile(path.join(target, 'release-provenance.json'), 'utf8'));
+    assert.equal(proof.sourceRef, releaseSourceRef);
+    assert.equal(proof.sourceSha, commit);
+    assert.equal(proof.overlaySha, commit);
+    assert.equal(proof.actualTree, tree);
+    assert.deepEqual(proof.overlayPaths, []);
+    assert.deepEqual(proof.excludedChanges, []);
+    assert.equal((await readFile(path.join(root, '.release/overlay.patch'))).length, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('v2.2.0 collection rechecks the exact checkout, package version and native Dapr proof', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'ans-v22-release-collect-'));
+  try {
+    const { root, commit, tree, lock } = await exactReleaseRepo(dir);
+    const assets = path.join(dir, 'assets');
+    const proofs = path.join(dir, 'proofs');
+    await mkdir(assets);
+    await mkdir(proofs);
+    const workflows: Record<string, string> = {};
+    for (const file of releaseWorkflowFiles) workflows[file] = sha256(await readFile(path.join(root, 'docs/workflows', file)));
+    const provenance = {
+      sourceRef: releaseSourceRef, sourceSha: commit, overlaySha: commit, actualTree: tree,
+      overlayPaths: [], excludedChanges: [], overlayPatchSha256: sha256(''),
+    };
+    const packages = [];
+    const targets = [{ platform: 'darwin', arch: 'arm64', distribution: 'mac' },
+      { platform: 'darwin', arch: 'x64', distribution: 'mac' },
+      { platform: 'win32', arch: 'x64', distribution: 'win' }];
+    for (const { platform, arch, distribution } of targets) {
+      const target = `${platform}-${arch}`;
+      const artifactName = `ANS-Studio-${releaseVersion}-${distribution}-${arch}.zip`;
+      const bytes = Buffer.from(`fixture ${target}`);
+      const artifact = { file: artifactName, size: bytes.length, sha256: sha256(bytes) };
+      const checks = {entry:true,rootMounted:true,driver:true,csp:true,cspViolations:true,dom:true,preload:true,ipc:true,importDisabled:true,missingConfiguration:true,settingsEntryDisabled:true,envPathMatches:true,console:true,load:true};
+      const suffix = platform === 'win32' ? '.exe' : '';
+      const value = {
+        ...provenance, packageVersion: releaseVersion, platform, arch, lockSha256: sha256(await readFile(lock)), builder: '26.15.3',
+        bundled: { daprVersion: '1.19.1', target: `${distribution}-${arch}`, workflows, license: sha256('license'),
+          files: { daprd: { file: `daprd${suffix}`, bytes: 1, sha256: sha256('daprd') },
+            scheduler: { file: `scheduler${suffix}`, bytes: 1, sha256: sha256('scheduler') } },
+          host: { passed: 3, skipped: 0, logSha256: sha256('host log') },
+          ...(suffix ? { desktop: { passed: 6, skipped: 0, logSha256: sha256('desktop log') } } : {}),
+        },
+        smoke: { ok: true, isPackaged: true, platform, arch, checks, version: releaseVersion }, process: { code: 0 },
+        nativeDependencies: {sdkImports: 'PACKAGED_SDK_IMPORTS_OK', codexVersion: 'codex-cli 0.162.1', claudeVersion: 'native fixture'}, artifact,
+      };
+      const manifest = path.join(assets, `manifest-${target}.json`);
+      packages.push({ manifest, value });
+      await writeFile(manifest, JSON.stringify(value));
+      await writeFile(path.join(assets, artifactName), bytes);
+      await writeFile(path.join(assets, `SHA256SUMS-${target}.txt`), `${artifact.sha256}  ${artifactName}\n`);
+      const proof = path.join(proofs, target);
+      await mkdir(proof);
+      await writeFile(path.join(proof, 'overlay.patch'), '');
+      await writeFile(path.join(proof, 'release-provenance.json'), JSON.stringify(provenance));
+    }
+    const collect = fileURLToPath(new URL('../../src/common/装配/release-assets.mjs', import.meta.url));
+    const run = (source = commit) => spawnSync(process.execPath, [collect, assets, proofs], {
+      cwd: root, encoding: 'utf8',
+      env: { ...process.env, SOURCE_REF: releaseSourceRef, RELEASE_SOURCE_SHA: source, GITHUB_SHA: commit },
+    });
+    const verified = run();
+    assert.equal(verified.status, 0, verified.stderr);
+    assert.match(run('b'.repeat(40)).stderr, /collection checkout must match/);
+    const selected = packages[2];
+    for (const [change, failure] of [
+      [{ sourceSha: 'a'.repeat(40) }, /source identity/],
+      [{ actualTree: 'a'.repeat(40) }, /source, version or empty overlay differs/],
+      [{ packageVersion: '2.1.0' }, /source, version or empty overlay differs/],
+      [{ lockSha256: 'a'.repeat(64) }, /source, version or empty overlay differs/],
+      [{ bundled: { ...selected.value.bundled, desktop: undefined } }, /Dapr test evidence/],
+      [{ bundled: { ...selected.value.bundled, workflows: {} } }, /Workflow source identity differs/],
+    ] as const) {
+      await writeFile(selected.manifest, JSON.stringify({ ...selected.value, ...change }));
+      const rejected = run();
+      assert.notEqual(rejected.status, 0);
+      assert.match(rejected.stderr, failure);
+    }
+    await writeFile(selected.manifest, JSON.stringify(selected.value));
+    await writeFile(path.join(proofs, 'win32-x64/overlay.patch'), 'nonempty overlay');
+    assert.match(run().stderr, /unmodified frozen source tree/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test('release collection accepts three bound native results and rejects tampering or cross-platform drift', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'ans-release-assets-contract-'));
