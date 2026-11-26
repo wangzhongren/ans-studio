@@ -428,7 +428,7 @@ test("legacy 项目普通派发仍 routeStar（不落入 fixed fail-closed）；
 
 // ══════════════════════════ 4. contract_check fixed / legacy 文本 ══════════════════════════
 
-test("contract_check fixed 视图（app-dispatch/v1）：无 workflow 新项目聊天展示应用流程驱动/新任务种类/新稳定码", async () => {
+test("contract_check fixed 视图：无 legacy run/pin 误导、含 stage-request 固定字段与 fixed 稳定码", async () => {
   const root = await makeRoot("ans-b71-contract-fixed-");
   const h = harness(root);
   try {
@@ -437,79 +437,19 @@ test("contract_check fixed 视图（app-dispatch/v1）：无 workflow 新项目�
     const check = chief.contractCheck!;
     const text = await check({ flowId: "snake", taskKind: "dispatch" });
     assert.match(text, /^contract_check（只读速查；查询不构成放行\/授权）/);
-    // 2026-11-17：空项目聊天无活动 workflow ⇒ app-dispatch/v1（桌面协议解析），run 行为应用流程驱动。
-    assert.ok(
-      text.includes("run：fixed（app-dispatch/v1；应用流程驱动——幕僚 select_workflow 启动，内置任务由应用按流程定义创建）"),
-      "app-dispatch run 行",
-    );
+    assert.ok(text.includes("run：fixed（无 run；固定路径由 stage-request 驱动）"), "fixed run 行");
     assert.equal(text.includes("run：legacy"), false, "fixed 视图不得输出 legacy run 行");
     assert.equal(text.includes("runId(pinned)"), false, "fixed 视图不得输出 legacy runId(pinned) 必填误导");
     assert.equal(text.includes("targetRoleId；runId"), false, "fixed 视图不得输出 legacy 必填串");
-    // 新协议派发口径与稳定码（幕僚不派发/运营只派绑定 worker/派内置拒绝/promptId 呈卡）。
-    for (const token of [
-      "chief-dispatch-removed",
-      "worker-dispatch-required",
-      "convener-builtin-dispatch-forbidden",
-      "promptId",
-    ]) {
-      assert.ok(text.includes(token), `app-dispatch dispatch 要点含 ${token}`);
-    }
-    assert.equal(text.includes('taskKind:"stage-request"'), false, "app-dispatch 视图不得输出旧 stage-request 必填串");
-    assert.ok(Buffer.byteLength(text, "utf8") <= 4096, "4 KiB 截断保持");
-    // 新任务种类按字符串透传查询（窗口形状只读，不构成放行/授权）。
-    const stageExecution = await check({ taskKind: "stage-execution" as never });
-    assert.ok(stageExecution.includes("taskKind stage-execution：应用按流程定义创建"), "stage-execution 要点");
-    const workerDispatch = await check({ taskKind: "worker-dispatch" as never });
-    assert.ok(workerDispatch.includes("taskKind worker-dispatch：应用→运营"), "worker-dispatch 要点");
-    assert.ok(workerDispatch.includes("close_created_task"), "worker-dispatch 收口者=运营");
-    const cardPrompt = await check({ taskKind: "card-prompt" as never });
-    assert.ok(cardPrompt.includes("taskKind card-prompt：应用→幕僚"), "card-prompt 要点");
-    assert.ok(cardPrompt.includes("card-prompt-mismatch"), "card-prompt 不一致拒绝码");
-    assert.ok(cardPrompt.includes("request_choice"), "card-prompt 呈卡工具");
-    // 无 kind：select_workflow 必填项；stage-request kind 按新协议 dispatch 要点（不回落旧文）。
-    const generic = await check({});
-    assert.ok(
-      generic.includes('select_workflow 必填：workflowPath:"A"|"B"；flowId；可选 acceptanceStrength:"light"|"standard"'),
-      "无 kind 时提示 select_workflow 必填",
-    );
-    const srKind = await check({ taskKind: "stage-request" });
-    assert.ok(srKind.includes("app-dispatch/v1 下幕僚不派发"), "stage-request kind 按新协议给出不派发要点");
-    assert.equal(srKind.includes('taskKind:"stage-request"'), false, "新协议不得输出旧 stage-request 必填串");
-    // topic 早退不变。
-    assert.equal(await check({ topic: "modules" }), contractSchemaText("modules"), "topic 静态早退逐字不变");
-  } finally {
-    await h.mgr.stop(null);
-    await cleanup(root);
-  }
-});
-
-test("contract_check fixed 视图（fixed-v2.1 在飞）：seed 无 protocol 的 workflow.started ⇒ 旧文案逐字保留", async () => {
-  const root = await makeRoot("ans-b71-contract-fixed-v21-");
-  const h = harness(root);
-  const workflowId = "wf-b71contractv210000000001";
-  try {
-    // 在飞 v2.1 记录：workflow.started 缺省 protocol（= fixed-v2.1，Q10 不迁移）。
-    await seedWorkflow(root, workflowId, "snake");
-    const chief = await openChat(h, root, "chief");
-    assert.equal(chief.workflowMode, "fixed");
-    const check = chief.contractCheck!;
-    const text = await check({ flowId: "snake", taskKind: "dispatch" });
-    assert.match(text, /^contract_check（只读速查；查询不构成放行\/授权）/);
-    assert.ok(text.includes("run：fixed（无 run；固定路径由 stage-request 驱动）"), "fixed-v2.1 run 行逐字保留");
-    assert.equal(text.includes("run：legacy"), false, "fixed 视图不得输出 legacy run 行");
-    assert.equal(text.includes("runId(pinned)"), false);
-    assert.ok(text.includes('taskKind:"stage-request"'), "fixed-v2.1 dispatch 必填含 stage-request");
-    assert.ok(text.includes('workflowAction:"advance"'), "fixed-v2.1 dispatch 必填含 workflowAction");
-    assert.ok(text.includes('workflowPath:"A"|"B"'), "fixed-v2.1 dispatch 必填含 workflowPath");
-    assert.ok(text.includes('sideEffect:"read-only"'), "fixed-v2.1 dispatch 必填含只读");
+    assert.ok(text.includes('taskKind:"stage-request"'), "fixed dispatch 必填含 stage-request");
+    assert.ok(text.includes('workflowAction:"advance"'), "fixed dispatch 必填含 workflowAction");
+    assert.ok(text.includes('workflowPath:"A"|"B"'), "fixed dispatch 必填含 workflowPath");
+    assert.ok(text.includes('sideEffect:"read-only"'), "fixed dispatch 必填含只读");
     for (const code of ["stage-request-invalid", "stage-request-required", "workflow-path-required", "stage-transition-invalid"]) {
-      assert.ok(text.includes(code), `fixed-v2.1 常见拒绝含 ${code}`);
-    }
-    // 新协议码不得混入在飞旧协议视图。
-    for (const newCode of ["chief-dispatch-removed", "convener-builtin-dispatch-forbidden", "worker-dispatch-required"]) {
-      assert.equal(text.includes(newCode), false, `fixed-v2.1 视图不得混入新协议码：${newCode}`);
+      assert.ok(text.includes(code), `fixed 常见拒绝含 ${code}`);
     }
     assert.ok(Buffer.byteLength(text, "utf8") <= 4096, "4 KiB 截断保持");
+    // 无 kind 与 stage-request kind 均给出固定口径；topic 早退不变。
     const generic = await check({});
     assert.ok(generic.includes("stage-request 或带 workflowId/stage 的 fixed 任务"), "无 kind 时提示固定两种形态");
     const srKind = await check({ taskKind: "stage-request" });

@@ -119,3 +119,25 @@ test("既有信号 #2/#3/#4 仍工作（队列积压/命令超时/重复失败�
     svc.stop();
   }
 });
+
+test("informational patrol does not wait for a model settlement", async () => {
+  let now = 0;
+  const labels: string[] = [];
+  const service = createWatchdogService({
+    projects: () => ["/proj"],
+    snapshot: () => snap({ roles: [{ roleId: "worker", runtime: "demo", busy: true, builtIn: true, taskId: "task", lastActivityAt: now }] }),
+    deliver: async (_root, message) => {
+      labels.push(message.dedupKey.split("\0")[2]!);
+      return "informational" as const;
+    },
+    now: () => now,
+    config: { env: {}, patrolIntervalMs: 1_000 },
+  });
+  service.tick();
+  for (const clock of [1_000, 2_000, 3_000, 4_000]) {
+    now = clock;
+    service.tick();
+    await Promise.resolve();
+  }
+  assert.deepEqual(labels, ["patrol", "patrol", "patrol", "patrol"]);
+});

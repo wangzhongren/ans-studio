@@ -184,7 +184,7 @@ async function judgeChecks(){
  await check('P5 judge starts authoritative off',`(()=>{const v=${toggleState};return v.checked===false&&v.disabled===false&&v.label==='替我审批'&&v.warningHidden===true&&v.onClass===false;})()`);
  // 首次勾选：琥珀标记 + 完整警告**只显示一次**（客户 2026-10-18；带「知道了」）。
  await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
- await check('P5 first enable shows amber marker and one-time warning',`(()=>{const v=${toggleState};return v.checked&&!v.disabled&&v.label==='替我审批中 · 自动代理'&&!v.warningHidden&&v.onClass&&v.closeLabel==='知道了'&&v.warningText.includes('替我审批中：shell 命令与写盘/写卡确认')&&v.warningText.includes('按所属开关回落逐张卡')&&v.warningText.includes('judge 代批 · 代审批/代决策');})()`);
+ await check('P5 first enable shows amber marker and one-time warning',`(()=>{const v=${toggleState};return v.checked&&!v.disabled&&v.label==='替我审批中 · 自动代理'&&!v.warningHidden&&v.onClass&&v.closeLabel==='知道了'&&v.warningText.includes('自动代理代你审核 shell 命令请求。')&&v.warningText.includes('未获有效审批时，本次命令不会执行。关闭开关后，可手动审核后续命令请求。')&&v.warningText.includes('结果行与审计会标明代审批来源。')&&!/写盘|写卡/.test(v.warningText);})()`);
  // 「知道了」收起：开关仍开启、紧凑琥珀标记仍在；重复推送 / 重绘 / 切角色都不再重现。
  await js(`document.getElementById('shell-judge-warning-close').click()`);await pause(40);
  await check('P5 acknowledged warning hides but compact amber marker stays',`(()=>{const v=${toggleState};return v.checked&&v.onClass&&v.label==='替我审批中 · 自动代理'&&v.warningHidden;})()`);
@@ -250,9 +250,9 @@ async function judgeChecks(){
  }else{
   const dState=`(()=>{const t=document.getElementById('judge-decision-toggle'),l=document.getElementById('judge-decision-label'),w=document.getElementById('shell-judge-warning'),s=document.getElementById('judge-decision-status'),wrap=t.closest('.composer-auto-approve'),x=document.getElementById('shell-judge-warning-text');return {checked:t.checked,disabled:t.disabled,label:l.textContent,warningHidden:w.hidden,noteShown:!s.hidden,note:s.textContent,onClass:wrap.classList.contains('is-on'),warningText:x?x.textContent:''};})()`;
   await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);await pause(60);
-  await check('P5 decision starts authoritative off in trio',`(()=>{const v=${dState};return v.checked===false&&v.disabled===false&&v.label==='替我决策'&&v.warningHidden===true&&v.onClass===false;})()`);
+  await check('P5 decision starts authoritative off in trio',`(()=>{const v=${dState},title=document.getElementById('judge-decision-toggle').closest('label').title;return v.checked===false&&v.disabled===false&&v.label==='替我决策'&&title==='手动处理工作流启用、意图确认、方案确认、角色任命、文件修订和合并卡（默认）'&&v.warningHidden===true&&v.onClass===false;})()`);
   await js(`document.getElementById('judge-decision-toggle').click()`);await pause(80);
-  await check('P5 decision first enable shows amber marker and the same one warning block',`(()=>{const v=${dState};return v.checked&&!v.disabled&&v.label==='替我决策中 · 自动代理'&&!v.warningHidden&&v.onClass&&v.warningText.includes('替我决策中：提案接受、任命、验收将由自动代理代批。')&&!v.warningText.includes('替我审批中：');})()`);
+  await check('P5 decision first enable shows amber marker and the same one warning block',`(()=>{const v=${dState},title=document.getElementById('judge-decision-toggle').closest('label').title;return v.checked&&!v.disabled&&v.label==='替我决策'&&title==='幕僚代决策'&&!v.warningHidden&&v.onClass&&v.warningText.trim()==='幕僚代决策';})()`);
   await js(`document.getElementById('shell-judge-warning-close').click()`);await pause(40);
   await js(`document.getElementById('judge-decision-toggle').click()`);await pause(80);
   await check('P5 decision disable hides warning and returns to manual label',`(()=>{const v=${dState};return !v.checked&&v.label==='替我决策'&&v.warningHidden&&!v.onClass;})()`);
@@ -277,7 +277,7 @@ async function judgeChecks(){
   judgeGovernanceModel='single';await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);await pause(60);
   await check('P5 single project disables decision with explicit note',`(()=>{const v=${dState};return v.disabled&&!v.checked&&v.label==='替我决策'&&v.noteShown&&v.note==='旧治理模型（single）不支持代决策';})()`);
   judgeGovernanceModel='trio';await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);await pause(60);
-  await check('P5 trio project restores decision availability',`(()=>{const v=${dState};return !v.disabled&&v.label==='替我决策'||v.label==='替我决策中 · 自动代理';})()`);
+  await check('P5 trio project restores decision availability',`(()=>{const v=${dState};return !v.disabled&&v.label==='替我决策';})()`);
   await push('decision:judge-state',{version:1,enabled:false});
   await check('P5 decision off after checks',`(()=>{const v=${dState};return !v.checked&&v.label==='替我决策'&&!v.onClass;})()`);
  }

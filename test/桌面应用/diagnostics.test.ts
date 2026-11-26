@@ -9,6 +9,52 @@ import { createWindowIpcRegistrar, observeWindowDiagnostics, recordRendererDiagn
 import { configureDiagnostics, createDiagnosticLogger, flushDiagnostics, disposeDiagnostics } from "../../src/common/shared/diagnostics.ts";
 import { createCustomerInputChannel, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import { createShellConfirmPresenter } from "../../app/desktop/operator-channel.ts";
+import { Diagnostics } from "../../app/desktop/session/diagnostics.ts";
+import { queueKey } from "../../app/desktop/session/shared/keys.ts";
+import type { DesktopDurableWorkflow } from "../../app/desktop/durable-workflow.ts";
+
+test("Dapr governance feedback uses the existing information line at running and terminal stages", async () => {
+  const projectRoot = "C:/demo";
+  const lastAssistantText = new Map<string, { text: string }>();
+  const state: ConstructorParameters<typeof Diagnostics>[0] = {
+    sessions: new Map(), deliveryQueues: new Map(), activeDeliveries: new Map(), openChains: new Map(), rebuildChains: new Map(),
+    lastGovernanceRuntime: new Map(), lastRoleActivity: new Map(), lastTurns: new Map(), lastAssistantText,
+    governanceHandbackMirrored: new Map(), governanceClientProjections: new Map(),
+    getNetworkState: () => null, setNetworkState: () => {}, getActiveRoleId: () => null,
+  };
+  const rejectLegacyTransport = () => assert.fail("Dapr feedback must never open, enqueue or send a Chief model turn");
+  const ports: ConstructorParameters<typeof Diagnostics>[1] = {
+    openBackground: rejectLegacyTransport, sendBackground: rejectLegacyTransport, enqueueDelivery: rejectLegacyTransport,
+    drainQueue: rejectLegacyTransport, drainAllQueuesFor: rejectLegacyTransport, notifyRoleState: () => {},
+  };
+  let active = true;
+  const durableWorkflow = {
+    owns: async () => active, store: async () => ({ owner: async () => undefined }),
+    find: async () => ({ status: "blocked", workflowOwnedDispatch: true }),
+  } as unknown as DesktopDurableWorkflow;
+  const observed: { roleId: string; event: { kind: string; summary: string; detail?: unknown } }[] = [];
+  const diagnostics = new Diagnostics(state, ports, {
+    durableWorkflow, emitEvent: value => { observed.push(value as typeof observed[number]); },
+    getListing: root => root === projectRoot ? { projectRoot, governanceModel: "trio", primaryRoleId: "chief", warnings: [], hasRoles: true,
+      roles: [{ roleId: "convener", builtIn: true, governanceFunction: "schedule", displayName: "运营",
+        cardPath: "", boundaryPath: "", cardText: "", boundary: { entries: [], boundarySource: "", acceptance: { accepted: true, source: "" } } }] } : undefined,
+  });
+  const source = queueKey(projectRoot, "convener", "pi");
+  for (const stage of [true, false]) {
+    active = stage;
+    lastAssistantText.set(source, { text: "Internal operator record" });
+    await diagnostics.mirrorGovernanceFeedback(projectRoot, "pi", "convener");
+    await diagnostics.mirrorGovernanceFeedback(projectRoot, "pi", "convener");
+  }
+  assert.equal(observed.length, 2);
+  for (const row of observed) {
+    assert.equal(row.roleId, "chief");
+    assert.equal(row.event.kind, "message");
+    assert.deepEqual(row.event.detail, { source: "delivery-note" });
+    assert.match(row.event.summary, /运营.*反馈已记录/);
+    assert.doesNotMatch(row.event.summary, /Internal operator record/);
+  }
+});
 
 test("窄诊断桥：关键节点落入统一sink，拒任意事件/路径，凭据净化且不存正文", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ans-desktop-diagnostics-"));

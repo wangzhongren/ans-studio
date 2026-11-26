@@ -14,6 +14,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type { ShellExecutionOutcome, ShellPostAuditResult, ShellReviewRequest } from "../../model/runtime.ts";
+import type { DurableA11GitObservation } from "../../model/durable-workflow.ts";
 import {
   baselineShaFor,
   isVersionedDocPath,
@@ -273,11 +274,27 @@ export interface ShellPostAuditRecord {
   appStateChanges?: ShellPostAuditChange[];
   /** 经写日志归因的合法工具写入（并发会话/应用工具写）。 */
   attributed?: ShellPostAuditChange[];
+  strict?: {
+    retestKey: string;
+    before: string;
+    after?: string;
+    coverage: readonly string[];
+    reason?: string;
+  };
+}
+
+interface StrictAuditBinding {
+  key: string;
+  candidateOid: string;
+  branch: string;
+  isCurrent(): boolean;
+  observeGit(): Promise<DurableA11GitObservation>;
 }
 
 export interface ShellPostAudit {
   /** 执行前快照（shell 闸在最终 allow 前调用；失败不阻塞执行，退化为空快照）。 */
   snapshotBefore(req: ShellReviewRequest): Promise<void>;
+  snapshotRetest(req: ShellReviewRequest, binding: StrictAuditBinding): Promise<void>;
   /** 执行后对比并（发现越界时）写审计；返回越界清单（工具层如实暴露）。 */
   auditAfter(req: ShellReviewRequest, outcome: ShellExecutionOutcome): Promise<ShellPostAuditResult>;
 }
@@ -310,8 +327,74 @@ export interface CreateShellPostAuditOptions {
   clock?: () => number;
 }
 
+type StrictTree = Map<string, TreeEntryFacts & { sha256: string }>;
+type StrictSnapshot = { tree: StrictTree; digest: string; clean: boolean };
+
+function sameStrictRequest(first: ShellReviewRequest, second: ShellReviewRequest): boolean {
+  return first.command === second.command && first.cwd === second.cwd && first.roleId === second.roleId
+    && first.turnId === second.turnId && first.toolCallId === second.toolCallId
+    && JSON.stringify(first.argv) === JSON.stringify(second.argv);
+}
+
+async function snapshotStrict(projectRoot: string, roots: readonly string[], limit: number,
+  binding: StrictAuditBinding, requireClean: boolean): Promise<StrictSnapshot> {
+  const fail = (reason: string) => new Error(reason);
+  const tree: StrictTree = new Map();
+  const base = path.resolve(projectRoot);
+  const git = await binding.observeGit();
+  const clean = !!(git.head === binding.candidateOid && git.branch === binding.branch && git.indexDigest && git.worktreeDigest
+    && !git.lock && !git.stagedPaths.length && !git.trackedDirty && git.untrackedPaths?.length === 0);
+  if (!binding.isCurrent() || requireClean && !clean) {
+    throw fail("补测候选、分支、索引或工作区当前不可核验。");
+  }
+  if (!(await fs.lstat(path.join(base, ".git"))).isDirectory()) {
+    throw fail("项目 Git 元数据位于另一个目录，严格补测无法证明覆盖。");
+  }
+  for (const pointer of [".git/commondir", ".git/objects/info/alternates"]) {
+    const missing = await fs.lstat(path.join(base, pointer)).then(() => false, (error: NodeJS.ErrnoException) => error.code === "ENOENT");
+    if (!missing) throw fail("项目 Git 元数据存在无法覆盖的外部指向：" + pointer);
+  }
+  let entries = 0;
+  let bytes = 0;
+  const walkStrict = async (file: string, label: string): Promise<void> => {
+    if (++entries > limit) throw fail("严格补测观测超过文件或目录覆盖上限。");
+    const before = await fs.lstat(file);
+    if (before.isSymbolicLink()) throw fail("严格补测遇到未能覆盖的符号链接：" + label);
+    if (before.isDirectory()) {
+      const listing = (await fs.readdir(file)).sort();
+      tree.set(label, { size: 0, mtimeMs: 0, sha256: "directory" });
+      for (const name of listing) await walkStrict(path.join(file, name), label === "." ? name : label + "/" + name);
+      if (JSON.stringify(listing) !== JSON.stringify((await fs.readdir(file)).sort()))
+        throw fail("严格补测读取期间目录内容发生变化：" + label);
+      return;
+    }
+    if (!before.isFile() || before.nlink !== 1) throw fail("严格补测无法完整观测路径：" + label);
+    bytes += before.size;
+    if (bytes > 128 * 1024 * 1024) throw fail("严格补测观测超过字节覆盖上限。");
+    const content = await fs.readFile(file);
+    const after = await fs.lstat(file);
+    if (!after.isFile() || before.ino !== after.ino || before.size !== content.length || before.size !== after.size
+      || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw fail("严格补测读取期间文件发生变化：" + label);
+    tree.set(label, { size: after.size, mtimeMs: after.mtimeMs,
+      sha256: createHash("sha256").update(content).update(String(after.mode)).update(String(after.ctimeMs)).digest("hex") });
+  };
+  await walkStrict(base, ".");
+  for (const root of roots) {
+    const target = path.resolve(root);
+    const relative = path.relative(base, target);
+    if (!relative || !relative.startsWith("..") && !path.isAbsolute(relative)) continue;
+    await walkStrict(target, OUTSIDE_SNAPSHOT_PREFIX + target);
+  }
+  const afterGit = await binding.observeGit();
+  if (!binding.isCurrent() || JSON.stringify(git) !== JSON.stringify(afterGit))
+    throw fail("严格补测观测期间实际 Git 状态发生变化。");
+  const digest = createHash("sha256").update(JSON.stringify([binding.key, git, [...tree]])).digest("hex");
+  return { tree, digest, clean };
+}
+
 export function createShellPostAudit(options: CreateShellPostAuditOptions): ShellPostAudit {
   const pending = new Map<string, { snapshot: TreeSnapshot; since: number }>();
+  const strictPending = new Map<string, { binding: StrictAuditBinding; request: ShellReviewRequest; before: StrictSnapshot }>();
   const now = options.now ?? (() => new Date());
   const clock = options.clock ?? (() => Date.now());
   const snapshot = options.snapshot ?? ((input) =>
@@ -322,19 +405,67 @@ export function createShellPostAudit(options: CreateShellPostAuditOptions): Shel
       ...(options.extraRoots !== undefined ? { extraRoots: options.extraRoots } : {}),
     }));
 
+  const persistRecord = async (record: ShellPostAuditRecord, strict = false): Promise<void> => {
+    if (options.auditWriter !== undefined) {
+      await options.auditWriter(record);
+      return;
+    }
+    const file = path.join(options.projectRoot, "docs", "audit", "shell-gate.jsonl");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const line = `${JSON.stringify(record)}\n`;
+    if (!strict) return fs.appendFile(file, line, "utf8");
+    if (path.relative(options.projectRoot, await fs.realpath(path.dirname(file))) !== "docs" + path.sep + "audit")
+      throw new Error("严格写审计日志路径已变化。");
+    const target = await fs.lstat(file).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+    if (target && (!target.isFile() || target.nlink !== 1)) throw new Error("严格写审计日志不是普通文件。");
+    const handle = await fs.open(file, "a");
+    try {
+      await handle.appendFile(line, "utf8");
+      await handle.sync();
+    } finally { await handle.close(); }
+  };
+
   const writeRecord = async (record: ShellPostAuditRecord): Promise<void> => {
     try {
-      if (options.auditWriter !== undefined) {
-        await options.auditWriter(record);
-        return;
-      }
-      const file = path.join(options.projectRoot, "docs", "audit", "shell-gate.jsonl");
-      await fs.mkdir(path.dirname(file), { recursive: true });
-      await fs.appendFile(file, `${JSON.stringify(record)}\n`, "utf8");
+      await persistRecord(record);
     } catch {
       /* 审计写失败只诊断（调用方在 run_shell 层记），绝不改变回执 */
     }
   };
+  const strictSnapshot = (binding: StrictAuditBinding, requireClean: boolean) => snapshotStrict(options.projectRoot, options.extraRoots ?? [],
+    options.maxEntries ?? DEFAULT_MAX_ENTRIES, binding, requireClean);
+
+  async function auditStrict(req: ShellReviewRequest, outcome: ShellExecutionOutcome,
+    entry: NonNullable<ReturnType<typeof strictPending.get>>): Promise<ShellPostAuditResult> {
+    const violations: ShellPostAuditChange[] = [];
+    let afterDigest: string | undefined;
+    let reason: string | undefined;
+    try {
+      if (!sameStrictRequest(entry.request, req)) throw new Error("严格写审计请求与批准调用不匹配。");
+      const after = await strictSnapshot(entry.binding, false);
+      afterDigest = after.digest;
+      const before = entry.before.tree;
+      violations.push(...diffTreeSnapshots(before, after.tree));
+      for (const [file, row] of after.tree) {
+        const prior = before.get(file);
+        if (prior && prior.mtimeMs === row.mtimeMs && prior.size === row.size && prior.sha256 !== row.sha256)
+          violations.push({ path: file, change: "modified" });
+      }
+      if (!after.clean || violations.length || entry.before.digest !== after.digest) reason = "严格补测观测到无法归因的工作区或 Git 变化。";
+    } catch (error) {
+      reason = "严格补测后观测未完成：" + (error instanceof Error ? error.message : String(error));
+    }
+    const strict = { retestKey: entry.binding.key, before: entry.before.digest, after: afterDigest,
+      coverage: [path.resolve(options.projectRoot), ...(options.extraRoots ?? [])], reason };
+    const record = { v: 1 as const, at: now().toISOString(), toolCallId: req.toolCallId, command: req.command, outcome,
+      violations, strict };
+    try { await persistRecord(record, true); }
+    catch { return { violations, strictAudit: { status: "failed", reason: "严格写审计观察未能可靠落账。" } }; }
+    if (reason) return { violations, strictAudit: { status: "failed", reason } };
+    return { violations, strictAudit: { status: "passed", digest: createHash("sha256").update(JSON.stringify(record)).digest("hex") } };
+  }
 
   return {
     async snapshotBefore(req) {
@@ -345,7 +476,19 @@ export function createShellPostAudit(options: CreateShellPostAuditOptions): Shel
         /* 快照失败 ⇒ 不审计（不阻塞执行） */
       }
     },
+    async snapshotRetest(req, binding) {
+      if (path.relative(options.projectRoot, req.cwd) || strictPending.size)
+        throw new Error("严格补测仅允许原项目根的一个当前前台调用。");
+      const before = await strictSnapshot(binding, true);
+      if (strictPending.size) throw new Error("当前已有另一次严格补测调用。");
+      strictPending.set(req.toolCallId, { binding, request: { ...req, argv: [...req.argv] }, before });
+    },
     async auditAfter(req, outcome) {
+      const strict = strictPending.get(req.toolCallId);
+      if (strict) {
+        try { return await auditStrict(req, outcome, strict); }
+        finally { strictPending.delete(req.toolCallId); }
+      }
       const beforeEntry = pending.get(req.toolCallId);
       pending.delete(req.toolCallId);
       if (beforeEntry === undefined) return { violations: [] };

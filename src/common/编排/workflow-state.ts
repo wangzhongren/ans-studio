@@ -14,9 +14,6 @@
 // 不变量（投影层）、关闭证据 fail-closed；**MF-IR-1 rework 语义**按冻结判据：
 // `stage.reworked.stage` = 回落目标阶段，`reworkOf` = 被返工的来源阶段（A12b→A11 时
 // `reworkOf:"A12b"`、`stage:"A11"`）；投影把 `reworkOf` 标记 failed、当前阶段置 `stage`。
-// 2026-11-20（SMOKE-2 S1）追加**同阶段 block 重入场**：事件带 `blockId` 时要求
-// `stage === reworkOf === 当前阶段` 且当前阶段 blocked（只由 block resolved(fixed|decided) 驱动），
-// 投影把该阶段置 pending、attempt 更新并清 blocked；无 `blockId` 的事件语义逐字不变。
 // 阶段完成的 artifact/hash/角色激活齐全等**应用事实**由 `workflow-service` 在写事件前校验；
 // 本模块仍是纯投影：缺事件/坏行/顺序非法 ⇒ `workflow-corrupt`，不猜、不自动推进。
 //
@@ -66,6 +63,33 @@ export interface WorkflowView {
   activatedRoleIds?: string[];
   /** 投影输入统计：形状非法事件数 / 幂等键重复事件数（坏事件不阻塞，关键缺失才 corrupt）。 */
   skippedEvents?: { invalid: number; duplicate: number };
+}
+
+export interface WorkflowValidationContext {
+  projectRoot: string;
+  operation: DurableDomainOperation;
+  view: WorkflowView;
+  events: WorkflowEvent[];
+}
+
+const workflowValidation = new AsyncLocalStorage<WorkflowValidationContext>();
+
+export function withWorkflowValidation<T>(context: WorkflowValidationContext, operation: () => T): T {
+  return workflowValidation.run(context, operation);
+}
+
+export function currentWorkflowValidation(projectRoot: string): WorkflowValidationContext | undefined {
+  const scope = workflowValidation.getStore();
+  return scope && path.relative(scope.projectRoot, projectRoot) === '' ? scope : undefined;
+}
+
+export function domainWorkflowView(workflowId: string, flowId: string, stage: WorkflowStage, attempt: number,
+  completed: readonly WorkflowStage[], status: WorkflowStageState['status']): WorkflowView {
+  const view = baseView(workflowId, flowId, stage.startsWith('B') ? 'B' : 'A', stage);
+  for (const item of completed) view.stages[item] = { status: 'completed', attempt };
+  view.stages[stage] = { status, attempt };
+  view.status = status;
+  return view;
 }
 
 /**
@@ -238,34 +262,6 @@ function applyWorkflowEvent(view: WorkflowView, event: WorkflowEvent): string | 
       return undefined;
     }
     case "stage.reworked": {
-      // 2026-11-20（SMOKE-2 S1）：block 重入场——`blockId` 在场时是**同阶段**重入（`stage === reworkOf
-      // === 当前 blocked 阶段`）：历史尝试置 failed、目标置 pending（新 attempt），清 blocked。
-      // 只有 block 已 resolved(fixed|decided) 才允许（应用事实由 workflow-service 写事件前校验）；
-      // 无 `blockId` 的旧事件继续走下方 MF-IR-1 冻结语义（逐字不变）。
-      if (event.blockId !== undefined) {
-        if (typeof event.blockId !== "string" || event.blockId.trim() === "") {
-          return "stage.reworked block 重入场必须携带非空 blockId";
-        }
-        if (event.reworkOf !== view.stage) {
-          return `stage.reworked block 重入场来源阶段不匹配：reworkOf=${event.reworkOf} != 当前 ${view.stage}`;
-        }
-        if (event.stage !== event.reworkOf) {
-          return `stage.reworked block 重入场必须同阶段：stage=${event.stage} != reworkOf=${event.reworkOf}`;
-        }
-        const state = view.stages[event.reworkOf];
-        if (state.status !== "blocked") {
-          return `stage.reworked block 重入场只接受 blocked 阶段：${event.reworkOf}(${state.status})`;
-        }
-        // 同一阶段记录：历史尝试以 failed 结束、目标（同阶段）以新 attempt 置 pending——
-        // 投影只保留终态 pending（与 MF-IR-1 的 failed 来源标记不同，这里是同阶段重入）。
-        state.status = "pending";
-        state.lastEventId = event.idempotencyKey;
-        state.attempt = Math.max(state.attempt, event.attempt);
-        view.stage = event.stage;
-        view.status = "pending";
-        view.blocked = undefined;
-        return undefined;
-      }
       // MF-IR-1（冻结判据）：`stage` = 回落目标（A11），`reworkOf` = 被返工来源（A12b）。
       // 合法性：`reworkOf` 必须是当前阶段（被返工者）且处于在办/已完成/阻塞；`stage` 必须等于
       // 冻结的回落映射（A3→A2 / A6→A5 / A12b→A11 / B2→B1）。
@@ -393,6 +389,8 @@ export function deriveWorkflowView(
   events: readonly WorkflowEvent[],
   tasks: readonly TaskStateEvent[] = [],
 ): WorkflowView {
+  const domain = workflowValidation.getStore();
+  if (domain && events.length && events[0]?.workflowId === domain.view.workflowId) return structuredClone(domain.view);
   const skipped = { invalid: 0, duplicate: 0 };
   const valid: WorkflowEvent[] = [];
   const seen = new Set<string>();
@@ -471,3 +469,6 @@ export function canDispatchStage(view: WorkflowView, stage: WorkflowStage): bool
 export function canCompleteStage(view: WorkflowView, stage: WorkflowStage): boolean {
   return canComplete(view, stage);
 }
+import { AsyncLocalStorage } from 'node:async_hooks';
+import path from 'node:path';
+import type { DurableDomainOperation } from '../../model/durable-workflow.ts';

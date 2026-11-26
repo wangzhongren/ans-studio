@@ -14,8 +14,10 @@ import { AlertTriangle, ShieldCheck, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/chat/chat-store";
+import { isWorkflowStartCard } from "@/chat/decision-card";
 import {
   confirmDecisionPayload,
+  decisionRequestOf,
   decisionView,
   pendingMoreCount,
   rejectDecisionPayload,
@@ -63,6 +65,7 @@ export function DecisionDialog() {
 
   const payload = activeId ? pending[activeId] : undefined;
   const view = payload ? decisionView(payload, locale) : null;
+  const workflowStart = isWorkflowStartCard(decisionRequestOf(payload));
   const role = view ? findRole(roles, view.sourceRoleId) : null;
   const roleName = role ? roleDisplayName(role, locale) : view?.sourceRoleId || t("ui.role.noneSelected");
   const more = activeId ? pendingMoreCount(pending, activeId) + Object.keys(queued).length : 0;
@@ -83,7 +86,9 @@ export function DecisionDialog() {
     if (document.activeElement instanceof HTMLElement) {
       restoreRef.current = document.activeElement;
     }
-    const recommended = view?.options.filter((option) => option.recommended).map((option) => option.id) ?? [];
+    const recommended = workflowStart
+      ? []
+      : view?.options.filter((option) => option.recommended).map((option) => option.id) ?? [];
     setSelected(recommended);
     // 客户主权（C1/F1）：勾选项一律不预选、不默认全选；换卡即清空。
     setAcknowledged([]);
@@ -168,8 +173,11 @@ export function DecisionDialog() {
     sendLock.current = true;
     setBusy(true);
     setError("");
+    const project = useChatStore.getState().projectRoot;
     await useChatStore.getState().respondOperator(activeId, decision);
-    const remaining = useChatStore.getState().pendingOperator[activeId];
+    const current = useChatStore.getState();
+    if (workflowStart && current.projectRoot !== project) return;
+    const remaining = current.pendingOperator[activeId];
     setBusy(false);
     if (remaining) {
       sendLock.current = false;
@@ -192,11 +200,17 @@ export function DecisionDialog() {
     void send(decision);
   };
 
+  const rejectWorkflowStart = workflowStart
+    ? view.options.find((option) => option.id === "reject-workflow-start")
+    : undefined;
+
   const reject = () => {
     if (view.kind === "choice") {
-      // VCA 客户主权卡（选项含 reject-version-change）：底部「拒绝」必须**真正拒绝申请**
-      // （选中拒绝项并提交）；不能用 cancelled——那只是放弃作答，申请会继续挂在待批（旧陷阱）。
-      const rejectOption = view.options.find((option) => option.id === "reject-version-change");
+      // Application workflow cards and version changes have explicit negative decisions.
+      const request = decisionRequestOf(payload);
+      const rejectOption = rejectWorkflowStart ?? (request.application === true && request.cardKind === "merge-main"
+        ? view.options.find((option) => option.id === "reject-merge-main")
+        : view.options.find((option) => option.id === "reject-version-change"));
       if (rejectOption !== undefined) {
         void send({ kind: "choice", selected: [rejectOption.id] }, { allowCancel: true });
         return;
@@ -232,7 +246,7 @@ export function DecisionDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="dd-title"
-        aria-describedby="dd-source dd-risk"
+        aria-describedby={workflowStart ? "dd-source" : "dd-source dd-risk"}
         data-request-id={view.id}
         data-priority={view.priority}
       >
@@ -247,7 +261,8 @@ export function DecisionDialog() {
                 variant="outline"
                 className={"dd-kind" + (view.acceptance ? " is-acceptance" : "")}
               >
-                {view.acceptance ? t("ui.decisionDialog.acceptanceKind") : view.cardKind}
+                {workflowStart ? t("ui.durableWorkflow.activationCard")
+                  : view.acceptance ? t("ui.decisionDialog.acceptanceKind") : view.cardKind}
               </Badge>
             ) : null}
             {view.destructive ? (
@@ -270,7 +285,7 @@ export function DecisionDialog() {
         <p id="dd-source" className="dd-source">
           {t("ui.decisionDialog.sourceRole", { role: roleName })}
         </p>
-        <p id="dd-risk" className={"dd-risk" + (view.highRisk ? " is-high" : "")}>
+        {!workflowStart ? <p id="dd-risk" className={"dd-risk" + (view.highRisk ? " is-high" : "")}>
           {view.highRisk ? (
             <>
               <AlertTriangle size={12} strokeWidth={1.75} aria-hidden="true" />{" "}
@@ -279,7 +294,7 @@ export function DecisionDialog() {
           ) : (
             t("ui.decisionDialog.highRisk")
           )}
-        </p>
+        </p> : null}
         {view.judgeNotice ? <p className="dd-judge">{view.judgeNotice}</p> : null}
 
         {showPreview ? (
@@ -410,7 +425,7 @@ export function DecisionDialog() {
           {view.kind === "choice" ? (
             <>
               <button type="button" className="dd-reject" disabled={busy} onClick={reject}>
-                {t("ui.decisionDialog.reject")}
+                {rejectWorkflowStart?.label ?? t("ui.decisionDialog.reject")}
               </button>
               <Button
                 type="button"

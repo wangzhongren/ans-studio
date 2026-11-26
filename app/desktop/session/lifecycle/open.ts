@@ -29,6 +29,11 @@ import type {
   DownloadRequestRuntime,
 } from "../../../../src/pipeline/orchestration/download-request.ts";
 import { buildDownloadCardRequest, createRequestDownloadCapability, toDownloadApprovalOutcome } from "../../download-request.ts";
+import { evidenceOperatorBinding, graphTurn, authorizeA11PackageLock, graphRolePorts, isA11PackageLockWorker, preflightDesktopEnvironmentOwner } from "../../durable-workflow-a.ts";
+import { acceptanceCommandObserver, acceptanceEnvironmentRestore, acceptanceEnvironmentTask, closeAcceptanceEnvironmentChild } from "../../durable-acceptance-environment.ts";
+import { desktopEvidenceCollectionCommandGuard, desktopImplementationRetestGuard, observeEvidenceCollectionExecution, observeImplementationSelfTest } from "../../durable-blocked-routing.ts";
+import { documentRevisionPorts, isDocumentRevisionTurn } from "../../durable-document-revision.ts";
+import { generateDesktopPackageLock } from "../../governed-package-lock.ts";
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
 import {
   appendWorkflowEvent,
@@ -65,15 +70,11 @@ import {
   resolveProjectFixedPanelMode,
   sessionWorkflowModeForChat,
   sessionWorkflowModeForTask,
-  sessionWorkflowProtocolForChat,
-  sessionWorkflowProtocolForTask,
   shouldRecordFixedStageDispatch,
   workflowModeForFlowResolver,
   type FixedReleaseTriggerStage,
   type WorkflowMode,
 } from "../../workflow.ts";
-import { WORKFLOW_PROTOCOL_APP_DISPATCH, WORKFLOW_PROTOCOL_FIXED_V2_1, type WorkflowProtocol } from "../../../../src/model/runtime.ts";
-import type { SelectWorkflowFn } from "../../../../src/provider/runtime/tools.ts";
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../../../src/common/shared/diagnostics.ts";
 import { mainT } from "../../i18n.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../../../src/common/编排/watchdog.ts";
@@ -85,6 +86,7 @@ import type { InstallSkillFn, InstallSkillPayload, InstallSkillReceipt, Uninstal
 import type { InstallMcpFn, InstallMcpPayload, InstallMcpReceipt, UninstallMcpFn } from "../../../../src/model/runtime.ts";
 import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../../../src/pipeline/orchestration/shell-arming.ts";
 import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn, ChiefDecisionBasis, ChiefDecisionHost } from "../../customer-input.ts";
+import { durableChiefDecisionExecutor, executeChiefDecision } from "../../durable-workflow.ts";
 import { createViewImageDelivery } from "../../view-image.ts";
 import { loadEffectiveConfig as defaultLoadEffectiveConfig, type ConfigSourceKind, type LoadConfigOptions, type LoadedConfig } from "../../../../src/common/shared/config-loader.ts";
 import { RUNTIME_KINDS, type RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
@@ -276,8 +278,10 @@ export class LifecycleOpen {
     // 收到 `request_stable_write`）。强制只在 trio 生效（固定路径为 trio 产品流程）；未携带时下面
     // task/chat 逻辑逐字不变。
     const listingGovernanceModel = this.deps.getListing(req.projectRoot)?.governanceModel ?? "single";
+    const durable = this.deps.durableWorkflow;
+    const durableOwned = durable ? await durable.owns(req.projectRoot) : false;
     const forcedSessionWorkflowMode: WorkflowMode | undefined =
-      req.forcedWorkflowMode === "fixed" && listingGovernanceModel === "trio" ? "fixed" : undefined;
+      (req.forcedWorkflowMode === "fixed" || durableOwned) && listingGovernanceModel === "trio" ? "fixed" : undefined;
     const requestedSessionMode: WorkflowMode =
       forcedSessionWorkflowMode ??
       (listingGovernanceModel === "trio"
@@ -311,13 +315,29 @@ export class LifecycleOpen {
     // （聊天打开/上一任务）时同样按 B8.1 口径安全重开；busy/关闭失败 ⇒ fail-closed。O-1 重建续段
     // （`internalReopen`）不参与任务重绑：其 taskId 取自被重建条目自身，不能反过来打断并发新会话。
     const forcedExisting = this.sessions.get(key);
+    if (req.workflowChatInput && !durableOwned && forcedExisting && durable?.isSession(forcedExisting.handle)) {
+      const ended = !internalReopen && req.roleId === "chief" && req.taskId === undefined
+        && forcedExisting.assignedTaskId === undefined && await durable.canRebindCompletedSession(req.projectRoot, forcedExisting.handle);
+      if (stopped()) return stoppedResult();
+      if (!ended || this.sessions.get(key) !== forcedExisting || forcedExisting.busy
+        || !this.deps.workflowChiefStart?.isInputCurrent(req.projectRoot, req.workflowChatInput)) {
+        return { ok: false, error: "workflow-chat-rebind-blocked" };
+      }
+      this.host.healStaleOrigin(forcedExisting, "stale-origin-before-workflow-chat-rebind");
+      if (this.activeRoleId === key && this.selectionVersion === selectionVersion) ctx.userInitiated = true;
+      const closed = await this.disposeEntry(key, forcedExisting);
+      if (closed !== null) return { ok: false, error: "workflow-chat-rebind-close-failed" };
+    }
     const fixedTaskRebindPending = forcedSessionWorkflowMode === "fixed" && !internalReopen
       && typeof req.taskId === "string" && req.taskId !== ""
       && forcedExisting !== undefined && forcedExisting.projectRoot === req.projectRoot
       && forcedExisting.sessionWorkflowMode === "fixed"
       && forcedExisting.assignedTaskId !== req.taskId;
+    const durableUnboundRebind = durableOwned && req.forcedWorkflowMode === "fixed" && !internalReopen
+      && req.taskId === undefined && forcedExisting?.assignedTaskId !== undefined;
     if (forcedSessionWorkflowMode === "fixed" && forcedExisting && forcedExisting.projectRoot === req.projectRoot
-        && (forcedExisting.sessionWorkflowMode !== "fixed" || fixedTaskRebindPending)) {
+        && (forcedExisting.sessionWorkflowMode !== "fixed" || fixedTaskRebindPending || durableUnboundRebind
+          || durableOwned && !durable?.isSession(forcedExisting.handle))) {
       const rebindDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId });
       if (forcedExisting.busy || forcedExisting.origins.running !== undefined) {
         rebindDiagnostic.record("session.fixed-rebind.blocked", { reasonCode: "target-busy", previousWorkflowMode: forcedExisting.sessionWorkflowMode, taskBinding: fixedTaskRebindPending ? "different-task" : "not-fixed" });
@@ -333,16 +353,6 @@ export class LifecycleOpen {
     ctx.forcedSessionWorkflowMode = forcedSessionWorkflowMode;
     ctx.requestedSessionMode = requestedSessionMode;
     ctx.requestedAssignment = requestedAssignment;
-    // 2026-11-17（app-dispatch/v1 第一步）：会话驱动协议（fixed 会话才有意义）。
-    // · 任务会话 ⇒ 该任务 workflow 的 `workflow.started.protocol`（缺失/读失败 ⇒ 旧协议 fail-closed）；
-    // · 聊天（无 taskId）⇒ 项目活动 workflow 协议；无 workflow 的新项目 ⇒ app-dispatch/v1（协调者口径）。
-    // fixed-v2.1 在飞 ⇒ 旧工具面/旧行为逐字保留（Q10 不迁移）。
-    ctx.sessionWorkflowProtocol = requestedSessionMode !== "fixed"
-      ? undefined
-      : req.taskId !== undefined
-        ? ((await sessionWorkflowProtocolForTask(req.projectRoot, req.taskId)) ?? WORKFLOW_PROTOCOL_FIXED_V2_1)
-        : await sessionWorkflowProtocolForChat(req.projectRoot);
-    ctx.appDispatchSession = requestedSessionMode === "fixed" && ctx.sessionWorkflowProtocol === WORKFLOW_PROTOCOL_APP_DISPATCH;
   }
 
   /** reuseOrRebindEntry：openInternalUnsafe 连续块（源 2061–2134；映射见 change 记录）。 */
@@ -605,30 +615,6 @@ export class LifecycleOpen {
       sessionWorkflowMode === "fixed" && direct !== undefined && (req.roleId === "chief" || req.roleId === "convener")
         ? async (input, signal) => this.closeCreatedTaskFixedForSession(req.projectRoot, req.roleId, input, signal)
         : undefined;
-    // 2026-11-17（app-dispatch/v1）：`select_workflow` 能力（仅应用驱动协议的 fixed 幕僚会话注入）。
-    // 宿主捕获 chief **当前真实客户轮次**（turnId）作为 sourceTaskId；轮次不在跑/已变 ⇒ 不伪造（返回
-    // `stage-request-source-missing`）。流程启动/首阶段任务创建/投递由应用驱动（不在本层）。
-    const selectWorkflowBinding: { handle?: RoleSessionHandle } = {};
-    const selectWorkflow: SelectWorkflowFn | undefined = ctx.appDispatchSession === true && req.roleId === "chief"
-      ? async (payload, metadata) => {
-          const entry = this.sessions.get(key);
-          const origin = entry?.origins.running;
-          const current = !!entry && !!origin && entry.handle === selectWorkflowBinding.handle && this.sessions.get(key) === entry
-            && entry.busy && !origin.settled && !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted
-            && (!metadata || ((metadata.turnId === undefined || metadata.turnId === origin.turnId)
-              && (metadata.roleId === undefined || metadata.roleId === req.roleId)));
-          return this.host.appDispatchSelectWorkflow({
-            projectRoot: req.projectRoot,
-            runtime: req.runtime,
-            workflowPath: payload.workflowPath,
-            flowId: payload.flowId,
-            ...(payload.acceptanceStrength !== undefined ? { acceptanceStrength: payload.acceptanceStrength } : {}),
-            ...(current && origin !== undefined ? { sourceTaskId: origin.turnId } : {}),
-          });
-        }
-      : undefined;
-    ctx.selectWorkflow = selectWorkflow;
-    ctx.selectWorkflowBinding = selectWorkflowBinding;
     ctx.governanceModel = governanceModel;
     ctx.governanceFunction = governanceFunction;
     ctx.sessionWorkflowMode = sessionWorkflowMode;
@@ -732,9 +718,8 @@ export class LifecycleOpen {
       canObserve ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
     const contractCheck: ContractCheckFn | undefined =
       // B7.1：契约速查按**本会话**的 workflow 模式分流（fixed 视图不含 legacy run/pin 口径；
-      // legacy/single 模式参数缺省路径逐字不变）。2026-11-17：fixed 再按协议分流（app-dispatch/v1
-      // 显示应用流程驱动/新任务种类/新稳定码；fixed-v2.1 文案逐字不变）。
-      (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input, sessionWorkflowMode, ctx.sessionWorkflowProtocol);
+      // legacy/single 模式参数缺省路径逐字不变）。
+      (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input, sessionWorkflowMode);
     // 2026-11-09（文档格式权威说明，方案 P1.2 §3.1/§4.1；B1 AC-9/AC-10）：`doc_format` 只读数据源——
     // **所有角色会话**（6 个内置治理角色 + 项目角色）与 `contractCheck` 同位无条件注入（项目角色走同一条
     // `openRoleSession` 路径，不依赖技能安装/动态 id 登记）。数据源 `docFormatText` 第一条语句静态早退到
@@ -926,7 +911,7 @@ export class LifecycleOpen {
 
   /** assembleToolSurface：openInternalUnsafe 连续块（源 2543–2956；映射见 change 记录）。 */
   private async assembleToolSurface(ctx: OpenContext): Promise<OpenResult | undefined> {
-    const { req, userInitiated, selectionVersion, internalReopen, lifecycle, key, stopped, stoppedResult, project, role, boundary, governanceModel, governanceFunction, sessionWorkflowMode, legacyOnlyCapabilitiesAllowed, customerInput, writeBoundary, mirrorRoleIdFor, dispatchTask, viewImage, canPresentAppRunChange, versionChangeStack, direct, closeCreatedTask, closeCreatedTaskFixed, selectWorkflow, selectWorkflowBinding, submitVersionChangeCapability, submitRefactorCapability, reportPlanEscalationCapability, requestStableWriteCapability, requestRequirementChange, roleStatus, contractCheck, docFormat, evidenceCheck, sessionTail, roleActivityLog, terminateRoleRun, redispatchTaskCapability, projectStateCapability, projectNoteCapability, requestVersionDecisionCapability, installationBinding, installSkill, uninstallSkill, installMcp, uninstallMcp, interactionState, shellOperatorChannel, shellArming, shellEscalationPresenter, shellOperatorOnly, gitBinding, planBinding, routineShellPolicy, dispatchBinding, currentGitRuntime } = ctx;
+    const { req, userInitiated, selectionVersion, internalReopen, lifecycle, key, stopped, stoppedResult, project, role, boundary, governanceModel, governanceFunction, sessionWorkflowMode, legacyOnlyCapabilitiesAllowed, customerInput, writeBoundary, mirrorRoleIdFor, dispatchTask, viewImage, canPresentAppRunChange, versionChangeStack, direct, closeCreatedTask, closeCreatedTaskFixed, submitVersionChangeCapability, submitRefactorCapability, reportPlanEscalationCapability, requestStableWriteCapability, requestRequirementChange, roleStatus, contractCheck, docFormat, evidenceCheck, sessionTail, roleActivityLog, terminateRoleRun, redispatchTaskCapability, projectStateCapability, projectNoteCapability, requestVersionDecisionCapability, installationBinding, installSkill, uninstallSkill, installMcp, uninstallMcp, interactionState, shellOperatorChannel, shellArming, shellEscalationPresenter, shellOperatorOnly, gitBinding, planBinding, routineShellPolicy, dispatchBinding, currentGitRuntime } = ctx;
     let createAdapter: RuntimeAdapterFactory;
     let profileRevision = this.profileRevision(req.runtime);
     try {
@@ -1020,30 +1005,10 @@ export class LifecycleOpen {
         return this.deps.prepareChiefDecisionEvidence({ projectRoot: req.projectRoot, originRoleId: req.roleId, request, metadata });
       },
       execute: async (context, evidence, decidePendingRequest, signal) => {
-        if (signal.aborted || interactionState.lifetime.signal.aborted) throw new Error("幕僚委托已撤销");
-        // Independent handle, same trusted project/runtime adapter. Never enters the busy chief's queue.
-        const boundedSignal = AbortSignal.any([signal, interactionState.lifetime.signal, AbortSignal.timeout(context.limits.timeoutMs)]);
-        let handle: RoleSessionHandle | undefined;
-        const stop = () => { void handle?.abort?.().catch(() => undefined); };
-        let cancelled: (() => void) | undefined;
-        const aborted = new Promise<never>((_, reject) => {
-          cancelled = () => { stop(); reject(new Error("幕僚独立决策已取消或达到预算")); };
-          boundedSignal.addEventListener("abort", cancelled, { once: true });
-          if (boundedSignal.aborted) cancelled();
-        });
-        const opening = this.openObservedRoleSession({ roleId: "chief", project, runtime: req.runtime,
-          chiefDecisionContext: context, decidePendingRequest }, { createAdapter });
-        void opening.then(late => { if (boundedSignal.aborted && handle !== late) void this.disposeObservedHandle(late).catch(() => undefined); }, () => undefined);
-        try {
-          handle = await Promise.race([opening, aborted]);
-          if (boundedSignal.aborted) throw new Error("幕僚委托已撤销");
-          const consume = (async () => { for await (const _event of handle!.events()) { /* isolated decision stream */ } })();
-          void consume.catch(() => undefined);
-          await Promise.race([handle.send(JSON.stringify({ request: context.request, evidence })), aborted]);
-        } finally {
-          if (cancelled !== undefined) boundedSignal.removeEventListener("abort", cancelled);
-          if (handle !== undefined) await this.disposeObservedHandle(handle);
-        }
+        await executeChiefDecision(context, evidence, AbortSignal.any([signal, interactionState.lifetime.signal]),
+          bounded => this.openObservedRoleSession({ roleId: "chief", project, runtime: req.runtime, chiefDecisionContext: context,
+            decidePendingRequest: (input, toolSignal) => decidePendingRequest(input, toolSignal ? AbortSignal.any([bounded, toolSignal]) : bounded) },
+          { createAdapter }), handle => this.disposeObservedHandle(handle));
       },
     };
     // 客户卡通道路由上下文（客户交互通道与需求变更审批卡**共用同一份**构造）：judge 闭包与 turnText
@@ -1171,6 +1136,102 @@ export class LifecycleOpen {
       // 桌面是否统一改走该入口：另行评估（更正记录见
       // `角色卡/桌面应用/docs/change/2026-10-12_change_session-comment-refresh.md`）。
       if (stopped()) return stoppedResult();
+      const durable = this.deps.durableWorkflow;
+      const durableOwned = durable ? await durable.owns(req.projectRoot) : false;
+      const requestWorkflowStart = durableOwned ? undefined : this.deps.workflowChiefStart?.requestForSession(req.projectRoot, req.roleId, req.taskId, () => {
+        const live = this.sessions.get(key);
+        return live?.handle === gitBinding.handle ? live : undefined;
+      });
+      const durableProjection = durableOwned ? await durable?.find(req.projectRoot) : undefined;
+      const durableFixedWorkflow = requestWorkflowStart !== undefined || durableProjection?.workflowOwnedDispatch === true;
+      const durableImplementationController = durableProjection?.workflowOwnedDispatch === true
+        && durableProjection.action === "operations-implementation" && req.roleId === "convener" && !!req.taskId
+        && durableProjection.pendingTasks?.some(task => task.capability === "operations-implementation" && !task.workItemId
+          && task.stepId === durableProjection.stepId && task.attempt === durableProjection.attempt && task.state === "pending"
+          && task.roleId === req.roleId && task.taskId === req.taskId && task.task.parentTaskId === durableProjection.ref.instanceId);
+      const b3Parent = durableProjection?.action === "b3-implement-and-accept" && durableProjection.scope?.evidenceRequirements?.length
+        ? evidenceOperatorBinding(durableProjection) : undefined;
+      const durableB3EvidenceController = !!b3Parent && b3Parent.taskId === req.taskId && b3Parent.roleId === req.roleId;
+      const getGraphSession = () => {
+        const entry = this.sessions.get(key);
+        return entry?.handle === gitBinding.handle ? entry : undefined;
+      };
+      const revisionTask = isDocumentRevisionTurn(durableProjection, req.roleId, req.taskId);
+      const revision = durable && (revisionTask || durableImplementationController && durableProjection?.documentRevisionEnabled)
+        ? documentRevisionPorts(durable, getGraphSession) : undefined;
+      const selectionId = () => this.deps.getRegisteredProjectLifecycle?.(req.projectRoot)?.selectionId;
+      const registration = selectionId();
+      const isRegistered = () => !!registration && selectionId() === registration;
+      const graph = durable && durableProjection?.schema === 2 && !revisionTask ? graphRolePorts({
+        durable, customer: customerInput,
+        executeDecision: durableChiefDecisionExecutor(this.deps, this.host, req.projectRoot, durableProjection.metadata.runtime),
+        isRegistered,
+        session: getGraphSession,
+      }) : undefined;
+      const effectClaims = durableOwned && !revisionTask ? durable?.taskEffectClaims(req, () => {
+        const entry = getGraphSession();
+        const origin = entry?.origins.running;
+        if (!entry || !origin || origin.settled
+          || entry.interactionState.turn.signal.aborted || entry.interactionState.lifetime.signal.aborted) return undefined;
+        return origin.clientMessageId;
+      }) : undefined;
+      const governedPackageLock = durable && durableProjection && effectClaims && req.taskId
+        && isA11PackageLockWorker(durableProjection, req.roleId, req.taskId)
+        ? { authorize: authorizeA11PackageLock(durable, getGraphSession), generate: generateDesktopPackageLock } : undefined;
+      const recoveryParent = durableProjection && req.taskId
+        ? acceptanceEnvironmentTask(durableProjection, req.roleId, req.taskId, "parent") : undefined;
+      const recoveryChild = durableProjection && req.taskId
+        ? acceptanceEnvironmentTask(durableProjection, req.roleId, req.taskId, "child") : undefined;
+      const preflightOwner = (projectRoot: string, roleId: string) => preflightDesktopEnvironmentOwner(projectRoot, roleId, this.deps);
+      const closeRecovery = durable && recoveryParent ? closeAcceptanceEnvironmentChild(durable, getGraphSession, preflightOwner) : undefined;
+      const observeAcceptanceEnvironmentShell = durable && req.taskId !== undefined && durableProjection?.acceptanceEnvironment?.enabled
+        && durableProjection.acceptanceEnvironment.basis?.assessmentTask.taskId === req.taskId
+        && durableProjection.acceptanceEnvironment.basis.assessmentTask.roleId === req.roleId
+        ? acceptanceCommandObserver(durable, getGraphSession) : undefined;
+      const observeSelfTest = durable && durableProjection?.blockedRoutingEnabled && req.taskId !== undefined
+        && durableProjection.pendingTasks?.some(task => task.capability === "operations-implementation" && task.workOrder && task.state === "pending"
+          && task.taskId === req.taskId && task.roleId === req.roleId && task.stepId === durableProjection.stepId && task.attempt === durableProjection.attempt)
+        ? observeImplementationSelfTest(durable, getGraphSession, selectionId) : undefined;
+      const implementationRetest = observeSelfTest && durable && req.taskId
+        ? desktopImplementationRetestGuard(durable, getGraphSession, req.projectRoot, req.taskId, selectionId)
+        : undefined;
+      const evidenceTask = durableProjection?.pendingTasks?.find(task => task.taskId === req.taskId && task.roleId === req.roleId && task.state === "pending");
+      const evidenceAudit = durableProjection?.evidenceAudit;
+      const evidenceAuditAccess = evidenceTask?.evidenceWorkOrder ? "collect"
+        : evidenceTask?.capability === "independent-assessment" ? "audit" : undefined;
+      const evidenceReadPaths = evidenceAuditAccess && evidenceTask
+        ? [...new Set([evidenceAudit?.basis.standard.path ?? durableProjection?.verificationPlan?.standard.path
+          ?? durableProjection?.acceptanceWorkspace?.basis.criteria.path,
+          ...(evidenceAuditAccess === "collect" ? [
+            ...evidenceAudit?.requirements.flatMap(row => row.paths ?? []) ?? [],
+            ...evidenceTask.evidenceWorkOrder?.writePaths ?? [],
+          ] : [
+            evidenceTask.reviewWritePath,
+            ...evidenceAudit?.records.flatMap(row => row.artifact ? [row.artifact.path] : []) ?? [],
+            ...durableProjection?.acceptanceWorkspace?.browserEvidence?.artifacts.map(row => row.path) ?? [],
+          ]),
+        ].filter((file): file is string => !!file))] : undefined;
+      const evidenceTurn = durable && evidenceTask && graphTurn(durable, getGraphSession);
+      const evidenceAuditIsCurrent = evidenceAuditAccess && evidenceTurn && (async () => {
+        if (!isRegistered() || !durable || !evidenceTask) return false;
+        const live = await evidenceTurn();
+        if (!live?.current() || live.entry.assignedTaskId !== evidenceTask.taskId
+          || live.source.parentTaskId !== evidenceTask.taskId || live.delivery.intent.task?.taskId !== evidenceTask.taskId
+          || live.delivery.selectionId !== registration) return false;
+        const store = await durable.store();
+        if (store.evidenceAuditAccess(live.view.ref, evidenceTask.task) !== evidenceAuditAccess) return false;
+        if (evidenceAuditAccess === "audit" && live.view.evidenceAuditEnabled) {
+          const permit = store.evidenceAuditDispatchPermit(live.view.ref, evidenceTask.task);
+          if (!permit.ok || permit.value.generation === undefined
+            || live.delivery.intent.expected?.evidenceAuditGeneration !== String(permit.value.generation)) return false;
+        }
+        return live.current() && isRegistered() && store.listEffects(live.view.ref, "model-send").some(row =>
+          row.intent.key === live.delivery.intent.key && row.state === "succeeded" && row.result?.result?.turnId === live.source.originId);
+      });
+      const observeCollection = evidenceAuditAccess === "collect" && durable
+        ? observeEvidenceCollectionExecution(durable, getGraphSession, selectionId) : undefined;
+      const evidenceCommandGuard = observeCollection && durable
+        ? desktopEvidenceCollectionCommandGuard(durable, getGraphSession, selectionId) : undefined;
       handle = await this.openObservedRoleSession(
         {
           roleId: req.roleId,
@@ -1186,32 +1247,55 @@ export class LifecycleOpen {
           // fixed 工具面（RR 根因修复）。legacy/single 不传本键：per-flow `workflowModeForFlow` 现场解析与
           // 旧注入面逐字不变（常量 legacy 会吞掉混合项目的 per-flow 判定，故不做无条件传入）。
           ...(sessionWorkflowMode === "fixed" ? { workflowMode: sessionWorkflowMode } : {}),
-          // 2026-11-17（app-dispatch/v1 第一步）：fixed 会话**驱动协议**（宿主从 workflow.started.protocol
-          // 解析；fixed-v2.1/缺省 ⇒ run-role 旧工具面逐字保留，Q10 在飞不迁移）。
-          ...(sessionWorkflowMode === "fixed" && ctx.sessionWorkflowProtocol !== undefined ? { workflowProtocol: ctx.sessionWorkflowProtocol } : {}),
-          // 2026-11-17：`select_workflow`（仅 app-dispatch/v1 fixed chief 注入；未注入 ⇒ 工具不注册）。
-          ...(selectWorkflow !== undefined ? { selectWorkflow } : {}),
-          // 2026-11-17：fixed 阶段动作完成应用回调（A8 激活成功后 drive 下一阶段；仅 app-dispatch/v1）。
-          ...(ctx.appDispatchSession === true
-            ? { afterFixedStageAction: (event: { projectRoot: string; workflowId: string; action: "activate-role-documents" }) => { void this.host.appDispatchDriveWorkflow(event.projectRoot, event.workflowId); } }
-            : {}),
+          ...(durableFixedWorkflow ? { durableFixedWorkflow: true } : {}),
+          ...(durableProjection?.evidenceCollectorRoleId ? { evidenceCollectorRoleId: durableProjection.evidenceCollectorRoleId } : {}),
+          ...(durableImplementationController ? { durableImplementationController: true } : {}),
+          ...(durableB3EvidenceController ? { durableB3EvidenceController: true } : {}),
+          ...(recoveryParent ? { durableAcceptanceEnvironmentController: true } : {}),
+          ...(revision && revisionTask ? { submitDocumentRevision: revision.submitDocumentRevision }
+            : revision ? { requestDocumentRevision: revision.requestDocumentRevision } : {}),
           // T3 B4.2（2026-11-10，AC-21/T-09）：fixed 会话注入任务级 Git 写（分类器 + 真实端口）。
           // 仅「trio 项目 + 该任务真实 flow 解析为 fixed + 带真实 taskId」时注入；legacy/single 会话
           // 不传本字段（注入面/行为逐字不变）。桌面只给「实现」——**不传 scope/taskId 事实**：scope 由
           // 编排从 task.created + basis/`change.scope-decided` 解析（桌面不采信模型自报），不可解析 ⇒
           // 编排不注入 scope ⇒ `git add`/`git commit` 一律拒（fail-closed）。端口 `acquireCriticalSection`
           // 与 B3 发布合并共用同一把项目级锁（`acquireProjectGitCriticalSection` 同一实现）。
-          ...(sessionWorkflowMode === "fixed" && req.taskId !== undefined
-            ? { taskGit: buildFixedTaskGitSurface(req.projectRoot) }
+          ...(sessionWorkflowMode === "fixed" && req.taskId !== undefined && !revisionTask && !evidenceAuditAccess
+            ? { taskGit: {
+              ...buildFixedTaskGitSurface(req.projectRoot, effectClaims?.claimTaskGit),
+              ...(durableOwned && durable ? {
+                durableScope: async ({ taskId, roleId }: { taskId: string; roleId: string }) => {
+                  const projection = await durable.find(req.projectRoot);
+                  return projection ? (await durable.store()).taskGitScope(projection.ref, taskId, roleId) : undefined;
+                },
+                ...(graph ? { durableWriteScope: async ({ taskId, roleId }: { taskId: string; roleId: string }) => {
+                  const projection = await durable.find(req.projectRoot);
+                  return projection ? (await durable.store()).taskWriteScope(projection.ref, taskId, roleId) : undefined;
+                } } : {}),
+              } : {}),
+            } }
             : {}),
+          ...(effectClaims ? { claimFileWrite: effectClaims.claimFileWrite } : {}),
+          ...(governedPackageLock ? { governedPackageLock } : {}),
+          ...(durable && recoveryChild ? { restoreAcceptanceEnvironment: acceptanceEnvironmentRestore(durable, getGraphSession, preflightOwner) } : {}),
+          ...(observeAcceptanceEnvironmentShell ? { observeAcceptanceEnvironmentShell } : {}),
+          ...(observeCollection || observeSelfTest ? { observeImplementationSelfTest: observeCollection ?? observeSelfTest } : {}),
+          ...(evidenceAuditAccess && evidenceAuditIsCurrent ? { evidenceAuditAccess, evidenceAuditIsCurrent } : {}),
+          ...(evidenceReadPaths ? { evidenceAuditReadPaths: evidenceReadPaths } : {}),
+          ...(evidenceAuditAccess === "audit" && evidenceTask?.reviewWritePath ? { evidenceAuditReportPath: evidenceTask.reviewWritePath } : {}),
+          ...(evidenceAuditAccess === "collect" && evidenceTask?.evidenceWorkOrder
+            ? { evidenceCollectionWritePaths: evidenceTask.evidenceWorkOrder.writePaths } : {}),
+          ...(evidenceCommandGuard || implementationRetest ? { implementationRetest: evidenceCommandGuard ?? implementationRetest } : {}),
+          ...(graph ? { workflowDomain: graph.workflowDomain } : {}),
           ...(routineShellPolicy ? { routineShellPolicy } : {}),
           // 客户交互通道（A-5）：仅内置治理角色（su / trio 三人）会话注入；Liaison 不注入（§4.3）。
           // **每会话闭包绑定 roleId**（请求本体不带角色标识——渲染侧据它把交互卡落到该角色的聊天流、
           // 点亮 B-3「等待你确认」）。**镜像面**（§6.1）：trio 治理决定卡额外带 `mirrorRoleId=主入口`，
           // 同一请求 id、同一份 pending、只答一次——不是第二个请求。普通角色逐字不传。
-          ...(customerInput
+          ...(customerInput && !revisionTask
             ? {
                 customerInput: async (r: CustomerInputRequest, metadata?: CustomerInputMetadata) => {
+                  if (graph && (r.cardKind === "intent-confirm" || r.cardKind === "proposal" || r.cardKind === "appointment")) return graph.customerInput(r, metadata);
                   // AC-13（D2）：stable boundary 确认卡——用 S7 API 检测 preview 正文扩大；
                   // 扩大 ⇒ 卡面横幅 + required acknowledgments；不可解析 ⇒ 不呈现、结构化拒绝。
                   let effectiveRequest = r;
@@ -1280,17 +1364,19 @@ export class LifecycleOpen {
           // B29（2026-11-11）：fixed 注入实现返回 **fixed 服务形状**（工具层按入参 workflowId+plan 分流到
           // B25 `fixedCompleteTeamPlanReceiptResult`）；注入位类型仍是 legacy `CompleteTeamPlanFn`（共享
           // 同一能力位），运行时形状由工具层校验——故此处显式断言，legacy 分支零改动。
-          ...(direct !== undefined && req.roleId === "convener" ? {
+          ...((!durableOwned || graph) && direct !== undefined && req.roleId === "convener" ? {
             completeTeamPlan: sessionWorkflowMode === "fixed"
               ? ((input: Parameters<CompleteTeamPlanFn>[0], planSignal?: AbortSignal) =>
                   this.completeTeamPlanFixedForHandle(req.projectRoot, req.runtime, planBinding.handle, input, planSignal)) as unknown as CompleteTeamPlanFn
               : (input, signal) => this.completeTeamPlanForHandle(req.projectRoot, req.runtime, planBinding.handle, input, direct, signal),
           } : {}),
-          ...(direct !== undefined && req.roleId === "nominator" ? { activateRoleDocuments: direct.activateRoleDocuments } : {}),
-          ...(closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
+          ...(!durableOwned && direct !== undefined && req.roleId === "nominator" ? { activateRoleDocuments: direct.activateRoleDocuments } : {}),
+          ...(graph && req.roleId === "nominator" ? { activateRoleDocumentsFixed: graph.activateRoleDocumentsFixed } : {}),
+          ...(!durableOwned && closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
           // T3 B3（AC-18/AC-20）：fixed 会话的 `close_created_task` v2 应用实现（补 artifacts/branchTipOid/
           // acceptanceArchive 证据；A12b accepted 时应用生成 `docs/acceptance/*`）；legacy 不注入本键。
-          ...(closeCreatedTaskFixed !== undefined ? { closeCreatedTaskFixed } : {}),
+          ...(closeRecovery !== undefined ? { closeCreatedTaskFixed: closeRecovery }
+            : closeCreatedTaskFixed !== undefined && (!durableFixedWorkflow || req.roleId === "convener") ? { closeCreatedTaskFixed } : {}),
           ...(legacyOnlyCapabilitiesAllowed && submitVersionChangeCapability ? { submitVersionChange: submitVersionChangeCapability } : {}),
           ...(legacyOnlyCapabilitiesAllowed && submitRefactorCapability ? { submitRefactor: submitRefactorCapability } : {}),
           ...(reportPlanEscalationCapability ? { reportPlanEscalation: reportPlanEscalationCapability } : {}),
@@ -1298,7 +1384,7 @@ export class LifecycleOpen {
           // 2026-11-04 下载申请（W-1）：每会话能力；未注入 ⇒ 编排/运行时核心不注册 `request_download`。
           ...(requestDownload ? { requestDownload } : {}),
           // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
-          ...(dispatchTask ? { dispatchTask } : {}),
+          ...(dispatchTask && (!durableFixedWorkflow || durableImplementationController || durableB3EvidenceController || recoveryParent) ? { dispatchTask } : {}),
           // 2026-10-26 view_image：全部角色会话注入（目标已定格＝本会话）；编排原样转交运行时核心。
           viewImage,
           // 2026-10-26 需求变更申请（request_requirement_change，仅统筹/提案会话注入；其余角色不注入）。
@@ -1307,6 +1393,7 @@ export class LifecycleOpen {
           // 2026-11-02（全局任务状态/版本决策）：三能力均「注入才注册」；project_state 给全部内置治理角色，
           // project_note / request_version_decision 仅 chief（编排 run-role 再按 trioSpec 收口）。
           ...(projectStateCapability ? { projectState: projectStateCapability } : {}),
+          ...(requestWorkflowStart ? { requestWorkflowStart } : {}),
           ...(projectNoteCapability ? { projectNote: projectNoteCapability } : {}),
           ...(legacyOnlyCapabilitiesAllowed && requestVersionDecisionCapability ? { requestVersionDecision: requestVersionDecisionCapability } : {}),
           ...(roleStatus ? { roleStatus } : {}),
@@ -1320,7 +1407,7 @@ export class LifecycleOpen {
           ...(roleActivityLog ? { roleActivityLog } : {}),
           // B 批：终止/安全重派动作（仅 chief；「未注入即不注册」）。
           ...(terminateRoleRun ? { terminateRoleRun } : {}),
-          ...(redispatchTaskCapability ? { redispatchTask: redispatchTaskCapability } : {}),
+          ...(redispatchTaskCapability && !durableFixedWorkflow ? { redispatchTask: redispatchTaskCapability } : {}),
           // G-4/I3：技能安装/卸载能力（**仅 su 会话注入**——「未注入即不注册」；编排透传字段落地前
           // 被其静默忽略，零行为影响；落地后即点亮两工具，见 change 文档的依赖登记）。
           ...(installSkill ? { installSkill } : {}),
@@ -1347,7 +1434,7 @@ export class LifecycleOpen {
       dispatchBinding.handle = handle;
       gitBinding.handle = handle;
       planBinding.handle = handle;
-      if (selectWorkflowBinding !== undefined) selectWorkflowBinding.handle = handle;
+      if (durableOwned) await durable?.markSession(handle, req.projectRoot, durableProjection);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }

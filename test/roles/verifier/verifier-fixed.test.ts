@@ -6,7 +6,7 @@
 //
 // 覆盖（不改既有断言、不新增跳过/强制退出机制）：
 //  - fixedCards=[]（v1.3 §3.4 冻结值；与 legacy cards 不同引用，不回退/过滤 legacy）；
-//  - fixed context 段（应用直派、A12a criteria、A12b report、强度=定义参数、如实回交应用、
+//  - fixed context 段（幕僚直派、A12a criteria、A12b report、强度调节、如实回幕僚、
 //    docs/acceptance 应用归档、不派发/不实现/不改他人报告、固定路径不发 acceptance 卡）；
 //  - legacy context/card/cards/capabilities 逐字冻结（context({})/legacy-v1 同一引用 + 冻结哈希）；
 //  - 无 release 合并请求工具（G-IR §六拒绝项）；无跳过/强制退出 token。
@@ -95,29 +95,21 @@ test("fixed context：仅 matrix=\"two-fixed-paths/v1\" 返回 fixed 两段（�
   }
   const all = fixed.map((section) => section.text).join("\n");
 
-  // 2026-11-17（app-dispatch/v1）：A12 任务由**应用直派**（不经运营、不经幕僚），与运营生产派发独立。
-  assert.equal(all.includes("应用直派"), true);
-  assert.equal(all.includes("由应用按流程定义直接创建并投递"), true);
-  assert.equal(all.includes("不经运营、不经幕僚"), true);
-  assert.equal(all.includes("与运营生产派发相互独立"), true);
-  assert.equal(all.includes("幕僚不再直派/收口验收任务"), true);
-  // A12a 实施前 criteria + A12b 实施后 report（v1.3 §3.4/A12）。
+  // 幕僚直派的验收角色 + A12a 实施前 criteria + A12b 实施后 report（v1.3 §3.4/A12）。
+  assert.equal(all.includes("幕僚"), true);
   assert.equal(all.includes("A12a"), true);
   assert.equal(all.includes("A12b"), true);
   assert.equal(all.includes("criteria"), true);
   assert.equal(all.includes("docs/quality/<flowId>-criteria-vN.md"), true);
   assert.equal(all.includes("docs/quality/<flowId>-report-vN.md"), true);
   assert.equal(all.includes("docs/verification/"), true);
-  // 验收强度 = 流程定义参数（select_workflow 可选 acceptanceStrength）。
+  // 按任务文本调节验收强度。
   assert.equal(all.includes("强度"), true);
   assert.equal(all.includes("任务文本"), true);
-  assert.equal(all.includes("select_workflow"), true);
-  assert.equal(all.includes('acceptanceStrength:"light"|"standard"'), true);
-  // 结论/证据如实回交（任务创建者为应用；应用观察 task.reported 后收口）。
+  // 结论/证据如实回幕僚。
   assert.equal(all.includes("submit_report"), true);
   assert.equal(all.includes("如实"), true);
   assert.equal(all.includes("insufficient evidence"), true);
-  assert.equal(all.includes("task.reported"), true);
   // 应用生成 docs/acceptance/<flowId>-acceptance-vN.md 归档；角色只读。
   assert.equal(all.includes("docs/acceptance/<flowId>-acceptance-vN.md"), true);
   assert.equal(all.includes("由应用"), true);
@@ -128,9 +120,6 @@ test("fixed context：仅 matrix=\"two-fixed-paths/v1\" 返回 fixed 两段（�
   assert.equal(all.includes("不改他人报告"), true);
   // fixed 抑制 acceptance 卡（fixedCards=[]）：不出现 legacy 卡数据/发卡指引。
   assert.equal(all.includes("固定路径不发 acceptance 卡"), true);
-  // 负例防「旧句删除后子串假绿」：旧幕僚直派验收口径必须整体消失（应用直派；幕僚不再直派/收口）。
-  assert.equal(all.includes("幕僚直派"), false, "fixed 段不得保留旧「幕僚直派」口径");
-  assert.equal(all.includes("运营（convener）派"), false, "fixed 段不得保留旧运营派验收口径");
   assert.equal(all.includes('cardKind="acceptance"'), false, "fixed 段不得携带 legacy acceptance 卡数据");
   assert.equal(all.includes("接受（accept）/拒绝（reject）"), false);
   // fixed 段不复制 legacy 段 id。

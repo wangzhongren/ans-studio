@@ -22,6 +22,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import type { ProjectConfig } from "../../src/model/role.ts";
+import type { DurableRequestWorkflowStartFn } from "../../src/model/durable-workflow.ts";
 import type {
   ActivateRoleDocumentsFn,
   CloseCreatedTaskFn,
@@ -111,6 +112,9 @@ const terminateRoleRun = (() => undefined) as TerminateRoleRunFn;
 const redispatchTask = (() => undefined) as RedispatchTaskFn;
 const projectNote = (() => ({ ok: true })) as unknown as ProjectNoteFn;
 const requestVersionDecision = (async () => ({ ok: true })) as unknown as RequestVersionDecisionFn;
+const requestWorkflowStart: DurableRequestWorkflowStartFn = async () => ({
+  ok: true, value: { state: "pending", activationId: "test-activation", definitionDigest: "a".repeat(64) },
+});
 const closeCreatedTask: CloseCreatedTaskFn = async input => ({
   ok: false,
   status: "blocked",
@@ -151,7 +155,7 @@ const activateRoleDocuments: ActivateRoleDocumentsFn = async input => ({
 
 // ——————————————————————— 工具注入 ———————————————————————
 
-test("X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注入 6 项且同一引用", async () => {
+test("X-R6 工具：原 6 项及工作流提议经 D1 审核，普通 trio chief 按宿主能力透传", async () => {
   const validation = validateRoleToolDeclaration("chief", CHIEF_TOOL_IDS);
   assert.equal(validation.allow, true);
   assert.deepEqual(validation.tools.map(binding => binding.id), [...CHIEF_TOOL_IDS]);
@@ -162,6 +166,7 @@ test("X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注�
     "project_note",
     "request_version_decision",
     "close_created_task",
+    "request_workflow_start",
   ]);
   assert.equal(CHIEF_TOOL_IDS.includes("decidePendingRequest"), false, "decidePendingRequest 不属普通会话声明");
 
@@ -177,6 +182,7 @@ test("X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注�
       selectRunChange,
       completeTeamPlan,
       activateRoleDocuments,
+      requestWorkflowStart,
     };
     const handle = await openRoleSession(
       { roleId: "chief", project: trioChiefProject(root), ...direct },
@@ -192,11 +198,35 @@ test("X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注�
         "closeCreatedTask",
       ] as const;
       for (const key of expected) assert.equal(captured.caps?.[key], direct[key], `${key} 未按模块声明注入同一引用`);
+      assert.equal(captured.caps?.requestWorkflowStart, requestWorkflowStart);
+      assert.ok(captured.caps?.contextSections?.some(text => text.includes("客户需求与工作流启用")
+        && text.includes("project_state") && text.includes("request_workflow_start")));
       for (const key of ["selectRunChange", "completeTeamPlan", "activateRoleDocuments"] as const) {
         assert.equal(captured.caps?.[key], undefined, `${key} 不得注入给 chief`);
       }
     } finally {
       await handle.dispose();
+    }
+  });
+});
+
+test("工作流启用提议只注入有宿主能力的普通未受派幕僚会话", async () => {
+  await withRoot(async root => {
+    const project = trioChiefProject(root);
+    const cases = [
+      { roleId: "chief", project },
+      { roleId: "chief", project, requestWorkflowStart, taskId: "assigned-task" },
+      { roleId: "chief", project, requestWorkflowStart,
+        workflowDomain: async <T>(_operation: unknown, run: () => Promise<T>) => run() },
+      { roleId: "product", project: { ...project, builtInRoles: ["chief", "product"] }, requestWorkflowStart },
+    ];
+    for (const input of cases) {
+      const captured: Captured = {};
+      const handle = await openRoleSession(input, { createAdapter: capturingFactory(captured) });
+      try {
+        assert.equal(captured.caps?.requestWorkflowStart, undefined);
+        assert.equal(captured.caps?.contextSections?.some(text => text.includes("客户需求与工作流启用")) ?? false, false);
+      } finally { await handle.dispose(); }
     }
   });
 });

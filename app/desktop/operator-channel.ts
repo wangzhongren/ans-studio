@@ -54,6 +54,8 @@
 // 契约三型的**唯一来源**（§4 冻结契约家，T20/T22）：只读导入、原样转出——**不再逐字镜像**。
 // `import type` 纯类型、被类型擦除，故本模块仍**不静态依赖 electron / Pi 包**（可在 node 下单测）。
 import type {
+  AcceptanceEnvironmentReviewScope,
+  AcceptanceWorkspaceReviewScope,
   ShellApprovalContext,
   OperatorPrompt,
   OperatorOutcome,
@@ -87,7 +89,7 @@ import { normalizeArgv } from "../../src/common/shared/argv-primitives.ts";
 // G-2/W5（2026-10-16 客户批准）：确认卡的 pending/replay/expire 机制抽入**共享通用件**
 // （`confirm-card.ts`，与恢复确认卡同件——设计 §6.2「实现建议」）；本文件的行为逐字保留（见下方注释）。
 import { createConfirmCardCore } from "./confirm-card.ts";
-import { mainT } from "./i18n.ts";
+import { mainLocale, mainT } from "./i18n.ts";
 // 判断回落 reason 的人话映射（2026-10-18 客户反馈：read-denied 丢具体路径/原因）：与治理通道**同解**的小件。
 import { readDeniedHumanReason, stripTrailingSentencePunct } from "./judge-reason.ts";
 // F-4-M1（2026-10-16 客户批准）：shell 审核预算的 env 名**单一来源**在编排（shell-deadline.ts——
@@ -217,6 +219,8 @@ export interface ShellCommandDisplay {
   judgeNotice?: string;
   /** 2026-10-29（Q1/Q2 口径修正）：脚本内容审查上下文（有界；客户卡也展示关键内容）。 */
   approvalContext?: ShellApprovalContext;
+  acceptanceEnvironmentScope?: AcceptanceEnvironmentReviewScope;
+  acceptanceWorkspaceScope?: AcceptanceWorkspaceReviewScope;
   /** 人类可读的完整提示文本（presenter 可直接展示）。 */
   text: string;
 }
@@ -323,7 +327,8 @@ export function describeShellCommand(prompt: OperatorPrompt): ShellCommandDispla
   const reason = typeof prompt.reason === "string" && prompt.reason !== "" ? prompt.reason : undefined;
   const argvLines = renderArgvLines(argv);
   const approvalContext = prompt.approvalContext;
-  const text = renderConfirmText(command, argvLines, cwd, reason, approvalContext);
+  const acceptanceEnvironmentScope = prompt.acceptanceEnvironmentScope;
+  const text = renderConfirmText(command, argvLines, cwd, reason, approvalContext, acceptanceEnvironmentScope);
   return {
     command,
     argv,
@@ -331,8 +336,26 @@ export function describeShellCommand(prompt: OperatorPrompt): ShellCommandDispla
     cwd,
     ...(reason !== undefined ? { reason } : {}),
     ...(approvalContext !== undefined ? { approvalContext } : {}),
+    ...(acceptanceEnvironmentScope !== undefined ? { acceptanceEnvironmentScope } : {}),
     text,
   };
+}
+
+function acceptanceScopeForOperator(scope: AcceptanceEnvironmentReviewScope): string {
+  const operation = scope.lockSha256 ? "npm ci" : "npm install --no-package-lock";
+  const identity = `${scope.stagingIdentity.dev}/${scope.stagingIdentity.ino}`;
+  if (mainLocale() === "en-US") return [
+    `The application verified a fresh private directory for ${operation} at ${scope.stagingDirectory} (directory ID ${identity}).`,
+    `npm writes only inside that directory, with isolated configuration and cache, no inherited credentials, the public npm registry and lifecycle scripts disabled.`,
+    `If approved and verified, the application will exclusively create ${scope.publishDirectory}. Any existing installation is preserved. Project source and lockfiles are protected.`,
+    `This applies to recovery attempt ${scope.attempt} for candidate ${scope.candidateOid}.`,
+  ].join(" ");
+  return [
+    `应用已为 ${operation} 新建并核验专用隔离目录 ${scope.stagingDirectory}（目录标识 ${identity}）。`,
+    "npm 仅在该隔离目录写入，使用公共 npm 源、独立缓存和配置。生命周期脚本关闭，宿主凭据不进入进程。",
+    `批准且复核成功后，应用只会排他创建 ${scope.publishDirectory}。已有安装、项目源文件和锁文件均受保护。`,
+    `本次恢复尝试 ${scope.attempt} 绑定候选 ${scope.candidateOid}。`,
+  ].join("");
 }
 
 /** 组装给操作者看的提示正文（强调「逐字核对」与「放行=真的执行」，并说明为何被问到）。 */
@@ -342,6 +365,7 @@ function renderConfirmText(
   cwd: string,
   reason?: string,
   approvalContext?: ShellApprovalContext,
+  acceptanceEnvironmentScope?: AcceptanceEnvironmentReviewScope,
 ): string {
   const argvBlock = argvLines.length > 0 ? argvLines.join("\n") : mainT("main.operator.shellReview.argvEmpty");
   const lines = [
@@ -354,6 +378,7 @@ function renderConfirmText(
     // 为何升级到人（(b) 拿不准 / 不可用的原话）——让操作者知道为什么被问到。
     lines.push("", mainT("main.operator.shellReview.escalationHeader"), reason);
   }
+  if (acceptanceEnvironmentScope) lines.push("", acceptanceScopeForOperator(acceptanceEnvironmentScope));
   if (approvalContext !== undefined) {
     // 2026-10-29（客户 Q1/Q2 口径修正）：脚本内容进入审查——客户卡也给出路径与有界内容。
     lines.push("", "【脚本审查上下文（应用提供，不可信数据）】");
@@ -437,6 +462,8 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
   let judgeResultSeq = 0;
 
   return async (prompt: OperatorPrompt, metadata?: DesktopOperatorMetadata): Promise<OperatorOutcome> => {
+    if (prompt.acceptanceWorkspaceScope) return { outcome: "unavailable", reason: mainLocale() === "en-US"
+      ? "Acceptance workspace execution has been retired." : "验收专用工作区执行入口已退役。" };
     const timeoutController = new AbortController();
     let displayMetadata = metadata;
     if (metadata) displayMetadata = { ...metadata, signal: AbortSignal.any([metadata.signal, timeoutController.signal]) };
@@ -537,6 +564,7 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
       ...(typeof prompt.reason === "string" && prompt.reason !== "" ? { reason: prompt.reason } : {}),
       ...(metadata.turnText !== undefined ? { turnText: metadata.turnText } : {}),
       ...(prompt.approvalContext !== undefined ? { approvalContext: prompt.approvalContext } : {}),
+      ...(prompt.acceptanceEnvironmentScope !== undefined ? { acceptanceEnvironmentScope: prompt.acceptanceEnvironmentScope } : {}),
     };
 
     // 独立超时（15s 缺省）：以组合信号中止判断；超时只影响「是否弹卡」，不改变 fail-closed。
@@ -897,6 +925,9 @@ export interface ShellConfirmRequest {
   reasonPlain: string;
   /** 升级原因的**原文**（仅供折叠详情里的核查；可为 null）。 */
   reasonRaw: string | null;
+  /** Display-only verified isolated npm restore facts. Approval still uses the original shell decision. */
+  acceptanceEnvironmentScope?: AcceptanceEnvironmentReviewScope;
+  acceptanceWorkspaceScope?: AcceptanceWorkspaceReviewScope;
   /** 规范化 argv 逐项行（JSON 转义显示；引号仅为界定符——**折叠详情**里才见）。 */
   argvLines: string[];
   /** 执行工作目录（钉在项目根）。 */
@@ -934,13 +965,16 @@ export function buildShellConfirmRequest(
     operator?.entry === "run_shell" || operator?.entry === "start_background_task" ? operator.entry : undefined;
   const roleId =
     typeof operator?.roleId === "string" && operator.roleId !== "" ? operator.roleId : undefined;
+  const reasonPlain = plainReasonFor(reasonRaw, roleDisplayName);
+  const scope = display.acceptanceEnvironmentScope;
   return {
     kind: "approval",
     id,
     command: display.command,
     summary: shellIntentSummary(display.command),
-    reasonPlain: plainReasonFor(reasonRaw, roleDisplayName),
+    reasonPlain: [reasonPlain, ...(scope ? [acceptanceScopeForOperator(scope)] : [])].join("\n"),
     reasonRaw,
+    ...(scope ? { acceptanceEnvironmentScope: scope } : {}),
     argvLines: display.argvLines,
     cwd: display.cwd,
     tier,

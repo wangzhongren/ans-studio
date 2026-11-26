@@ -20,12 +20,11 @@ import { loadPinnedRoster, listRunManifestsResult, type RunManifest } from "../.
 import { docFormatIndexText, docFormatSpecText } from "../../../src/common/编排/doc-format-specs.ts";
 import { intentEntryContractText, readIntentEntryFacts, type IntentContractRole } from "../../../src/common/shared/intent-entry-contract.ts";
 import { makeMechanicalRejection, rejectionMapSnapshot } from "../../../src/common/编排/mechanical-rejection.ts";
-import { archiveAcceptance, findAcceptanceArchive, readWorkflowLedger, taskBranchName, verifyCardPrompt, type WorkflowServiceFailure } from "../../../src/common/编排/workflow-service.ts";
+import { archiveAcceptance, findAcceptanceArchive, readWorkflowLedger, taskBranchName, type WorkflowServiceFailure } from "../../../src/common/编排/workflow-service.ts";
 import { readTaskState, type TaskReplay } from "../../../src/common/编排/task-state.ts";
-import { WORKFLOW_PROTOCOL_APP_DISPATCH, workflowProtocolOf, type WorkflowProtocol } from "../../../src/model/runtime.ts";
 import { createDesktopReleaseGitPort } from "../workflow-git.ts";
 import type { FixedReleaseTriggerStage, WorkflowMode } from "../workflow.ts";
-import type { ContractCheckInput, CustomerInputRequest, DocFormatInput, EvidenceCheckInput, WorkflowArtifactRef, WorkflowDocumentRef, WorkflowEvent, WorkflowStage } from "../../../src/model/runtime.ts";
+import type { ContractCheckInput, DocFormatInput, EvidenceCheckInput, WorkflowArtifactRef, WorkflowDocumentRef, WorkflowEvent } from "../../../src/model/runtime.ts";
 import type { SessionManagerDeps } from "./contracts/deps.ts";
 import { isProjectRelativeFileRef, latestVersionedDoc } from "./shared/text.ts";
 import { readTasks } from "./shared/tasks-store.ts";
@@ -33,30 +32,6 @@ import { refreshListingNow } from "./shared/roles.ts";
 
 /** 名单/刷新端口面（原 `this.deps` 的两项只读查询；与 shared/roles.ts 的 RolesDeps 同形）。 */
 export type EvidenceDeps = Pick<SessionManagerDeps, "getListing" | "refreshListing">;
-
-/**
- * 2026-11-17（app-dispatch/v1）：从幕僚呈卡请求读取**模型回传**的 documentRefs（运行时附加字段；
- * Model 契约不另立第二形状）。只做形状校验（项目相对路径 + 64-hex + 可选 kind/version）；非法 ⇒ undefined
- * （调用方按「未回传」处理：documentRefs 由应用计算，不采信模型自报）。
- */
-function readSubmittedDocumentRefs(request: CustomerInputRequest): WorkflowDocumentRef[] | undefined {
-  const raw = (request as CustomerInputRequest & { documentRefs?: unknown }).documentRefs;
-  if (!Array.isArray(raw) || raw.length > 16) return undefined;
-  const refs: WorkflowDocumentRef[] = [];
-  for (const item of raw) {
-    if (item === null || typeof item !== "object" || Array.isArray(item)) return undefined;
-    const record = item as Record<string, unknown>;
-    const path = typeof record["path"] === "string" ? record["path"].trim().replace(/\\/g, "/") : "";
-    if (path === "" || path.startsWith("/") || /^[a-zA-Z]:/.test(path) || path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
-    const sha256 = typeof record["sha256"] === "string" ? record["sha256"].trim().toLowerCase() : "";
-    if (!/^[a-f0-9]{64}$/.test(sha256)) return undefined;
-    const kind = typeof record["kind"] === "string" && record["kind"].trim() !== "" ? record["kind"].trim() : undefined;
-    const version = record["version"];
-    if (version !== undefined && (typeof version !== "number" || !Number.isSafeInteger(version) || version < 1)) return undefined;
-    refs.push({ path, sha256, ...(kind !== undefined ? { kind } : {}), ...(typeof version === "number" ? { version } : {}) });
-  }
-  return refs;
-}
 
 /** 证据/契约/文档格式检查（原 `SessionManager` 9 方法的同签名实现；构造时注入 deps 只读端口）。 */
 export class Evidence {
@@ -429,7 +404,7 @@ export class Evidence {
     const role = listing?.roles.find((item) => item.roleId === roleId);
     const verifier = roleId === "verifier";
     const builtIn = role?.builtIn === true || isBuiltInGovernanceRoleId(roleId);
-    const creatorAllowed: ReadonlySet<"chief" | "convener" | "application"> =
+    const creatorAllowed: ReadonlySet<"chief" | "convener"> =
       verifier ? new Set(["chief", "convener"]) : builtIn ? new Set(["chief"]) : new Set(["convener"]);
     const roleKindKnown = verifier || builtIn || role !== undefined;
 
@@ -502,74 +477,6 @@ export class Evidence {
   }
 
   /**
-   * 2026-11-17（app-dispatch/v1 第一步）：**卡 prompt 呈现校验**（幕僚 `request_choice` 带 promptId 时，
-   * 应用在发卡前调用）。只认应用账本事实（`card-prompt` 任务 + `request.created` promptId）：
-   * - 未找到 prompt / 任务已收口 / 非 app-dispatch/v1 / workflow/stage 不符 ⇒ `card-prompt-mismatch`
-   *   或 `workflow-protocol-mismatch`（**不发卡、不写记录**）；
-   * - 逐项校验 cardKind/选项（含顺序）/documentRefs（`verifyCardPrompt`）；模型未回传 documentRefs 时，
-   *   以**应用发放的记录**为准自校（documentRefs 由应用计算，模型无改写面；卡种/选项仍须与 prompt 一致）。
-   * 返回应用发放的 requestId/promptId/workflowId/stage/documentRefs（供后续结算与阶段驱动）。
-   */
-  async resolveAppDispatchCardPrompt(
-    projectRoot: string,
-    promptId: string,
-    request: CustomerInputRequest,
-  ): Promise<
-    | { ok: true; taskId: string; workflowId: string; flowId?: string; stage: WorkflowStage; requestId: string; promptId: string; documentRefs: WorkflowDocumentRef[] }
-    | WorkflowServiceFailure
-  > {
-    const id = typeof promptId === "string" ? promptId.trim() : "";
-    if (id === "") return { ok: false, code: "card-prompt-mismatch", message: "缺少 promptId（应用发放）；未发卡。" };
-    const state = await readTaskState(projectRoot);
-    const promptTask = [...state.records.values()].find((record) =>
-      record.created?.taskKind === "card-prompt" && record.created.promptId === id);
-    if (promptTask?.created === undefined) {
-      return { ok: false, code: "card-prompt-mismatch", message: `未找到应用发放的 card-prompt 任务（promptId=${id}）；不采信模型自报，未发卡。` };
-    }
-    const created = promptTask.created;
-    if (created.workflowId === undefined || created.stage === undefined) {
-      return { ok: false, code: "workflow-corrupt", message: `card-prompt 任务 ${promptTask.taskId} 缺少 workflowId/stage（账本不一致）。` };
-    }
-    const ledger = await readWorkflowLedger(projectRoot);
-    const started = ledger.events.find((event): event is Extract<WorkflowEvent, { kind: "workflow.started" }> =>
-      event.kind === "workflow.started" && event.workflowId === created.workflowId);
-    if (started === undefined || workflowProtocolOf(started) !== WORKFLOW_PROTOCOL_APP_DISPATCH) {
-      return { ok: false, code: "workflow-protocol-mismatch", message: `workflow ${created.workflowId} 不是 app-dispatch/v1；promptId 校验不属于旧协议。` };
-    }
-    if (promptTask.closed !== undefined) {
-      return { ok: false, code: "card-prompt-mismatch", message: `card-prompt 任务 ${promptTask.taskId} 已收口（${promptTask.closed.outcome}），不得再次呈卡。` };
-    }
-    const requestRow = state.events.find((event) =>
-      event.kind === "request.created" && event.promptId === id);
-    if (requestRow === undefined || requestRow.kind !== "request.created") {
-      return { ok: false, code: "card-prompt-mismatch", message: `未找到应用发放的卡记录（promptId=${id}）；未发卡。` };
-    }
-    const receivedDocumentRefs = readSubmittedDocumentRefs(request);
-    const cardKind = request.cardKind ?? requestRow.cardKind;
-    const optionIds = request.kind === "choice" ? request.options.map((option) => option.id) : undefined;
-    const verified = await verifyCardPrompt({
-      projectRoot,
-      workflowId: created.workflowId,
-      stage: created.stage,
-      promptId: id,
-      cardKind: String(cardKind ?? ""),
-      ...(optionIds !== undefined ? { optionIds } : {}),
-      documentRefs: receivedDocumentRefs ?? requestRow.documentRefs ?? [],
-    });
-    if (verified.ok !== true) return verified;
-    return {
-      ok: true,
-      taskId: promptTask.taskId,
-      workflowId: created.workflowId,
-      ...(created.flowId !== undefined ? { flowId: created.flowId } : {}),
-      stage: created.stage,
-      requestId: verified.requestId,
-      promptId: id,
-      documentRefs: (requestRow.documentRefs ?? []).map((ref) => ({ ...ref })),
-    };
-  }
-
-  /**
    * 2026-10-30（3.2）：`contract_check` 只读契约速查。不写盘、不放行；只返回调用角色可见信息。
    * 2026-11-03（contract schema query）：`topic` 模式**第一句早退**到静态 schema 文本——
    * 早退前不读 listing/run、不写盘；legacy 路径逐字不变。
@@ -577,9 +484,9 @@ export class Evidence {
    * `contractCheckTextFixed`（无 legacy run/pin 口径、stage-request 必填项）；topic 早退对两模式
    * 都逐字不变；legacy/single（缺省 mode）输出逐字不变。
    */
-  async contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput, mode: WorkflowMode = "legacy", protocol?: WorkflowProtocol): Promise<string> {
+  async contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput, mode: WorkflowMode = "legacy"): Promise<string> {
     if (input.topic !== undefined) return contractSchemaText(input.topic);
-    if (mode === "fixed") return this.contractCheckTextFixed(projectRoot, callerRoleId, input, protocol);
+    if (mode === "fixed") return this.contractCheckTextFixed(projectRoot, callerRoleId, input);
     let listing = this.deps.getListing(projectRoot);
     if (!listing) await this.refreshListingNow(projectRoot);
     listing = this.deps.getListing(projectRoot);
@@ -701,10 +608,7 @@ export class Evidence {
    * （A12a/A12b/verifier 直派按 workflowId/stage）；常见拒绝补充 fixed 稳定码。
    * 只读、不写盘、不授予放行/派发权；`topic` 早退与 4 KiB 截断与 legacy 同型。
    */
-  async contractCheckTextFixed(projectRoot: string, callerRoleId: string, input: ContractCheckInput, protocol?: WorkflowProtocol): Promise<string> {
-    // 2026-11-17（app-dispatch/v1，门禁记录 §5.2 待对齐项）：按**会话协议**分流 fixed 措辞——
-    // `app-dispatch/v1` 显示应用流程驱动/新任务种类/新稳定码；缺省（fixed-v2.1）逐字保留旧文案。
-    const appDispatch = protocol === WORKFLOW_PROTOCOL_APP_DISPATCH;
+  async contractCheckTextFixed(projectRoot: string, callerRoleId: string, input: ContractCheckInput): Promise<string> {
     let listing = this.deps.getListing(projectRoot);
     if (!listing) await this.refreshListingNow(projectRoot);
     listing = this.deps.getListing(projectRoot);
@@ -713,9 +617,7 @@ export class Evidence {
     const role = listing?.roles.find((item) => item.roleId === roleId);
     const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
     const lines: string[] = ["contract_check（只读速查；查询不构成放行/授权）"];
-    lines.push(appDispatch
-      ? "run：fixed（app-dispatch/v1；应用流程驱动——幕僚 select_workflow 启动，内置任务由应用按流程定义创建）"
-      : "run：fixed（无 run；固定路径由 stage-request 驱动）");
+    lines.push("run：fixed（无 run；固定路径由 stage-request 驱动）");
     // fixed 角色/模块事实：只读名单文档（不读 `.ans/runs` manifest；pin 状态不适用）。
     const roster = flowId !== "" ? await loadLatestRoster({ projectRoot, flowId }) : undefined;
     if (roster !== undefined && !roster.ok) lines.push(`roster：不可用（${roster.reason}）`);
@@ -759,25 +661,8 @@ export class Evidence {
         }
       }
     }
-    // 2026-11-17（app-dispatch/v1）：ContractCheckInput.taskKind 类型面仍是 legacy 五项；新协议任务种类
-    // 按字符串透传查询（窗口形状只读、不构成放行/授权）。
-    const kind: string | undefined = input.taskKind as string | undefined;
-    if (appDispatch) {
-      // app-dispatch/v1：任务种类与选择流程字段（门禁记录 §5.2；旧协议文案在下方原样保留）。
-      if (kind === "dispatch" || kind === "stage-request") {
-        lines.push('taskKind dispatch：app-dispatch/v1 下幕僚不派发（固定会话不注入 dispatch_task；越权 ⇒ chief-dispatch-removed），旧 stage-request 派发入口已移除（旧形调用 ⇒ stage-request-removed；旧协议 fixed-v2.1 仍走旧码）。运营派项目 worker 必须绑定自身 open 的 worker-dispatch 任务（worker-dispatch-required；派内置 ⇒ convener-builtin-dispatch-forbidden）；呈卡用 request_choice 并原样回传 promptId。');
-      } else if (kind === "stage-execution") {
-        lines.push("taskKind stage-execution：应用按流程定义创建（from=application）并投递给内置执行者；受派角色用 submit_report 回交，应用观察 task.reported 后按完成条件收口（报告 ≠ 收口）。");
-      } else if (kind === "worker-dispatch") {
-        lines.push("taskKind worker-dispatch：应用→运营（from=application/to=convener/read-only）；运营派项目 worker 时须绑定本任务（open、workflow+stage 一致）；运营用 close_created_task 收口（Q6），应用只按阶段完成条件判定阶段完成。");
-      } else if (kind === "card-prompt") {
-        lines.push('taskKind card-prompt：应用→幕僚（read-only）；用 request_choice 原样回传 promptId/cardKind/选项/documentRefs（应用先 verifyCardPrompt 逐项校验；不一致 ⇒ card-prompt-mismatch，不发卡）。');
-      } else if (kind !== undefined) {
-        lines.push(`taskKind ${kind}：legacy 专属（app-dispatch/v1 不使用；fixed 请用 stage-execution/worker-dispatch/card-prompt 或 select_workflow）`);
-      } else {
-        lines.push("taskKind：可传 dispatch 获取操作要点，或传 stage-execution/worker-dispatch/card-prompt 获取对应必填项；select_workflow 必填：workflowPath:\"A\"|\"B\"；flowId；可选 acceptanceStrength:\"light\"|\"standard\"");
-      }
-    } else if (kind === "dispatch" || kind === "stage-request") {
+    const kind = input.taskKind;
+    if (kind === "dispatch" || kind === "stage-request") {
       lines.push('taskKind dispatch 必填：flowId；roleId；taskKind:"stage-request"；workflowAction:"advance"；workflowPath:"A"|"B"；stage；sideEffect:"read-only"；task（A12a/A12b/verifier 直派任务按 workflowId/stage）');
     } else if (kind !== undefined) {
       lines.push(`taskKind ${kind}：legacy 专属（fixed 路径不使用；fixed 请用 dispatch 的 stage-request 或带 workflowId/stage 的 fixed 任务）`);
@@ -786,24 +671,12 @@ export class Evidence {
     }
     lines.push("常见拒绝 → 下一步：");
     // fixed 稳定码先列（截断时也不丢；legacy 快照随后补充，与 legacy 视图同一 code→owner 格式）。
-    const fixedRejections: ReadonlyArray<readonly [string, string, boolean]> = appDispatch
-      ? [
-          ["chief-dispatch-removed", "chief", false],
-          ["stage-request-removed", "chief", false],
-          ["convener-builtin-dispatch-forbidden", "convener", false],
-          ["worker-dispatch-required", "convener", true],
-          ["card-prompt-mismatch", "chief", true],
-          ["workflow-definition-unknown", "chief", false],
-          ["workflow-definition-version-unsupported", "chief", false],
-          ["workflow-protocol-mismatch", "chief", false],
-          ["workflow-corrupt", "chief", false],
-        ]
-      : [
-          ["stage-request-invalid", "chief", true],
-          ["stage-request-required", "convener", false],
-          ["workflow-path-required", "chief", true],
-          ["stage-transition-invalid", "chief", true],
-        ];
+    const fixedRejections: ReadonlyArray<readonly [string, string, boolean]> = [
+      ["stage-request-invalid", "chief", true],
+      ["stage-request-required", "convener", false],
+      ["workflow-path-required", "chief", true],
+      ["stage-transition-invalid", "chief", true],
+    ];
     const snapshot = rejectionMapSnapshot();
     for (const [code, owner, retryable] of fixedRejections) {
       if (snapshot.some((item) => item.code === code)) continue;

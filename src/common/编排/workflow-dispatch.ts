@@ -14,10 +14,8 @@
 import type {
   TaskSideEffect,
   WorkflowAction,
-  WorkflowProtocol,
   WorkflowStage,
 } from "../../model/runtime.ts";
-import { WORKFLOW_PROTOCOL_APP_DISPATCH } from "../../model/runtime.ts";
 import type { RoleDispatchPurpose } from "../../model/role.ts";
 
 /** fixed 矩阵模式（与 `model/role.ts::DispatchMatrixMode` 同源；此处只导出 fixed 值便捷常量）。 */
@@ -28,33 +26,7 @@ export const FIXED_CONVENER_BUILT_IN_TARGETS: readonly string[] = Object.freeze(
 /** fixed：幕僚可派发的内置目标（v1.3 §3.4；仅 fixed 谓词使用）。 */
 export const FIXED_CHIEF_BUILT_IN_TARGETS: readonly string[] = Object.freeze(["convener", "verifier"]);
 
-/**
- * 2026-11-17（app-dispatch/v1，设计 §2.1）：**新协议目标集清零**——
- * 幕僚不再派发任何 agent（任意目标 `chief-dispatch-removed`）；
- * 运营不再派发任何内置角色（`convener-builtin-dispatch-forbidden`），只可派项目 worker 且必须
- * 绑定自身 open 的 `worker-dispatch` 任务（`worker-dispatch-required`）。
- * 本常量只表达目标集；判定在 `evaluateFixedPathDispatchAuthorization(protocol:"app-dispatch/v1")`。
- */
-export const APP_DISPATCH_CHIEF_BUILT_IN_TARGETS: readonly string[] = Object.freeze([]);
-export const APP_DISPATCH_CONVENER_BUILT_IN_TARGETS: readonly string[] = Object.freeze([]);
-
-/** app-dispatch/v1 稳定码（集中定义；与 fixed-v2.1 旧码并存，旧协议仍返回旧码）。 */
-export const APP_DISPATCH_FAILURE_CODES = Object.freeze([
-  "chief-dispatch-removed",
-  "convener-builtin-dispatch-forbidden",
-  "worker-dispatch-required",
-  "card-prompt-mismatch",
-  "card-prompt-document-invalid",
-  "stage-request-removed",
-  "workflow-definition-unknown",
-  "workflow-definition-version-unsupported",
-  "workflow-protocol-mismatch",
-  "workflow-stopping",
-  "workflow-corrupt",
-] as const);
-export type AppDispatchFailureCode = (typeof APP_DISPATCH_FAILURE_CODES)[number];
-
-/** fixed 派发失败码（v1.3 附录 C + MF-10 窄例外 + 2026-11-17 app-dispatch 三码；fixture/测试断言稳定码）。 */
+/** fixed 派发失败码（v1.3 附录 C + MF-10 窄例外；fixture/测试断言稳定码）。 */
 export type FixedDispatchFailureCode =
   | "self-dispatch"
   | "unknown-source"
@@ -68,11 +40,7 @@ export type FixedDispatchFailureCode =
   | "dispatch-evidence-missing"
   | "dispatch-source-changed"
   | "stage-request-required"
-  | "review-role-invalid"
-  // 2026-11-17（app-dispatch/v1 新协议专属；fixed-v2.1/legacy 路径不返回）
-  | "chief-dispatch-removed"
-  | "convener-builtin-dispatch-forbidden"
-  | "worker-dispatch-required";
+  | "review-role-invalid";
 
 /**
  * Q6 证据（宿主捕获；AC-04 fail-closed）。
@@ -114,12 +82,6 @@ export interface FixedStageRequestFacts {
 
 /** fixed 谓词输入（宿主已核验事实；缺省一律按 fail-closed 处理）。 */
 export interface FixedDispatchPolicyInput {
-  /**
-   * 2026-11-17：工作流驱动协议（宿主从 `workflow.started.protocol` 解析；缺省 = fixed-v2.1）。
-   * `fixed-v2.1`/缺省 ⇒ **逐字保持旧矩阵**；`app-dispatch/v1` ⇒ 新矩阵（§2.1：幕僚 ∅ / 运营内置 ∅ /
-   * 运营项目 worker 需绑定 open `worker-dispatch` 任务）。
-   */
-  readonly protocol?: WorkflowProtocol;
   readonly sourceRoleId?: string;
   readonly chiefRoleId?: string;
   readonly convenerRoleId?: string;
@@ -202,12 +164,6 @@ export function evaluateFixedPathDispatchAuthorization(input: FixedDispatchPolic
   }
   if (kind === undefined || !isNonEmptyString(target)) {
     return deny("target-card-missing", `派发未受理：目标角色 ${String(target)} 类别/身份不明确；不猜。`);
-  }
-
-  // 2026-11-17（app-dispatch/v1，设计 §2.1）：新协议矩阵。
-  // 缺省/fixed-v2.1 不进入本分支 ⇒ 下方旧矩阵**逐字不变**（在飞协议隔离，Q10）。
-  if (input.protocol === WORKFLOW_PROTOCOL_APP_DISPATCH) {
-    return evaluateAppDispatchAuthorization(input, { source, target, kind, chief, convener });
   }
 
   if (source === chief) {
@@ -293,108 +249,8 @@ export function evaluateFixedPathDispatchAuthorization(input: FixedDispatchPolic
   return withEvidence(input, purpose, convener, undefined);
 }
 
-/**
- * app-dispatch/v1 矩阵（2026-11-17；设计 §2.1；纯判定）：
- * - 幕僚 → 任意目标：**拒绝** `chief-dispatch-removed`（固定会话不再注入派发工具，谓词双保险）；
- * - 运营 → 任意内置：**拒绝** `convener-builtin-dispatch-forbidden`（内置任务由应用按定义创建）；
- * - 运营 → 项目 worker：仅当同时满足 Q6 证据 + 绑定自身 open 的 `worker-dispatch` 任务
- *   （`from:"application"`、`to`=运营、`taskKind:"worker-dispatch"`、workflow/stage 一致、未停止）
- *   ⇒ 允许 production；否则 `worker-dispatch-required`。
- * - 应用侧建任务不走本谓词（由 `workflow-service` 按定义/阶段/幂等校验）。
- */
-function evaluateAppDispatchAuthorization(
-  input: FixedDispatchPolicyInput,
-  facts: {
-    source: string;
-    target: string;
-    kind: "built-in-governance" | "project";
-    chief: string;
-    convener: string;
-  },
-): FixedDispatchPolicyResult {
-  const { source, target, kind, chief, convener } = facts;
-  if (source === chief) {
-    return deny(
-      "chief-dispatch-removed",
-      "派发未受理：app-dispatch/v1 下幕僚不再派发任何 agent（只选流程、按应用 prompt 呈客户卡）。",
-    );
-  }
-  if (source !== convener) {
-    return deny("unknown-source", "派发未受理：app-dispatch/v1 下只有运营（convener）可以派发项目 worker。");
-  }
-  if (kind === "built-in-governance") {
-    return deny(
-      "convener-builtin-dispatch-forbidden",
-      "派发未受理：app-dispatch/v1 下运营只派项目 worker，不派任何内置角色（内置任务由应用按流程定义创建）。",
-    );
-  }
-  const purpose: RoleDispatchPurpose = input.purpose ?? "production";
-  if (purpose !== "production") {
-    return deny(
-      "worker-dispatch-required",
-      "派发未受理：app-dispatch/v1 下运营只做项目 worker 生产派发（不得代发验收/review 或其他目的）。",
-    );
-  }
-  if (input.targetExists !== true) {
-    return deny("target-card-missing", `派发未受理：目标角色 ${target} 不存在/未枚举到。`);
-  }
-  const evidence = input.evidence;
-  if (evidence === undefined) {
-    return deny(
-      "dispatch-evidence-missing",
-      "派发未受理：app-dispatch/v1 派发必须携带 live-turn / worker-dispatch 绑定 / identity / 幂等证据（不得默认通过）。",
-      ["evidence"],
-    );
-  }
-  if (evidence.sourceIsCurrent !== true) {
-    return deny("dispatch-source-changed", "派发未受理：来源会话/轮次已变化或不可证（sourceIsCurrent=false/缺省）。");
-  }
-  if (!isNonEmptyString(evidence.idempotencyKey)) {
-    return deny("dispatch-evidence-missing", "派发未受理：缺少应用计算的幂等键证据。", ["idempotencyKey"]);
-  }
-  if (isNonEmptyString(evidence.expectedIdempotencyKey) && evidence.expectedIdempotencyKey !== evidence.idempotencyKey) {
-    return deny(
-      "dispatch-evidence-missing",
-      "派发未受理：幂等键与应使用的幂等键不一致（不得重复投递或改写幂等键）。",
-      ["idempotencyKey"],
-    );
-  }
-  if (evidence.identity !== undefined) {
-    const identity = evidence.identity;
-    if ((identity.sourceRoleId !== undefined && identity.sourceRoleId !== source)
-      || (identity.targetRoleId !== undefined && identity.targetRoleId !== target)) {
-      return deny("dispatch-evidence-missing", "派发未受理：identity 证据与真实来源/目标不一致。", ["identity"]);
-    }
-  }
-  const assigned = evidence.assignedTask;
-  if (assigned === undefined || assigned.open !== true || assigned.stopped === true
-    || assigned.from !== "application" || assigned.to !== source || assigned.taskKind !== "worker-dispatch") {
-    return deny(
-      "worker-dispatch-required",
-      "派发未受理：app-dispatch/v1 下运营派 worker 必须绑定自身当前 open 的 worker-dispatch 任务（由应用创建）。",
-      [assigned === undefined ? "assignedTask" : "assignedTask.binding"],
-    );
-  }
-  const workflowId = input.workflow?.workflowId;
-  if (workflowId !== undefined && assigned.workflowId !== undefined && assigned.workflowId !== workflowId) {
-    return deny(
-      "worker-dispatch-required",
-      "派发未受理：worker-dispatch 任务的 workflowId 与本次派发不一致。",
-      ["assignedTask.workflowId"],
-    );
-  }
-  const stage = input.workflow?.stage;
-  if (stage !== undefined && assigned.stage !== undefined && assigned.stage !== stage) {
-    return deny(
-      "worker-dispatch-required",
-      "派发未受理：worker-dispatch 任务的 stage 与本次派发不一致。",
-      ["assignedTask.stage"],
-    );
-  }
-  return { ok: true, purpose: "production" };
-}
-
-function validateStageRequestFacts(facts: FixedStageRequestFacts | undefined): FixedDispatchPolicyResult | { ok: true; purpose: "stage-request" } {  if (facts === undefined) {
+function validateStageRequestFacts(facts: FixedStageRequestFacts | undefined): FixedDispatchPolicyResult | { ok: true; purpose: "stage-request" } {
+  if (facts === undefined) {
     return deny("stage-request-invalid", "stage-request 未携带其子模式字段（taskKind/workflowAction/sideEffect）。");
   }
   if (facts.taskKind !== undefined && facts.taskKind !== "stage-request") {

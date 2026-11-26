@@ -63,24 +63,17 @@ import {
   activateRoleDocumentsFixed,
   archiveAcceptance,
   closeTask,
-  completeTeamPlanFixed,
-  driveAppDispatchStage,
   executeReleaseMerge,
   findAcceptanceArchive,
-  observeAppDispatchTaskReport,
   prepareReleaseMerge,
   readBasisLedger,
   readReleaseLedger,
   readWorkflowLedger,
-  recordBasis,
-  selectWorkflow,
   taskBranchName,
-  verifyCardPrompt,
   workflowIdFor,
 } from "../../src/common/编排/workflow-service.ts";
 import { deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
 import { appendTaskEvent, readTaskState, taskEvent, type TaskRecord } from "../../src/common/编排/task-state.ts";
-import { closeApplicationTaskDirect } from "../../app/desktop/session/fixed-workflow/stage-dispatch.ts";
 import { resolveTaskGitScope } from "../../src/pipeline/orchestration/run-role.ts";
 import { classifyShellDetailed, defaultShellRules, TASK_GIT_CODES, TASK_GIT_GATE_CODES } from "../../src/service/gate/shell-rules.ts";
 import { runTaskGitCommit } from "../../src/common/门禁引擎/task-git-gate.ts";
@@ -442,11 +435,9 @@ const FIXED_CHIEF_WORKFLOW_V2_PATH = path.resolve(
  * `openRoleSession` 入参必须是 fixed——会话级常量 + fixed 工具注入位（legacy 治理型能力缺席）。
  * 与 B6.1 桌面测试同口径（真实 SessionManager；本测试额外把同一入参交给真实编排，见下）。
  */
-function assertFixedChiefChatEntry(input: CapturedInput, expectedTaskId?: string): void {
-  assert.equal(input.taskId, expectedTaskId, expectedTaskId === undefined
-    ? "固定 chat 入口不携带 taskId（B10.1 保留旧语义：聊天无任务绑定）"
-    : "fixed-v2.1 任务绑定 chief 会话携带真实任务 taskId");
-  assert.equal(input.workflowMode, "fixed", "fixed 幕僚会话必须向编排传 workflowMode:\"fixed\"");
+function assertFixedChiefChatEntry(input: CapturedInput): void {
+  assert.equal(input.taskId, undefined, "固定 chat 入口不携带 taskId（B10.1 保留旧语义：聊天无任务绑定）");
+  assert.equal(input.workflowMode, "fixed", "空项目无 taskId 幕僚聊天必须向编排传 workflowMode:\"fixed\"（B6.1 聊天入口）");
   assert.equal(typeof input.workflowModeForFlow, "function", "per-flow 回调与常量并存（legacy/混合项目路径不变）");
   for (const legacyTool of ["gitQuery", "gitCandidate", "gitPublish", "requestVersionDecision"] as const) {
     assert.equal(input[legacyTool], undefined, `fixed 聊天不得注入 legacy 能力 ${legacyTool}（AC-23）`);
@@ -461,19 +452,12 @@ function assertFixedChiefChatEntry(input: CapturedInput, expectedTaskId?: string
  * B6.2 编排层断言：把聊天入口捕获的**同一入参**原样交给真实编排 `openRoleSession`（假适配器；
  * 不发送任何回合、立即 dispose）——断言 fixed context/`chief-workflow-v2.md` 确实由 run-role 消费注入
  * （而不仅是入参文本），且编排能力面同样无 legacy 工具。镜像打开不启动模型、不写账本。
- * 2026-11-17（T2 协议分拆）：本断言只用于 **fixed-v2.1 协议会话**（任务绑定 chief；空项目聊天已按新
- * 协议 app-dispatch/v1 注入 v3，见 `assertAppDispatchChiefInjection`）。
  */
-async function assertFixedChiefChatInjection(input: CapturedInput, expectedTaskId?: string): Promise<void> {
-  assertFixedChiefChatEntry(input, expectedTaskId);
-  // 镜像打开去掉 taskId：真实 run-role 会校验任务受派人（stage-request 受派 convener，chief 会话本身
-  // 不占用该任务）；同时显式固定会话模式/协议（captured 真值：任务 workflow 的 protocol=fixed-v2.1），
-  // 只验证 fixed-v2.1 协议下的资源/工具面注入。
-  const mirrorInput = { ...input, workflowMode: "fixed" as const };
-  delete (mirrorInput as { taskId?: string }).taskId;
+async function assertFixedChiefChatInjection(input: CapturedInput): Promise<void> {
+  assertFixedChiefChatEntry(input);
   const captured: { caps?: AdapterCapabilities } = {};
   const handle = await orchestrationOpenRoleSession(
-    mirrorInput as unknown as Parameters<typeof orchestrationOpenRoleSession>[0],
+    input as unknown as Parameters<typeof orchestrationOpenRoleSession>[0],
     {
       createAdapter: (_gate: WriteGate, caps?: AdapterCapabilities): RuntimeAdapter => {
         captured.caps = caps;
@@ -505,9 +489,7 @@ async function assertFixedChiefChatInjection(input: CapturedInput, expectedTaskI
     assert.equal(metadata["resourceVersion"], "chief-workflow/v2");
     assert.equal(metadata["sha256"], sha(v2Bytes), "v2 资源 SHA-256 必须是磁盘实测值");
     assert.equal(metadata["bytes"], v2Bytes.length);
-    // 2026-11-17 门禁文本批：fixed 幕僚模块 context 段改按应用流程驱动口径（select_workflow），
-    // fixed-v2.1 会话同样注入该段；此处断言段存在（旧「产线调度」标题已按新口径改写）。
-    assert.ok(sections.some((section) => section.includes("固定路径流程选择与驱动")), "fixed chief 模块 context 段必须注入");
+    assert.ok(sections.some((section) => section.includes("固定路径产线调度")), "fixed chief 模块 context 段必须注入");
     for (const legacyTool of ["gitQuery", "gitCandidate", "gitPublish", "requestVersionDecision", "submitVersionChange", "submitRefactor", "requestStableWrite", "selectRunChange"] as const) {
       assert.equal(caps[legacyTool], undefined, `fixed 聊天编排能力面不得含 legacy ${legacyTool}`);
     }
@@ -522,128 +504,6 @@ async function assertChatEntryNoStateWrites(root: string): Promise<void> {
   await assert.rejects(fs.stat(path.join(root, ".ans", "trunk")), "聊天入口不得写 .ans/trunk");
   await assert.rejects(fs.stat(path.join(root, ".ans", "runs")), "聊天入口不得写 .ans/runs");
   await assert.rejects(fs.stat(path.join(root, ".ans", "project.json")), "聊天入口不得提前写 project.json（首次 fixed 启动仍在首条 stage-request）");
-}
-
-// —————————————— 2026-11-17（T2）：app-dispatch/v1 全链辅助与入口断言 ——————————————
-
-const FIXED_CHIEF_WORKFLOW_V3_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..", "..", "src", "common", "门禁引擎", "workflows", "chief", "chief-workflow-v3.md",
-);
-
-/** 空项目幕僚聊天（无 workflow ⇒ 新协议 app-dispatch/v1）的应用层断言。 */
-function assertAppDispatchChiefEntry(input: CapturedInput): void {
-  assert.equal(input.taskId, undefined, "聊天入口不携带 taskId");
-  assert.equal(input.workflowMode, "fixed", "空项目幕僚聊天为 fixed");
-  assert.equal(input.workflowProtocol, "app-dispatch/v1", "无 workflow 的新项目 = app-dispatch/v1（协调者口径）");
-  assert.equal(typeof input.selectWorkflow, "function", "app-dispatch 幕僚注入 select_workflow 能力");
-  for (const legacyTool of ["gitQuery", "gitCandidate", "gitPublish", "requestVersionDecision"] as const) {
-    assert.equal(input[legacyTool], undefined, `fixed 聊天不得注入 legacy 能力 ${legacyTool}（AC-23）`);
-  }
-}
-
-/**
- * app-dispatch/v1 编排层断言：同一聊天入参交给真实 run-role ⇒ v3 资源注入、幕僚旧动作面结构性缺席、
- * select_workflow 注入；v2 资源不得混入。
- */
-async function assertAppDispatchChiefInjection(input: CapturedInput): Promise<void> {
-  assertAppDispatchChiefEntry(input);
-  const captured: { caps?: AdapterCapabilities } = {};
-  const handle = await orchestrationOpenRoleSession(
-    input as unknown as Parameters<typeof orchestrationOpenRoleSession>[0],
-    {
-      createAdapter: (_gate: WriteGate, caps?: AdapterCapabilities): RuntimeAdapter => {
-        captured.caps = caps;
-        return {
-          async composeContext() { return { systemPrompt: "" }; },
-          async bindRole(): Promise<RoleSession> {
-            return {
-              async prompt() {},
-              events(): AsyncIterable<SessionEvent> {
-                return (async function* () { yield { kind: "settled" as const, summary: "T2 镜像打开（不发回合）" }; })();
-              },
-              async dispose() {},
-            };
-          },
-        };
-      },
-    },
-  );
-  try {
-    const caps = captured.caps;
-    assert.ok(caps !== undefined, "编排必须构造适配器能力面");
-    assert.equal(typeof caps.selectWorkflow, "function", "app-dispatch 幕僚编排能力面注入 select_workflow");
-    assert.equal(caps.dispatchTask, undefined, "app-dispatch 幕僚不注入 dispatch_task（chief-dispatch-removed）");
-    assert.equal(caps.closeCreatedTaskFixed, undefined, "app-dispatch 幕僚不注入 close_created_task v2");
-    assert.equal(caps.redispatchTask, undefined, "app-dispatch 幕僚不注入 redispatch_task");
-    assert.equal(caps.terminateRoleRun, undefined, "app-dispatch 幕僚不注入 terminate_role_run");
-    const sections = caps.contextSections ?? [];
-    const v3 = sections.find((section) => section.includes("chief-workflow/v3"));
-    assert.ok(v3 !== undefined, "app-dispatch 幕僚必须注入 chief-workflow-v3.md");
-    assert.match(v3!, /^## 应用内置 Chief workflow v3（app-dispatch\/v1 应用流程驱动）/);
-    assert.ok(v3!.includes("# Chief 工作流（两条固定路径 v3 / 应用流程驱动）"), "注入 v3 资源正文");
-    const v3Bytes = await fs.readFile(FIXED_CHIEF_WORKFLOW_V3_PATH);
-    const metadata = JSON.parse(v3!.split("\n")[1]!) as Record<string, unknown>;
-    assert.equal(metadata["resourceVersion"], "chief-workflow/v3");
-    assert.equal(metadata["sha256"], sha(v3Bytes), "v3 资源 SHA-256 必须是磁盘实测值");
-    assert.equal(metadata["bytes"], v3Bytes.length);
-    assert.ok(sections.some((section) => section.includes("select_workflow")), "v3 正文段必须注入（select_workflow 口径）");
-    assert.equal(sections.some((section) => section.includes("chief-workflow/v2")), false, "新协议会话不得混入 v2 资源");
-  } finally {
-    await handle.dispose();
-  }
-}
-
-/** app-dispatch 链辅助：读任务/视图、驱动、报告、观察收口。 */
-async function appTask(root: string, workflowId: string, stage: WorkflowStage, to?: string): Promise<TaskRecord> {
-  return findTask(root, (record) => record.created?.workflowId === workflowId
-    && record.created.stage === stage && (to === undefined || record.created.to === to));
-}
-async function appView(root: string, workflowId: string) {
-  return view(root, workflowId);
-}
-async function driveApp(root: string, workflowId: string, stage?: WorkflowStage) {
-  const receipt = await driveAppDispatchStage({ projectRoot: root, workflowId, ...(stage !== undefined ? { stage } : {}) });
-  assert.equal(receipt.ok, true, receipt.ok === false ? `${receipt.code}: ${receipt.message}` : "");
-  if (!receipt.ok) throw new Error("unreachable");
-  return receipt;
-}
-async function reportApp(root: string, taskId: string, from: string, status: "done" | "blocked", summary: string, evidence?: string[]): Promise<void> {
-  const appended = await appendTaskEvent(root, taskEvent("task.reported", {
-    taskId, from, status, summary,
-    ...(evidence !== undefined && evidence.length > 0 ? { evidence } : {}),
-  }, () => new Date(AT)));
-  assert.equal(appended.ok, true, appended.ok === false ? appended.message : "");
-}
-async function observeApp(root: string, taskId: string, decision?: "accept" | "rework" | "reject") {
-  const observed = await observeAppDispatchTaskReport({ projectRoot: root, taskId, ...(decision !== undefined ? { decision } : {}) });
-  return observed;
-}
-/** 打开幕僚聊天并返回捕获入参（app-dispatch 新协议）。 */
-async function openAppChief(h: H, root: string): Promise<CapturedInput> {
-  const chief = await openRole(h, root, "chief");
-  assertAppDispatchChiefEntry(chief);
-  return chief;
-}
-/** 用应用发放的 promptId 呈卡并完成客户裁决（生产卡生命周期；documentRefs 由应用发放记录自校）。 */
-async function presentAppCard(
-  chief: CapturedInput,
-  request: CustomerInputRequest,
-  promptId: string,
-  cardKind: string,
-  optionIds: readonly string[],
-  extra: { multiple?: boolean; title?: string } = {},
-): Promise<CustomerInputOutcome | null | undefined> {
-  assert.equal(typeof chief.customerInput, "function", "幕僚会话必须保留 request_choice 客户通道");
-  return chief.customerInput!({
-    kind: "choice",
-    title: extra.title ?? cardKind,
-    cardKind,
-    promptId,
-    flowId: FLOW,
-    ...(extra.multiple === true ? { multiple: true } : {}),
-    options: optionIds.map((id) => ({ id, label: id })),
-  } as unknown as CustomerInputRequest);
 }
 
 // —————————————— 路径 A：空项目 → delivered 全链 ——————————————
@@ -663,11 +523,7 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     //    (b) 由该聊天会话经真实派发发出首个 stage-request ⇒ `ensureFixedPathStarted` 原子写
     //        project.json workflowSchema 并按 fixed 路由（旧路径不经过本测试的唯一入口）。
     let chief = await openRole(h, root, "chief");
-    // 2026-11-17（T2 协议分拆）：空项目无 workflow ⇒ 聊天入口按新协议 app-dispatch/v1（v3 注入、幕僚
-    // 无派发/收口/停止工具）。本用例走旧 fixed-v2.1 全链：首个 stage-request 由聊天会话经旧路由发出
-    // （协议未知 ⇒ 旧矩阵逐字）并在启动后绑定任务；任务绑定 chief 会话再断言 fixed-v2.1 的 v2 注入逐字。
-    assertAppDispatchChiefEntry(chief);
-    await assertAppDispatchChiefInjection(chief);
+    await assertFixedChiefChatInjection(chief);
     await assertChatEntryNoStateWrites(root);
     const turnA1 = "turn-customer-a1";
     const a1Text = "推进 A1：请运营派产品撰写意图";
@@ -704,8 +560,6 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     await h.mgr.stop("convener");
     chief = await openRole(h, root, "chief", srA1.taskId);
     const convener = await openRole(h, root, "convener", srA1.taskId);
-    // 任务绑定 chief 会话的协议 = 该任务 workflow 的 protocol = fixed-v2.1（旧链启动缺省）⇒ v2 注入逐字。
-    await assertFixedChiefChatInjection(chief, srA1.taskId);
 
     // 2) A1：运营派产品（Q6：绑定真实受派 open stage-request）；生产路由记 stage.dispatched A1（B5.1 接线）。
     let convenerLive = liveSource(h.mgr, root, "convener", { taskId: srA1.taskId });
@@ -1410,486 +1264,6 @@ test("路径 B 无既有 Git 仓库 ⇒ b-repository-required（不自动 init�
     await assertNoLegacyWrites(root);
     // 幕僚 A 路径仍可用（同一空项目改走 A；无仓库由 A9 基线 git init 负责）——此处只验证 B 失败不污染配置/账本。
     assert.equal((await readWorkflowLedger(root)).events.filter((event) => event.kind === "workflow.started").length, 1);
-  } finally {
-    await h.mgr.stop(null);
-    await cleanup(root);
-  }
-});
-
-// —————————————— 2026-11-17（T2）：app-dispatch/v1 路径 A 全链 ——————————————
-
-test("路径 A 全链（app-dispatch/v1）：select_workflow → A1–A13（三卡 prompt、worker-dispatch、A12a/A12b、merge-main）", async () => {
-  const root = await tempRoot("ans-app-dispatch-chain-a-");
-  const h = harness(root);
-  try {
-    // 0) 空项目：无 .ans/project.json、无 Git 仓库。新协议由幕僚 select_workflow 启动（应用侧）。
-    await assert.rejects(fs.stat(path.join(root, ".git")));
-    const selected = await selectWorkflow({
-      projectRoot: root, flowId: FLOW, workflowPath: "A", sourceTaskId: "turn-app-a-1",
-    });
-    assert.equal(selected.ok, true, selected.ok === false ? `${selected.code}: ${selected.message}` : "");
-    if (!selected.ok) return;
-    const WF = selected.workflowId;
-    assert.equal(selected.protocol, "app-dispatch/v1");
-    assert.equal(selected.acceptanceStrength, "standard");
-    // 应用侧启动：workflow.started 钉死协议 + 定义 hash；A1 任务 application→product，创建即完成。
-    const started = (await readWorkflowLedger(root)).events.find((event) => event.kind === "workflow.started");
-    assert.ok(started !== undefined && started.kind === "workflow.started");
-    assert.equal(started!.protocol, "app-dispatch/v1");
-    assert.equal(started!.sourceTaskId, "turn-app-a-1");
-    assert.equal(started!.definition?.id, "add");
-    assert.match(started!.definition?.sha256 ?? "", /^[a-f0-9]{64}$/);
-    const a1 = await appTask(root, WF, "A1", "product");
-    assert.equal(a1.created?.from, "application");
-    assert.equal((await appView(root, WF)).stages.A1.status, "completed", "A1 创建即完成");
-    // 打开幕僚聊天（新协议）供三卡沿应用 prompt 呈交。
-    const chief = await openAppChief(h, root);
-
-    // 1) A2：意图撰写（应用建任务）→ 应用观察收口。
-    const a2Drive = await driveApp(root, WF);
-    assert.equal(a2Drive.stage, "A2");
-    await writeChainDocs(root, { intent: true, proposal: false, teamPlan: false });
-    const a2 = await appTask(root, WF, "A2", "product");
-    assert.equal(a2.created?.taskKind, "stage-execution");
-    await reportDone(root, a2.taskId, "product", "意图完成", ["docs/product/snake-intent-v1.md"]);
-    const a2Observed = await observeApp(root, a2.taskId);
-    assert.equal(a2Observed.ok, true, a2Observed.ok === false ? `${a2Observed.code}: ${a2Observed.message}` : "");
-    if (a2Observed.ok) assert.equal(a2Observed.stageCompleted, true);
-
-    // 2) A3：应用开卡（request.created）→ 幕僚按 promptId 呈 intent-confirm（先不一致拒绝，再 confirm）。
-    const a3Drive = await driveApp(root, WF);
-    assert.equal(a3Drive.stage, "A3");
-    const promptTaskA3 = await appTask(root, WF, "A3", "chief");
-    assert.equal(promptTaskA3.created?.taskKind, "card-prompt");
-    const promptA3 = promptTaskA3.created!.promptId!;
-    type RequestCreatedRow = Extract<Awaited<ReturnType<typeof readTaskState>>["events"][number], { kind: "request.created" }>;
-    const requestA3 = (await readTaskState(root)).events.find((event) =>
-      event.kind === "request.created" && event.promptId === promptA3) as RequestCreatedRow | undefined;
-    assert.ok(requestA3 !== undefined && requestA3.kind === "request.created");
-    assert.equal(requestA3!.workflowId, WF);
-    assert.equal(requestA3!.stage, "A3");
-    const intentRef = requestA3!.documentRefs?.find((ref) => ref.kind === "intent");
-    assert.ok(intentRef !== undefined);
-    assert.equal(intentRef!.sha256, sha(await fs.readFile(path.join(root, "docs", "product", "snake-intent-v1.md"))), "documentRefs 由应用按字节计算");
-    assert.equal((await verifyCardPrompt({
-      projectRoot: root, workflowId: WF, stage: "A3", promptId: promptA3, cardKind: "intent-confirm",
-      optionIds: ["revise", "confirm"], documentRefs: requestA3!.documentRefs,
-    })).ok, false, "选项顺序不一致 ⇒ card-prompt-mismatch");
-    const mismatchA3 = await presentAppCard(chief, { kind: "choice" } as CustomerInputRequest, promptA3, "intent-confirm", ["revise", "confirm"]);
-    assert.equal(mismatchA3?.outcome, "declined", "不一致不发卡");
-    const requestCountBefore = (await readTaskState(root)).events.filter((event) => event.kind === "request.created").length;
-    const answeredA3 = await presentAppCard(chief, { kind: "choice" } as CustomerInputRequest, promptA3, "intent-confirm", ["confirm", "revise"]);
-    assert.equal(answeredA3?.outcome, "answered");
-    assert.equal((await readTaskState(root)).events.filter((event) => event.kind === "request.created").length, requestCountBefore, "request.created 不重复写");
-    assert.equal((await appView(root, WF)).stages.A3.status, "completed", "客户 confirm ⇒ A3 completed（finalizeIntent）");
-    assert.equal((await readTaskState(root)).records.get(promptTaskA3.taskId)?.closed?.by, "application", "prompt 任务由应用收口");
-
-    // 3) A4/A5：卡裁决 advance 已驱动 A4（创建即完成）/A5；报告 + 方案四件证据 ⇒ A5 accepted。
-    await writeChainDocs(root, { intent: false, proposal: true, teamPlan: false });
-    const a5 = await appTask(root, WF, "A5", "rapporteur");
-    await reportDone(root, a5.taskId, "rapporteur", "方案完成", [
-      "docs/proposals/snake-proposal-v1.md", "docs/proposals/snake-modules-v1.md",
-      "docs/proposals/snake-roster-v1.md", "docs/contracts/snake-architecture-v1.md",
-    ]);
-    const a5Observed = await observeApp(root, a5.taskId);
-    assert.equal(a5Observed.ok, true, a5Observed.ok === false ? `${a5Observed.code}: ${a5Observed.message}` : "");
-    if (a5Observed.ok) assert.equal(a5Observed.stageCompleted, true);
-
-    // 4) A6：应用开方案卡（documentRefs=proposal/roster/modules/architecture）→ 幕僚按 prompt 呈卡 accept。
-    await driveApp(root, WF);
-    const promptTaskA6 = await appTask(root, WF, "A6", "chief");
-    const promptA6 = promptTaskA6.created!.promptId!;
-    const requestA6 = (await readTaskState(root)).events.find((event) =>
-      event.kind === "request.created" && event.promptId === promptA6) as RequestCreatedRow | undefined;
-    assert.ok(requestA6 !== undefined && requestA6.kind === "request.created");
-    assert.deepEqual((requestA6!.documentRefs ?? []).map((ref) => ref.kind), ["proposal", "roster", "modules", "architecture"]);
-    const answeredA6 = await presentAppCard(chief, { kind: "choice" } as CustomerInputRequest, promptA6, "proposal", ["accept", "accept-quick", "revise", "reject"]);
-    assert.equal(answeredA6?.outcome, "answered");
-    assert.equal((await appView(root, WF)).stages.A6.status, "completed", "客户 accept ⇒ A6 completed");
-    // advance：A7（创建即完成）→ A8（nominator）。
-    const a8 = await appTask(root, WF, "A8", "nominator");
-    assert.equal(a8.created?.from, "application");
-
-    // 5) A8：人事建卡/激活（v2）⇒ 全部名单角色 role.activated + A8 completed。
-    const roleDocs = await writeRoleDocuments(root);
-    const proposalResolved = (await readTaskState(root)).events.find((event) =>
-      event.kind === "request.resolved" && event.cardKind === "proposal") as Extract<Awaited<ReturnType<typeof readTaskState>>["events"][number], { kind: "request.resolved" }>;
-    assert.ok(proposalResolved !== undefined && proposalResolved.kind === "request.resolved");
-    const activation = await activateRoleDocumentsFixed({
-      projectRoot: root, operationId: "op-app-activate-worker", flowId: FLOW, workflowId: WF,
-      proposalDecisionId: proposalResolved.decisionId!, targetRoleId: "worker",
-      roster: { path: "docs/proposals/snake-roster-v1.md", sha256: sha(ROSTER_TEXT) },
-      documents: {
-        card: { path: "角色卡/worker/role-card.md", sha256: sha(roleDocs.card) },
-        boundaryMd: { path: "角色卡/worker/boundary.md", sha256: sha(roleDocs.boundaryMd) },
-        boundaryYaml: { path: "角色卡/worker/boundary.yaml", sha256: sha(roleDocs.boundaryYaml) },
-      },
-    });
-    assert.equal(activation.ok, true, activation.ok === false ? `${activation.code}: ${activation.message}` : "");
-    if (activation.ok) assert.equal(activation.stageCompleted, true, "全部名单角色激活 ⇒ A8 completed");
-
-    // 6) A9：应用建运营 stage-execution 任务 → 团队计划 + 基线 3 件小事（真实 BaselineGitPort）。
-    const a9Drive = await driveApp(root, WF);
-    assert.equal(a9Drive.stage, "A9");
-    const a9 = await appTask(root, WF, "A9", "convener");
-    assert.equal(a9.created?.from, "application");
-    assert.equal(a9.created?.taskKind, "stage-execution");
-    await writeChainDocs(root, { intent: false, proposal: false, teamPlan: true });
-    const planReceipt = await completeTeamPlanFixed({
-      projectRoot: root, flowId: FLOW, workflowId: WF, operationId: "op-app-a9-baseline",
-      plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(TEAM_PLAN_TEXT) },
-      port: createDesktopBaselineGitPort(), actorRoleId: "convener",
-    });
-    assert.equal(planReceipt.ok, true, planReceipt.ok === false ? `${planReceipt.code}: ${planReceipt.message}` : "");
-    if (planReceipt.ok) {
-      assert.match(planReceipt.basisId, /^bas-[a-f0-9]{24}$/);
-      assert.equal(planReceipt.stageCompleted, true);
-    }
-    assert.equal(git(root, "symbolic-ref", "--short", "HEAD"), taskBranchName(WF));
-    assert.equal((await appView(root, WF)).stages.A9.status, "completed");
-
-    // 7) A10：应用开任命卡（选项=名单角色、多选）→ 幕僚按 prompt 呈卡 worker ⇒ A10 completed。
-    await driveApp(root, WF);
-    const promptTaskA10 = await appTask(root, WF, "A10", "chief");
-    const promptA10 = promptTaskA10.created!.promptId!;
-    const requestA10 = (await readTaskState(root)).events.find((event) =>
-      event.kind === "request.created" && event.promptId === promptA10) as RequestCreatedRow | undefined;
-    assert.ok(requestA10 !== undefined && requestA10.kind === "request.created");
-    assert.deepEqual(requestA10!.options.map((option) => option.id), ["worker"], "任命选项 = 名单角色（应用生成）");
-    const answeredA10 = await presentAppCard(chief, { kind: "choice" } as CustomerInputRequest, promptA10, "appointment", ["worker"], { multiple: true });
-    assert.equal(answeredA10?.outcome, "answered");
-    assert.equal((await appView(root, WF)).stages.A10.status, "completed", "客户任命 ⇒ A10 completed");
-    const appointmentResolved = (await readTaskState(root)).events.find((event) =>
-      event.kind === "request.resolved" && event.cardKind === "appointment") as Extract<Awaited<ReturnType<typeof readTaskState>>["events"][number], { kind: "request.resolved" }>;
-    assert.ok(appointmentResolved !== undefined && appointmentResolved.kind === "request.resolved");
-    assert.equal(appointmentResolved.source, "stage-a10");
-    assert.deepEqual(appointmentResolved.targetRoleIds, ["worker"]);
-
-    // 8) A12a：A10 完成后应用直派 verifier criteria；报告 ⇒ A12a completed。
-    const a12a = await appTask(root, WF, "A12a", "verifier");
-    assert.equal(a12a.created?.from, "application");
-    assert.equal(a12a.created?.taskKind, "stage-execution");
-    await writeFile(root, "docs/quality/snake-criteria-v1.md", "# 验收标准\n\n- AC-1：贪吃蛇可玩\n");
-    await reportDone(root, a12a.taskId, "verifier", "criteria 完成", ["docs/quality/snake-criteria-v1.md"]);
-    const a12aObserved = await observeApp(root, a12a.taskId);
-    assert.equal(a12aObserved.ok, true, a12aObserved.ok === false ? `${a12aObserved.code}: ${a12aObserved.message}` : "");
-    if (a12aObserved.ok) assert.equal(a12aObserved.stageCompleted, true);
-
-    // 9) A11：应用建 worker-dispatch → 运营派项目 worker；真实任务分支提交 + 收口 ⇒ A11 completed。
-    const a11Drive = await driveApp(root, WF);
-    assert.equal(a11Drive.stage, "A11");
-    const a11Dispatch = await appTask(root, WF, "A11", "convener");
-    assert.equal(a11Dispatch.created?.taskKind, "worker-dispatch");
-    assert.equal(a11Dispatch.created?.sideEffect, "read-only");
-    const implAppended = await appendTaskEvent(root, taskEvent("task.created", {
-      taskId: "t-app-chain-a11-impl", from: "convener", to: "worker", text: "实现贪吃蛇核心模块",
-      sideEffect: "code", idempotencyKey: "dispatch:t-app-chain-a11-impl", flowId: FLOW, workflowId: WF,
-      stage: "A11", moduleId: "core", modulePaths: ["src/core/"],
-    }, () => new Date(AT)));
-    assert.equal(implAppended.ok, true, implAppended.ok === false ? implAppended.message : "");
-    const scopeRes = await resolveTaskGitScope({ projectRoot: root, taskId: "t-app-chain-a11-impl", roleId: "worker" });
-    assert.equal(scopeRes.ok, true, scopeRes.ok === false ? `${scopeRes.code}: ${scopeRes.message}` : "");
-    if (!scopeRes.ok) return;
-    assert.deepEqual(scopeRes.scope.paths, ["src/core/"]);
-    const taskGit = createDesktopTaskGitPort();
-    assert.equal(await taskGit.currentBranch({ projectRoot: root }), taskBranchName(WF));
-    await writeFile(root, "src/core/snake.ts", "export const SNAKE = { tick: 1 };\n");
-    const addResult = await taskGit.add({ projectRoot: root, paths: ["src/core/snake.ts"] });
-    assert.equal(addResult.exitCode, 0, addResult.error ?? "");
-    const gate = await runTaskGitCommit({
-      scope: scopeRes.scope,
-      currentBranch: await taskGit.currentBranch({ projectRoot: root }),
-      commitArgv: ["git", "commit", "-m", "A11: snake core"],
-      acquire: (owner) => taskGit.acquireCriticalSection(root, owner),
-      inspectStaged: () => taskGit.inspectStaged({ projectRoot: root }),
-      commit: () => taskGit.commit({ projectRoot: root, message: "A11: snake core" }),
-    });
-    assert.equal(gate.ok, true, gate.ok === false ? `${gate.code}: ${gate.message}` : "");
-    const implTip = git(root, "rev-parse", "HEAD");
-    // Q6：运营先收口应用创建的 worker-dispatch 任务（不写阶段事件）；A11 完成仍以全部实现任务 accepted 为准。
-    await reportDone(root, a11Dispatch.taskId, "convener", "A11 worker 已派发并收口");
-    const wdClosed = await closeApplicationTaskDirect({
-      projectRoot: root, taskId: a11Dispatch.taskId, outcome: "accepted", operationId: "op-app-close-a11-wd",
-    });
-    assert.equal(wdClosed.ok, true, wdClosed.ok === false ? `${wdClosed.code}: ${wdClosed.message}` : "");
-    await writeFile(root, "docs/quality/snake-impl-report-v1.md", "# A11 实现报告\n\n静态自检通过。\n");
-    await reportDone(root, "t-app-chain-a11-impl", "worker", "实现完成并提交", ["docs/quality/snake-impl-report-v1.md", "src/core/snake.ts"]);
-    const a11Closed = await closeTask({
-      projectRoot: root, operationId: "op-app-close-a11-impl", taskId: "t-app-chain-a11-impl",
-      outcome: "accepted", actorRoleId: "convener",
-      evidence: {
-        artifacts: [
-          { path: "docs/quality/snake-impl-report-v1.md", sha256: sha(await fs.readFile(path.join(root, "docs", "quality", "snake-impl-report-v1.md"))), kind: "report-evidence" },
-          { path: "src/core/snake.ts", sha256: sha(await fs.readFile(path.join(root, "src", "core", "snake.ts"))), kind: "report-evidence" },
-        ],
-        branchTipOid: implTip,
-      },
-    });
-    assert.equal(a11Closed.ok, true, a11Closed.ok === false ? `${a11Closed.code}: ${a11Closed.message}` : "");
-    assert.equal((await appView(root, WF)).stages.A11.status, "completed", "A11 = 全部实现任务 accepted + 分支 tip");
-
-    // 10) A12b：应用直派验收报告 → 应用归档 + A12b accepted + A12 聚合。
-    const a12bDrive = await driveApp(root, WF);
-    assert.equal(a12bDrive.stage, "A12b");
-    const a12b = await appTask(root, WF, "A12b", "verifier");
-    await writeFile(root, "docs/quality/snake-report-v1.md", "# 验收报告\n\n结论：通过。\n");
-    const archived = await archiveAcceptance({
-      projectRoot: root, flowId: FLOW, workflowId: WF,
-      criteriaPath: "docs/quality/snake-criteria-v1.md", reportPath: "docs/quality/snake-report-v1.md",
-      conclusion: "通过", staffDecision: "应用按定义标准验收",
-    });
-    assert.equal(archived.ok, true, archived.ok === false ? `${archived.code}: ${archived.message}` : "");
-    if (!archived.ok) return;
-    await reportDone(root, a12b.taskId, "verifier", "独立验收通过", ["docs/quality/snake-report-v1.md"]);
-    const a12bClosed = await closeTask({
-      projectRoot: root, operationId: "op-app-close-a12b", taskId: a12b.taskId, outcome: "accepted",
-      actorRoleId: "application",
-      evidence: {
-        artifacts: [{ path: "docs/quality/snake-report-v1.md", sha256: sha(await fs.readFile(path.join(root, "docs", "quality", "snake-report-v1.md"))), kind: "report" }],
-        acceptanceArchive: { path: archived.path, sha256: archived.sha256 },
-      },
-    });
-    assert.equal(a12bClosed.ok, true, a12bClosed.ok === false ? `${a12bClosed.code}: ${a12bClosed.message}` : "");
-    assert.equal((await appView(root, WF)).stages.A12b.status, "completed");
-    assert.equal((await appView(root, WF)).stages.A12.status, "completed", "A12 聚合完成");
-
-    // 11) A13：应用建运营汇总任务；报告收口后应用呈 merge-main 卡（客户本人 approve）→ 本地合并 main。
-    const a13Drive = await driveApp(root, WF);
-    assert.equal(a13Drive.stage, "A13");
-    const a13 = await appTask(root, WF, "A13", "convener");
-    assert.equal(a13.created?.from, "application");
-    await writeFile(root, "docs/scheduling/snake-integration-v1.md", "# 集成/交付汇总\n\n交付贪吃蛇 v1。\n");
-    await reportDone(root, a13.taskId, "convener", "汇总完成", ["docs/scheduling/snake-integration-v1.md"]);
-    const a13Closed = await closeApplicationTaskDirect({
-      projectRoot: root, taskId: a13.taskId, outcome: "accepted", operationId: "op-app-close-a13",
-    });
-    assert.equal(a13Closed.ok, true, a13Closed.ok === false ? `${a13Closed.code}: ${a13Closed.message}` : "");
-    // release-or-close：报告/收口不完成 A13，只能由 release.merged 完成。
-    assert.notEqual((await appView(root, WF)).stages.A13.status, "completed");
-    const archiveFacts = await findAcceptanceArchive({ projectRoot: root, flowId: FLOW, workflowId: WF });
-    assert.ok(archiveFacts !== undefined);
-    const release = await h.mgr.runFixedReleaseMerge({
-      projectRoot: root, workflowId: WF, operationId: "op-app-release-a13", summary: "交付贪吃蛇 v1",
-      evidence: [{ path: archiveFacts!.path, sha256: archiveFacts!.sha256 }],
-    });
-    assert.equal(release.ok, true, release.message);
-    assert.equal(release.merged, true);
-    assert.equal(git(root, "symbolic-ref", "--short", "HEAD"), "main", "合并后停在 main");
-    assert.doesNotThrow(() => execFileSync("git", ["merge-base", "--is-ancestor", `refs/heads/${taskBranchName(WF)}`, "refs/heads/main"], { cwd: root, stdio: "ignore" }));
-    assert.equal(git(root, "tag"), "", "不 push/tag");
-    assert.equal(git(root, "remote"), "", "");
-    const finalView = await appView(root, WF);
-    assert.equal(finalView.closed?.outcome, "delivered");
-    assert.equal(finalView.releaseId !== undefined, true);
-    const releases = (await readReleaseLedger(root)).events.filter((event) => event.workflowId === WF);
-    assert.deepEqual(releases.map((event) => event.kind), ["release.requested", "release.confirmed", "release.merged"]);
-    const confirmed = releases.find((event) => event.kind === "release.confirmed");
-    assert.ok(confirmed !== undefined && confirmed.kind === "release.confirmed" && confirmed.by === "customer", "merge-main 只能客户本人确认");
-    // 卡预算：3 张确认卡 + merge-main；无 acceptance 卡 / 无额外客户门。
-    const cardKinds = h.requests.map((request) => request.cardKind);
-    assert.equal(cardKinds.filter((kind) => kind === "intent-confirm").length, 1);
-    assert.equal(cardKinds.filter((kind) => kind === "proposal").length, 1);
-    assert.equal(cardKinds.filter((kind) => kind === "appointment").length, 1);
-    assert.equal(cardKinds.filter((kind) => kind === MERGE_MAIN_CARD_KIND).length, 1);
-    assert.equal(cardKinds.includes("acceptance"), false, "fixed 路径不发 acceptance 卡");
-    assert.equal(cardKinds.length, 4);
-    // 协议/驱动不变量：无 stage-request 任务；stage.requested/dispatched 全由应用签发；无 trunk/run 写入。
-    const allTasks = [...(await readTaskState(root)).records.values()];
-    assert.equal(allTasks.some((record) => record.created?.taskKind === "stage-request"), false, "新协议不产生 stage-request");
-    const allWorkflowEvents = (await readWorkflowLedger(root)).events.filter((event) => event.workflowId === WF);
-    for (const event of allWorkflowEvents) {
-      if (event.kind === "stage.requested" || event.kind === "stage.dispatched") {
-        assert.equal(event.issuedBy, "application", `${event.kind} ${event.stage} 必须由应用签发`);
-      }
-    }
-    assert.equal(allWorkflowEvents.filter((event) => event.kind === "stage.requested" && event.stage === "A13").length, 1);
-    await assertNoLegacyWrites(root);
-    assert.equal(git(root, "ls-files", "docs/acceptance").trim(), "", "治理文档不入 Git");
-    assert.equal(git(root, "ls-files", ".ans").trim(), "", "应用账本不入 Git");
-  } finally {
-    await h.mgr.stop(null);
-    await cleanup(root);
-  }
-});
-
-// —————————————— 2026-11-17（T2）：app-dispatch/v1 路径 B 全链 ——————————————
-
-test("路径 B 全链（app-dispatch/v1）：B1 worker-dispatch → B2 应用派生（change.scope-decided）→ B3 → B4 → merge-main", async () => {
-  const root = await tempRoot("ans-app-dispatch-chain-b-");
-  const h = harness(root);
-  try {
-    // 既有 Git 项目 + 五件基础文档（B1 报告证据 / B2 派生输入）。
-    initRepo(root);
-    await writeFile(root, "src/core/snake.ts", "export const SNAKE = 1;\n");
-    const ensured = await createDesktopBaselineGitPort().ensureGitignore({ projectRoot: root });
-    assert.equal(ensured.ok, true);
-    const mainOid = commitAll(root, "base");
-    await writeChainDocs(root, { intent: true, proposal: true, teamPlan: false });
-    await writeFile(root, "docs/governance/rapporteur/snake-impact-v1.md", "# 影响面\n\ncore 碰撞问题修复。\n");
-
-    const selected = await selectWorkflow({
-      projectRoot: root, flowId: FLOW, workflowPath: "B", sourceTaskId: "turn-app-b-1",
-    });
-    assert.equal(selected.ok, true, selected.ok === false ? `${selected.code}: ${selected.message}` : "");
-    if (!selected.ok) return;
-    const WF = selected.workflowId;
-    assert.equal(selected.stage, "B1");
-    const started = (await readWorkflowLedger(root)).events.find((event) => event.kind === "workflow.started");
-    assert.ok(started !== undefined && started.kind === "workflow.started");
-    assert.equal(started!.protocol, "app-dispatch/v1");
-    assert.equal(started!.definition?.id, "modify");
-    // path-b 只读快照 + 任务分支准备（应用；不写团队计划、不重建角色、不弹卡）。
-    const basis = await recordBasis({
-      projectRoot: root, flowId: FLOW, workflowId: WF, operationId: "op-app-b-basis",
-      reason: "path-b", port: createDesktopBaselineGitPort(),
-    });
-    assert.equal(basis.ok, true, basis.ok === false ? `${basis.code}: ${basis.message}` : "");
-    const basisEvents = (await readBasisLedger(root)).events.filter((event) => event.kind === "basis.recorded" && event.workflowId === WF);
-    assert.equal(basisEvents.length, 1);
-    const pathB = basisEvents[0] as Extract<BasisEvent, { kind: "basis.recorded" }>;
-    assert.equal(pathB.reason, "path-b");
-    assert.equal(pathB.teamPlan, null, "路径 B 不写团队计划");
-    assert.equal(pathB.repo?.state, "existing");
-    assert.equal(pathB.repo?.branch, taskBranchName(WF));
-    assert.equal(git(root, "symbolic-ref", "--short", "HEAD"), taskBranchName(WF));
-    assert.equal(h.requests.length, 0, "路径 B 准备不弹客户卡");
-    await assert.rejects(fs.stat(path.join(root, "docs", "scheduling")), "路径 B 不写团队计划");
-
-    // 打开幕僚聊天（新协议）登记 runtime；B1 worker-dispatch 由应用建任务。
-    await openAppChief(h, root);
-    const b1Dispatch = await appTask(root, WF, "B1", "convener");
-    assert.equal(b1Dispatch.created?.taskKind, "worker-dispatch");
-    assert.equal(b1Dispatch.created?.from, "application");
-    // 运营按 worker-dispatch 派分析 worker（生产由 route 创建；本链以账本事实模拟同一形状）。
-    const b1WorkerAppended = await appendTaskEvent(root, taskEvent("task.created", {
-      taskId: "t-app-chain-b1-worker", from: "convener", to: "worker", text: "B1 影响面分析",
-      sideEffect: "read-only", idempotencyKey: "dispatch:t-app-chain-b1-worker", flowId: FLOW, workflowId: WF,
-      stage: "B1", moduleId: "core", modulePaths: ["src/core/snake.ts"],
-    }, () => new Date(AT)));
-    assert.equal(b1WorkerAppended.ok, true, b1WorkerAppended.ok === false ? b1WorkerAppended.message : "");
-    await reportDone(root, "t-app-chain-b1-worker", "worker", "影响面完成", ["docs/governance/rapporteur/snake-impact-v1.md"]);
-    const b1Closed = await closeTask({
-      projectRoot: root, operationId: "op-app-close-b1", taskId: "t-app-chain-b1-worker", outcome: "accepted",
-      actorRoleId: "convener",
-      evidence: {
-        artifacts: [{
-          path: "docs/governance/rapporteur/snake-impact-v1.md",
-          sha256: sha(await fs.readFile(path.join(root, "docs", "governance", "rapporteur", "snake-impact-v1.md"))),
-          kind: "report-evidence",
-        }],
-      },
-    });
-    assert.equal(b1Closed.ok, true, b1Closed.ok === false ? `${b1Closed.code}: ${b1Closed.message}` : "");
-    assert.equal((await appView(root, WF)).stages.B1.status, "completed");
-
-    // 2) B2：B1 完成后应用确定性派生（不建任务、不发请求）；随后驱动 B3 worker-dispatch。
-    const reconcileB2 = await h.mgr.reconcileAppDispatch(root);
-    assert.equal(reconcileB2.corrupt.length, 0, reconcileB2.corrupt.join(";"));
-    const impactSha = sha(await fs.readFile(path.join(root, "docs", "governance", "rapporteur", "snake-impact-v1.md")));
-    const scopeDecided = (await readWorkflowLedger(root)).events.filter((event): event is Extract<WorkflowEvent, { kind: "change.scope-decided" }> =>
-      event.kind === "change.scope-decided" && event.workflowId === WF);
-    assert.equal(scopeDecided.length, 1, "change.scope-decided 由应用派生一次");
-    assert.equal(scopeDecided[0]!.impactReport.path, "docs/governance/rapporteur/snake-impact-v1.md");
-    assert.equal(scopeDecided[0]!.impactReport.sha256, impactSha, "影响面 hash 由应用按字节重算");
-    assert.deepEqual(scopeDecided[0]!.effectiveWritesets, [{ roleId: "worker", paths: ["src/core/snake.ts"] }]);
-    assert.equal(scopeDecided[0]!.requestTaskId, b1Dispatch.taskId, "B2 审计绑定应用发放的 B1 worker-dispatch");
-    assert.equal((await appView(root, WF)).stages.B2.status, "completed");
-    assert.equal(h.requests.length, 0, "B2 不弹卡");
-    // 运营收口 B1 worker-dispatch（Q6）。
-    await reportDone(root, b1Dispatch.taskId, "convener", "B1 worker 已收口");
-    const b1WdClosed = await closeApplicationTaskDirect({
-      projectRoot: root, taskId: b1Dispatch.taskId, outcome: "accepted", operationId: "op-app-close-b1-wd",
-    });
-    assert.equal(b1WdClosed.ok, true, b1WdClosed.ok === false ? `${b1WdClosed.code}: ${b1WdClosed.message}` : "");
-
-    // 3) B3：应用建 worker-dispatch → 运营派实现；写集 = B2 派生 ∩ roster 属主；真实提交。
-    const b3Dispatch = await appTask(root, WF, "B3", "convener");
-    assert.equal(b3Dispatch.created?.taskKind, "worker-dispatch");
-    assert.equal(b3Dispatch.created?.from, "application");
-    const b3WorkerAppended = await appendTaskEvent(root, taskEvent("task.created", {
-      taskId: "t-app-chain-b3-worker", from: "convener", to: "worker", text: "B3 修复 core 碰撞",
-      sideEffect: "code", idempotencyKey: "dispatch:t-app-chain-b3-worker", flowId: FLOW, workflowId: WF,
-      stage: "B3", moduleId: "core", modulePaths: ["src/core/snake.ts"],
-    }, () => new Date(AT)));
-    assert.equal(b3WorkerAppended.ok, true);
-    const scopeRes = await resolveTaskGitScope({ projectRoot: root, taskId: "t-app-chain-b3-worker", roleId: "worker" });
-    assert.equal(scopeRes.ok, true, scopeRes.ok === false ? `${scopeRes.code}: ${scopeRes.message}` : "");
-    if (!scopeRes.ok) return;
-    assert.deepEqual(scopeRes.scope.paths, ["src/core/snake.ts"], "B3 写集 = B2 派生 ∩ roster 属主");
-    const taskGit = createDesktopTaskGitPort();
-    await writeFile(root, "src/core/snake.ts", "export const SNAKE = 2;\n");
-    const addFix = await taskGit.add({ projectRoot: root, paths: ["src/core/snake.ts"] });
-    assert.equal(addFix.exitCode, 0, addFix.error ?? "");
-    const commitGate = await runTaskGitCommit({
-      scope: scopeRes.scope,
-      currentBranch: await taskGit.currentBranch({ projectRoot: root }),
-      commitArgv: ["git", "commit", "-m", "B3: fix core collision"],
-      acquire: (owner) => taskGit.acquireCriticalSection(root, owner),
-      inspectStaged: () => taskGit.inspectStaged({ projectRoot: root }),
-      commit: () => taskGit.commit({ projectRoot: root, message: "B3: fix core collision" }),
-    });
-    assert.equal(commitGate.ok, true, commitGate.ok === false ? `${commitGate.code}: ${commitGate.message}` : "");
-    const b3Tip = git(root, "rev-parse", "HEAD");
-    assert.notEqual(b3Tip, mainOid);
-    // Q6：运营先收口 worker-dispatch 任务；B3 完成要求全部实现任务 accepted（无 open sibling）。
-    await reportDone(root, b3Dispatch.taskId, "convener", "B3 worker 已收口");
-    const b3WdClosed = await closeApplicationTaskDirect({
-      projectRoot: root, taskId: b3Dispatch.taskId, outcome: "accepted", operationId: "op-app-close-b3-wd",
-    });
-    assert.equal(b3WdClosed.ok, true);
-    await writeFile(root, "docs/quality/snake-b3-report-v1.md", "# B3 报告\n\n修复完成，静态自检通过。\n");
-    await reportDone(root, "t-app-chain-b3-worker", "worker", "修复完成", ["docs/quality/snake-b3-report-v1.md"]);
-    const b3ReportSha = sha(await fs.readFile(path.join(root, "docs", "quality", "snake-b3-report-v1.md")));
-    const b3Closed = await closeTask({
-      projectRoot: root, operationId: "op-app-close-b3", taskId: "t-app-chain-b3-worker", outcome: "accepted",
-      actorRoleId: "convener",
-      evidence: {
-        artifacts: [{ path: "docs/quality/snake-b3-report-v1.md", sha256: b3ReportSha, kind: "report-evidence" }],
-        branchTipOid: b3Tip,
-      },
-    });
-    assert.equal(b3Closed.ok, true, b3Closed.ok === false ? `${b3Closed.code}: ${b3Closed.message}` : "");
-    assert.equal((await appView(root, WF)).stages.B3.status, "completed");
-
-    // 4) B4：应用建运营汇总任务 → 报告收口 → merge-main 客户本人 approve → 合并（不要求 A12b）。
-    const reconcileB4 = await h.mgr.reconcileAppDispatch(root);
-    assert.equal(reconcileB4.corrupt.length, 0, reconcileB4.corrupt.join(";"));
-    const b4 = await appTask(root, WF, "B4", "convener");
-    assert.equal(b4.created?.from, "application");
-    await writeFile(root, "docs/scheduling/snake-b4-summary-v1.md", "# B4 汇总\n\n修复交付。\n");
-    await reportDone(root, b4.taskId, "convener", "汇总完成", ["docs/scheduling/snake-b4-summary-v1.md"]);
-    const b4Closed = await closeApplicationTaskDirect({
-      projectRoot: root, taskId: b4.taskId, outcome: "accepted", operationId: "op-app-close-b4",
-    });
-    assert.equal(b4Closed.ok, true);
-    assert.notEqual((await appView(root, WF)).stages.B4.status, "completed", "release-or-close：B4 只能由 release.merged 完成");
-    const release = await h.mgr.runFixedReleaseMerge({
-      projectRoot: root, workflowId: WF, operationId: "op-app-release-b4", summary: "修复交付",
-      evidence: [{ path: "docs/quality/snake-b3-report-v1.md", sha256: b3ReportSha }],
-    });
-    assert.equal(release.ok, true, release.message);
-    assert.equal(release.merged, true);
-    assert.equal(h.requests.length, 1, "路径 B 只在发布时弹一张 merge-main 卡");
-    assert.equal(h.requests[0]!.cardKind, MERGE_MAIN_CARD_KIND);
-    assert.equal(git(root, "symbolic-ref", "--short", "HEAD"), "main");
-    assert.equal(await fs.readFile(path.join(root, "src", "core", "snake.ts"), "utf8"), "export const SNAKE = 2;\n", "main 含修复");
-    assert.equal(git(root, "tag"), "");
-    assert.equal(git(root, "remote"), "");
-    await assert.rejects(fs.stat(path.join(root, "docs", "acceptance")), "路径 B 无 docs/acceptance 归档要求");
-    const releases = (await readReleaseLedger(root)).events.filter((event) => event.workflowId === WF);
-    assert.deepEqual(releases.map((event) => event.kind), ["release.requested", "release.confirmed", "release.merged"]);
-    assert.equal((await appView(root, WF)).closed?.outcome, "delivered");
-    await assertNoLegacyWrites(root);
-    // 不重建角色 / 不写团队计划；无 stage-request；stage 事件全由应用签发。
-    const events = (await readWorkflowLedger(root)).events.filter((event) => event.workflowId === WF);
-    assert.equal(events.some((event) => event.kind === "role.activated"), false);
-    assert.equal([...(await readTaskState(root)).records.values()].some((record) => record.created?.taskKind === "stage-request"), false);
-    for (const event of events) {
-      if (event.kind === "stage.requested" || event.kind === "stage.dispatched") {
-        assert.equal(event.issuedBy, "application", `${event.kind} ${event.stage} 必须由应用签发`);
-      }
-    }
-    assert.equal(events.some((event) => event.kind === "stage.requested" && event.stage === "B2"), false, "新协议不产生 B2 请求（B34 死锁类根除）");
   } finally {
     await h.mgr.stop(null);
     await cleanup(root);

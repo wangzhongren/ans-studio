@@ -237,8 +237,7 @@ export interface TrustedToolPolicyInput {
 }
 
 /**
- * 角色模块可额外声明的工具稳定 id **闭集**（E0.2 §3.1 R-1 / §10.2 D1；14 项 legacy + 2026-11-17
- * app-dispatch/v1 新增第 15 项 `selectWorkflow`）。
+ * 角色模块可额外声明的工具稳定 id **闭集**（E0.2 §3.1 R-1 / §10.2 D1，含幕僚启动方案 v1.1 增补）。
  *
  * - 只列**角色专属额外注入**的工具；`projectState` 等内置治理角色共有工具由引擎按
  *   `builtInGovernance` 注入，不在此列。
@@ -265,13 +264,10 @@ export type RoleToolId =
   | "submitRefactor"
   | "requestStableWrite"
   | "decidePendingRequest"
-  // 2026-11-17（app-dispatch/v1，设计 §6.1）：幕僚显式选择流程（A/B；workflowPath + flowId，
-  // 可选 acceptanceStrength）；仅 chief、仅 fixed 会话注入（注入开关由桌面批控制）。
-  | "selectWorkflow";
+  | "requestWorkflowStart";
 
 /**
- * `RoleToolId` 对应的运行时注册工具名（snake_case；E0.2 §3.1 逐字，14 项 legacy + 第 15 项
- * `select_workflow`（app-dispatch/v1））。
+ * `RoleToolId` 对应的运行时注册工具名（snake_case；E0.2 §3.1 与幕僚启动方案 v1.1）。
  *
  * 本类型只定义字面量闭集，**不承载映射值**：逐项映射只存在于门禁引擎私有装配表
  * （`role-tool-registry.ts::ROLE_TOOL_CATALOG`，单一来源），由契约测试逐项断言与 §3.1 表一致。
@@ -291,7 +287,7 @@ export type RoleToolName =
   | "submit_refactor"
   | "request_stable_write"
   | "decide_pending_request"
-  | "select_workflow";
+  | "request_workflow_start";
 
 /** `tools()` 的输出：可用能力位 + 额外注入工具稳定 id + 结构化原因（纯数据）。 */
 export interface RoleToolPolicy {
@@ -453,21 +449,17 @@ export interface BuiltInRoleModule extends GovernanceRoleSpec {
    */
   readonly fixedCards?: readonly GovernanceCardKind[];
   /**
-   * fixed 矩阵下 chief 的可派发内置目标（v1.3 §3.2/§3.4；MF-IR-4）。2026-11-17（app-dispatch/v1，
-   * 设计 §2.1/§6.1）**按设计清零为空数组**：幕僚不再派发任何 agent（只选流程、按应用 prompt
-   * 呈客户卡；越权 ⇒ `chief-dispatch-removed`）。v2.1 历史冻结值曾为 `["convener","verifier"]`
-   * （仅 fixed-v2.1 在飞协议；不迁移）。
+   * fixed 矩阵下 chief 的可派发内置目标（v1.3 §3.2/§3.4；MF-IR-4）。恰为
+   * `["convener","verifier"]`：convener 仅 `purpose:"stage-request"`；verifier 为 review/preparation。
    *
    * 仅 fixed 谓词/矩阵视图消费；legacy `CHIEF_HUB_DISPATCH.targetRoleIds`（五内置）**逐字冻结**、
    * 消费点不改读取源。**缺失 ⇒ 消费方 fail-closed**（不得回退 legacy 五内置）。纯数据、无 I/O。
    */
   readonly fixedTargetRoleIds?: readonly string[];
   /**
-   * fixed 矩阵下 convener 可派发的内置生产线目标（v1.3 §3.2/§3.4；MF-IR-4）。2026-11-17
-   * （app-dispatch/v1，设计 §2.1/§6.1）**按设计清零为空数组**：内置角色任务全部由应用按流程
-   * 定义创建，运营只派项目 worker 且须绑定应用 open 的 `worker-dispatch` 任务（越权 ⇒
-   * `convener-builtin-dispatch-forbidden` / `worker-dispatch-required`）。v2.1 历史冻结值曾为
-   * `["product","rapporteur","nominator"]`（仅 fixed-v2.1 在飞协议；不迁移）。
+   * fixed 矩阵下 convener 可派发的内置生产线目标（v1.3 §3.2/§3.4；MF-IR-4）。恰为
+   * `["product","rapporteur","nominator"]`（verifier 拒绝 `convener-to-verifier-forbidden`；
+   * 项目角色另按 production 允许）。
    *
    * 仅 fixed 谓词/矩阵视图消费；legacy `CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds`
    * （`["verifier"]`）**逐字冻结**、消费点不改读取源。**缺失 ⇒ 消费方 fail-closed**。纯数据、无 I/O。

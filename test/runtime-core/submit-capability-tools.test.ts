@@ -536,15 +536,10 @@ test("R2 decision rejection/revision stays pending unless the trusted capability
   assert.equal(wrong.ok, false); assert.match(wrong.message, /结果未知/);
 });
 
-// v2.1.0 发布阻断硬化（R2 chief timeout 注入预算 25ms→250ms，协调者裁决）：发布 run 44052288470
-// （head 3c2b844）x64 以「demo 建立角色会话 超时（25ms）」失败（该用例 49ms），TimeoutError 在
-// assert.rejects 作用域外抛出——慢 x64 实例上 25ms 连会话建立都不够，超时早于 prompt 阶段触发
-// （该名在旧 B0/B7 基线中属历史环境敏感族，本机/test-ci 常态通过）。decide handler 永不返回，
-// 250ms 后仍必然触发超时；仅扩大注入预算以消除会话建立耗时敏感。测试名/断言/其它语义零改动。
 test("R2 chief timeout is finite and normal sessions still receive injected narrow capabilities", async (t) => {
   const neutral = await neutralProjectRoot(); t.after(neutral.cleanup);
   const captured: RuntimeProviderOptions[] = [];
-  const context = chiefContext(); context.limits.timeoutMs = 250;
+  const context = chiefContext(); context.limits.timeoutMs = 25;
   let calls = 0;
   const session = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: neutral.root, skillRoot: neutral.root,
     chiefDecisionContext: context, decidePendingRequest: async (_input, signal) => {

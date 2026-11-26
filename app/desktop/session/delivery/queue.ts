@@ -29,6 +29,7 @@ import { createDiagnosticLogger } from "../../../../src/common/shared/diagnostic
 import { shortenSummary, taskEvent, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
 import { renderHandbackBatchPrompt, renderWorkReportBatchPrompt, type TaskHandback } from "../../../../src/common/编排/handback.ts";
 import { isBuiltInGovernanceRoleId } from "../../../../src/service/boundary/resolve-boundary.ts";
+import { desktopQueuedAcceptanceIsCurrent } from "../../durable-acceptance-workspace.ts";
 import { inspectAssignedTask, inspectQueuedControllerResume, classifyClosedTaskNotice, prepareRoleDispatch, resolveDeliveryAssignment } from "../../../../src/pipeline/orchestration/trunk-runtime.ts";
 import { inspectAssignedTask as inspectWorkflowAssignedTask } from "../../../../src/common/编排/workflow-service.ts";
 import { RuntimeDeliveryError } from "../../../../src/model/runtime.ts";
@@ -58,7 +59,7 @@ import { queueKey, sessionKey } from "../shared/keys.ts";
 import { now } from "../shared/clock.ts";
 import { emitDeliveryNote } from "../shared/notifier.ts";
 import { chiefTaskRoleIdOf, handbackOwnerRoleId, roleDisplayName } from "../shared/roles.ts";
-import { appendRoleActivity, appendTaskState, isFixedTask, readTasks } from "../shared/tasks-store.ts";
+import { appendRoleActivity, appendTaskState, isFixedTask, readTasks, recordTaskFailure } from "../shared/tasks-store.ts";
 import { inventoryChanged, publishDeliveryInventory, type SessionInventoryState } from "../shared/inventory.ts";
 import { contextInfo } from "../shared/session-views.ts";
 import { APP_TASK_CLIENT_MESSAGE_ID_PREFIX, isAppTaskClientMessageId } from "../shared/text.ts";
@@ -129,7 +130,7 @@ export interface DeliveryPorts {
 }
 
 /** queue 方法读取的 deps 切片（原 this.deps 的只读查询）。 */
-type DeliveryDeps = Pick<SessionManagerDeps, "emitEvent" | "emitRoleState" | "getListing" | "refreshListing" | "now" | "demoRuntimeAutoDeliver">;
+type DeliveryDeps = Pick<SessionManagerDeps, "emitEvent" | "emitRoleState" | "getListing" | "refreshListing" | "now" | "demoRuntimeAutoDeliver" | "durableWorkflow" | "workflowChiefStart">;
 
 /** 「已投递」应用任务标记的内存上界（FIFO 淘汰；防长跑进程无界增长）。 */
 const MAX_DELIVERED_APP_TASK_IDS = 1024;
@@ -169,6 +170,7 @@ export class Delivery {
     this.store = new DeliveryStore(this.state, this.refs, {
       enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item),
       drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime),
+      reconcileRecoveredInformation: (projectRoot, roleId, item) => this.reconcileRecoveredInformation(projectRoot, roleId, item),
       managerId: () => this.port.managerId(),
       inventoryState: () => this.port.inventoryState(),
     }, deps);
@@ -254,6 +256,23 @@ export class Delivery {
   deliveryQueuePersistenceFacts(): DeliveryQueuePersistenceFacts { return this.store.deliveryQueuePersistenceFacts(); }
   finishStopPersistence(result: StopResult): Promise<StopResult> { return this.store.finishStopPersistence(result); }
   async restorePersistedDeliveries(): Promise<DeliveryQueueRestoreReport> { return this.store.restorePersistedDeliveries(); }
+
+  private async reconcileRecoveredInformation(projectRoot: string, roleId: string, item: DeliveryItem): Promise<(() => void) | undefined> {
+    const durable = this.deps.durableWorkflow;
+    if (!durable || item.kind !== "system" || item.sourceRoleId !== "" || item.targetRoleId !== roleId
+      || item.clientMessageId || item.taskId || item.flowId || item.systemAssignment || item.notificationSource || item.controllerResume) return;
+    const [producer, root, signal, sequence, ...tail] = item.dedupKey.split("\u0000");
+    if (producer !== "watchdog" || root !== projectRoot || tail.length || !sequence || !/^[1-9][0-9]*$/.test(sequence)
+      || !signal || !/^(?:patrol(?:-skipped)?|storm-notice|auto-abort-[\w-]+|(?:alert|recovery)-(?:turn-deadline|queue-stuck|cmd-timeout|repeat-fail|log-silence):[\w-]+)$/.test(signal)) return;
+    const chief = chiefTaskRoleIdOf(projectRoot, this.deps);
+    if (chief && roleId !== chief) return;
+    const owner = await (await durable.store()).owner(projectRoot);
+    if (owner ? owner.engine !== "dapr" : (await durable.find(projectRoot))?.workflowOwnedDispatch !== true) return;
+    return () => {
+      this.emitDeliveryNote(projectRoot, item.runtime, roleId, "", item.summary);
+      createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId }).record("delivery.notice.information-only", { signal });
+    };
+  }
   persistableDeliveryItem(item: DeliveryItem): PersistedDeliveryItemV1["item"] | undefined { return this.store.persistableDeliveryItem(item); }
   deliveryStoreItems(): PersistedDeliveryItemV1[] { return this.store.deliveryStoreItems(); }
   parsePersistedDeliveryItem(raw: unknown): { projectRoot: string; roleId: string; runtime: RuntimeKind; item: DeliveryItem } | undefined { return this.store.parsePersistedDeliveryItem(raw); }
@@ -695,9 +714,18 @@ export class Delivery {
     // 2026-10-20 真机（Convener 卡 1h、队列 24 条回交被 system 看护项堵住）：**回交/派发优先于 system**。
     // 认领时跳过 system 看护项、取第一个非 system 条目（回交/派发/客户消息的相对顺序不变——客户消息屏障
     // 语义保留；同类仍按到达序）。只有在队列全是 system 时才投 system。
-    const priorityIndex = q.findIndex((i) => i.kind !== "system");
+    const durable = this.deps.durableWorkflow;
+    const owned = durable && await durable.owns(projectRoot);
+    if (stopped()) return;
+    const priorityIndex = owned ? q.findIndex(item => durable?.delivery(projectRoot, item.clientMessageId) !== undefined)
+      : q.findIndex(item => item.kind !== "system");
+    if (owned && priorityIndex === -1) return;
     const headIndex = priorityIndex >= 0 ? priorityIndex : 0;
     const item = q[headIndex];
+    const delivery = durable?.delivery(projectRoot, item.clientMessageId);
+    const directIntent = item.kind === "dispatch" && resolvedTarget === "product" && delivery?.intent.task?.stage === "A2" && delivery.intent.task.taskId === item.taskId
+      && delivery.intent.task.parentTaskId === delivery.ref.instanceId && delivery.runtime === runtime ? delivery : undefined;
+    const ownedDispatch = directIntent ?? (item.kind === "dispatch" && delivery?.workflowOwnedDispatch && delivery.intent.task?.taskId === item.taskId && delivery.runtime === runtime ? delivery : undefined);
     // These identities come from the selected transport item, never from the latest role/task.
     const claimTaskId = item.kind === "dispatch" ? item.taskId : item.kind === "system" ? item.systemAssignment?.taskId : undefined;
     claim.taskIds = claimTaskId ? [claimTaskId] : undefined;
@@ -795,6 +823,7 @@ export class Delivery {
       diagnostic.record("delivery.skip.delivered", { state: item.kind, queueDepth: q.length });
       this.notifyRoleState(projectRoot, resolvedTarget, runtime);
       this.persistDeliveryQueues();
+      void this.drainQueue(projectRoot, resolvedTarget, runtime);
       return;
     }
 
@@ -960,22 +989,41 @@ export class Delivery {
     // `input.taskId`，`submit_report` 关联的来源）。已打开但未绑定本次任务（聊天/上一任务）⇒ 安全重绑。
     // 回交条目的 `taskId` 是**子任务**（创建者要收口的对象，不是目标会话自己的受派任务），不用于会话
     // 绑定（误绑会让创建者自己的报告关联到子任务）；B8.2 的 forced fixed 重绑照旧。
+    if (durable?.delivery(projectRoot, item.clientMessageId)?.intent.task?.stage === "A12b") {
+      const current = await desktopQueuedAcceptanceIsCurrent(durable, projectRoot, item.clientMessageId).catch(() => false);
+      if (stopped() || !q.includes(item)) return;
+      if (!current) {
+        q.splice(q.indexOf(item), 1);
+        if (!q.length) this.deliveryQueues.delete(key);
+        this.activeDispatchKeys.delete(item.dedupKey);
+        diagnostic.record("delivery.skip.stale-assessment-evidence", { taskId: item.taskId });
+        this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+        this.persistDeliveryQueues();
+        durable.activate();
+        void this.drainQueue(projectRoot, resolvedTarget, runtime);
+        return;
+      }
+    }
     const fixedOpenTaskId = forcedDeliveryMode === "fixed" && item.kind === "dispatch"
       && typeof item.taskId === "string" && item.taskId !== "" ? item.taskId : undefined;
     const needsFixedRebind = forcedDeliveryMode === "fixed" && entry !== undefined && entry.projectRoot === projectRoot &&
       entry.sessionWorkflowMode !== "fixed";
     const needsFixedTaskBind = fixedOpenTaskId !== undefined && entry !== undefined && entry.projectRoot === projectRoot
       && entry.sessionWorkflowMode === "fixed" && boundTaskOf(entry) !== fixedOpenTaskId;
+    const workflowChatInput = item.kind === "message" && resolvedTarget === "chief" && entry && durable?.isSession(entry.handle)
+      && entry.assignedTaskId === undefined && item.workflowInput?.text === item.text
+      && this.deps.workflowChiefStart?.isInputCurrent(projectRoot, item.workflowInput) ? item.workflowInput : undefined;
+    if (workflowChatInput && entry?.busy) return;
     // 目标忙且尚未绑定本次任务 ⇒ 保持排队（settle 后重试再安全重开）；绝不把任务投进未绑定/别的任务的会话。
     if (entry?.busy && (taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedTaskBind)) return;
     if (stopped()) return;
-    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedRebind || needsFixedTaskBind) {
+    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedRebind || needsFixedTaskBind || workflowChatInput) {
       // 2026-11-05（真机缺陷「又卡住」）：生产宿主（Interface）把 `demoRuntimeAutoDeliver` 置 false ⇒
       // **演示运行时（demo）不自动开会话**。demo 适配器执行内置演示脚本（对 `src/evil.ts` 的越界写，
       // 用于演示"写前被拒"），自动唤醒只会得到被门禁拒绝的回合，失败结果再经回交/派发级联成 blocked
       // （重启后持久队列里的历史 demo 项会连锁触发）。demo 仅供用户显式体验：只投给已打开的 demo 会话；
       // 未打开则保持排队（不丢消息、不自动开启）。缺省 true 保持测试/演示宿主既有语义。
-      if (runtime === "demo" && this.deps.demoRuntimeAutoDeliver === false) {
+      if (runtime === "demo" && this.deps.demoRuntimeAutoDeliver === false && !workflowChatInput) {
         diagnostic.record("delivery.skip.demo-not-opened", { state: item.kind, targetRoleId: resolvedTarget, queueDepth: q.length });
         return;
       }
@@ -985,8 +1033,29 @@ export class Delivery {
       const openTaskId = taskBoundSession ? assignedDeliveryId : fixedOpenTaskId;
       const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime,
         ...(openTaskId !== undefined ? { taskId: openTaskId } : {}),
-        ...(forcedDeliveryMode !== undefined ? { forcedWorkflowMode: forcedDeliveryMode } : {}) }, false);
+        ...(forcedDeliveryMode !== undefined ? { forcedWorkflowMode: forcedDeliveryMode } : {}),
+        ...(workflowChatInput ? { workflowChatInput } : {}) }, false);
       if (!opened.ok) {
+        const reason = opened.error ?? mainT("shared.common.unknownReason");
+        if (ownedDispatch && !stopped() && !this.isNetworkOffline()
+          && !/fixed-session-rebind-blocked|worker-task-session-busy|run-stop-host-fenced|会话已停止|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|网络离线/.test(reason)) {
+          const chief = chiefTaskRoleIdOf(projectRoot, this.deps);
+          if (chief) {
+            const summary = await durable!.rejectWorkflowDispatch(ownedDispatch.ref, ownedDispatch.intent.task!, reason, chief);
+            if (summary) {
+              const index = q.indexOf(item);
+              if (index !== -1) q.splice(index, 1);
+              if (q.length === 0) this.deliveryQueues.delete(key);
+              this.activeDispatchKeys.delete(item.dedupKey);
+              await recordTaskFailure(projectRoot, item.taskId!, summary, () => this.now());
+              this.emitDeliveryNote(projectRoot, runtime, chief, chief, summary);
+              this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+              this.persistDeliveryQueues();
+              void this.drainQueue(projectRoot, resolvedTarget, runtime);
+              return;
+            }
+          }
+        }
         item.lastAttempt = { state: "blocked", code: "unknown", at: new Date(this.now()).toISOString() };
         this.emitDeliveryNote(projectRoot, runtime,
           item.kind === "handback" ? resolvedTarget : item.sourceRoleId,
@@ -1086,6 +1155,8 @@ export class Delivery {
     origin.kind = sent.kind;
     const originFlows = [...new Set(sentItems.map((queued) => queued.flowId).filter((id): id is string => typeof id === "string" && id !== ""))];
     if (originFlows.length > 0) origin.flowIds = originFlows;
+    if (sent.kind === "message" && sent.workflowInput?.projectRoot === entry.projectRoot
+      && entry.roleId === "chief" && sent.workflowInput.text === sent.text) origin.workflowInput = sent.workflowInput;
     if (sent.kind === "handback") {
       origin.handbackEvidence = [
         ...new Set(sentItems.flatMap((queued) => queued.handback?.evidence ?? []).filter((item): item is string => typeof item === "string" && item !== "")),
@@ -1204,9 +1275,13 @@ export class Delivery {
       // 放回队首保留重试（失败重试仍允许）；回交保留 receipt 判据（providerMayHaveStarted）不变。
       // P0：settle 已记 `delivery.end` ⇒ 视为已处理（更不允许重投）。
       const acked = origin.turnId !== undefined || origin.inputAccepted === true || terminalRecorded;
-      const canRetry = terminalRecorded || sent.controllerResume && origin.assignmentRejectionCode ? false : cAttempt
+      const retiredDurable = origin.assignmentRejectionCode === "effect-attempt-retired";
+      const durableEffect = !acked && delivery && durable
+        ? (await durable.store()).listEffects(delivery.ref, "model-send").find(effect => effect.intent.key === delivery.intent.key)
+        : undefined;
+      const canRetry = terminalRecorded || retiredDurable || sent.controllerResume && origin.assignmentRejectionCode ? false : cAttempt
         ? !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed
-        : !acked;
+        : !acked && (!durableEffect || durableEffect.state === "not-started");
       const mayBeActive = terminalRecorded ? false : cAttempt && (!receipt || receipt.providerMayHaveStarted);
       const ownsRunningDelivery = entry.origins.running === origin;
       if (!mayBeActive) this.failDeliveryOrigin(entry, origin);
@@ -1233,6 +1308,10 @@ export class Delivery {
         this.rememberAppTaskDelivered(sent.clientMessageId);
       }
       this.persistDeliveryQueues();
+      if (retiredDurable) {
+        void this.drainQueue(projectRoot, resolvedTarget, runtime);
+        return;
+      }
       if (terminalRecorded) {
         // 回合已完成、终态已记账：不再向 pane 发「投递失败/保留重试」的错误口径系统行。
         return;

@@ -48,7 +48,7 @@ import {
   type VersionChangeStack,
 } from "../../version-change.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage, WorkflowProtocol } from "../../../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage } from "../../../../src/model/runtime.ts";
 import type { RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult } from "../../../../src/model/runtime.ts";
 import type { PlanEscalationFn, PlanEscalationInput, PlanEscalationResult } from "../../../../src/model/runtime.ts";
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn, WorkflowEvent, WorkflowArtifactRef, BasisEvent } from "../../../../src/model/runtime.ts";
@@ -70,7 +70,6 @@ import type {
 } from "../contracts/session-types.ts";
 import type { SessionManagerDeps } from "../contracts/deps.ts";
 import { beginSessionDisposeLease, buildFixedTaskGitSurface, createTurnGitRuntime, endSessionDisposeLease, gitContextFailure, noteSessionDisposeInterruption } from "../git-ports.ts";
-import type { SelectWorkflowFn } from "../../../../src/provider/runtime/tools.ts";
 
 /** openInternalUnsafe 的**单一**上下文对象：跨 builder 的原局部变量显式传递（无第二份状态）。 */
 export interface OpenContext {
@@ -84,13 +83,6 @@ export interface OpenContext {
   stoppedResult: () => OpenResult;
   forcedSessionWorkflowMode?: WorkflowMode;
   requestedSessionMode: WorkflowMode;
-  /** 2026-11-17（app-dispatch/v1）：fixed 会话驱动协议（fixed-v2.1/undefined = 旧工具面逐字保留）。 */
-  sessionWorkflowProtocol?: WorkflowProtocol;
-  /** 2026-11-17：本会话是否走 app-dispatch/v1（fixed + 协议匹配）。 */
-  appDispatchSession?: boolean;
-  /** 2026-11-17：`select_workflow` 能力与句柄绑定（仅 app-dispatch/v1 fixed chief 构造）。 */
-  selectWorkflow?: SelectWorkflowFn;
-  selectWorkflowBinding?: { handle?: RoleSessionHandle };
   requestedAssignment: DeliveryAssignment | undefined;
   listing: ProjectListing;
   role: ProjectListing["roles"][number];

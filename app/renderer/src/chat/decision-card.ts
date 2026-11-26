@@ -52,6 +52,15 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+/** Application Choice shape used to render explicit workflow activation actions. */
+export function isWorkflowStartCard(request: unknown): boolean {
+  const req = asRecord(request);
+  if (req.kind !== "choice" || req.cardKind !== "workflow-start" || req.application !== true ||
+      req.multiple === true || !Array.isArray(req.options) || req.options.length !== 2) return false;
+  const ids = req.options.map((option) => asRecord(option).id);
+  return ids.includes("approve-workflow-start") && ids.includes("reject-workflow-start");
+}
+
 /** decision 卡卡面视图（纯函数；locale 决定三处共享 i18n 文案）。 */
 export function decisionCardView(
   request: unknown,

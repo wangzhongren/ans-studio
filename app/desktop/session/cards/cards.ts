@@ -1112,25 +1112,14 @@ export class Cards {
     // flowId 现场解析（per-flow，不缓存）；绑定失败 ⇒ notPresented（不发卡、不写账本、不冒充客户拒绝）。
     // **只对 3 张 fixed 卡 + acceptance 卡**做模式解析：其他卡种（decision/download/stable-write/
     // merge-main/appointment-write 等）保持既有呈现时序（零新增 await；legacy 卡路径逐字不变）。
-    // 2026-11-17（app-dispatch/v1）：`request_choice` 携带 promptId ⇒ 发卡前应用逐项校验（verifyCardPrompt；不发卡前）；
-    // 不一致/协议不符/任务已收口 ⇒ notPresented（card-prompt-mismatch 等；不发卡、不写 request.created）。
-    const promptId = typeof request.promptId === "string" && request.promptId.trim() !== "" ? request.promptId.trim() : undefined;
-    const promptResolution = promptId !== undefined ? await this.evidence.resolveAppDispatchCardPrompt(projectRoot, promptId, request) : undefined;
-    if (promptResolution !== undefined && promptResolution.ok !== true) {
-      this.appendRoleActivity(projectRoot, sourceRoleId, { kind: "request.rejected", summary: shortenSummary(`${promptResolution.code}：${promptResolution.message}`, 200), status: "not-presented" });
-      return { outcome: "declined", notPresented: true, reason: `${promptResolution.code}：${promptResolution.message}` };
-    }
-    const promptBinding = promptResolution !== undefined && promptResolution.ok === true ? promptResolution : undefined;
-    let fixedCardBinding: { workflowId?: string; stage?: WorkflowStage; documentRefs?: WorkflowDocumentRef[] } | undefined = promptBinding !== undefined ? { workflowId: promptBinding.workflowId, stage: promptBinding.stage, documentRefs: promptBinding.documentRefs } : undefined;
+    let fixedCardBinding: { workflowId?: string; stage?: WorkflowStage; documentRefs?: WorkflowDocumentRef[] } | undefined;
     const cardFlowId = request.flowId ?? metadata?.flowId;
-    const resolvedFlowId = promptBinding?.flowId ?? (typeof cardFlowId === "string" && cardFlowId.trim() !== "" ? cardFlowId.trim() : undefined);
     const fixedCardKind = request.cardKind === "intent-confirm" || request.cardKind === "proposal"
       || request.cardKind === "appointment" || request.cardKind === "acceptance";
-    const cardFixed = promptBinding !== undefined || (fixedCardKind
+    const cardFixed = fixedCardKind
       && typeof cardFlowId === "string" && cardFlowId.trim() !== ""
-      && (await resolveFixedPathMode(projectRoot, cardFlowId.trim())) === "fixed");
-    // app-dispatch/v1 的卡由应用开卡/计算 documentRefs（prompt 绑定）——不走旧 fixed 卡的准备段。
-    if (cardFixed && promptBinding === undefined) {
+      && (await resolveFixedPathMode(projectRoot, cardFlowId.trim())) === "fixed";
+    if (cardFixed) {
       const fixedFlowId = cardFlowId!.trim();
       const rejectFixedCard = (code: string, message: string): CustomerInputOutcome => {
         this.appendRoleActivity(projectRoot, sourceRoleId, {
@@ -1217,8 +1206,7 @@ export class Cards {
         return { outcome: "declined", notPresented: true, reason: formatted };
       }
     }
-    // app-dispatch/v1：requestId 由应用开卡时发放（= promptId），不另生成（verifyCardPrompt 已核验）。
-    const requestId = promptBinding?.requestId ?? requestIdOverride ?? this.requestIdFor(projectRoot, sourceRoleId, request, metadata);
+    const requestId = requestIdOverride ?? this.requestIdFor(projectRoot, sourceRoleId, request, metadata);
     const options = request.kind === "choice"
       ? request.options.map((option) => ({ id: option.id, label: option.label, ...(option.recommended === true ? { recommended: true } : {}) }))
       : [];
@@ -1238,9 +1226,7 @@ export class Cards {
     // 但 `raw`（客户卡通道）在首次 await 前同步调用——否则调用方会在卡片出现前看到 pending 空档，
     // 会话被释放时还会把原本有效的轮次 signal 误判为已中止。落盘顺序仍为
     // created → approval.created → presented → resolved（每一步 `.then` 接力）。
-    // app-dispatch/v1：`request.created` 已由应用开卡（driveAppDispatchStage）写入 ⇒ 不重复写；
-    // 只走既有 presented/resolved 生命周期（同一 requestId = promptId）。
-    const createdWrite: Promise<boolean> = promptBinding !== undefined ? Promise.resolve(true) : this.appendTaskState(projectRoot, taskEvent("request.created", {
+    const createdWrite = this.appendTaskState(projectRoot, taskEvent("request.created", {
       requestId,
       ...(request.flowId !== undefined ? { flowId: request.flowId } : {}),
       // 2026-10-31（D3 卡种收口）：卡种由应用从 request 对象落账（不信任模型/judge 自报）。
@@ -1269,7 +1255,7 @@ export class Cards {
         }, () => new Date(this.now()))))
       : Promise.resolve(true);
     const notifyMode = lifecycle?.notify ?? "default";
-    const notifyCreated = notifyMode === "default" && promptBinding === undefined;
+    const notifyCreated = notifyMode === "default";
     const notifyResolved = notifyMode !== "none";
     const abortSignal = lifecycle?.signal;
     let aborted = abortSignal?.aborted === true;
@@ -1461,11 +1447,11 @@ export class Cards {
     await this.appendTaskState(projectRoot, resolvedEvent);
     // T3 B3（AC-08/AC-13）：fixed 卡裁决 → 工作流阶段事件（A3/A6/A10；应用唯一实现）。
     // 失败只诊断/系统行（不重写 request.resolved、不阻塞已完成的客户决定）。
-    if (cardFixed && fixedCardBinding?.workflowId !== undefined && resolvedFlowId !== undefined) {
+    if (cardFixed && fixedCardBinding?.workflowId !== undefined) {
       await this.recordFixedCardWorkflowResolution({
         projectRoot,
         sourceRoleId,
-        flowId: resolvedFlowId,
+        flowId: cardFlowId!.trim(),
         workflowId: fixedCardBinding.workflowId,
         requestId,
         resolvedEvent,
@@ -1473,9 +1459,6 @@ export class Cards {
         judged: resolvedByJudge,
         documentRefs: fixedCardBinding.documentRefs ?? [],
       });
-      // 2026-11-17（app-dispatch/v1）：卡裁决后关闭 card-prompt 任务并驱动下一阶段（旧协议钩子缺席=no-op）；
-      // 只有真实作答（answered）才收口 prompt——judge 转人工/通道异常等不关闭，保留可重呈。
-      if (promptBinding !== undefined) await this.fixedHooks.afterAppDispatchCardResolved?.({ projectRoot, workflowId: promptBinding.workflowId, stage: promptBinding.stage, promptId: promptBinding.promptId, requestId: promptBinding.requestId, resolved: answeredOut !== undefined });
     }
     if (request.cardKind === "appointment-write") {
       await this.appendTaskState(projectRoot, taskEvent("approval.resolved", {

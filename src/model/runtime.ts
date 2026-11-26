@@ -17,6 +17,7 @@ import type {
   VersionDecisionStatus,
 } from "./project-state.ts";
 import type { DownloadJudgeFacts, RequestDownloadFn } from "./download.ts";
+import type { DurableRequestWorkflowStartFn, DurableResult } from "./durable-workflow.ts";
 import type { GovernanceMatrixFn } from "./governance-matrix.ts";
 import type {
   DirectActionReceipt,
@@ -575,6 +576,24 @@ export function isRuntimeNativeLifecycleFacts(value: unknown): value is RuntimeN
 /** 写门禁操作类型（F6）：仅内容上下文的分类，不改变任何判定/审批/预授权语义。 */
 export type WriteGateOperation = "write" | "edit";
 
+/** Facts supplied by the live host invocation after read-only write protection. */
+export interface FileWriteClaimInput {
+  operationId: string;
+  targetPath: string;
+  operation: WriteGateOperation;
+  contentSha256: string;
+  signal: AbortSignal | undefined;
+}
+
+export type FileWriteClaimOutcome = "not-started" | "succeeded" | "unknown";
+
+export interface FileWriteClaim {
+  /** Settle the durable claim after the effect and audit. Reject if the receipt cannot be confirmed. */
+  finish(outcome: FileWriteClaimOutcome, evidence: string): Promise<void>;
+}
+
+export type ClaimFileWriteFn = (input: FileWriteClaimInput) => Promise<DurableResult<FileWriteClaim>>;
+
 /** Host observations only. These shapes neither grant access nor prove an issued context. */
 export type FileGateStage = "lexical-read" | "canonical-read" | "final-write";
 export interface FileGateProtectionFacts {
@@ -663,8 +682,14 @@ export interface ShellReviewRequest {
    * 注入，**不是模型输入**——模型参数里不存在本字段。仅用于审计/展示关联；角色身份仍以 Core 会话闭包为准。
    */
   roleId?: string;
+  /** Actual foreground runtime turn, captured by the tool, for matching a bound retest. */
+  readonly turnId?: string;
   /** 应用补充的脚本内容审查上下文（由编排 shell-approval-context 读取；有界）。 */
   approvalContext?: ShellApprovalContext;
+  /** Verified host facts for the dedicated acceptance environment recovery tool. */
+  readonly acceptanceEnvironmentScope?: AcceptanceEnvironmentReviewScope;
+  /** Verified host facts for the dedicated A12b build and static loopback preview. */
+  readonly acceptanceWorkspaceScope?: AcceptanceWorkspaceReviewScope;
   /**
    * 2026-10-29（方案 v2.1 §6.4，Q1 A）：不透明执行类（`node <脚本>`/解释器脚本/构建包脚本等无法静态
    * 界定写范围）——**「替我审批」不得代批**，必须由客户本人确认。仅由 shell 写目标守卫置位。
@@ -680,6 +705,11 @@ export interface ShellExecutionOutcome {
   error?: string;
 }
 
+/** Same-call retest audit, issued by the host after checking coverage and settling its evidence. */
+export type ShellStrictAuditObservation =
+  | { readonly status: "passed"; readonly digest: string }
+  | { readonly status: "failed"; readonly reason: string };
+
 /** 执行后写审计：越界写入清单（空 = 未发现）。 */
 export interface ShellPostAuditResult {
   violations: { path: string; change: "added" | "modified" | "deleted" }[];
@@ -687,6 +717,8 @@ export interface ShellPostAuditResult {
   appStateChanges?: { path: string; change: "added" | "modified" | "deleted" }[];
   /** 经写日志归因的合法工具写入（并发会话/应用工具落盘；记入审计记录，不按越界处理）。 */
   attributed?: { path: string; change: "added" | "modified" | "deleted" }[];
+  /** Present only for the bound retest. A legacy empty violations array does not supply coverage. */
+  strictAudit?: ShellStrictAuditObservation;
 }
 
 /** 执行后写审计钩子（2026-10-29 方案 v2.1 §6.5；由编排 shell-arming 装配、run_shell 执行完调用）。 */
@@ -710,12 +742,15 @@ export type ShellReviewResult =
       by: string;
       grant?: ShellGrant;
       directive?: { id: string; scope: "once" | "session" | "forever" };
+      /** Host-confirmed pre-execution audit and a final check of the same retest binding. */
+      implementationSelfTest?: { readonly strictAuditReady: true; isCurrent(): boolean };
     }
   | {
       allow: false;
       reason: string;
       by: string;
       directive?: { id: string; scope: "once" | "session" | "forever" };
+      implementationSelfTest?: { readonly strictAuditReady: false };
     };
 
 export type ShellGate = (req: ShellReviewRequest) => Promise<ShellReviewResult>;
@@ -813,6 +848,8 @@ export interface OperatorPrompt {
   manualOnly?: boolean;
   /** 脚本内容审查上下文（不透明执行类；随判断请求交给 judge）。 */
   approvalContext?: ShellApprovalContext;
+  readonly acceptanceEnvironmentScope?: AcceptanceEnvironmentReviewScope;
+  readonly acceptanceWorkspaceScope?: AcceptanceWorkspaceReviewScope;
 }
 
 export type OperatorOutcome =
@@ -893,21 +930,23 @@ export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance"
 export type GovernanceConfirmCardKind = "appointment-write";
 
 /**
- * 应用自有、**永不进入判断分组**的治理卡种（2026-11-04 trunk-amendment C1b；PM 复审 §4.5 F2）：
+ * 应用自有、**不进入通用判断分组**的治理卡种（2026-11-04 trunk-amendment C1b；PM 复审 §4.5 F2）：
  * - `stable-write` = P1.6 §4.5.1 的 stable 文件（workflow）轻量写入确认卡，项目级、无 flowId；
  * - `merge-main`（2026-11-10 T3 两条固定工作流路径；v1.3 §8.4 / B1 AC-14）= A13/B4 高风险
  *   **合并 main** 确认卡：应用构造，preview 必含 workflowId/flowId、main base OID、branch tip OID、
- *   变更文件数、diff stat、合并方式与高风险提示；**必须客户本人 approve/reject，judge 不可代批**
- *   （只能转人工/拒绝，不得 approve、不得冒充客户；协调方决策 #4）。合并由应用执行，不经角色
- *   工具/shell，不 push/tag。
- * 两者都只由应用自有通道构造，客户本人回答，**永不进判断器/委托/指令**；都不是
- * `request_choice`/`request_confirmation` 可发卡种（两个工具卡种联合均不含它们），
- * 也都**不进 `GOVERNANCE_CARD_GROUP`**（`governanceCardGroup(...) === undefined`）。
+ *   变更文件数、diff stat、合并方式与高风险提示，合并由应用执行。旧线继续要求客户本人确认。
+ * - `workflow-start` = 幕僚选用定版定义后，由应用呈现的流程启用选择卡。
+ * - `document-revision` = 应用绑定原依据和修订候选后呈现的确认卡。
+ * - `workflow-blocked-scope` = 应用绑定当期阻塞和批准依据后呈现的处置选项。
+ * 持久流程卡可由应用提供独立的有界幕僚决策上下文。应用自有卡均不可经
+ * `request_choice`/`request_confirmation` 构造，且 `governanceCardGroup(...)` 返回 `undefined`。
  */
-export type AppOwnedGovernanceCardKind = "stable-write" | "merge-main";
+export type AppOwnedGovernanceCardKind = "stable-write" | "merge-main" | "workflow-start" | "document-revision" | "workflow-blocked-scope";
 
 /** 应用自有、非判断分组的卡种清单（与 `GOVERNANCE_CARD_GROUP` 键集互斥；`GOVERNANCE_CARD_KINDS` 派生来源）。 */
-export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKind[] = Object.freeze(["stable-write", "merge-main"]);
+export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKind[] = Object.freeze([
+  "stable-write", "merge-main", "workflow-start", "document-revision", "workflow-blocked-scope",
+]);
 
 /**
  * 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。
@@ -918,7 +957,7 @@ export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKin
  * `stable-write`（2026-11-04 trunk-amendment C1b）同属应用自有卡：只由 stable-write-runtime
  * 构造，`governanceCardGroup("stable-write") === undefined` ⇒ 永不判断/代选；
  * `merge-main`（2026-11-10 T3 两条固定工作流路径；v1.3 §8.4）同属应用自有非判断卡：只由应用合并
- * 通道构造，客户本人确认、judge 不可代批，`governanceCardGroup("merge-main") === undefined`；
+ * 通道构造，`governanceCardGroup("merge-main") === undefined`；
  * 账本 cardKind 白名单见 `GOVERNANCE_CARD_KINDS`。
  */
 export type GovernanceCardKind =
@@ -992,12 +1031,6 @@ export const GOVERNANCE_CARD_KINDS: readonly GovernanceCardKind[] = Object.freez
 export interface GovernanceCardMetadata extends GovernanceFlowMetadata {
   cardKind?: GovernanceCardKind;
   /**
-   * 2026-11-17（app-dispatch/v1）：应用发放的卡 prompt 标识。仅当应用以 `card-prompt` 任务
-   * 发放该卡时由幕僚在 `request_choice` 中**原样回传**；应用逐项校验卡种/选项/documentRefs，
-   * 不一致 ⇒ `card-prompt-mismatch`。缺省＝旧卡（旧行为不变；应用不要求 promptId）。
-   */
-  promptId?: string;
-  /**
    * C 批（2026-10-28）：**应用自有申请/决策卡**（不是角色模型发起）。仅应用侧可设置；decision 卡校验
    * 据此放行，不扩大 `DECISION_CARD_ALLOWED_ROLES`。角色工具载荷即使夹带本字段也不得获得额外权限
    * （工具层不读取/不转发；应用侧入口自行构造）。
@@ -1015,58 +1048,6 @@ export type GovernanceAcceptanceOptionId = "accept" | "reject";
 
 /** 提案版本（评审 §6.3-3：一个提案最多 v2）。 */
 export type GovernanceProposalVersion = 1 | 2;
-
-// —————————————— Block 决策卡选项词表（2026-11-20 block resolver 地基） ——————————————
-//
-// 依据：`docs/planning/2026-11-20_design_block-resolution-paths.md` §4.1/§7.3。
-// block 决策卡复用既有 `cardKind:"decision"` 与应用发行通道（`application:true`）；
-// 本段只定义**选项 id 词表**（单一来源），不表达权限、不做结算：
-//  · `block-decision` 词汇：judge 在「替我决策」开启且恰有唯一推荐时代选（仅非高危）；
-//  · `block-sovereign` 词汇：进入客户主权排除面，永远客户本人（judge 只能转人工/拒绝）。
-// 桌面批次消费这两个常量与守卫接线 `isApplicationDecisionReservedForCustomer`；
-// 模型/角色工具层不读取本词表，也不会因携带这些 id 获得额外权限。
-
-/** `block-decision` 选项 id（judge 可代批；「接受限制」仅限非高危）。 */
-export const BLOCK_DECISION_OPTION_IDS = Object.freeze([
-  "block-revise-scope",
-  "block-rework",
-  "block-replace-executor",
-  "block-retry-with-cap",
-  "block-accept-with-limits",
-] as const);
-export type BlockDecisionOptionId = (typeof BLOCK_DECISION_OPTION_IDS)[number];
-
-/** `block-sovereign` 选项 id（客户主权；judge 永不代批）。 */
-export const BLOCK_SOVEREIGN_OPTION_IDS = Object.freeze([
-  "block-terminate-flow",
-  "block-grant-exception",
-  "block-accept-current-state",
-  "block-merge-main",
-  "block-stable-write",
-] as const);
-export type BlockSovereignOptionId = (typeof BLOCK_SOVEREIGN_OPTION_IDS)[number];
-
-/** 全部 block 卡选项 id（两族并集；冻结）。 */
-export const BLOCK_OPTION_IDS: readonly (BlockDecisionOptionId | BlockSovereignOptionId)[] = Object.freeze([
-  ...BLOCK_DECISION_OPTION_IDS,
-  ...BLOCK_SOVEREIGN_OPTION_IDS,
-]);
-export type BlockOptionId = (typeof BLOCK_OPTION_IDS)[number];
-
-/** 终止本次流程选项 id（Q4：仅客户在决策卡中显式选择；judge 永不选择；是 decided 的结果，不是停止态）。 */
-export const BLOCK_TERMINATE_OPTION_ID = "block-terminate-flow" as const;
-
-export function isBlockDecisionOptionId(value: unknown): value is BlockDecisionOptionId {
-  return typeof value === "string" && (BLOCK_DECISION_OPTION_IDS as readonly string[]).includes(value);
-}
-
-export function isBlockSovereignOptionId(value: unknown): value is BlockSovereignOptionId {
-  return typeof value === "string" && (BLOCK_SOVEREIGN_OPTION_IDS as readonly string[]).includes(value);
-}
-
-export function isBlockOptionId(value: unknown): value is BlockOptionId {
-  return isBlockDecisionOptionId(value) || isBlockSovereignOptionId(value);
-}
 
 export interface CustomerInputOption {
 
@@ -1140,6 +1121,13 @@ export type CustomerInputOutcome =
   | {
       outcome: "answered";
       actionSource?: DirectActionSource;
+      /** The application projects a committed concrete A6 choice onto the initiating card's accept option. */
+      durableProposalSelection?: {
+        readonly requestId: string;
+        readonly baseDigest: string;
+        readonly selectedOptionId: string;
+        readonly decisionValues: Readonly<Record<string, string | number | boolean>>;
+      };
       /** Host-observed domain apply result, independent of the retained choice. Not approval or later write authority. */
       intentConfirmation?: { status: "committed" | "pending-recovery"; code?: string; message?: string };
       value: { confirmed?: boolean; selected?: string[] };
@@ -1268,14 +1256,6 @@ export interface CustomerInputMetadata {
   criteriaRef?: CriteriaRef;
   /** 3.4：验收事实（priority 由应用派生）。 */
   acceptanceFacts?: AcceptanceFact[];
-  /**
-   * 2026-11-20（block resolver 桌面批）：block 决策卡的**应用绑定**（只由桌面 router 设置）：
-   * · `blockId`：block 生命周期 id（审计/回指；不构成权限）；
-   * · `blockJudgePermitted`：仅当该 block 的路由为 `judge-decision` 时为 true——通道只在此标记存在时
-   *   允许「替我决策」确定性代选唯一推荐项（客户主权/客户卡永不进入代选）。模型工具不读取/不转发。
-   */
-  blockId?: string;
-  blockJudgePermitted?: boolean;
 }
 
 export type CustomerInputFn = (
@@ -1444,12 +1424,9 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   flowId?: string;
   /**
    * 2026-10-29（方案 v2.1 §5.4，F2/F3）：任务创建者——幕僚派发主链 / 运营派发实现任务。
-   * 2026-11-17（app-dispatch/v1，编排水线 app-dispatch builtins）：新增 `"application"`——应用侧
-   * 流程驱动按流程定义创建的内置角色任务（`stage-execution` / `worker-dispatch` / `card-prompt`）。
-   * 旧值原样保留（旧记录读取不变）。报告按本字段路由回创建者（M9）；application 任务的报告只
-   * 写入账本，由应用观察 `task.reported` 后按定义收口（`reportTargetForTaskCreator` 返回 null）。
+   * 报告按本字段路由回创建者（M9）。
    */
-  from: "chief" | "convener" | "application";
+  from: "chief" | "convener";
   to: string;
   text: string;
   expectedOutput?: string;
@@ -1489,33 +1466,10 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   workflowId?: string;
   /** fixed 阶段（A1–A13 含 A12a/A12b；B1–B4）。 */
   stage?: WorkflowStage;
-  /**
-   * fixed 任务种类：`"stage-request"`＝幕僚→运营的产线调度请求（v2.1 兼容，保留）；普通生产任务缺省。
-   * 2026-11-17（app-dispatch/v1）：新增 `"stage-execution"`（应用→内置执行者内容任务）、
-   * `"worker-dispatch"`（应用→运营请派 worker）、`"card-prompt"`（应用→幕僚呈客户卡）。
-   */
-  taskKind?: FixedTaskKind | (string & {});
-  /**
-   * 2026-11-20（block resolver 桌面批）：`taskKind:"repair"` 的反向引用（`block-<24hex>` 的 24 位 hex；
-   * 只由应用写入，模型不可自报）。其它任务缺省；旧记录读取不变。
-   */
-  blockId?: string;
+  /** fixed 任务种类：`"stage-request"`＝幕僚→运营的产线调度请求；普通生产任务缺省。 */
+  taskKind?: "stage-request" | string;
   /** fixed 路径（A/B）；首次 stage-request 写入，后续可省略（从账本解析）。 */
   workflowPath?: WorkflowPath;
-  /**
-   * 2026-11-17（app-dispatch/v1）：`card-prompt` 任务携带的应用卡 prompt 标识
-   * （与 `request.created.promptId` 同一值；幕僚呈卡时原样回传，应用逐项校验）。
-   * 旧任务无此字段（读取不变）。
-   */
-  promptId?: string;
-  /** app-dispatch/v1：`card-prompt` 任务的卡种（白名单 = `GovernanceCardKind`）。 */
-  cardKind?: GovernanceCardKind;
-  /** app-dispatch/v1：应用计算的卡文档引用（path+字节 SHA-256；旧卡无此字段）。 */
-  cardDocumentRefs?: WorkflowDocumentRef[];
-  /** app-dispatch/v1：应用生成的卡面选项（与 `request.created.options` 逐项一致）。 */
-  cardOptions?: { id: string; label: string; recommended?: boolean }[];
-  /** app-dispatch/v1：应用给定的推荐项 id 集（与 `request.created.recommended` 一致）。 */
-  cardRecommended?: string[];
 }
 
 export interface TaskDeliveredEvent extends TaskStateEventBase {
@@ -1539,12 +1493,8 @@ export interface TaskReportedEvent extends TaskStateEventBase {
 export interface TaskClosedEvent extends TaskStateEventBase {
   kind: "task.closed";
   taskId: string;
-  /**
-   * 2026-10-29（方案 v2.1 §5.4，F2）：任务创建者收口自己的任务（chief / convener）。
-   * 2026-11-17（app-dispatch/v1）：新增 `"application"`——应用侧驱动收口自己创建的
-   * `stage-execution` / `card-prompt` 任务（`worker-dispatch` 由运营收口，Q6）。旧值原样保留。
-   */
-  by: "chief" | "convener" | "application";
+  /** 2026-10-29（方案 v2.1 §5.4，F2）：任务创建者收口自己的任务（chief / convener）。 */
+  by: "chief" | "convener";
   outcome: TaskClosedOutcome;
   note?: string;
   /** Application-bound direct-close provenance; absent on historical events. */
@@ -1594,20 +1544,6 @@ export interface RequestCreatedEvent extends TaskStateEventBase {
   /** T3：fixed 工作流/阶段绑定；旧事件无此字段（兼容读取）。 */
   workflowId?: string;
   stage?: WorkflowStage;
-  /**
-   * 2026-11-17（app-dispatch/v1）：应用发放的卡 prompt 标识（`card-prompt` 任务同值）。
-   * 幕僚以 `request_choice` 呈卡时原样回传；应用校验卡种/选项/documentRefs 逐项一致
-   * （不一致 ⇒ `card-prompt-mismatch`，不发卡、不写记录）。旧卡无此字段（旧行为不变）。
-   */
-  promptId?: string;
-  /**
-   * 2026-11-20（SMOKE-3 S3 地基）：**同一 requestId 重新呈现**的显式取代事实。
-   * 应用在 `request.orphaned`（restart 等）之后以同 requestId 重投/重呈现时，新的
-   * `request.created` 携带**被取代 orphan 事件的 `at` 原文**（非空、可解析时间戳）；
-   * 首次创建与旧记录无此字段（兼容读取）。消费者据此区分「取代后重新等待」与
-   * 「历史 orphan 粘性」，不得把已被取代的 orphan 当作终态。
-   */
-  supersedesOrphanAt?: string;
   sourceRoleId: string;
   title: string;
   context?: string;
@@ -2091,96 +2027,6 @@ export type StageStatus = "pending" | "requested" | "dispatched" | "in-progress"
 export type WorkflowAction = "advance" | "stop";
 
 /**
- * 2026-11-17（app-dispatch builtins 第一步）：fixed 任务种类（单一来源）。
- * - `stage-request`：v2.1 幕僚→运营 stage-request（**兼容保留**，新协议不再产生）；
- * - `stage-execution`：应用侧流程驱动 → 内置执行者（product/rapporteur/nominator/convener/verifier）；
- * - `worker-dispatch`：应用 → 运营（请为某阶段派 worker；由运营收口，Q6）；
- * - `card-prompt`：应用 → 幕僚（请按应用 prompt 呈客户卡）。
- * - `repair`（2026-11-20 block resolver 桌面批）：应用 → 属主角色（确定性修复任务；`blockId` 反向引用；
- *   报告由 desktop block router 观察/核验/收口，**不触发阶段完成**；fixed-v2.1 不用本种类——修复简报走创建者）。
- */
-export const FIXED_TASK_KINDS = Object.freeze([
-  "stage-request", "stage-execution", "worker-dispatch", "card-prompt", "repair",
-] as const);
-export type FixedTaskKind = (typeof FIXED_TASK_KINDS)[number];
-
-/** fixed/app-dispatch 任务种类守卫（值域单一来源 = `FIXED_TASK_KINDS`）。 */
-export function isFixedTaskKind(value: unknown): value is FixedTaskKind {
-  return typeof value === "string" && (FIXED_TASK_KINDS as readonly string[]).includes(value);
-}
-
-/**
- * 工作流驱动协议（2026-11-17）：
- * - `fixed-v2.1`：v2.1.0 在飞协议（chief stage-request 驱动；**旧记录缺省值**）；
- * - `app-dispatch/v1`：应用侧流程驱动（幕僚只选流程；内置任务由应用按定义创建；worker 仍由运营派）。
- * 协议在 `workflow.started` 钉死；禁止同一 workflow 中途切换（读取缺省 = fixed-v2.1）。
- */
-export const WORKFLOW_PROTOCOL_FIXED_V2_1 = "fixed-v2.1" as const;
-export const WORKFLOW_PROTOCOL_APP_DISPATCH = "app-dispatch/v1" as const;
-export type WorkflowProtocol = typeof WORKFLOW_PROTOCOL_FIXED_V2_1 | typeof WORKFLOW_PROTOCOL_APP_DISPATCH;
-
-/** 协议值域守卫。 */
-export function isWorkflowProtocol(value: unknown): value is WorkflowProtocol {
-  return value === WORKFLOW_PROTOCOL_FIXED_V2_1 || value === WORKFLOW_PROTOCOL_APP_DISPATCH;
-}
-
-/** `workflow.started.protocol` 缺省解释（旧记录 = fixed-v2.1；不迁移，Q10）。 */
-export function workflowProtocolOf(
-  started: { protocol?: WorkflowProtocol } | undefined,
-): WorkflowProtocol {
-  return started?.protocol ?? WORKFLOW_PROTOCOL_FIXED_V2_1;
-}
-
-/**
- * 流程定义引用（app-dispatch/v1）：随 `workflow.started` 钉死定义 id/version/定义 hash；
- * 新版本只影响新 workflow，不做静默迁移。定义本体 = 编排 `workflow-definitions.ts` 注册表。
- */
-export interface WorkflowDefinitionRef {
-  id: string;
-  version: number;
-  sha256: string;
-}
-
-/** 流程定义引用守卫（纯形状：id 非空、version 正整数、sha256 64 hex）。 */
-export function isWorkflowDefinitionRef(value: unknown): value is WorkflowDefinitionRef {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const ref = value as Record<string, unknown>;
-  return Object.keys(ref).length === 3
-    && typeof ref["id"] === "string" && ref["id"].trim() !== "" && ref["id"].length <= 64
-    && typeof ref["version"] === "number" && Number.isInteger(ref["version"]) && ref["version"] >= 1
-    && typeof ref["sha256"] === "string" && /^[a-f0-9]{64}$/i.test(ref["sha256"]);
-}
-
-/**
- * 验收强度（Q2 定义参数；`select_workflow` 可选携带，应用执行）：
- * - `light`：轻量验收（A12b blocked 报告 + 应用归档证据时可接受，保留 B31 审计口径）；
- * - `standard`：标准验收（默认；blocked 按定义策略处置）。
- */
-export const WORKFLOW_ACCEPTANCE_STRENGTHS = Object.freeze(["light", "standard"] as const);
-export type WorkflowAcceptanceStrength = (typeof WORKFLOW_ACCEPTANCE_STRENGTHS)[number];
-
-/** 验收强度值域守卫。 */
-export function isWorkflowAcceptanceStrength(value: unknown): value is WorkflowAcceptanceStrength {
-  return value === "light" || value === "standard";
-}
-
-/**
- * `stage.dispatched.executorKind`（app-dispatch/v1 审计字段）：
- * `built-in`＝内置角色 stage-execution；`worker-dispatch`＝运营 worker 派发请求；
- * `review`＝应用直派验收（verifier / reviewRoleId）；`card-prompt`＝应用卡 prompt；
- * `application`＝应用确定性阶段（无任务，如 B2 派生）。旧记录无此字段（读取不变）。
- */
-export const WORKFLOW_STAGE_EXECUTOR_KINDS = Object.freeze([
-  "built-in", "worker-dispatch", "review", "card-prompt", "application",
-] as const);
-export type WorkflowStageExecutorKind = (typeof WORKFLOW_STAGE_EXECUTOR_KINDS)[number];
-
-/** executorKind 值域守卫。 */
-export function isWorkflowStageExecutorKind(value: unknown): value is WorkflowStageExecutorKind {
-  return typeof value === "string" && (WORKFLOW_STAGE_EXECUTOR_KINDS as readonly string[]).includes(value);
-}
-
-/**
  * 文档引用（应用计算 path+字节 SHA-256；kind 可选）。
  * 用于 `request.created`/`request.resolved` 的 `documentRefs`（裁决事件一次写入，不由模型自报）。
  * T3 B2（MF-IR-5 / v1.3 §4.2 A3）：追加**可选** `version`（意图/提案文档版本号）；旧形状
@@ -2218,15 +2064,6 @@ export interface WorkflowStartedEvent extends WorkflowEventBase {
   sourceTaskId: string;
   /** 旧 trunk/run 历史存在但被忽略时为 true（如实记录，不迁移）。 */
   legacyStateIgnored?: boolean;
-  /**
-   * 2026-11-17（app-dispatch/v1）：驱动协议。**缺省（旧记录）= `fixed-v2.1`**；
-   * 新协议 = `app-dispatch/v1`（应用侧流程驱动）。协议钉死，禁止同一 workflow 中途切换（Q10）。
-   */
-  protocol?: WorkflowProtocol;
-  /** app-dispatch/v1：流程定义引用（id/version/sha256；随 workflow 钉死，不静默迁移）。 */
-  definition?: WorkflowDefinitionRef;
-  /** app-dispatch/v1：选流程时给定的定义参数（Q2 验收强度；应用执行；旧记录无此字段）。 */
-  parameters?: { acceptanceStrength?: WorkflowAcceptanceStrength };
 }
 
 /** `stage.requested`（幂等键 `stage-request:<workflowId>:<stage>:<attempt>`）。 */
@@ -2237,11 +2074,6 @@ export interface StageRequestedEvent extends WorkflowEventBase {
   requestTaskId: string;
   requestDigest: string;
   attempt: number;
-  /**
-   * 2026-11-17（app-dispatch/v1）：`"application"` = 应用侧流程驱动直接请求
-   * （不再由 chief stage-request 触发）。旧记录无此字段（= 旧 chief 驱动，读取不变）。
-   */
-  issuedBy?: "application";
 }
 
 /** `stage.dispatched`（幂等键 `stage-dispatch:<workflowId>:<stage>:<taskId>`）。 */
@@ -2251,10 +2083,6 @@ export interface StageDispatchedEvent extends WorkflowEventBase {
   taskId: string;
   targetRoleId: string;
   moduleId?: string;
-  /** app-dispatch/v1：`"application"` = 应用建任务时记录（旧记录无此字段）。 */
-  issuedBy?: "application";
-  /** app-dispatch/v1：执行者类别审计（旧记录无此字段，读取不变）。 */
-  executorKind?: WorkflowStageExecutorKind;
 }
 
 /** 阶段完成产物引用（path 必填；sha256/kind 由应用附）。 */
@@ -2286,19 +2114,10 @@ export interface StageBlockedEvent extends WorkflowEventBase {
 export interface StageReworkedEvent extends WorkflowEventBase {
   kind: "stage.reworked";
   stage: WorkflowStage;
-  /**
-   * 被打回的具体阶段（A12b→A11、A6→A5、A3→A2、B2→B1）。
-   * 2026-11-20（SMOKE-2 S1 block 重入场）：带 `blockId` 时 `stage === reworkOf === 当前 blocked 阶段`
-   * （同阶段重入场，新 attempt）；无 `blockId` 的旧事件逐字沿用 MF-IR-1 回落语义。
-   */
+  /** 被打回的具体阶段（A12b→A11、A6→A5、A3→A2、B2→B1）。 */
   reworkOf: WorkflowStage;
   reason: string;
   attempt: number;
-  /**
-   * 2026-11-20（SMOKE-2 S1）：block 重入场标记——block（`blocks.jsonl`）已 `resolved(fixed|decided)` 后
-   * 以新 attempt 重入原 blocked 阶段。旧记录/旧事件无此字段（读取不变）。
-   */
-  blockId?: string;
 }
 
 /** `change.scope-decided`（B2；幂等键 `scope:<workflowId>:<impactSha>:<scopeDigest>`）。 */
@@ -2596,22 +2415,7 @@ function isWorkflowEventBody(value: Record<string, unknown>): boolean {
   switch (kind) {
     case "workflow.started": {
       const trigger = value["trigger"];
-      const protocol = value["protocol"];
-      const definition = value["definition"];
-      const parameters = value["parameters"];
-      // 2026-11-17（app-dispatch/v1）：protocol 缺省（旧记录）= fixed-v2.1；definition 只在
-      // app-dispatch/v1 下允许且必填；parameters 仅可选 acceptanceStrength（Q2）。
-      const protocolOk = protocol === undefined
-        ? definition === undefined && parameters === undefined
-        : isWorkflowProtocol(protocol)
-          && (protocol === WORKFLOW_PROTOCOL_APP_DISPATCH
-            ? isWorkflowDefinitionRef(definition)
-            : definition === undefined && parameters === undefined);
-      const parametersOk = parameters === undefined
-        || (ledgerRecord(parameters)
-          && (parameters["acceptanceStrength"] === undefined || isWorkflowAcceptanceStrength(parameters["acceptanceStrength"])));
-      return protocolOk && parametersOk
-        && ledgerRecord(trigger) && trigger["by"] === "chief" && typeof trigger["reason"] === "string"
+      return ledgerRecord(trigger) && trigger["by"] === "chief" && typeof trigger["reason"] === "string"
         && (trigger["customerOverride"] === undefined || typeof trigger["customerOverride"] === "boolean")
         && ledgerText(value["sourceTaskId"])
         && (value["legacyStateIgnored"] === undefined || typeof value["legacyStateIgnored"] === "boolean");
@@ -2619,13 +2423,10 @@ function isWorkflowEventBody(value: Record<string, unknown>): boolean {
     case "stage.requested":
       return isWorkflowStage(value["stage"])
         && (value["fromStage"] === undefined || isWorkflowStage(value["fromStage"]))
-        && (value["issuedBy"] === undefined || value["issuedBy"] === "application")
         && ledgerText(value["requestTaskId"]) && ledgerDigest(value["requestDigest"]) && ledgerAttempt(value["attempt"]);
     case "stage.dispatched":
       return isWorkflowStage(value["stage"]) && ledgerText(value["taskId"]) && ledgerText(value["targetRoleId"])
-        && (value["moduleId"] === undefined || ledgerText(value["moduleId"]))
-        && (value["issuedBy"] === undefined || value["issuedBy"] === "application")
-        && (value["executorKind"] === undefined || isWorkflowStageExecutorKind(value["executorKind"]));
+        && (value["moduleId"] === undefined || ledgerText(value["moduleId"]));
     case "stage.completed": {
       const cause = value["cause"], artifacts = value["artifacts"];
       return isWorkflowStage(value["stage"]) && ledgerRecord(cause) && ledgerText(cause["kind"]) && ledgerText(cause["ref"])
@@ -2637,9 +2438,7 @@ function isWorkflowEventBody(value: Record<string, unknown>): boolean {
         && (value["taskId"] === undefined || ledgerText(value["taskId"])) && ledgerAttempt(value["attempt"]);
     case "stage.reworked":
       return isWorkflowStage(value["stage"]) && isWorkflowStage(value["reworkOf"])
-        && typeof value["reason"] === "string" && ledgerAttempt(value["attempt"])
-        // 2026-11-20（SMOKE-2 S1）：block 重入场标记可选；出现时必须是非空文本（旧记录无字段）。
-        && (value["blockId"] === undefined || ledgerText(value["blockId"]));
+        && typeof value["reason"] === "string" && ledgerAttempt(value["attempt"]);
     case "change.scope-decided": {
       const report = value["impactReport"], scope = value["scope"], writesets = value["effectiveWritesets"];
       return ledgerRecord(report) && ledgerText(report["path"]) && ledgerDigest(report["sha256"])
@@ -2920,13 +2719,6 @@ export interface DispatchTaskPayload {
 export interface DispatchReceipt {
   ok: boolean;
   message?: string;
-  /**
-   * 2026-11-20（block resolver 桌面批）：拒绝回执附带的 block 事实（应用确定性计算；模型只读展示）。
-   * `blockId` 为 `computeBlockId` 的确定性 24 位 hex；`nextActions` 为稳定短语（下一步正确动作）。
-   * 旧调用方/旧测试只读 `ok`/`message`——加法可选，形状兼容。
-   */
-  blockId?: string;
-  nextActions?: string[];
 }
 
 export type DispatchTaskFn = (
@@ -3265,7 +3057,7 @@ export type RequestRequirementChangeFn = (input: RequestRequirementChangeInput) 
  * 注入面由编排/桌面注入端决定：全部内置治理角色（chief 完整、其余按会话角色裁剪），项目 worker 不注入。
  */
 export type ProjectStateFn = (
-  query: ProjectStateQuery,
+  query: ProjectStateQuery & { definitionId?: string },
   metadata?: ReportHandbackMetadata,
 ) => ProjectStateToolResult | Promise<ProjectStateToolResult>;
 
@@ -3528,13 +3320,11 @@ export type FixedActivateRoleDocumentsFn = (
   signal?: AbortSignal,
 ) => Promise<FixedActivateRoleDocumentsResult>;
 
-/** Trusted application request, not model-authored state. Retained business cards only. */
-export interface ChiefPendingDecisionRequest {
+interface ChiefPendingDecisionRequestBase {
   requestId: string;
   baseDigest: string;
   delegationRevision: number;
   originRoleId: string;
-  cardKind: "appointment" | "acceptance" | "decision" | "proposal";
   flowId?: string;
   runId?: string;
   taskId?: string;
@@ -3542,6 +3332,24 @@ export interface ChiefPendingDecisionRequest {
   options: readonly { id: string; label: string; description?: string; recommended?: boolean }[];
   evidenceRefs: readonly SnapshotArtifactRef[];
 }
+
+export const DURABLE_CHIEF_DECISION_CARD_KINDS = Object.freeze([
+  "intent-confirm", "proposal", "appointment", "workflow-start", "document-revision", "merge-main", "workflow-blocked-scope",
+] as const);
+export type DurableChiefDecisionCardKind = typeof DURABLE_CHIEF_DECISION_CARD_KINDS[number];
+
+/** Only the application binds a verified durable card, its generation and its selection mode. */
+export interface DurableChiefPendingDecisionRequest extends ChiefPendingDecisionRequestBase {
+  cardKind: DurableChiefDecisionCardKind;
+  durableWorkflow: { generation: number; multiple: boolean };
+}
+
+type LegacyChiefPendingDecisionRequest = ChiefPendingDecisionRequestBase & {
+  cardKind: "appointment" | "acceptance" | "decision" | "proposal";
+  durableWorkflow?: never;
+};
+
+export type ChiefPendingDecisionRequest = LegacyChiefPendingDecisionRequest | DurableChiefPendingDecisionRequest;
 export type DecidePendingRequestInput = {
   requestId: string;
   baseDigest: string;
@@ -3566,6 +3374,19 @@ export interface ChiefDecisionExecutionContext {
   tools: readonly ["decide_pending_request"];
   limits: { maxTurns: number; timeoutMs: number; maxAttempts: number };
 }
+
+function isChiefPendingDecisionCard(request: ChiefPendingDecisionRequest): boolean {
+  const binding = request.durableWorkflow;
+  if (binding === undefined) return ["appointment", "acceptance", "decision", "proposal"].includes(request.cardKind);
+  return !!binding && typeof binding === "object" && !Array.isArray(binding)
+    && Number.isSafeInteger(binding.generation) && binding.generation >= 1
+    && typeof binding.multiple === "boolean" && (!binding.multiple || request.cardKind === "appointment")
+    && (DURABLE_CHIEF_DECISION_CARD_KINDS as readonly string[]).includes(request.cardKind)
+    && request.evidenceRefs.length > 0 && Array.from(request.evidenceRefs).every(isSnapshotArtifactRef)
+    && Array.from(request.options).every(option => !!option && Array.from(option.id).length <= 500
+      && !/[\x00-\x1f]/.test(option.id));
+}
+
 export function isChiefDecisionExecutionContext(value: unknown): value is ChiefDecisionExecutionContext {
   if (!value || typeof value !== "object") return false;
   const context = value as ChiefDecisionExecutionContext;
@@ -3578,13 +3399,13 @@ export function isChiefDecisionExecutionContext(value: unknown): value is ChiefD
     && typeof context.request.baseDigest === "string" && /^[a-f0-9]{64}$/i.test(context.request.baseDigest)
     && Number.isSafeInteger(context.request.delegationRevision) && context.request.delegationRevision >= 0
     && typeof context.request.originRoleId === "string" && context.request.originRoleId.trim().length > 0
-    && ["appointment", "acceptance", "decision", "proposal"].includes(context.request.cardKind)
     && typeof context.request.question === "string" && context.request.question.trim().length > 0
     && Array.isArray(context.request.options) && context.request.options.length > 0
     && context.request.options.every(option => !!option && typeof option.id === "string"
       && option.id.trim().length > 0 && typeof option.label === "string" && option.label.trim().length > 0)
     && new Set(context.request.options.map(option => option.id)).size === context.request.options.length
     && Array.isArray(context.request.evidenceRefs) && context.request.evidenceRefs.every(isSnapshotArtifactRef)
+    && isChiefPendingDecisionCard(context.request)
     && !!context.limits && [context.limits.maxTurns, context.limits.timeoutMs, context.limits.maxAttempts]
       .every(limit => Number.isSafeInteger(limit) && limit > 0);
 }
@@ -3809,6 +3630,8 @@ export interface ShellJudgeRequest {
   turnText?: string;
   /** 脚本内容审查上下文（应用提供、有界；judge 必须据此核对写区/破坏性/越权）。 */
   approvalContext?: ShellApprovalContext;
+  readonly acceptanceEnvironmentScope?: AcceptanceEnvironmentReviewScope;
+  readonly acceptanceWorkspaceScope?: AcceptanceWorkspaceReviewScope;
 }
 
 /** `deny` 的替代方案（文本；应用**不自动执行**）。 */
@@ -4461,7 +4284,7 @@ export interface ToolResult {
   message: string;
   /**
    * 本轮工具结果附带的**模型可见**图片（2026-10-27 同轮设计；可选、向后兼容）。
-   * 仅 `view_image` 在 `ok:true` 且交付方式为 `tool-result` 时非空；适配器负责映射为原生工具结果内容。
+   * 受信图片工具仅在 `ok:true` 且交付方式为 `tool-result` 时返回图片，适配器映射为原生工具结果。
    * **不得**进入 `details`、诊断、工具展示事件或 ANS 回放（只允许计数/字节/MIME 摘要等元数据）。
    */
   images?: readonly PromptImage[];
@@ -4520,7 +4343,157 @@ export interface ReadonlyGitCapability {
   execute(match: object, budgets?: { timeoutMs?: number; outputLimit?: number }): Promise<ReadonlyGitExecutionFacts>;
 }
 
+/** Trusted desktop port for the current A11 child. The isolated generator returns bytes only. */
+export interface GovernedPackageLockGenerator {
+  authorize(signal?: AbortSignal): Promise<{ isCurrent: () => boolean } | undefined>;
+  generate(manifest: Buffer, signal?: AbortSignal): Promise<DurableResult<Buffer>>;
+}
+
+/** Identity from the running tool handler and its actual session, never from tool parameters. */
+export interface AcceptanceEnvironmentToolCall {
+  readonly roleId: string;
+  readonly turnId: string;
+  readonly toolCallId: string;
+  readonly cwd: string;
+}
+
+/**
+ * Host-verified scope for one isolated npm install. The reviewed argv/cwd carries the
+ * npm mode, staging prefix, verified registry and private config/cache paths.
+ * Publication is create-only at publishDirectory, with lifecycle scripts disabled.
+ */
+export interface AcceptanceEnvironmentReviewScope {
+  readonly kind: "application-isolated-npm-restore";
+  readonly projectRoot: string;
+  readonly stagingDirectory: string;
+  readonly stagingIdentity: Readonly<{ dev: string; ino: string }>;
+  readonly publishDirectory: string;
+  /** Device and inode of the app-created task slot parent for private publication. */
+  readonly publishIdentity?: Readonly<{ dev: string; ino: string }>;
+  readonly instanceId: string;
+  readonly flowId: string;
+  readonly stepId: string;
+  readonly attempt: number;
+  readonly taskId: string;
+  readonly roleId: string;
+  readonly turnId: string;
+  readonly toolCallId: string;
+  readonly effectKey: string;
+  readonly candidateOid: string;
+  readonly manifestSha256: string;
+  readonly lockSha256?: string;
+  readonly criteriaSha256: string;
+}
+
+/** The facts sent to the active session's ShellGate for this invocation. */
+export interface AcceptanceEnvironmentApprovedCommand extends AcceptanceEnvironmentToolCall {
+  readonly argv: readonly string[];
+  readonly reviewedBy: string;
+  readonly acceptanceEnvironmentScope: AcceptanceEnvironmentReviewScope;
+  /** The host rechecks this immediately before spawning and before installing the resulting files. */
+  isCurrent(): boolean;
+}
+
+/** Prepared by the desktop for its exact current recovery child task. */
+export interface AcceptanceEnvironmentRestoreCommand {
+  readonly cwd: string;
+  readonly argv: readonly string[];
+  readonly acceptanceEnvironmentScope: AcceptanceEnvironmentReviewScope;
+  isCurrent(): boolean;
+  executeApproved(input: AcceptanceEnvironmentApprovedCommand, signal?: AbortSignal):
+    Promise<DurableResult<{ message: string; execution?: ShellExecutionOutcome }>>;
+  reject(input: { readonly decision: "denied" | "unavailable"; readonly message: string }): void | Promise<void>;
+}
+
+export type AcceptanceEnvironmentRestoreFn = (
+  call: AcceptanceEnvironmentToolCall, signal?: AbortSignal,
+) => Promise<DurableResult<AcceptanceEnvironmentRestoreCommand>>;
+
+/** Scope of a previously approved isolated workspace command, kept for historical facts. */
+export interface AcceptanceWorkspaceReviewScope {
+  readonly kind: "application-isolated-acceptance-workspace";
+  /** Static preparation serves verified files without a candidate build. Omission identifies the original build operation. */
+  readonly operation?: "static";
+  readonly projectRoot: string;
+  readonly workspaceDirectory: string;
+  readonly workspaceIdentity: Readonly<{ dev: string; ino: string }>;
+  readonly inputDirectory: string;
+  readonly outputDirectory: string;
+  readonly evidenceDirectory: string;
+  readonly launcherPath: string;
+  readonly launcherSha256: string;
+  readonly previewLoopback: true;
+  readonly previewTtlMs: number;
+  readonly instanceId: string;
+  readonly flowId: string;
+  readonly stepId: string;
+  readonly taskId: string;
+  readonly attempt: number;
+  readonly roleId: string;
+  readonly turnId: string;
+  readonly toolCallId: string;
+  readonly effectKey: string;
+  readonly candidateOid: string;
+  readonly criteriaSha256: string;
+}
+
+/** Host-only observation of an actual foreground npm script invocation in the eligible acceptance session. */
+export interface AcceptanceEnvironmentShellObservation extends AcceptanceEnvironmentToolCall {
+  readonly argv: readonly string[];
+  readonly decision: "allowed" | "denied" | "unavailable";
+  readonly reviewedBy?: string;
+  readonly outcome?: Readonly<ShellExecutionOutcome>;
+  /** True when the injected write audit returned no violations. Host verifies project facts separately. */
+  readonly writeAuditPassed?: boolean;
+  readonly stderr?: string;
+}
+
+export interface ImplementationSelfTestTransport {
+  readonly kind: "direct" | "bundled-node" | "bundled-npm";
+  /** Exact executable supplied to spawn. An unresolved command name is insufficient for a strict retest. */
+  readonly executable: string;
+  /** Exact arguments supplied to spawn, excluding the executable. */
+  readonly argv: readonly string[];
+}
+
+/** Host-only observation of the actual foreground tool call in the current A11 task. */
+export interface ImplementationSelfTestObservation extends AcceptanceEnvironmentToolCall {
+  /** Original approved (or attempted, when no approval was given) literal argv. */
+  readonly argv: readonly string[];
+  /** Empty only when a strict retest attempt stopped before approval. */
+  readonly reviewedBy: string;
+  readonly outcome: Readonly<ShellExecutionOutcome>;
+  /** Legacy result. A strict retest additionally requires a completed strictAudit. */
+  readonly writeAuditPassed: boolean;
+  /** Started is recorded from the spawn event. Transport is absent if no spawn input was used. */
+  readonly process?: { readonly started: boolean; readonly transport?: ImplementationSelfTestTransport };
+  readonly strictAudit?: ShellStrictAuditObservation;
+  /** Actual reason a bound retest could not execute or could not complete its audit. */
+  readonly failure?: string;
+  /** Bounded foreground output for reviewing an actual retest result. */
+  readonly output?: Readonly<Required<Pick<RuntimeToolExecutionFactsV1, "stdout" | "stderr" | "stdoutTruncated" | "stderrTruncated">>>;
+}
+
+/** Collection may return the application receipt of a strict, durably registered command execution. */
+export type ImplementationSelfTestObserver = (facts: ImplementationSelfTestObservation) =>
+  void | { readonly evidenceExecutionRef: string } | Promise<void | { readonly evidenceExecutionRef: string }>;
+
+export const DOCUMENT_REVISION_PATH_MAX_CHARS = 500;
+export const DOCUMENT_REVISION_REASON_MAX_CHARS = 4000;
+export const DOCUMENT_REVISION_CONTENT_MAX_BYTES = 128 * 1024;
+
+export type DocumentRevisionToolReceipt = { requestId: string; status: string; message: string };
+
+export type RequestDocumentRevisionFn = (
+  input: { path: string; reason: string }, signal?: AbortSignal,
+) => Promise<DurableResult<DocumentRevisionToolReceipt>>;
+
+export type SubmitDocumentRevisionFn = (
+  input: { content: string }, signal?: AbortSignal,
+) => Promise<DurableResult<DocumentRevisionToolReceipt>>;
+
 export interface GovernedToolsOptions {
+  durableFixedWorkflow?: boolean;
   /** Actual host roots, never inferred from readRoot/writeRoot. */
   projectRoot?: string;
   skillRoot?: string;
@@ -4528,6 +4501,29 @@ export interface GovernedToolsOptions {
   fileGateProtocol?: "host-facts-v1";
   /** Preserve the host's coverage/digest/reasons; an array of roots alone proves no coverage. */
   fileGateProtection?: FileGateProtectionFacts;
+  /** Durably claim each write before file effects. Requires live host-facts-v1. */
+  claimFileWrite?: ClaimFileWriteFn;
+  /** Enable the fixed lockfile tool only with live task authorization and a durable file-write claim. */
+  governedPackageLock?: GovernedPackageLockGenerator;
+  /** Inject only for the host-bound recovery child task using the actual session ShellGate. */
+  restoreAcceptanceEnvironment?: AcceptanceEnvironmentRestoreFn;
+  /** Inject only for the host-bound A12b execution task. */
+  observeAcceptanceEnvironmentShell?: (facts: AcceptanceEnvironmentShellObservation) => void | Promise<void>;
+  /** Inject only for the current A11 implementation task with an authoritative self-test work item. */
+  observeImplementationSelfTest?: ImplementationSelfTestObserver;
+  /** Actual host-bound task mode. No effect or path authority is inferred from the role's name. */
+  evidenceAuditAccess?: "audit" | "collect";
+  /** Current task authority, checked before exposing data or executing any scoped capability. */
+  evidenceAuditIsCurrent?: () => boolean | Promise<boolean>;
+  /** Project-relative literal files, or explicitly authorized directories ending in /. */
+  evidenceAuditReadPaths?: readonly string[];
+  /** The actual formal report granted to this audit, if the workflow requires one. */
+  evidenceAuditReportPath?: string;
+  /** Project-relative evidence write scope, intersected with the original WriteGate. */
+  evidenceCollectionWritePaths?: readonly string[];
+  /** Host ports bound to the actual operations turn or the actual built-in revision task. */
+  requestDocumentRevision?: RequestDocumentRevisionFn;
+  submitDocumentRevision?: SubmitDocumentRevisionFn;
   /** Host-only canonical repo/gitdir/common/other-worktree roots. Not model tool arguments or a safe flag. */
   protectedGitRoots?: readonly string[];
   extraCredentialEnvVars?: readonly string[];
@@ -4560,6 +4556,8 @@ export interface GovernedToolsOptions {
    * 本层不依赖门禁引擎类型（I0-9：`match` 对 Model 保持不透明）。
    */
   readonlyGit?: ReadonlyGitCapability;
+  /** Presentation only. The host sets this after attaching the actual current A11 task Git scope. */
+  taskGitAvailable?: boolean;
   /**
    * 2026-10-29（v2.13）：属主 write_file/edit_file 成功后的版本登记入口（guard 锁内追加/回退）。
    * 缺省 ⇒ 不登记（旧行为）；注入端由编排提供。
@@ -4646,6 +4644,8 @@ export interface GovernedToolsOptions {
    * （chief 完整、其余按会话角色裁剪），项目 worker 不注入。纯读、零写入；不改变任何写权/判定链。
    */
   projectState?: ProjectStateFn;
+  /** `request_workflow_start` 只提交提议。受信宿主绑定普通幕僚会话及实际客户输入，由客户本人决定是否启用。 */
+  requestWorkflowStart?: DurableRequestWorkflowStartFn;
   /**
    * 治理权力矩阵只读能力（governance-authority-matrix，C2）：`governance_matrix` 工具。
    * **注入才注册**：未注入 ⇒ 工具不存在（能力缺席 = 最强 fail-closed）。注入面由编排（C3）决定：

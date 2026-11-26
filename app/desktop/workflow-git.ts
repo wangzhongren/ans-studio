@@ -23,8 +23,10 @@
 
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { promises as fs } from "node:fs";
+import { promises as fs, type Stats } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { createInterface } from "node:readline";
 
 import {
   ensureProjectGitignore,
@@ -38,6 +40,7 @@ import type {
   WorkflowServiceFailure,
 } from "../../src/common/编排/workflow-service.ts";
 import type { GitOid } from "../../src/model/trunk.ts";
+import type { DurableA11GitObservation, DurableEffectOutcome, DurableProblem, DurableReleaseRequest, DurableReleaseSnapshot, DurableResult } from "../../src/model/durable-workflow.ts";
 import type { ReleaseFileChange, ReleaseMergeKind } from "../../src/model/runtime.ts";
 // B4.2（2026-11-10）：固定 staged 检查 argv 的唯一合法来源（门禁引擎经 Service 出口再导出；
 // 消费者不得另抄一份）。桌面端口只读消费，不复制规则/门禁实现。
@@ -303,9 +306,10 @@ async function sanitizedGitEnv(projectRoot: string): Promise<NodeJS.ProcessEnv> 
 async function runGit(
   projectRoot: string,
   argv: readonly string[],
-  options: { input?: string; timeoutMs?: number; outputLimit?: number } = {},
+  options: { input?: string; timeoutMs?: number; outputLimit?: number; indexFile?: string } = {},
 ): Promise<GitRunResult> {
   const env = await sanitizedGitEnv(projectRoot);
+  if (options.indexFile !== undefined) env.GIT_INDEX_FILE = options.indexFile;
   const hooksDir = path.join(projectRoot, ".ans", "git-home", "hooks-empty");
   // B4.2：调用方可给更小的输出预算；硬上限仍是本模块的 `GIT_OUTPUT_LIMIT`（绝不放大）。
   const outputLimit = Math.max(1, Math.min(Math.floor(options.outputLimit ?? GIT_OUTPUT_LIMIT), GIT_OUTPUT_LIMIT));
@@ -345,9 +349,9 @@ async function runGit(
       timedOut = true;
       child.kill();
     }, options.timeoutMs ?? GIT_TIMEOUT_MS);
-    const append = (current: string, chunk: Buffer): string => {
-      if (current.length >= outputLimit) return current;
-      const next = current + chunk.toString("utf8");
+    const append = (current: string, chunk: string): string => {
+      if (killedForLimit) return current;
+      const next = current + chunk;
       if (next.length > outputLimit) {
         killedForLimit = true;
         child.kill();
@@ -355,8 +359,8 @@ async function runGit(
       }
       return next;
     };
-    child.stdout?.on("data", (chunk: Buffer) => { stdout = append(stdout, chunk); });
-    child.stderr?.on("data", (chunk: Buffer) => { stderr = append(stderr, chunk); });
+    child.stdout?.setEncoding("utf8").on("data", (chunk: string) => { stdout = append(stdout, chunk); });
+    child.stderr?.setEncoding("utf8").on("data", (chunk: string) => { stderr = append(stderr, chunk); });
     child.once("error", (error: Error) => { spawnError = error.message; finish(null); });
     child.once("close", (code: number | null) => finish(code));
     child.stdin?.on("error", () => undefined);
@@ -426,10 +430,19 @@ function parsePorcelainZ(raw: string): PorcelainEntry[] {
   return entries;
 }
 
-async function statusEntriesOf(projectRoot: string): Promise<PorcelainEntry[] | undefined> {
-  const result = await runGit(projectRoot, ["status", "--porcelain=v1", "-z", "--untracked-files=normal"]);
+async function statusEntriesOf(projectRoot: string, definitionFile?: string): Promise<PorcelainEntry[] | undefined> {
+  let selectedDefinition: string | undefined;
+  if (definitionFile && /^docs\/workflows\/[\w][\w.-]*\.ya?ml$/i.test(definitionFile)) {
+    const abs = path.join(projectRoot, definitionFile);
+    const definition = await fs.lstat(abs).catch(() => undefined);
+    const actualPath = definition?.isFile() && await fs.realpath(abs).catch(() => undefined);
+    const expectedPath = path.join(await fs.realpath(projectRoot), definitionFile);
+    if (actualPath && path.relative(expectedPath, actualPath) === "") selectedDefinition = definitionFile;
+  }
+  const result = await runGit(projectRoot, ["status", "--porcelain=v1", "-z",
+    selectedDefinition ? "--untracked-files=all" : "--untracked-files=normal"]);
   if (!result.ok) return undefined;
-  return parsePorcelainZ(result.stdout);
+  return parsePorcelainZ(result.stdout).filter(entry => entry.status !== "??" || entry.path !== selectedDefinition);
 }
 
 async function readGitignoreSha256(projectRoot: string): Promise<string | null> {
@@ -453,14 +466,14 @@ async function gitignoreWorktreeDirty(projectRoot: string): Promise<boolean> {
 }
 
 /** 只读仓库事实（发布前置与端口的共同来源）。 */
-async function inspectRepositoryFacts(projectRoot: string): Promise<
+async function inspectRepositoryFacts(projectRoot: string, definitionFile?: string): Promise<
   { ok: true; facts: WorkflowGitRepositoryFacts } | WorkflowServiceFailure
 > {
   const headOid = await revParseOid(projectRoot, "HEAD");
   if (headOid === undefined) {
     return portFailure("release-workflow-not-ready", "当前工作区没有提交（HEAD 不可解析），无法发布。", ["head-oid"]);
   }
-  const entries = await statusEntriesOf(projectRoot);
+  const entries = await statusEntriesOf(projectRoot, definitionFile);
   if (entries === undefined) {
     return portFailure("release-workflow-not-ready", "git status 读取失败（fail-closed）。");
   }
@@ -568,6 +581,12 @@ async function mergeMainReal(request: {
   baseOid: GitOid | null;
   tipOid: GitOid;
   mergeKind: ReleaseMergeKind;
+  durable?: {
+    snapshot: DurableReleaseSnapshot;
+    marker: string;
+    definitionFile?: string;
+    claim(): Promise<{ ok: true } | ({ ok: false } & DurableProblem)>;
+  };
 }): Promise<
   | {
       ok: true;
@@ -585,7 +604,7 @@ async function mergeMainReal(request: {
     return portFailure("release-main-busy", "项目级 Git 临界区被占用（并发合并/提交）；未合并。");
   }
   try {
-    const factsResult = await inspectRepositoryFacts(request.projectRoot);
+    const factsResult = await inspectRepositoryFacts(request.projectRoot, request.durable?.definitionFile);
     if (!factsResult.ok) return factsResult;
     const facts = factsResult.facts;
     if (facts.branch !== request.branch) {
@@ -604,8 +623,18 @@ async function mergeMainReal(request: {
     } else if (request.baseOid === null || facts.mainOid === null || facts.mainOid.hex !== request.baseOid.hex) {
       return portFailure("release-merge-failed", "main base OID 已漂移；未合并。");
     }
-    const preview = await previewMergeReal(request.projectRoot, request.baseOid, request.tipOid);
+    const durableBaseline = request.durable?.snapshot.baselineOid;
+    const preview = await previewMergeReal(request.projectRoot, durableBaseline
+      ? { objectFormat: request.tipOid.objectFormat, hex: durableBaseline } : request.baseOid, request.tipOid);
     if (!preview.ok) return preview;
+    if (request.durable) {
+      if (preview.diffDigest !== request.durable.snapshot.diffDigest
+        || JSON.stringify(preview.files.map(file => file.path)) !== JSON.stringify(request.durable.snapshot.files)) {
+        return portFailure("release-workflow-not-ready", "The approved diff has changed.");
+      }
+      const claimed = await request.durable.claim();
+      if (!claimed.ok) return portFailure("release-workflow-not-ready", claimed.message);
+    }
     if (request.mergeKind === "initial") {
       // main unborn ⇒ `git switch -c main <tipOid>`（mergeKind:"initial"；工作区停在 main）。
       const created = await runGit(request.projectRoot, ["switch", "-c", "main", request.tipOid.hex]);
@@ -635,12 +664,18 @@ async function mergeMainReal(request: {
     if (!switched.ok) {
       return portFailure("release-main-busy", `切换到 main 失败（可能被其他 worktree 占用）：${asMessage(switched)}`);
     }
+    if (request.durable) {
+      const beforeMerge = await revParseOid(request.projectRoot, "HEAD");
+      if (beforeMerge?.hex !== request.durable.snapshot.mainOid) {
+        return portFailure("release-workflow-not-ready", "Main changed before the actual merge command.");
+      }
+    }
     const merged = await runGit(request.projectRoot, [
       "merge",
       "--no-ff",
       "-m",
-      `ANS release merge ${request.branch} (${request.workflowId})`,
-      request.branch,
+      request.durable?.marker ?? `ANS release merge ${request.branch} (${request.workflowId})`,
+      request.durable ? request.tipOid.hex : request.branch,
     ]);
     if (!merged.ok) {
       const conflict = /CONFLICT|Automatic merge failed/i.test(`${merged.stdout}\n${merged.stderr}`);
@@ -696,7 +731,7 @@ async function findParentRepository(projectRoot: string): Promise<string | undef
 async function ensureRepositoryReal(request: {
   projectRoot: string;
   allowInit: boolean;
-}): Promise<{ ok: true; repository: BaselineGitRepositoryState } | WorkflowServiceFailure> {
+}, durableMarker?: string, expectOwnedRepository = false): Promise<{ ok: true; repository: BaselineGitRepositoryState } | WorkflowServiceFailure> {
   const root = request.projectRoot;
   let gitEntry: Awaited<ReturnType<typeof fs.lstat>> | undefined;
   try {
@@ -714,7 +749,8 @@ async function ensureRepositoryReal(request: {
     if (parent !== undefined) {
       return portFailure("baseline-parent-repository-detected", `项目根位于其他仓库工作树内（${parent}）；不自动嵌套初始化。`);
     }
-    const initialized = await runGit(root, ["init", "-b", "main"]);
+    const initialized = durableMarker ? await initializeDurableRepository(root, durableMarker) : await runGit(root, ["init", "-b", "main"]);
+    if (durableMarker && !initialized.ok) return portFailure("baseline-git-init-failed", asMessage(initialized));
     if (!initialized.ok) {
       // 旧 git 不支持 `-b`：`git init` + `git symbolic-ref HEAD refs/heads/main`（G-9：初始分支钉死 main）。
       const plain = await runGit(root, ["init"]);
@@ -743,6 +779,9 @@ async function ensureRepositoryReal(request: {
     };
   }
   // 既有仓库（目录或 worktree `.git` 文件）：原样保留，只补仓库本地身份缺省。
+  if (durableMarker && expectOwnedRepository && !await hasDurableInitializationMarker(root, durableMarker)) {
+    return portFailure("workflow-baseline-reconciliation-required", "The newly present repository has no marker for this baseline operation.");
+  }
   const identityDefaultsApplied = await ensureIdentityDefaults(root);
   const mainOid = await revParseOid(root, "refs/heads/main");
   const branch = await currentBranchOf(root);
@@ -764,7 +803,7 @@ async function ensureRepositoryReal(request: {
  * `.gitignore` ans-managed 块 + 仅 `.gitignore` 的 baseline commit。
  * 被跟踪且有未提交修改 ⇒ `baseline-gitignore-dirty`（不覆盖用户改动）；提交只含 `.gitignore`。
  */
-async function ensureGitignoreReal(request: { projectRoot: string }): Promise<
+async function ensureGitignoreReal(request: { projectRoot: string }, durableMarker?: string): Promise<
   { ok: true; changed: boolean; committed: boolean; sha256: string } | WorkflowServiceFailure
 > {
   const root = request.projectRoot;
@@ -781,7 +820,8 @@ async function ensureGitignoreReal(request: { projectRoot: string }): Promise<
     if (!added.ok) {
       return portFailure("baseline-gitignore-write-failed", `git add .gitignore 失败：${asMessage(added)}`);
     }
-    const commit = await runGit(root, ["commit", "-m", "ANS baseline: ans-managed .gitignore", "--", ".gitignore"]);
+    const commit = await runGit(root, ["commit", "-m", "ANS baseline: ans-managed .gitignore",
+      ...(durableMarker ? ["-m", `ANS durable baseline ${durableMarker}`] : []), "--", ".gitignore"]);
     if (!commit.ok) {
       const stillDirty = await gitignoreWorktreeDirty(root);
       if (stillDirty) {
@@ -795,10 +835,10 @@ async function ensureGitignoreReal(request: { projectRoot: string }): Promise<
   return { ok: true, changed: ensured.changed, committed, sha256: ensured.sha256 };
 }
 
-async function inspectWorktreeReal(request: { projectRoot: string; branch?: string }): Promise<
+async function inspectWorktreeReal(request: { projectRoot: string; branch?: string }, definitionFile?: string): Promise<
   { ok: true; branch: string; trackedChanges: number; untracked: string[] } | WorkflowServiceFailure
 > {
-  const entries = await statusEntriesOf(request.projectRoot);
+  const entries = await statusEntriesOf(request.projectRoot, definitionFile);
   if (entries === undefined) {
     return portFailure("baseline-git-init-failed", "git status 读取失败（fail-closed）。");
   }
@@ -875,17 +915,242 @@ export function createDesktopReleaseGitPort(): ReleaseGitPort {
   };
 }
 
+export async function previewDurableMerge(input: {
+  projectRoot: string;
+  branch: string;
+  baselineOid: string;
+  definitionFile?: string;
+}): Promise<DurableResult<{
+  mainOid: string;
+  tipOid: string;
+  files: string[];
+  diffDigest: string;
+  diffStat: string;
+}>> {
+  const facts = await inspectRepositoryFacts(input.projectRoot, input.definitionFile);
+  if (!facts.ok) return facts;
+  const { branch, headOid, mainOid, trackedChanges, untracked } = facts.facts;
+  if (mainOid === null || branch !== input.branch || trackedChanges || untracked.length) {
+    return portFailure("release-workflow-not-ready", "The task branch and main must have known commits and the worktree must be clean.");
+  }
+  const [baseline, alreadyMerged] = await Promise.all([
+    runGit(input.projectRoot, ["merge-base", "--is-ancestor", input.baselineOid, headOid.hex]),
+    runGit(input.projectRoot, ["merge-base", "--is-ancestor", headOid.hex, mainOid.hex]),
+  ]);
+  if (!baseline.ok || alreadyMerged.ok || alreadyMerged.exitCode !== 1 || headOid.hex === input.baselineOid) {
+    return portFailure("release-workflow-not-ready", "The task tip does not prove a new change from its authorized baseline.");
+  }
+  const preview = await previewMergeReal(input.projectRoot, { objectFormat: headOid.objectFormat, hex: input.baselineOid }, headOid);
+  if (!preview.ok) return preview;
+  return {
+    ok: true,
+    value: {
+      mainOid: mainOid.hex,
+      tipOid: headOid.hex,
+      files: preview.files.map(file => file.path),
+      diffDigest: preview.diffDigest,
+      diffStat: preview.diffStat,
+    },
+  };
+}
+
+function durableMergeMarker(workflowId: string, requestId: string): string {
+  return `ANS durable release ${workflowId} ${requestId}`;
+}
+
+export async function mergeDurableMain(input: {
+  projectRoot: string;
+  workflowId: string;
+  flowId: string;
+  release: DurableReleaseRequest;
+  definitionFile?: string;
+  claim: NonNullable<Parameters<typeof mergeMainReal>[0]["durable"]>["claim"];
+}): ReturnType<typeof mergeMainReal> {
+  const { requestId, digest, generation, snapshot, decision } = input.release;
+  const provenance = decision?.provenance;
+  const trusted = decision?.source === "customer" && (!provenance || provenance.source === "customer")
+    || decision?.source === "delegated-chief" && provenance?.source === "delegated-chief"
+      && provenance.requestId === requestId && provenance.digest === digest && provenance.generation === generation
+      && Number.isSafeInteger(provenance.delegationRevision) && provenance.delegationRevision >= 0
+      && typeof provenance.reason === "string" && provenance.reason.trim().length > 0;
+  if (!trusted || decision?.action !== "approve" || typeof decision.id !== "string" || !decision.id.trim()) {
+    return portFailure("release-workflow-not-ready", "The current release requires a matching recorded approval.");
+  }
+  const objectFormat = await objectFormatOf(input.projectRoot);
+  return mergeMainReal({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    flowId: input.flowId,
+    branch: snapshot.branch,
+    baseOid: { objectFormat, hex: snapshot.mainOid },
+    tipOid: { objectFormat, hex: snapshot.tipOid },
+    mergeKind: "merge",
+    durable: {
+      snapshot,
+      marker: durableMergeMarker(input.workflowId, requestId),
+      definitionFile: input.definitionFile,
+      claim: input.claim,
+    },
+  });
+}
+
+export async function verifyDurableMerge(input: {
+  projectRoot: string;
+  workflowId: string;
+  requestId: string;
+  snapshot: DurableReleaseSnapshot;
+  writePaths: readonly string[];
+  definitionFile?: string;
+}): Promise<DurableResult<{ mainOid: string; files: string[]; diffDigest: string }>> {
+  const { projectRoot, workflowId, requestId, snapshot } = input;
+  const facts = await inspectRepositoryFacts(projectRoot, input.definitionFile);
+  if (!facts.ok) return facts;
+  const { branch, headOid, mainOid, trackedChanges, untracked } = facts.facts;
+  if (branch !== "main" || mainOid?.hex !== headOid.hex || trackedChanges || untracked.length) {
+    return portFailure("release-workflow-not-ready", "The current worktree cannot establish the durable merge result.");
+  }
+  const [commit, taskTip] = await Promise.all([
+    runGit(projectRoot, ["show", "-s", "--format=%P%n%s", headOid.hex]),
+    revParseOid(projectRoot, `refs/heads/${snapshot.branch}`),
+  ]);
+  if (!commit.ok || taskTip?.hex !== snapshot.tipOid
+    || commit.stdout.trim().replace(/\r\n/g, "\n") !== `${snapshot.mainOid} ${snapshot.tipOid}\n${durableMergeMarker(workflowId, requestId)}`) {
+    return portFailure("release-workflow-not-ready", "Main does not prove this exact approved merge.");
+  }
+  const diff = await previewMergeReal(projectRoot, { objectFormat: headOid.objectFormat, hex: snapshot.mainOid }, headOid);
+  if (!diff.ok) return diff;
+  const files = diff.files.map(file => file.path);
+  const allowed = new Set(input.writePaths);
+  if (files.length === 0 || files.some(file => !allowed.has(file))) {
+    return portFailure("release-workflow-not-ready", "The actual merge has no authorized diff.");
+  }
+  return { ok: true, value: { mainOid: headOid.hex, files, diffDigest: diff.diffDigest } };
+}
+
 /**
  * 构造**真实** `BaselineGitPort`（桌面 B3 注入 `completeTeamPlanFixed`/`preparePathBStart`）：
  * A9 `git init -b main`（allowInit=true）；路径 B 无仓库 ⇒ `b-repository-required`（不自动 init）。
  */
-export function createDesktopBaselineGitPort(): BaselineGitPort {
+export function createDesktopBaselineGitPort(definitionFile?: string): BaselineGitPort {
   return {
     ensureRepository: async (request) => ensureRepositoryReal(request),
     ensureGitignore: async (request) => ensureGitignoreReal(request),
-    inspectWorktree: async (request) => inspectWorktreeReal(request),
+    inspectWorktree: async (request) => inspectWorktreeReal(request, definitionFile),
     prepareTaskBranch: async (request) => prepareTaskBranchReal(request),
   };
+}
+
+const durableBaselineMarkerFile = "ans-baseline-operation";
+
+async function initializeDurableRepository(projectRoot: string, marker: string) {
+  const template = await fs.mkdtemp(path.join(tmpdir(), "ans-baseline-template-"));
+  try {
+    await fs.writeFile(path.join(template, durableBaselineMarkerFile), marker, { flag: "wx", mode: 0o600 });
+    return await runGit(projectRoot, ["init", "-b", "main", `--template=${template}`]);
+  } finally {
+    await fs.unlink(path.join(template, durableBaselineMarkerFile)).catch(() => undefined);
+    await fs.rmdir(template).catch(() => undefined);
+  }
+}
+
+export interface DurableBaselineOrigin {
+  repositoryBefore: "absent" | "existing";
+  mainBefore: string;
+}
+
+export async function durableBaselineOrigin(projectRoot: string, workflowId: string): Promise<DurableResult<DurableBaselineOrigin>> {
+  const git = await fs.lstat(path.join(projectRoot, ".git")).catch(error => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!git) return { ok: true, value: { repositoryBefore: "absent", mainBefore: "" } };
+  const main = await revParseOid(projectRoot, "refs/heads/main");
+  const oldTaskBranch = await revParseOid(projectRoot, `refs/heads/${taskBranchName(workflowId)}`);
+  if ((!git.isDirectory() && !git.isFile()) || await currentBranchOf(projectRoot) !== "main" || oldTaskBranch) {
+    return portFailure("workflow-baseline-reconciliation-required", "The existing workspace must be on main with no branch for the pending operation.");
+  }
+  return { ok: true, value: { repositoryBefore: "existing", mainBefore: main?.hex ?? "" } };
+}
+
+async function proveDurableBaselineState(
+  projectRoot: string, workflowId: string, marker: string, origin: DurableBaselineOrigin,
+): Promise<DurableResult<{ reuseBranch?: GitOid; mainOid?: GitOid; onTaskBranch?: boolean }>> {
+  const git = await fs.lstat(path.join(projectRoot, ".git")).catch(error => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  });
+  const fail = () => portFailure("workflow-baseline-reconciliation-required", "Git does not prove the original baseline operation. Keep the current worktree and inspect it.");
+  if (!git) return origin.repositoryBefore === "absent" ? { ok: true, value: {} } : fail();
+  if (!git.isDirectory() && !git.isFile()) return fail();
+  if (origin.repositoryBefore === "absent") {
+    if (!git.isDirectory() || !await hasDurableInitializationMarker(projectRoot, marker)) return fail();
+  }
+  const mainOid = await revParseOid(projectRoot, "refs/heads/main");
+  const branch = taskBranchName(workflowId);
+  const prepared = await revParseOid(projectRoot, `refs/heads/${branch}`);
+  const current = await currentBranchOf(projectRoot);
+  if ((current !== "main" && current !== branch) || prepared && prepared.hex !== mainOid?.hex) return fail();
+  if (prepared) {
+    const reflog = await runGit(projectRoot, ["reflog", "-1", "--format=%gs", `refs/heads/${branch}`]);
+    if (!reflog.ok || reflog.stdout.trim() !== `ANS durable baseline ${marker}`) return fail();
+  }
+  if ((mainOid?.hex ?? "") !== origin.mainBefore) {
+    if (!mainOid) return fail();
+    const commit = await runGit(projectRoot, ["show", "-s", "--format=%P%n%B", mainOid.hex]);
+    const content = commit.stdout.trimEnd().replace(/\r\n/g, "\n").split("\n");
+    const changed = await runGit(projectRoot, ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", mainOid.hex]);
+    if (!commit.ok || (content[0] ?? "") !== origin.mainBefore || !content.includes(`ANS durable baseline ${marker}`)
+      || !changed.ok || changed.stdout.trim() !== ".gitignore") return fail();
+  }
+  return { ok: true, value: { reuseBranch: prepared, mainOid, onTaskBranch: current === branch } };
+}
+
+async function hasDurableInitializationMarker(projectRoot: string, marker: string): Promise<boolean> {
+  const markerFile = path.join(projectRoot, ".git", durableBaselineMarkerFile);
+  const stat = await fs.lstat(markerFile).catch(() => undefined);
+  return !!stat?.isFile() && stat.size === marker.length && await fs.readFile(markerFile, "utf8").catch(() => undefined) === marker;
+}
+
+export async function createDurableGraphBaselineGitPort(input: {
+  projectRoot: string; workflowId: string; token: string; origin: DurableBaselineOrigin; definitionFile?: string;
+}): Promise<DurableResult<BaselineGitPort>> {
+  const { projectRoot, workflowId, origin, definitionFile } = input;
+  const marker = hashSha256(`${workflowId}\0${input.token}`);
+  const proof = await proveDurableBaselineState(projectRoot, workflowId, marker, origin);
+  if (!proof.ok) return proof;
+  return { ok: true, value: {
+    ensureRepository: request => ensureRepositoryReal(request, marker, origin.repositoryBefore === "absent"),
+    ensureGitignore: request => ensureGitignoreReal(request, marker),
+    inspectWorktree: request => inspectWorktreeReal(request, definitionFile),
+    prepareTaskBranch: async request => {
+      const fresh = await proveDurableBaselineState(projectRoot, workflowId, marker, origin);
+      if (!fresh.ok) return fresh;
+      const branch = taskBranchName(workflowId);
+      const baseOid = fresh.value.mainOid;
+      if (!baseOid || request.base !== "main") return portFailure("baseline-git-init-failed", "The original main baseline is missing.");
+      if (!fresh.value.reuseBranch) {
+        const created = await runGit(projectRoot, ["update-ref", "--create-reflog", "-m", `ANS durable baseline ${marker}`,
+          `refs/heads/${branch}`, baseOid.hex, "0".repeat(baseOid.hex.length)]);
+        if (!created.ok) return portFailure("baseline-branch-exists", asMessage(created));
+      }
+      if (!fresh.value.onTaskBranch) {
+        const switched = await runGit(projectRoot, ["switch", branch]);
+        if (!switched.ok) return portFailure("baseline-repository-dirty", asMessage(switched));
+      }
+      return { ok: true, branch, baseOid, reused: fresh.value.reuseBranch !== undefined };
+    },
+  } };
+}
+
+export async function verifyDurableGraphBaseline(
+  projectRoot: string, workflowId: string, token: string, origin: DurableBaselineOrigin,
+): Promise<DurableResult<{ branch: string; oid: string }>> {
+  const marker = hashSha256(`${workflowId}\0${token}`);
+  const proof = await proveDurableBaselineState(projectRoot, workflowId, marker, origin);
+  if (!proof.ok) return proof;
+  return proof.value.reuseBranch && proof.value.onTaskBranch
+    ? { ok: true, value: { branch: taskBranchName(workflowId), oid: proof.value.reuseBranch.hex } }
+    : portFailure("workflow-baseline-reconciliation-required", "The original task branch has not been established.");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -1061,13 +1326,62 @@ export function createDesktopTaskGitPort(): TaskGitPort {
  * run-role 以固定 argv 调用 `inspectStaged`/`commit`；本适配器再复核 argv 形状后转给真实端口
  * （形态外的 argv ⇒ 失败事实/抛错，不执行）。`acquireCriticalSection` 与 B3 发布合并共用同一把锁。
  */
-export function createDesktopTaskGitShellPort(projectRoot: string): TaskGitShellPort {
+export type ClaimDurableTaskGit = (request: {
+  kind: "task-write" | "task-commit";
+  key: string;
+  expected: Readonly<Record<string, string | readonly string[]>>;
+}) => Promise<DurableResult<{
+  execute: boolean;
+  finish(outcome: DurableEffectOutcome["outcome"], evidence: string, result?: DurableEffectOutcome["result"]): Promise<void>;
+}>>;
+
+export function createDesktopTaskGitShellPort(projectRoot: string, claimDurable?: ClaimDurableTaskGit): TaskGitShellPort {
   const root = path.resolve(projectRoot);
   const port = createDesktopTaskGitPort();
   return {
     acquireCriticalSection: (owner) => port.acquireCriticalSection(root, owner),
     currentBranch: () => port.currentBranch({ projectRoot: root }),
-    add: (paths, budgets) => port.add({ projectRoot: root, paths }, budgets),
+    add: async (paths, budgets) => {
+      if (!claimDurable) return port.add({ projectRoot: root, paths }, budgets);
+      const release = port.acquireCriticalSection(root, "durable-task-add");
+      if (!release) return rejectedTaskGit("Git worktree is busy.");
+      try {
+        const invalid = taskGitAddTransportError(paths);
+        if (invalid) return rejectedTaskGit(invalid);
+        const diff = await runGit(root, ["diff", "HEAD", "--binary", "--no-ext-diff", "--", ...paths]);
+        if (!diff.ok) return rejectedTaskGit("Files to stage could not be read.");
+        const before = await durableTaskGitIndex(root);
+        if (!before) return rejectedTaskGit("The actual Git index and task branch could not be verified before staging.");
+        const effect = await claimDurable({ kind: "task-write", key: `git-add:v2:${hashSha256(JSON.stringify([before, paths, diff.stdout]))}`,
+          expected: { ...before, paths } });
+        if (!effect.ok) return rejectedTaskGit(effect.message);
+        if (!effect.value.execute) {
+          const matches = await runGit(root, ["diff", "--quiet", "--no-ext-diff", "--", ...paths]);
+          const others = await runGit(root, ["ls-files", "--others", "--exclude-standard", "-z", "--", ...paths]);
+          if (!matches.ok || !others.ok || others.stdout || !sameDurableTaskGitIndex(before, await durableTaskGitIndex(root))) {
+            return rejectedTaskGit("The previous staging receipt no longer matches the actual Git index and selected files.");
+          }
+          return { exitCode: 0, stdout: "This staging operation is already recorded.", stderr: "" };
+        }
+        const result = await port.add({ projectRoot: root, paths }, budgets);
+        const after = await durableTaskGitIndex(root);
+        const proof = { beforeIndex: before.indexDigest, ...(after ? { afterIndex: after.indexDigest,
+          afterBranch: after.branch, afterHead: after.head } : {}),
+          ...(result.exitCode === undefined ? {} : { exitCode: String(result.exitCode) }) };
+        if (result.exitCode === 0 && after?.branch === before.branch && after.head === before.head) {
+          await effect.value.finish("succeeded", "git add returned success on the verified task branch.", proof);
+          return result;
+        }
+        if (result.exitCode !== undefined && result.exitCode !== 0 && !result.error && sameDurableTaskGitIndex(before, after)) {
+          await effect.value.finish("not-started", "git add exited unsuccessfully. The task branch, HEAD and complete index are unchanged.", proof);
+          return result;
+        }
+        await effect.value.finish("unknown", "git add returned without proven index state.", proof);
+        return result.exitCode === 0 ? { ...result, error: "Git staging requires verification of the task branch and actual index." } : result;
+      } finally {
+        release();
+      }
+    },
     inspectStaged: (argv) => {
       if (!isFixedStagedInspectionArgv(argv)) {
         throw new Error(
@@ -1076,12 +1390,711 @@ export function createDesktopTaskGitShellPort(projectRoot: string): TaskGitShell
       }
       return port.inspectStaged({ projectRoot: root });
     },
-    commit: (argv, budgets) => {
+    commit: async (argv, budgets) => {
       const verdict = readFixedCommitMessage(argv);
       if (!verdict.ok) {
         return { stdout: "", stderr: verdict.error, error: verdict.error };
       }
-      return port.commit({ projectRoot: root, message: verdict.message }, budgets);
+      if (!claimDurable) return port.commit({ projectRoot: root, message: verdict.message }, budgets);
+      const before = await durableTaskGitFacts(root);
+      if (!before) return rejectedTaskGit("Task branch could not be read.");
+      const paths = await port.inspectStaged({ projectRoot: root });
+      const diff = await runGit(root, ["diff", "--cached", "--binary", "--no-ext-diff", before.head]);
+      if (!diff.ok || paths.length === 0) return rejectedTaskGit("The staged commit diff could not be established.");
+      const diffDigest = hashSha256(diff.stdout);
+      const operation = hashSha256(JSON.stringify([before.branch, before.head, paths, diffDigest, verdict.message]));
+      const key = `task-commit:${operation}`;
+      const marker = `ANS-Durable-Operation: ${operation}`;
+      const effect = await claimDurable({ kind: "task-commit", key, expected: { ...before, paths, diffDigest, marker } });
+      if (!effect.ok) return rejectedTaskGit(effect.message);
+      if (!effect.value.execute) return { exitCode: 0, stdout: "This task commit is already recorded.", stderr: "" };
+      const result = await port.commit({ projectRoot: root, message: `${verdict.message}\n\n${marker}` }, budgets);
+      const verified = await verifyDurableTaskCommit(root, { ...before, paths, diffDigest, marker });
+      await effect.value.finish(verified ? "succeeded" : "unknown",
+        verified ? "Task commit marker, parent and staged diff verified." : "Git returned without a proven task commit.",
+        verified);
+      return verified ? result : rejectedTaskGit("Task commit result requires verification.");
     },
   };
+}
+
+function rejectedTaskGit(message: string): ShellTaskGitCommandFacts {
+  return { stdout: "", stderr: message, error: message };
+}
+
+async function durableTaskGitFacts(projectRoot: string): Promise<{ branch: string; head: string } | undefined> {
+  const [head, branch] = await Promise.all([revParseOid(projectRoot, "HEAD"), currentBranchOf(projectRoot)]);
+  return head && branch ? { branch, head: head.hex } : undefined;
+}
+
+type DurableTaskGitIndex = NonNullable<Awaited<ReturnType<typeof durableTaskGitFacts>>> & { indexDigest: string };
+
+function sameDurableTaskGitIndex(before: DurableTaskGitIndex, after: DurableTaskGitIndex | undefined): boolean {
+  return after?.branch === before.branch && after.head === before.head && after.indexDigest === before.indexDigest;
+}
+
+function sameIndexFile(before: Stats, after: Stats): boolean {
+  return before.dev === after.dev && before.ino === after.ino && before.size === after.size
+    && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs;
+}
+
+function indexPathState(filePath: string): Promise<Stats | null | undefined> {
+  return fs.lstat(filePath).catch((error: NodeJS.ErrnoException) => error.code === "ENOENT" ? null : undefined);
+}
+
+async function gitIndexFileDigest(filePath: string): Promise<string | undefined> {
+  const before = await indexPathState(filePath);
+  if (before === null) return "absent";
+  if (!before?.isFile()) return undefined;
+  try {
+    const file = await fs.open(filePath, "r");
+    try {
+      if (!sameIndexFile(before, await file.stat())) return undefined;
+      const hash = createHash("sha256");
+      for await (const chunk of file.createReadStream({ autoClose: false })) hash.update(chunk);
+      return sameIndexFile(before, await file.stat()) && sameIndexFile(before, await fs.lstat(filePath)) ? hash.digest("hex") : undefined;
+    } finally {
+      await file.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
+/** Resolve the actual worktree index and include the shared file when Git uses a split index. */
+async function taskGitIndexPaths(projectRoot: string) {
+  const files = await runGit(projectRoot, ["rev-parse", "--path-format=absolute", "--git-path", "index", "--shared-index-path"]);
+  if (!files.ok) return undefined;
+  const [indexPath, sharedIndexPath, ...extra] = files.stdout.replace(/\r?\n$/, "").split(/\r?\n/);
+  if (!indexPath || !path.isAbsolute(indexPath) || extra.length || sharedIndexPath && (!path.isAbsolute(sharedIndexPath)
+    || !/^sharedindex\.(?:[a-f\d]{40}|[a-f\d]{64})$/.test(path.basename(sharedIndexPath)))) return undefined;
+  return { indexPath, sharedIndexPath, raw: files.stdout };
+}
+
+function taskGitIndexDigest(indexPath: string, primary: string, sharedIndexPath?: string, shared?: string): string {
+  return hashSha256(JSON.stringify([path.normalize(indexPath), primary, sharedIndexPath && path.normalize(sharedIndexPath), shared]));
+}
+
+async function readTaskGitIndexDigest({ indexPath, sharedIndexPath }: NonNullable<Awaited<ReturnType<typeof taskGitIndexPaths>>>) {
+  const [primary, shared] = await Promise.all([gitIndexFileDigest(indexPath), sharedIndexPath ? gitIndexFileDigest(sharedIndexPath) : undefined]);
+  return primary && (!sharedIndexPath || shared && shared !== "absent")
+    ? taskGitIndexDigest(indexPath, primary, sharedIndexPath, shared) : undefined;
+}
+
+async function durableTaskGitIndex(projectRoot: string): Promise<DurableTaskGitIndex | undefined> {
+  const [facts, files] = await Promise.all([durableTaskGitFacts(projectRoot), taskGitIndexPaths(projectRoot)]);
+  if (!facts || !files) return undefined;
+  const { indexPath } = files;
+  if (await indexPathState(`${indexPath}.lock`) !== null) return undefined;
+  const indexDigest = await readTaskGitIndexDigest(files);
+  const [current, currentFiles, lock] = await Promise.all([durableTaskGitFacts(projectRoot), taskGitIndexPaths(projectRoot), indexPathState(`${indexPath}.lock`)]);
+  if (!indexDigest || current?.head !== facts.head || current.branch !== facts.branch || currentFiles?.raw !== files.raw || lock !== null) return undefined;
+  return { ...facts, indexDigest };
+}
+
+type A11FileProof = { readonly path: string; readonly sha256: string };
+export type A11IndexExpectation = {
+  branch: string; head: string; beforeIndex: string; afterIndex: string; worktreeDigest: string; paths: readonly string[];
+  lockPid: string; lockFileId: string;
+};
+
+const a11GitOptions = ["-c", "core.fsmonitor=false", "-c", "core.ignoreStat=false"];
+const a11GitUnreadable = "无法一致读取实际 Git 分支、提交、索引或工作区。";
+const a11IndexOccupied = "原生 Git 索引锁存在或无法核验";
+const a11RefOccupied = "原生 Git 引用锁存在或无法核验";
+
+export function sameA11GitSnapshot(left: DurableA11GitObservation, right: DurableA11GitObservation): boolean {
+  const fingerprint = (value: DurableA11GitObservation) => JSON.stringify([
+    value.branch, value.head, value.indexDigest, value.stagedPaths, value.untrackedPaths, value.trackedDirty,
+    value.worktreeDigest, value.lock?.startsWith(a11IndexOccupied) || value.lock?.startsWith(a11RefOccupied) ? value.lock : undefined,
+  ]);
+  return fingerprint(left) === fingerprint(right);
+}
+
+function a11FilePaths(paths: readonly string[]): boolean {
+  return paths.length <= 128 && new Set(paths).size === paths.length
+    && paths.every(file => isTaskGitPortLiteralPath(file) && !file.endsWith("/") && !file.split("/").some(part => part.toLowerCase() === ".ans"));
+}
+
+function sameA11Paths(actual: readonly string[] | undefined, expected: readonly string[]): boolean {
+  return actual !== undefined && actual.length === expected.length
+    && JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+}
+
+async function a11LockFileId(file: string): Promise<string | null | undefined> {
+  try {
+    const info = await fs.lstat(file, { bigint: true });
+    return info.isFile() && info.ino !== 0n ? `${info.dev}:${info.ino}` : undefined;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? null : undefined;
+  }
+}
+
+async function a11LockFileRevision(file: string): Promise<string | null | undefined> {
+  try {
+    const info = await fs.lstat(file, { bigint: true });
+    return hashSha256(`${info.dev}:${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`).slice(0, 16);
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? null : undefined;
+  }
+}
+
+async function a11RefLockRevision(root: string, branch: string): Promise<string | undefined> {
+  const names = ["--git-path", "HEAD"];
+  if (branch !== "(detached)") names.push("--git-path", `refs/heads/${branch}`);
+  const resolved = await runGit(root, ["rev-parse", "--path-format=absolute", ...names]);
+  const files = resolved.ok ? resolved.stdout.trimEnd().split(/\r?\n/) : [];
+  if (files.length !== names.length / 2 || !files.every(file => path.isAbsolute(file))) return a11RefOccupied;
+  const locks = await Promise.all(files.map(file => a11LockFileRevision(`${file}.lock`)));
+  if (locks.every(lock => lock === null)) return undefined;
+  return `${a11RefOccupied}（${locks.map((lock, index) => lock === null ? undefined
+    : `${index ? "分支" : "HEAD"} ${lock ?? "身份未知"}`).filter(Boolean).join("、")}）。`;
+}
+
+async function a11FileProof(root: string, file: string, format: "sha1" | "sha256") {
+  let absolute = root;
+  const parts = file.split("/");
+  for (const part of parts.slice(0, -1)) {
+    absolute = path.join(absolute, part);
+    if (!(await fs.lstat(absolute)).isDirectory()) return undefined;
+  }
+  absolute = path.join(absolute, parts.at(-1)!);
+  const realRoot = await fs.realpath(root);
+  if (path.relative(realRoot, await fs.realpath(absolute)).split(path.sep).join("/") !== file) return undefined;
+  const before = await fs.lstat(absolute);
+  if (!before.isFile()) return undefined;
+  const handle = await fs.open(absolute, "r");
+  try {
+    if (!sameIndexFile(before, await handle.stat())) return undefined;
+    const content = createHash("sha256");
+    const blob = createHash(format).update(`blob ${before.size}\0`);
+    for await (const chunk of handle.createReadStream({ autoClose: false })) {
+      content.update(chunk);
+      blob.update(chunk);
+    }
+    if (!sameIndexFile(before, await handle.stat()) || !sameIndexFile(before, await fs.lstat(absolute))
+      || path.relative(realRoot, await fs.realpath(absolute)).split(path.sep).join("/") !== file) return undefined;
+    return { path: file, sha256: content.digest("hex"), blob: blob.digest("hex") };
+  } finally {
+    await handle.close();
+  }
+}
+
+/** Actual snapshot only. Status runs with optional writes and fsmonitor disabled. */
+export async function observeA11Git(projectRoot: string, paths?: readonly string[],
+  retained?: { index: string; refs: true }): Promise<DurableA11GitObservation> {
+  const root = path.resolve(projectRoot);
+  const unavailable = { reason: a11GitUnreadable, stagedPaths: [], untrackedPaths: [], trackedDirty: true };
+  try {
+    const [facts, index] = await Promise.all([durableTaskGitFacts(root), taskGitIndexPaths(root)]);
+    if (!facts || !index) return unavailable;
+    const lockPath = `${index.indexPath}.lock`;
+    const lock = await a11LockFileId(lockPath);
+    const lockRevision = await a11LockFileRevision(lockPath);
+    const refLock = retained?.refs ? undefined : await a11RefLockRevision(root, facts.branch);
+    const occupied = lock !== null && (retained === undefined || lock !== retained.index);
+    const status = await runGit(root, [...a11GitOptions, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames", "--ignore-submodules=none"]);
+    const entries = await runGit(root, [...a11GitOptions, "ls-files", "--stage", "-v", "-z"]);
+    const indexDigest = await readTaskGitIndexDigest(index);
+    const lockReason = occupied ? `${a11IndexOccupied}（${lockRevision ?? "身份未知"}）。${refLock ?? ""}` : refLock;
+    if (!indexDigest || !status.ok || !entries.ok) return { ...unavailable, ...facts, ...(lockReason ? { lock: lockReason } : {}) };
+    const rows = parsePorcelainZ(status.stdout);
+    const staged = rows.filter(row => !["?", " "].includes(row.status[0]!));
+    const stagedPaths = staged.map(row => row.path).sort();
+    const untrackedPaths = rows.filter(row => row.status === "??").map(row => row.path).sort();
+    const indexed = new Map<string, { mode: string; oid: string }>();
+    const dirtyFiles = rows.some(row => row.status !== "??" && row.status[1] !== " ");
+    let invalidIndexEntries = false;
+    for (const entry of entries.stdout.split("\0").filter(Boolean)) {
+      const parsed = /^H (\d{6}) ([a-f\d]{40}|[a-f\d]{64}) 0\t([\s\S]+)$/.exec(entry);
+      if (!parsed || indexed.has(parsed[3]!)) {
+        invalidIndexEntries = true;
+        continue;
+      }
+      indexed.set(parsed[3]!, { mode: parsed[1]!, oid: parsed[2]! });
+    }
+    const proofPaths = paths ?? stagedPaths;
+    const files: A11FileProof[] = [];
+    let proven = a11FilePaths(proofPaths);
+    if (proven) for (const file of [...proofPaths].sort()) {
+      const proof = await a11FileProof(root, file, facts.head.length === 64 ? "sha256" : "sha1").catch(() => undefined);
+      const entry = indexed.get(file);
+      const row = staged.find(item => item.path === file);
+      if (!proof || (row ? row.status !== "A " || !entry || !["100644", "100755"].includes(entry.mode) || entry.oid !== proof.blob
+        : !!entry || !untrackedPaths.includes(file))) {
+        proven = false;
+        break;
+      }
+      files.push({ path: proof.path, sha256: proof.sha256 });
+    }
+    const [latest, latestIndex] = await Promise.all([durableTaskGitFacts(root), taskGitIndexPaths(root)]);
+    if (latest?.branch !== facts.branch || latest.head !== facts.head || latestIndex?.raw !== index.raw
+      || await readTaskGitIndexDigest(latestIndex) !== indexDigest || await a11LockFileId(lockPath) !== lock
+      || await a11LockFileRevision(lockPath) !== lockRevision
+      || !retained?.refs && await a11RefLockRevision(root, facts.branch) !== refLock) return { ...unavailable, ...facts };
+    const reason = lockReason ?? (dirtyFiles ? "Git 工作区仍有已跟踪改动。" : invalidIndexEntries ? "Git 索引含无法核对的条目。"
+      : stagedPaths.length ? proven && untrackedPaths.length === 0 ? "原工作项提交后仍有附加文件待撤暂存。" : "暂存或工作区内容无法证明只属于原工作项。"
+        : "实际 Git 索引和已跟踪工作区已清洁。");
+    return { ...facts, indexDigest, stagedPaths, untrackedPaths, trackedDirty: dirtyFiles || invalidIndexEntries, reason, ...(lockReason ? { lock: lockReason } : {}),
+      ...(proven ? { files, worktreeDigest: hashSha256(JSON.stringify(files)) } : {}) };
+  } catch {
+    return unavailable;
+  }
+}
+
+async function prepareA11Ref(root: string, command: string, privateGitDir?: string) {
+  const hooksDir = path.join(root, ".ans", "git-home", "hooks-empty");
+  const child = spawn("git", ["-c", `core.hooksPath=${hooksDir}`, "-c", "core.filesRefLockTimeout=0", "-c", "core.packedRefsTimeout=0",
+    ...(privateGitDir ? [`--git-dir=${privateGitDir}`] : []), "update-ref", "--stdin"], {
+    cwd: root, env: await sanitizedGitEnv(root), shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
+  });
+  const stdout = createInterface({ input: child.stdout });
+  child.stderr.resume();
+  child.stdin.on("error", () => undefined);
+  let alive = true;
+  const exited = new Promise<void>(resolve => {
+    child.once("error", () => { alive = false; });
+    child.once("close", () => { alive = false; resolve(); });
+  });
+  const prepared = await new Promise<boolean>(resolve => {
+    const timeout = setTimeout(() => { resolve(false); }, GIT_TIMEOUT_MS);
+    stdout.on("line", line => {
+      if (line === "prepare: ok") {
+        clearTimeout(timeout);
+        resolve(alive);
+      }
+    });
+    void exited.then(() => { clearTimeout(timeout); resolve(false); });
+    child.stdin.write(`start\noption no-deref\n${command}\nprepare\n`);
+  });
+  if (!prepared) {
+    child.stdin.end("abort\n");
+    await exited;
+    return undefined;
+  }
+  return {
+    held: () => alive && child.exitCode === null && child.signalCode === null,
+    async release() {
+      child.stdin.end("abort\n");
+      await exited;
+    },
+  };
+}
+
+async function reserveA11Refs(root: string, branch: string, head: string) {
+  if (!/^ans\/task\/[a-zA-Z\d][a-zA-Z\d._/-]*$/.test(branch) || !/^(?:[a-f\d]{40}|[a-f\d]{64})$/.test(head)) return undefined;
+  const ref = `refs/heads/${branch}`;
+  if (!(await runGit(root, ["check-ref-format", ref])).ok) return undefined;
+  const format = await runGit(root, ["rev-parse", "--show-ref-format"]);
+  const common = await runGit(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  const commonDir = common.ok ? common.stdout.trim() : "";
+  if (!format.ok || format.stdout.trim() !== "files" || !path.isAbsolute(commonDir)) return undefined;
+
+  // The files backend automatically adds HEAD to an update of its referent. Use a detached private
+  // Git context with the same common directory to verify the branch separately from the real HEAD.
+  const temporary = await fs.mkdtemp(path.join(tmpdir(), "ans-a11-ref-"));
+  const headFile = path.join(temporary, "HEAD");
+  const commonFile = path.join(temporary, "commondir");
+  let headRef: Awaited<ReturnType<typeof prepareA11Ref>>;
+  let branchRef: Awaited<ReturnType<typeof prepareA11Ref>>;
+  let released = false;
+  const release = async () => {
+    if (released) return;
+    released = true;
+    try {
+      await branchRef?.release();
+    } finally {
+      try {
+        await headRef?.release();
+      } finally {
+        await fs.unlink(headFile).catch(() => undefined);
+        await fs.unlink(commonFile).catch(() => undefined);
+        await fs.rmdir(temporary);
+      }
+    }
+  };
+  try {
+    await fs.writeFile(headFile, `${head}\n`, { flag: "wx" });
+    await fs.writeFile(commonFile, `${commonDir}\n`, { flag: "wx" });
+    const argv = ["rev-parse", "--path-format=absolute", "--git-path", ref];
+    const actual = await runGit(root, argv);
+    const detached = await runGit(root, [`--git-dir=${temporary}`, ...argv]);
+    if (!actual.ok || !detached.ok || !path.isAbsolute(actual.stdout.trim())
+      || path.relative(actual.stdout.trim(), detached.stdout.trim()) !== "") return undefined;
+    headRef = await prepareA11Ref(root, `symref-verify HEAD ${ref}`);
+    if (!headRef?.held()) return undefined;
+    branchRef = await prepareA11Ref(root, `verify ${ref} ${head}`, temporary);
+    if (!branchRef?.held() || !headRef.held()) return undefined;
+    return { held: () => headRef!.held() && branchRef!.held(), release };
+  } finally {
+    if (!headRef?.held() || !branchRef?.held()) await release();
+  }
+}
+
+function previousA11HolderDead(pid: string): boolean {
+  if (!/^[1-9]\d{0,9}$/.test(pid) || Number(pid) > 0x7fffffff) return false;
+  try {
+    process.kill(Number(pid), 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ESRCH";
+  }
+}
+
+async function recoverA11OwnedResidual(indexPath: string, lockId: string, expected: A11IndexExpectation): Promise<Buffer | undefined> {
+  const lock = `${indexPath}.lock`;
+  if (lockId !== expected.lockFileId || !previousA11HolderDead(expected.lockPid)) return undefined;
+  const digest = await gitIndexFileDigest(lock);
+  if (!digest || taskGitIndexDigest(indexPath, digest) !== expected.afterIndex) return undefined;
+  const replacement = await fs.readFile(lock);
+  if (hashSha256(replacement) !== digest || await a11LockFileId(lock) !== lockId) return undefined;
+  await fs.unlink(lock);
+  return replacement;
+}
+
+async function reserveA11Index(indexPath: string, replacement?: Buffer) {
+  if (typeof await a11LockFileId(indexPath) !== "string") return undefined;
+  const lockPath = `${indexPath}.lock`;
+  const handle = await fs.open(lockPath, "wx");
+  let id: string | undefined;
+  try {
+    const info = await handle.stat({ bigint: true });
+    if (info.ino !== 0n) id = `${info.dev}:${info.ino}`;
+    if (!id || await a11LockFileId(lockPath) !== id) return undefined;
+    if (replacement) {
+      await handle.writeFile(replacement);
+      await handle.sync();
+    }
+  } catch (error) {
+    await handle.close();
+    if (id && await a11LockFileId(lockPath) === id) await fs.unlink(lockPath);
+    throw error;
+  } finally {
+    await handle.close();
+  }
+  return {
+    id,
+    async exchange(stillCurrent: () => boolean) {
+      if (await a11LockFileId(lockPath) !== id || !stillCurrent()) return false;
+      await fs.rename(lockPath, indexPath);
+      return true;
+    },
+    async release() {
+      if (await a11LockFileId(lockPath) === id) await fs.unlink(lockPath);
+    },
+  };
+}
+
+/** Derive the private full index by removing only the approved appended leaf entries. */
+async function prepareA11Index(root: string, indexPath: string, head: string, paths: readonly string[]): Promise<Buffer | undefined> {
+  const temporary = await fs.mkdtemp(path.join(tmpdir(), "ans-a11-index-"));
+  const indexFile = path.join(temporary, "index");
+  try {
+    await fs.copyFile(indexPath, indexFile);
+    const updated = await runGit(root, [...a11GitOptions, "--literal-pathspecs", "-c", "core.splitIndex=false",
+      "update-index", "--no-split-index", "--force-remove", "--", ...paths], { indexFile });
+    if (!updated.ok) return undefined;
+    const verified = await runGit(root, [...a11GitOptions, "diff", "--cached", "--quiet", "--no-ext-diff", head, "--"], { indexFile });
+    return verified.ok ? await fs.readFile(indexFile) : undefined;
+  } finally {
+    await fs.unlink(indexFile).catch(() => undefined);
+    await fs.unlink(`${indexFile}.lock`).catch(() => undefined);
+    await fs.rmdir(temporary);
+  }
+}
+
+/** Reconcile once under the same project lock used by governed task Git and the release gate. */
+export async function recoverA11Index(input: {
+  projectRoot: string;
+  branch: string;
+  head: string;
+  recovery?: { afterIndex: string; paths: readonly string[]; writes: readonly A11FileProof[] };
+  expected?: A11IndexExpectation;
+  allowManualWithExisting?: boolean;
+  isCurrent: () => boolean;
+  claim: (expected: A11IndexExpectation) => Promise<boolean>;
+  settle: (observation: DurableA11GitObservation | undefined) => Promise<boolean>;
+  resume: (observation: DurableA11GitObservation) => Promise<boolean>;
+}): Promise<DurableA11GitObservation> {
+  const { branch, head, recovery, expected } = input;
+  const root = path.resolve(input.projectRoot);
+  const paths = recovery?.paths;
+  const releaseProject = acquireProjectGitCriticalSection(root, "a11-index-recovery");
+  if (!releaseProject) {
+    const observation = await observeA11Git(root, paths);
+    const lock = "当前项目已有受治理的 Git 操作。";
+    return { ...observation, lock, reason: lock };
+  }
+  let activeClaim = false;
+  let reference: Awaited<ReturnType<typeof reserveA11Refs>>;
+  let indexLock: Awaited<ReturnType<typeof reserveA11Index>>;
+  let observation: DurableA11GitObservation;
+  try {
+    observation = await observeA11Git(root, paths);
+    const sameCandidate = (value: DurableA11GitObservation) => value.branch === branch && value.head === head
+      && !!value.indexDigest && !value.trackedDirty;
+    if (!input.isCurrent() || !sameCandidate(observation)) {
+      return observation.branch && observation.head && (observation.branch !== branch || observation.head !== head)
+        ? { ...observation, reason: "实际 Git 分支或当前提交与原工作项不符。" } : observation;
+    }
+    const index = await taskGitIndexPaths(root);
+    if (!index) return observation;
+    const sameFiles = (value: DurableA11GitObservation) => !!value.worktreeDigest && !!recovery
+      && JSON.stringify(value.files) === JSON.stringify([...recovery.writes].sort((a, b) => a.path < b.path ? -1 : a.path === b.path ? 0 : 1));
+    const completeBefore = (value: DurableA11GitObservation) => !!recovery && sameCandidate(value)
+      && value.indexDigest === recovery.afterIndex && sameA11Paths(value.stagedPaths, recovery.paths)
+      && value.untrackedPaths?.length === 0 && sameFiles(value);
+    const completeAfter = (value: DurableA11GitObservation, intent: A11IndexExpectation) => sameCandidate(value)
+      && value.indexDigest === intent.afterIndex && value.stagedPaths.length === 0 && sameA11Paths(value.untrackedPaths, intent.paths)
+      && sameFiles(value) && value.worktreeDigest === intent.worktreeDigest;
+    const clean = observation.stagedPaths.length === 0;
+    if (!clean && !completeBefore(observation)) return observation;
+    if (observation.lock && (!expected || !completeBefore(observation) || observation.lock.includes(a11RefOccupied))) return observation;
+    reference = await reserveA11Refs(root, branch, head);
+    if (!reference?.held()) {
+      const lock = "Git 无法保留原工作树的符号 HEAD 和批准分支引用。";
+      return { ...observation, lock, reason: lock };
+    }
+    const stillCurrent = () => reference?.held() === true && input.isCurrent();
+    if (!stillCurrent()) return observation;
+    let residual: Buffer | undefined;
+    if (observation.lock && expected) {
+      const lock = await a11LockFileId(`${index.indexPath}.lock`);
+      if (typeof lock !== "string") return observation;
+      residual = await recoverA11OwnedResidual(index.indexPath, lock, expected);
+      if (!residual) return observation;
+    }
+    if (clean) {
+      indexLock = await reserveA11Index(index.indexPath);
+      if (!indexLock) return observation;
+      observation = await observeA11Git(root, paths, { index: indexLock.id, refs: true });
+      if (!stillCurrent() || observation.lock || !sameCandidate(observation) || observation.stagedPaths.length) return observation;
+      if (expected) {
+        if (completeAfter(observation, expected)) {
+          if (!await input.settle(observation)) return observation;
+        } else if (!input.allowManualWithExisting) return observation;
+      }
+      if (stillCurrent()) await input.resume(observation);
+      return observation;
+    }
+    if (!recovery) return observation;
+    const replacement = residual ?? await prepareA11Index(root, index.indexPath, head, recovery.paths);
+    if (!replacement) return { ...observation, reason: "不能构造与原候选一致的索引后态。" };
+    if (!stillCurrent()) return observation;
+    const afterIndex = taskGitIndexDigest(index.indexPath, hashSha256(replacement));
+    if (expected && (expected.afterIndex !== afterIndex || expected.beforeIndex !== recovery.afterIndex
+      || expected.branch !== branch || expected.head !== head || expected.worktreeDigest !== observation.worktreeDigest
+      || !sameA11Paths(expected.paths, recovery.paths))) return observation;
+    indexLock = await reserveA11Index(index.indexPath, replacement);
+    if (!indexLock) return observation;
+    observation = await observeA11Git(root, paths, { index: indexLock.id, refs: true });
+    if (!stillCurrent() || observation.lock || !completeBefore(observation) || !observation.worktreeDigest) return observation;
+    const intent = { branch, head, beforeIndex: recovery.afterIndex, afterIndex, worktreeDigest: observation.worktreeDigest,
+      paths: [...recovery.paths].sort(), lockPid: String(process.pid), lockFileId: indexLock.id };
+    activeClaim = await input.claim(intent);
+    if (!activeClaim || !stillCurrent()) return observation;
+    observation = await observeA11Git(root, paths, { index: indexLock.id, refs: true });
+    if (observation.lock || !completeBefore(observation) || observation.worktreeDigest !== intent.worktreeDigest
+      || !await indexLock.exchange(stillCurrent)) return observation;
+    indexLock = await reserveA11Index(index.indexPath);
+    if (!indexLock) return observation;
+    observation = await observeA11Git(root, paths, { index: indexLock.id, refs: true });
+    if (!stillCurrent() || observation.lock || !completeAfter(observation, intent) || !await input.settle(observation)) return observation;
+    activeClaim = false;
+    if (stillCurrent()) await input.resume(observation);
+    return observation;
+  } catch {
+    const lock = "Git 索引锁、索引交换或实际后置核验未能完成。";
+    return { ...await observeA11Git(root, paths, indexLock ? { index: indexLock.id, refs: true } : undefined), lock, reason: lock };
+  } finally {
+    try {
+      if (activeClaim) await input.settle(undefined);
+    } finally {
+      try {
+        await indexLock?.release();
+      } finally {
+        try { await reference?.release(); } finally { releaseProject(); }
+      }
+    }
+  }
+}
+
+export interface AcceptanceEnvironmentGitFacts {
+  root: string;
+  branch: string;
+  head: string;
+  indexDigest: string;
+  untrackedDigest: string;
+  hasManifest: boolean;
+}
+
+export interface AcceptanceWorkspaceCandidateFile {
+  path: string;
+  bytes: Buffer;
+}
+
+export function acceptanceDependencyParent(root: string, taskId: string): string | undefined {
+  return /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,255}$/.test(taskId) ? path.join(root, ".ans", "acceptance-deps", taskId) : undefined;
+}
+
+function workspaceFilePath(value: string): boolean {
+  return value.length <= 360 && value.split("/").every(part => !!part && part !== "." && part !== ".." && !/[\\<>:"|?*\x00-\x1f]|[ .]$/.test(part)
+    && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part) && part.toLowerCase() !== ".git");
+}
+
+function readCandidateBlob(projectRoot: string, oid: string, env: NodeJS.ProcessEnv, remaining: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const blob = spawn("git", ["cat-file", "blob", oid], { cwd: projectRoot, env, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    let overflow = false;
+    const timer = setTimeout(() => blob.kill(), 8_000);
+    blob.stdout.on("data", (chunk: Buffer) => {
+      bytes += chunk.length;
+      if (bytes > Math.min(remaining, 32 * 1024 * 1024)) { overflow = true; blob.kill(); }
+      else chunks.push(chunk);
+    });
+    blob.once("error", reject);
+    blob.once("close", code => {
+      clearTimeout(timer);
+      if (code === 0 && !overflow) resolve(Buffer.concat(chunks));
+      else reject(new Error("Cannot verify bounded candidate blob."));
+    });
+  });
+}
+
+/** Copies exact regular Git blob bytes without smudge filters or links to the source worktree. */
+export async function readAcceptanceWorkspaceCandidate(projectRoot: string, candidateOid: string): Promise<AcceptanceWorkspaceCandidateFile[]> {
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(candidateOid)) throw new Error("Invalid candidate OID.");
+  const tree = await runGit(projectRoot, ["ls-tree", "-rz", "--full-tree", candidateOid]);
+  if (!tree.ok) throw new Error("Could not read the candidate tree.");
+  const entries = tree.stdout.split("\0").filter(Boolean);
+  if (!entries.length || entries.length > 500) throw new Error("Candidate file inventory exceeds the workspace limit.");
+  const candidateFiles: AcceptanceWorkspaceCandidateFile[] = [];
+  const names = new Set<string>();
+  const env = await sanitizedGitEnv(projectRoot);
+  let remaining = 96 * 1024 * 1024;
+  for (const entry of entries) {
+    const item = /^100(?:644|755) blob ([a-f0-9]{40}|[a-f0-9]{64})\t([^\n]+)$/.exec(entry);
+    if (!item || !workspaceFilePath(item[2]!) || /^(?:\.ans|node_modules)(?:\/|$)/i.test(item[2]!) || item[2]!.includes("\ufffd")
+      || names.has(item[2]!.toLowerCase())) throw new Error("Candidate contains an unsupported path or non-regular object.");
+    const [, oid, file] = item as unknown as [string, string, string];
+    names.add(file.toLowerCase());
+    const bytes = await readCandidateBlob(projectRoot, oid, env, remaining);
+    const digest = createHash(oid.length === 40 ? "sha1" : "sha256").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
+    if (digest !== oid) throw new Error("Candidate content does not match its Git object identity.");
+    remaining -= bytes.length;
+    candidateFiles.push({ path: file, bytes });
+  }
+  return candidateFiles;
+}
+
+/** Attest the installed toolchain that the app will later copy. npm's .bin shims are never used by the workspace runner. */
+export async function inspectAcceptanceDependencies(projectRoot: string, copyTo?: string): Promise<string> {
+  const source = path.join(projectRoot, "node_modules");
+  const digest = createHash("sha256");
+  const queues = [""];
+  let files = 0;
+  let byteBudget = 512 * 1024 * 1024;
+  if (copyTo) await fs.mkdir(copyTo);
+  for (const prefix of queues) {
+    const directory = path.join(source, prefix);
+    if (!(await fs.lstat(directory)).isDirectory() || path.relative(directory, await fs.realpath(directory))) {
+      throw new Error("Installed dependencies contain an unsafe directory.");
+    }
+    const entries = (await fs.readdir(directory)).sort();
+    for (const name of entries) {
+      if (name === ".bin") continue;
+      const relative = prefix ? `${prefix}/${name}` : name;
+      if (++files > 60_000 || !workspaceFilePath(relative)) throw new Error("Installed dependencies exceed the supported inventory.");
+      const file = path.join(source, relative);
+      const before = await fs.lstat(file);
+      if (before.isDirectory()) {
+        queues.push(relative);
+        if (copyTo) await fs.mkdir(path.join(copyTo, relative));
+        continue;
+      }
+      if (!before.isFile() || before.nlink !== 1 || before.size > Math.min(byteBudget, 64 * 1024 * 1024)) {
+        throw new Error("Installed dependency bytes cannot be bounded or verified.");
+      }
+      const bytes = await fs.readFile(file);
+      const after = await fs.lstat(file);
+      if (!after.isFile() || !sameIndexFile(before, after) || bytes.length !== before.size) throw new Error("An installed dependency changed while being read.");
+      digest.update(JSON.stringify([relative, bytes.length, hashSha256(bytes)]) + "\n");
+      byteBudget -= bytes.length;
+      if (copyTo) {
+        const target = path.join(copyTo, relative);
+        await fs.writeFile(target, bytes, { flag: "wx", mode: before.mode & 0o777 });
+      }
+    }
+  }
+  return digest.digest("hex");
+}
+
+/** Local installation is permitted only on the intact candidate of the original task worktree. */
+export async function readAcceptanceEnvironmentGit(
+  projectRoot: string, branch: string, candidateOid: string,
+): Promise<DurableResult<AcceptanceEnvironmentGitFacts>> {
+  const drift = { ok: false as const, code: "workflow-environment-candidate-drift", message: "本地工作树、候选、分支或暂存区无法与已批准候选核对。" };
+  try {
+    const root = await fs.realpath(projectRoot);
+    if (!path.isAbsolute(projectRoot) || path.relative(path.resolve(projectRoot), root)
+      || !(await fs.lstat(projectRoot)).isDirectory() || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(candidateOid)) return drift;
+    for (const entry of [".ans", ".ans/git-home", ".ans/git-home/hooks-empty", ".ans/git-home/gitconfig-empty"]) {
+      const file = path.join(root, entry);
+      const actual = await indexPathState(file);
+      if (actual === undefined || actual && (path.relative(file, await fs.realpath(file))
+        || (entry.endsWith("gitconfig-empty") ? !actual.isFile() || actual.size !== 0 || actual.nlink !== 1 : !actual.isDirectory()))) return drift;
+    }
+    const before = await durableTaskGitIndex(root);
+    if (before?.branch !== branch || before.head !== candidateOid) return drift;
+    const [top, status, indexFlags, packages, ignored, stateIgnored] = await Promise.all([
+      runGit(root, ["rev-parse", "--show-toplevel"]),
+      runGit(root, ["-c", "core.fsmonitor=false", "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--ignore-submodules=none"]),
+      runGit(root, ["ls-files", "-v", "-z"]),
+      runGit(root, ["ls-tree", "-z", candidateOid, "--", ".gitignore", "package.json", "package-lock.json", "node_modules"]),
+      runGit(root, ["check-ignore", "-v", "--no-index", "--", "node_modules/"]),
+      runGit(root, ["check-ignore", "-v", "--no-index", "--", ".ans/"]),
+    ]);
+    const flags = indexFlags.stdout.split("\0").filter(Boolean);
+    const entries = status.stdout.split("\0").filter(Boolean);
+    const tree = packages.stdout.split("\0").filter(Boolean);
+    const hasManifest = tree.some(entry => /^100(?:644|755) blob [a-f\d]+\tpackage\.json$/.test(entry));
+    if (!top.ok || path.relative(root, top.stdout.replace(/\r?\n$/, "")) || !status.ok || !indexFlags.ok
+      || flags.some(entry => !entry.startsWith("H ")) || entries.some(entry => !entry.startsWith("?? "))
+      || !packages.ok
+      || tree.some(entry => !/^100(?:644|755) blob [a-f\d]+\t(?:\.gitignore|package(?:-lock)?\.json)$/.test(entry))
+      || hasManifest && (!tree.some(entry => entry.endsWith("\t.gitignore")) || !ignored.ok || !/^\.gitignore:\d+:[^!\r\n]+\tnode_modules\/$/.test(ignored.stdout.trimEnd())
+        || !stateIgnored.ok || !/^\.gitignore:\d+:[^!\r\n]+\t\.ans\/$/.test(stateIgnored.stdout.trimEnd()))
+      || !sameDurableTaskGitIndex(before, await durableTaskGitIndex(root))) return drift;
+    const lock = await indexPathState(path.join(root, "package-lock.json"));
+    const committedLock = tree.some(entry => entry.endsWith("\tpackage-lock.json"));
+    if (committedLock ? !lock?.isFile() : lock !== null) return drift;
+    return { ok: true, value: { root, ...before, hasManifest, untrackedDigest: hashSha256(JSON.stringify(entries.sort())) } };
+  } catch {
+    return drift;
+  }
+}
+
+export async function verifyDurableTaskCommit(
+  projectRoot: string, expected: Readonly<Record<string, string | readonly string[]>>,
+): Promise<{ oid: string; diffDigest: string } | undefined> {
+  const { branch, head, paths, diffDigest, marker } = expected;
+  if (typeof branch !== "string" || typeof head !== "string" || typeof diffDigest !== "string" ||
+    typeof marker !== "string" || !Array.isArray(paths)) return undefined;
+  const observed = await durableTaskGitFacts(projectRoot);
+  if (!observed || observed.branch !== branch || observed.head === head) return undefined;
+  const tip = await revParseOid(projectRoot, `refs/heads/${branch}`);
+  if (!tip || tip.hex !== observed.head) return undefined;
+  const [commit, diff, names] = await Promise.all([
+    runGit(projectRoot, ["show", "-s", "--format=%P%n%B", tip.hex]),
+    runGit(projectRoot, ["diff", "--binary", "--no-ext-diff", head, tip.hex]),
+    runGit(projectRoot, ["diff", "--name-only", "-z", head, tip.hex]),
+  ]);
+  if (!commit.ok || !diff.ok || !names.ok) return undefined;
+  const [parents, ...body] = commit.stdout.trim().split(/\r?\n/);
+  const files = names.stdout.split("\0").filter(Boolean).sort();
+  if (parents !== head || !body.includes(marker) || hashSha256(diff.stdout) !== diffDigest
+    || JSON.stringify(files) !== JSON.stringify([...paths].sort())) return undefined;
+  return { oid: tip.hex, diffDigest };
 }

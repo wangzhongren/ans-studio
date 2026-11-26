@@ -153,6 +153,7 @@ export class LifecycleConsume {
               const wasBusy = en.busy; // G-2：只有真实「忙→闲」翻转才产生看护观察（重复/迟到的 settled 不重复计数）
               en.busy = false;
               en.busySince = undefined;
+              this.deps.workflowChiefStart?.wake(en.projectRoot);
               // W6-B 真机阻塞修复：settle = 来源本轮写入完成——结算所有「等这一轮收尾」的等待者
               // （`advanceGovernanceFlow` 的 appointment 时序），再放行队列。
               const settleWaiters = en.settleWaiters;

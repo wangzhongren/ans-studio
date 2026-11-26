@@ -92,17 +92,15 @@ export const CHIEF_FIXED_CARDS: readonly GovernanceCardKind[] = Object.freeze([
 ]);
 
 /**
- * fixed 矩阵下 chief 可派发的内置目标（2026-11-17 app-dispatch/v1，设计 §2.1/§6.1）。
+ * fixed 矩阵下 chief 可派发的内置目标（T3 v1.3 §3.2/§3.4 / G-IR §5.7 MF-IR-4 冻结值）：
+ * 恰 `["convener","verifier"]`——convener 仅 `purpose:"stage-request"`（产线调度请求；
+ * read-only、无 module/写集），verifier 为 review/preparation（独立验收）。
  *
- * **按设计清零为空数组**：新协议下幕僚不再派发任何 agent（只选流程、按应用 prompt 呈客户卡）；
- * 固定会话不注入 `dispatch_task`/`close_created_task`/`redispatch_task`/`terminate_role_run`，
- * 越权调用由编排谓词返回 `chief-dispatch-removed`（双保险）。空数组 = 消费方（
- * `governance-matrix` fixed 视图、fixed 谓词）fail-closed 不出任何幕僚派发路由，**不落回**
- * legacy 五内置；legacy `CHIEF_HUB_DISPATCH.targetRoleIds`（五内置）**逐字冻结**、消费点
- * （apply-journal / trunk-runtime）不改读取源。纯数据、无 I/O。
- *
- * 历史（v2.1，fixed-v2.1 在飞协议）：冻结值曾为 `["convener","verifier"]`（convener 仅
- * stage-request；verifier 为 review/preparation）；该协议的在飞 workflow 继续按 v2 资源与旧码
- * 运行直至关闭（Q10 不迁移），本字段只为新协议使用。
+ * 仅 fixed 谓词/矩阵视图消费；legacy `CHIEF_HUB_DISPATCH.targetRoleIds`（五内置）
+ * **逐字冻结**、消费点（apply-journal / trunk-runtime）不改读取源。缺失 ⇒ fixed 消费方
+ * fail-closed（不回退 legacy 五内置）。纯数据、无 I/O。
  */
-export const CHIEF_FIXED_TARGET_ROLE_IDS: readonly string[] = Object.freeze([]);
+export const CHIEF_FIXED_TARGET_ROLE_IDS: readonly string[] = Object.freeze([
+  "convener",
+  "verifier",
+]);

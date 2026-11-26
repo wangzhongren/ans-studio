@@ -1,0 +1,18 @@
+candidate_number	difference	baseline_evidence	case
+397	baseline-reproduced	w5-frozen-regression.log	store validate callback rejects directory symlink before Pi parse or new native write
+398	baseline-reproduced	w5-frozen-regression.log	Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+645	baseline-reproduced	w5-frozen-regression.log	差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+894	baseline-reproduced	w5-frozen-regression.log	差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+2678	fixed-final-targeted	w5-final-structure-and-legacy.tap	体量预算·session/**/*.ts：单模块 <= 1,500 行，且 index.ts（门面）<= 800 行
+3026	baseline-reproduced	w5-frozen-symlink-extra.tap	读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛
+3257	baseline-reproduced	w5-frozen-posix-commands.tap	F-7 放行并真实执行：引号内 `\\|` 与未加引号反斜杠前导 `\\|` 的 grep（真机证据命令口径）
+3259	baseline-reproduced	w5-frozen-posix-commands.tap	F-7-opt2：未加引号 $HOME / $(...) 拒绝；'$HOME' 引号态放行并真实执行出字面量
+5085	baseline-reproduced	w5-frozen-chief-resource.tap	B7.1 A1：首个 stage-request JSON 示例含全部精确字段（roleId=convener/taskKind/workflowAction/workflowPath=A/stage=A1/flowId/sideEffect=read-only）
+5091	baseline-reproduced	w5-frozen-chief-resource.tap	B7.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+5102	baseline-reproduced	w5-frozen-chief-resource.tap	B32.1/B32.2 既有安全语义不放宽：hash/shell/卡预算口径保留，legacy 字节与模块 pin 不变
+5107	baseline-reproduced	w5-frozen-chief-resource.tap	B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+5111	baseline-reproduced	w5-frozen-chief-resource.tap	B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+5120	baseline-reproduced	w5-frozen-chief-resource.tap	B34 既有安全语义不放宽 + legacy 不改：hash/卡预算/写区/fail-closed 口径保留；v1 字节与模块 pin 不变；v2 版本行/规模/编码有界
+5125	baseline-reproduced	w5-frozen-chief-resource.tap	B9.2 A1 精确 JSON：stage 仍为 A1；任务文本明确 A1 只受理/准备、A2 另派（B9.1 hash 口径保留）
+5130	baseline-reproduced	w5-frozen-chief-resource.tap	B9.2 冻结与资源事实：legacy 字节/模块 pin 不变；v2 版本行恰一处、≤256 KiB、无 BOM/NUL；B9.1 哈希口径保留
+5237	baseline-reproduced	w5-frozen-chief-resource.tap	Chief资源正文独立且卡只声明真实注入来源，两套workflow分开

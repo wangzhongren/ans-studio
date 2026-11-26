@@ -1,46 +1,10 @@
-export const SOURCE_REF = 'v2.1.0';
-export const SOURCE_SHA = 'c289309883c7fd2529312519de16d86ccc69d7bb';
-// v2.1.0 overlay：冻结源 tag v2.1.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 / 修改
+export const SOURCE_REF = 'v2.0.0';
+export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
+// v2.0.0 overlay：冻结源 tag v2.0.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 / 修改
 // B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化（默认路径零 trunk/bootstrap/
-// stable-write，治理走应用账本）、B29–B34 修复；`app/desktop/session.ts` 十三模块重构（barrel 30 行 +
-// 门面 + 13 协作模块，导出面 51 与 import 路径逐字不变）；全量测试债清零——三平台 5,828 用例 0 失败、
-// 冻结 known-red 62→0、B7 收口）；白名单＝**基础集 + v2.1.0 发布阻断条目（FS 诊断 + Q2 P2 darwin-x64 skip +
-// R2 timeout 硬化，共 3 条）**——files＝package.json、package-lock.json、.github/workflows/release.yml、
-// test/桌面应用/project-document.test.ts（诊断条目见下「v2.1.0 发布阻断诊断」段）、
-// test/测试/git-role-workflows-e2e.test.ts（skip 条目见下「v2.1.0 发布阻断处置」段）、
-// test/runtime-core/submit-capability-tools.test.ts（timeout 硬化条目见下「v2.1.0 发布阻断硬化」段）；
-// dirs＝src/common/装配/、test/装配/。v2.0.0 及更早的逐文件条目仍保留在 files Set 中，但对应文件已随冻结源
-// 吸收、不出现在 v2.1.0 tag→overlay 差异中（历史注释不逐条对应）。
-// v2.1.0 发布阻断诊断（arm64 Regression 27 名 UNSUPPORTED_ENVIRONMENT；run 44032276465）：测试 1 条——
-// 测试侧只加诊断、不改产品。`fs.statfs(root).type` 不在 localTypes 白名单
-// （src/provider/project-document/impl/file-reader.ts:28）时 `resolveRoot` 抛 UNSUPPORTED_ENVIRONMENT；
-// 诊断在 resolveRoot 失败路径打印 FS_DIAGNOSTIC（platform/arch/tmpdir 与 fixture root 的 statfs type，
-// 十进制+十六进制）后原样 rethrow，Service/Pipeline 的 updateListing 返回
-// documentReadUnavailable==='UNSUPPORTED_ENVIRONMENT' 时同打诊断（win32 预期 fail-closed 除外）。
-// 断言/测试名零放宽、零跳过；下一轮 arm64 日志据 FS type 数值由协调者决定扩白名单或修环境。
-// · 测试 1 条：test/桌面应用/project-document.test.ts
-// v2.1.0 发布阻断处置（Q2 P2 darwin-x64 skip，协调者裁决）：测试 1 条，测试侧只跳过 darwin-x64 的单个
-// 注册项，不改产品语义、不改其它平台、不改其它断言。发布 run 44039948085（head b8813b3）：arm64/Windows
-// 全绿；x64（macos-15-intel）Q2 P2 恰 900,098ms 撞 E3 硬上限（child 900s/父 960s），5,828 用例中仅此
-// 1 项失败；同一链此前 x64 729.88s 通过（实例波动 729s–900s+）。按 E3 规则不再抬预算：注册父测试
-// options 增加 `skip: process.platform==='darwin' && process.arch==='x64' ? q2P2DarwinX64SkipReason : undefined`
-// （理由：runner 波动 / E3 硬上限 / arm64+Windows 完整覆盖 / 发布后拆分跟进）；该平台整例标 skipped 且
-// 不执行函数体，避免 900s 触顶；测试名与断言逐字不变。528 步串行链拆分登记为发布后跟进，不阻塞 v2.1.0。
-// · 测试 1 条：test/测试/git-role-workflows-e2e.test.ts
-// v2.1.0 发布阻断硬化（R2 chief timeout 注入预算，协调者裁决）：测试 1 条，测试侧只扩大注入预算，
-// 不改产品语义、不改其它测试/断言、测试名逐字不变。发布 run 44052288470（head 3c2b844）：arm64/Windows
-// success；x64 仅 1 项失败——`R2 chief timeout is finite and normal sessions still receive injected narrow
-// capabilities`（test/runtime-core/submit-capability-tools.test.ts:539，49ms），错误体
-// `Error [TimeoutError]: demo 建立角色会话 超时（25ms）：底层操作未在时限内返回，已中止以免无限挂起。`：
-// 用例注入 `context.limits.timeoutMs = 25` 原意在 prompt 阶段人为触发有限超时，慢 x64 实例上 25ms 连会话
-// 建立都不够，TimeoutError 在 assert.rejects 作用域外抛出（该名在旧 B0/B7 基线中存在，属历史环境敏感族，
-// 本机/test-ci 常态通过）。硬化仅把注入预算 25→250ms：decide handler 永不返回，250ms 后仍必然触发超时；
-// 断言（/超时|超过|到点/、calls===1）零改动，不删除、不跳过。按精确路径、单文件不开目录。
-// · 测试 1 条：test/runtime-core/submit-capability-tools.test.ts
-// 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
-// 历史（v2.0.0 overlay）：冻结源 tag v2.0.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 /
-// 修改 B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化、B29–B34 修复）；当时白名单为
-// 基础集 + 各批发布阻断修复条目（见下）。
+// stable-write，治理走应用账本）、B29–B34 修复）；白名单为基础集 + 各批发布阻断修复条目（见下）：
+// files＝package.json、package-lock.json、.github/workflows/release.yml 及各批按精确路径列名的测试/
+// 回归文件；dirs＝src/common/装配/、test/装配/（v1.9.2 及更早条目已随冻结源吸收，见下）。
 // v2.0.0 发布阻断修复：tag v2.0.0 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽。
 // · 测试 1 条：test/桌面应用/optional-acceptance.test.ts——macOS arm64 CI Regression 挂起修复（>45 分钟
 // 被取消）：v2.0.0 起 acceptance 属幕僚业务卡、不再进通用 judge，旧夹具 `await customerInput` 永不解
@@ -261,10 +225,7 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'test/测试/g4v2-mcp-verify/f-handler.test.ts',
   'app/desktop/session.ts',
   'test/桌面应用/handback-delivery.test.ts',
-  'test/桌面应用/queue-visibility.test.ts',
-  'test/桌面应用/project-document.test.ts',
-  'test/测试/git-role-workflows-e2e.test.ts',
-  'test/runtime-core/submit-capability-tools.test.ts']);
+  'test/桌面应用/queue-visibility.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

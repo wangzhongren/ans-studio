@@ -45,7 +45,7 @@ import type { DirectiveInterpretRequest, DirectiveInterpretResult } from "../../
 import { intentArtifactPath } from "../../src/common/编排/governance-judge-intent.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
 // 2026-10-20：内置治理角色判定同样经该 Service 公开出口（看护自动中止按角色映射开关用；不复制 id 列表）。
-import { inspectPinnedBoundaries, isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
+import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
 
 import { buildProjectConfig as realBuildProjectConfig, buildEffectiveProjectConfig, deriveGovernanceRecord, deriveGovernanceRecordWithPins, readRoleDocsIndex, projectDocumentCandidates, type DocsIndexEntry, type GovernanceRecordStatus, type RoleRootDocEntry } from "./project.ts";
@@ -63,8 +63,6 @@ import { PROJECT_STATE_SCHEMA, type ProjectStateView } from "../../src/model/pro
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
 import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-channel.ts";
-// 2026-11-20（block resolver 桌面批）：shell 拒绝（a 层 judge deny/manual/retry-capped）→ block 事实。
-import { shellDenialReasonFromOperatorOutcome } from "./block-router.ts";
 // 内置治理角色审批档（客户裁定 2026-10-17；2026-10-19 新规则扩至全部内置治理角色）：审批档装配选项形状的
 // **单一来源**同样在编排（`shell-arming.ts::AssembleOperatorShellGateOptions`）——只读导入其类型，本层不另立
 // 第二形状。旧只读档（2026-10-12）类型保留兼容；桌面自 2026-10-17 起不再注入 `shellReadonly`。
@@ -460,7 +458,25 @@ export function registerPreferencesIpc(
   });
 }
 
+import {
+  durableFailure,
+  durableIdentifier,
+  durableRequest,
+  durableSelection,
+  type DesktopDurableDefinition,
+  type DesktopDurableDeliverySummary,
+  type DesktopDurableDeliveryView,
+  type DesktopDurableView,
+  type DesktopDurableWorkflow,
+} from "./durable-workflow.ts";
+import type { DurableRequestWorkflowStartFn, DurableResult } from "../../src/model/durable-workflow.ts";
+import { WorkflowChiefStart, type DesktopWorkflowStartProposal } from "./workflow-chief-start.ts";
+import { A11_STOP_COMMAND, openWorkflowStopConfirmation } from "./durable-blocked-routing.ts";
+import { MERGE_MAIN_OPTION_IDS } from "./customer-input.ts";
+
 export interface DesktopDeps {
+  durableWorkflow?: DesktopDurableWorkflow;
+  pickWorkflowDefinition?: () => Promise<string | null>;
   /** 系统文件夹选择器（由主进程用 electron dialog 注入；测试可注入假实现）。 */
   pickDirectory: () => Promise<string | null>;
   /** 会话事件外推（主进程用它 webContents.send; 测试可注入收集器）。**入参为带 `roleId` 信封的
@@ -480,6 +496,7 @@ export interface DesktopDeps {
       scope?: undefined;
       /** 客户确认制交互通道（A-1/A-3）：仅内置治理角色（su）会话注入（见 session.ts）。 */
       customerInput?: CustomerInputFn;
+      requestWorkflowStart?: DurableRequestWorkflowStartFn;
       /** 下载申请能力（2026-11-04 download-requests W-1）：每会话能力；未注入 ⇒ 工具不注册。 */
       requestDownload?: RequestDownloadFn;
       /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
@@ -630,6 +647,7 @@ export interface DesktopDeps {
    * 交互卡 + per-window pending Map + 按请求快照校验回包）构造后传入。**测试/e2e 可注入替身**。
    */
   customerInput?: DesktopCustomerInputFn;
+  hasPendingProjectCard?: (projectRoot: string) => boolean;
   /**
    * **客户授权平面控制器（C1，2026-11-03）**：main.ts 用应用运行级 `sessionId` 构造后注入（presenter/系统行
    * 由主进程接线）。`sendSession` 命中 `@审批`/`@决策` 时只调用它——**绝不**回退 `manager.send`/普通聊天；
@@ -755,6 +773,17 @@ export interface DesktopInterface {
   getSessionPersistence(input: unknown): Promise<PersistenceReply<PersistenceValues['getSessionPersistence']>>;
   pickProject(): Promise<string | null>;
   readProjectDocument(input: unknown): Promise<ReadProjectDocumentResult>;
+  listDurableWorkflows(input: unknown): Promise<DurableResult<{ definitions: DesktopDurableDefinition[]; controlPlane: DesktopDurableView["controlPlane"] }>>;
+  validateDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
+  copyDurableWorkflowPreset(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
+  importDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableDefinition>>;
+  startDurableWorkflow(input: unknown): Promise<DurableResult<DesktopDurableView>>;
+  listWorkflowStartProposals(input: unknown): Promise<DurableResult<DesktopWorkflowStartProposal[]>>;
+  revokeWorkflowStartProposal(input: unknown, isMainFrameCurrent?: () => boolean): Promise<DurableResult<DesktopWorkflowStartProposal>>;
+  getDurableWorkflowProjection(input: unknown): Promise<DurableResult<DesktopDurableView>>;
+  readDurableWorkflowDelivery(input: unknown): Promise<DurableResult<DesktopDurableDeliveryView>>;
+  acknowledgeDurableWorkflowDelivery(input: unknown): Promise<DurableResult<DesktopDurableDeliverySummary>>;
+  replayDurableReleaseDecision(input: unknown): Promise<{ ok: boolean; error?: string } | undefined>;
   disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
   /**
@@ -824,7 +853,7 @@ export interface DesktopInterface {
    * 一律不可信**：本层按**真实字节重校验**（base64 严格解码 → 魔数嗅探定类型 → ≤5MB），全过才组
    * `PromptOptions` 下发；任一张不合格 ⇒ **整条拒发**（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
    */
-  sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult>;
+  sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }, isMainFrameCurrent?: () => boolean): Promise<SendResult>;
   /**
    * **客户授权平面自然语言解释入口**（2026-11-04 客户直修；主进程内部使用，不挂 IPC）：
    * 只做判断 AI 纯理解/预填，不落账、不放行；失败返回 `{ok:false}`（控制器回退现有面板）。
@@ -1220,32 +1249,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       deliver: (root, message) => manager.watchdogDeliver(root, message),
       // B 批（2026-10-28；仅 env `ANS_LOG_AUTO_TERMINATE=auto-terminate` 时看护才回调）：
       // 终止当前轮次/子进程树；确认退出且任务已知 ⇒ 交给安全重派（外部/破坏性/未知副作用 0 次自动重派）。
-      // 2026-11-20（block resolver 桌面批）：看护 tick 同时驱动 block stall 检测/T_repair/T_remind
-      // （只提供 tick 时机；block 事实与处置全在 block router，看护判定不变）。
-      onTickProject: (root) => {
-        try {
-          manager.noteBlockTick(root);
-        } catch (error) {
-          createDiagnosticLogger({ component: "desktop.block-router", projectRoot: root }).error("block.tick.failed", error);
-        }
-      },
-      // 2026-11-20：stuck 角色终止结果作为 block 事实（终止未确认 ⇒ B5；不伪造停稳）。
       onStuckRole: (root, roleId, runtime, info) => {
         const diagnostic = createDiagnosticLogger({ component: "desktop.watchdog", projectRoot: root, roleId });
         void manager.terminateRoleRun({ projectRoot: root, roleId, runtime, ...(info.taskId !== undefined ? { taskId: info.taskId } : {}) })
           .then((result) => {
             diagnostic.record("watchdog.stuck.terminated", { state: info.state, confirmed: result.terminationConfirmed, childProcesses: result.childProcesses, stopped: result.childProcessesStopped });
-            if (!result.terminationConfirmed) {
-              manager.noteBlockFact(root, {
-                protocol: "fixed-v2.1",
-                kind: "watchdog",
-                code: "terminate-unconfirmed",
-                ...(info.taskId !== undefined ? { taskId: info.taskId } : {}),
-                ownerRoleId: roleId,
-                summary: `看护终止 ${roleId} 未确认（${info.state}）：${result.message ?? "终止未确认"}`,
-                fingerprintMaterial: ["watchdog-terminate-unconfirmed", roleId, info.taskId ?? "", info.state],
-              });
-            } else if (info.taskId !== undefined) {
+            if (result.terminationConfirmed && info.taskId !== undefined) {
               void manager.redispatchTask({ projectRoot: root, taskId: info.taskId }).then((redispatched) => {
                 diagnostic.record("watchdog.stuck.redispatch", { safety: redispatched.safety, ok: redispatched.ok, taskId: redispatched.taskId });
               });
@@ -1253,14 +1262,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           })
           .catch((error) => diagnostic.error("watchdog.stuck.terminate.failed", error));
       },
-      // 2026-10-20 真机（Convener 卡 1h、队列 24）：看护覆盖**所有角色**（含内置治理角色）——
-      // 自动开关按角色映射：内置治理角色 ↑「替我决策」、项目角色 ↑「替我审批」；关闭或未配置自动中止时限 ⇒ 只告警。
-      autoRecoveryEnabled: (root, roleId) => {
-        const builtIn =
-          listingCache.get(root)?.roles.find((role) => role.roleId === roleId)?.builtIn === true ||
-          isBuiltInGovernanceRoleId(roleId);
-        return builtIn ? decisionJudgeSwitch.isEnabled() : shellJudgeSwitch.isEnabled();
-      },
+      // The watchdog requires its own explicit positive deadline before attempting recovery.
+      autoRecoveryEnabled: () => true,
       // 自动中止（**默认禁用**，仅显式配置正时限时由看护调用）：请求停止该回合，成功后按既有投递机再
       // drain 一次（settled 前 drain 自判忙并保留；settled 后由既有路径放行）。失败只记诊断、不循环。
       onTurnDeadline: (root, roleId, runtime) => {
@@ -2156,29 +2159,27 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const versionChangeStacks = new Map<string, VersionChangeStack>();
   let stackForRef: (projectRoot: string) => VersionChangeStack | undefined = () => undefined;
 
-  // 2026-11-20（block resolver 桌面批）：shell (a) 层拒绝（judge deny/manual/retry-capped）→ block 事实。
-  // 只观察、不改判定：wrap 后原样返回 outcome（拒绝/放行/fail-closed 语义逐字不变）。
-  // 透传语义保留（源码钉/审查用）：shellOperatorChannel: deps.shellOperatorChannel
-  // —— 包装只调用同一个 deps 通道并把 outcome 原样返回；会话管理器仍是同一份 (a) 层实件。
-  const rawShellOperatorChannel: DesktopOperatorChannelFn | undefined = deps.shellOperatorChannel;
-  const shellOperatorChannelForSessions: DesktopOperatorChannelFn | undefined = rawShellOperatorChannel === undefined
-    ? undefined
-    : async (prompt, metadata) => {
-        const outcome = await rawShellOperatorChannel(prompt, metadata);
-        try {
-          const reason = shellDenialReasonFromOperatorOutcome(outcome as { outcome?: unknown; judge?: { reasonCode?: unknown; manualAsDeny?: unknown } });
-          if (reason !== undefined && metadata !== undefined) {
-            const command = typeof (prompt as { command?: unknown }).command === "string" ? (prompt as { command: string }).command : undefined;
-            manager.noteShellDenial(metadata.projectRoot, reason, command, metadata.roleId);
-          }
-        } catch (error) {
-          createDiagnosticLogger({ component: "desktop.block-router" }).error("shell-denial.observe.failed", error);
-        }
-        return outcome;
-      };
-
-  const manager = new SessionManager({
+  const workflowChiefStart = deps.durableWorkflow ? new WorkflowChiefStart({
+    durable: deps.durableWorkflow,
+    customer: deps.customerInput,
+    executeDecision: (projectRoot, runtime) => manager.durableDecisionExecutor(projectRoot, runtime),
+    selection: projectRoot => importedProjectRoot === projectRoot && registeredProjectLifecycle?.projectRoot === projectRoot
+      && listingCache.get(projectRoot)?.governanceModel === "trio" ? registeredProjectLifecycle : undefined,
+    hasActiveTurn: projectRoot => manager.hasActiveRoleTurn(projectRoot),
+    hasPendingCard: deps.hasPendingProjectCard,
+    hasActiveRun: async projectRoot => {
+      const current = await manager.activeRunViews(projectRoot);
+      return !current.ok || current.runs.length !== 0;
+    },
+  }) : undefined;
+  const manager: SessionManager = new SessionManager({
     openRoleSession: openRoleSessionFn,
+    durableWorkflow: deps.durableWorkflow,
+    workflowChiefStart,
+    readDurableReports: deps.durableWorkflow ? async input => (await getSessionHistory(input, {
+      credentialEnvNames: [...(deps.runtimeOptions?.extraCredentialEnvVars ?? []),
+        ...(deps.runtimeOptions?.apiKeyEnvVar ? [deps.runtimeOptions.apiKeyEnvVar] : [])],
+    })).reports ?? [] : undefined,
     getRegisteredProjectLifecycle: projectRoot =>
       importedProjectRoot === projectRoot && registeredProjectLifecycle?.projectRoot === projectRoot
         ? { ...registeredProjectLifecycle } : undefined,
@@ -2221,8 +2222,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // L-1 + 状态准确性：真实状态快照外推（变化时；缺省 ⇒ 界面无队列行/忙态——入队本身不受影响）。
     emitRoleState: deps.emitRoleState,
     shellGate: deps.shellGate,
-    shellOperatorChannel: shellOperatorChannelForSessions,
-    decisionDelegationEnabled: () => decisionJudgeSwitch.isEnabled(),
+    shellOperatorChannel: deps.shellOperatorChannel,
     // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件——与 (a) 同处透传（仅项目角色消费；见 session.ts）。
     shellArming: deps.shellArming,
     // 2026-10-31（判拒升级方案 v1.3 §6.4）：升级卡呈现端——SessionManager 每会话包装后交 openRoleSession；
@@ -2461,6 +2461,30 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return { projectRoot: value.projectRoot, runtime: value.runtime, roleId: value.roleId, taskId: value.taskId };
   };
 
+  let unobserveDurableProject: (() => void) | undefined;
+  let observedDurableProjectRoot: string | undefined;
+  const openedDeliveryViews = new Map<string, { projectId: string; deliveryId: string; releaseRequestId: string; token: string }>();
+
+  async function durableCall<T>(
+    input: unknown,
+    operation: (durable: DesktopDurableWorkflow, projectRoot: string, request: Record<string, unknown>, isCurrent: () => boolean) => Promise<DurableResult<T>>,
+  ): Promise<DurableResult<T>> {
+    const request = durableRequest(input);
+    const registration = registeredProjectLifecycle;
+    if (!registration || request.projectRoot !== registration.projectRoot || importedProjectRoot !== registration.projectRoot) {
+      return durableFailure("workflow-project-unselected", "Open the project using the directory picker before using durable workflows.");
+    }
+    const durable = deps.durableWorkflow;
+    if (!durable) return durableFailure("workflow-unavailable", "Durable workflow support is unavailable.");
+    try {
+      return await operation(durable, registration.projectRoot, request, () =>
+        registeredProjectLifecycle?.selectionId === registration.selectionId && importedProjectRoot === registration.projectRoot);
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.durable-workflow", projectRoot: registration.projectRoot }).error("workflow.request.failed", error);
+      return durableFailure("workflow-operation-failed", "The durable workflow operation could not be completed.");
+    }
+  }
+
   return {
     retryReportSave: input => persistenceCall('retryReportSave', input),
     getReportSaveState: input => persistenceCall('getReportSaveState', input),
@@ -2470,6 +2494,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async pickProject(): Promise<string | null> {
       let selection = 0;
       changeProjectSource([], () => {
+        openedDeliveryViews.clear();
+        workflowChiefStart?.select();
+        unobserveDurableProject?.();
+        unobserveDurableProject = undefined;
+        observedDurableProjectRoot = undefined;
         selection = ++nativeSelectionSequence;
         nativeSelection = undefined;
         registeredProjectLifecycle = undefined;
@@ -2489,8 +2518,99 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return root;
     },
     readProjectDocument(input) { return documentReader.read(input); },
+    listDurableWorkflows: input => durableCall(input, async (durable, projectRoot) => {
+      const definitions = await durable.listDefinitions(projectRoot);
+      return { ok: true, value: { definitions, controlPlane: durable.controlPlane() } };
+    }),
+    validateDurableWorkflow: input => durableCall(input, async (durable, projectRoot, request) => {
+      if (!durableIdentifier(request.definitionId)) return durableFailure("workflow-definition-invalid", "Select a workflow definition.");
+      const selection = durableSelection(request);
+      return selection.ok ? durable.validateDefinition(projectRoot, request.definitionId, selection.value) : selection;
+    }),
+    copyDurableWorkflowPreset: input => durableCall(input, async (durable, projectRoot, request) => {
+      if (!durableIdentifier(request.definitionId)) return durableFailure("workflow-definition-invalid", "Select a workflow preset.");
+      return durable.copyPreset(projectRoot, request.definitionId);
+    }),
+    importDurableWorkflow: input => durableCall(input, async (durable, projectRoot, _request, isCurrent) => {
+      if (!deps.pickWorkflowDefinition) return durableFailure("workflow-import-unavailable", "The file picker is unavailable.");
+      const selectedFile = await deps.pickWorkflowDefinition();
+      if (selectedFile === null) return durableFailure("workflow-import-cancelled", "No workflow file was selected.");
+      if (!isCurrent()) return durableFailure("workflow-project-unselected", "The selected project changed.");
+      return durable.importDefinition(projectRoot, selectedFile);
+    }),
+    startDurableWorkflow: async () => durableFailure("workflow-start-confirmation-required", mainT("main.workflowStart.approvalRequired")),
+    listWorkflowStartProposals: input => durableCall(input, async (_durable, projectRoot, _request, isCurrent) => {
+      if (!workflowChiefStart?.mode(projectRoot)) return { ok: true, value: [] };
+      const proposals = await workflowChiefStart.list(projectRoot);
+      return isCurrent() ? { ok: true, value: proposals } : durableFailure("workflow-project-unselected", "The selected project changed.");
+    }),
+    revokeWorkflowStartProposal: (input, isMainFrameCurrent) => durableCall(input, async (_durable, projectRoot, request, isCurrent) => {
+      if (!workflowChiefStart?.mode(projectRoot) || !isMainFrameCurrent?.()
+        || !durableIdentifier(request.activationId) || !durableIdentifier(request.requestId)) {
+        return durableFailure("workflow-start-revoke-unverified", mainT("main.workflowStart.approvalRequired"));
+      }
+      return workflowChiefStart.revoke(projectRoot, request.activationId, request.requestId, () => isCurrent() && isMainFrameCurrent());
+    }),
+    getDurableWorkflowProjection: input => durableCall(input, async (durable, projectRoot, request) => {
+      if (request.instanceId !== undefined && !durableIdentifier(request.instanceId)) {
+        return durableFailure("workflow-instance-invalid", "Invalid workflow instance.");
+      }
+      return { ok: true, value: durable.view(await durable.find(projectRoot, request.instanceId)) };
+    }),
+    readDurableWorkflowDelivery: input => durableCall(input, async (durable, projectRoot, request, isCurrent) => {
+      const { instanceId, deliveryId } = request;
+      if (!durableIdentifier(instanceId) || !durableIdentifier(deliveryId)) {
+        return durableFailure("workflow-delivery-invalid", "Choose a workflow instance and its delivery explanation.");
+      }
+      const result = await durable.findDelivery(projectRoot, instanceId, deliveryId);
+      if (!result.ok) return result;
+      if (!isCurrent()) return durableFailure("workflow-project-unselected", "The selected project changed.");
+      const { ref, delivery } = result.value;
+      const opened = openedDeliveryViews.get(instanceId);
+      const token = opened?.projectId === ref.projectId && opened.deliveryId === deliveryId
+        && opened.releaseRequestId === delivery.releaseRequestId ? opened.token : randomUUID();
+      openedDeliveryViews.set(instanceId, { projectId: ref.projectId, deliveryId, releaseRequestId: delivery.releaseRequestId, token });
+      return { ok: true, value: { delivery, viewToken: token } };
+    }),
+    acknowledgeDurableWorkflowDelivery: input => durableCall(input, async (durable, projectRoot, request, isCurrent) => {
+      const { instanceId, deliveryId, viewToken } = request;
+      if (!durableIdentifier(instanceId) || !durableIdentifier(deliveryId) || !durableIdentifier(viewToken)) {
+        return durableFailure("workflow-delivery-invalid", "The delivery view identity is invalid.");
+      }
+      const opened = openedDeliveryViews.get(instanceId);
+      if (!opened || opened.token !== viewToken || opened.deliveryId !== deliveryId) {
+        return durableFailure("workflow-delivery-not-opened", "Open the delivery explanation in this window before acknowledging it.");
+      }
+      const result = await durable.findDelivery(projectRoot, instanceId, deliveryId);
+      if (!result.ok) return result;
+      const { ref, delivery } = result.value;
+      if (opened.projectId !== ref.projectId || opened.releaseRequestId !== delivery.releaseRequestId) {
+        return durableFailure("workflow-delivery-not-opened", "This delivery explanation no longer matches the opened view.");
+      }
+      return durable.acknowledgeDelivery(ref, delivery, isCurrent);
+    }),
+    async replayDurableReleaseDecision(input) {
+      const durable = deps.durableWorkflow;
+      const selection = registeredProjectLifecycle;
+      const { id, decision } = durableRequest(input);
+      if (!durable || !selection || typeof id !== "string" || !/^rel-[a-f0-9]{24}-decision$/.test(id)) return undefined;
+      const value = durableRequest(decision);
+      if (value.kind !== "choice" || value.cancelled || !Array.isArray(value.selected) || value.selected.length !== 1
+        || !MERGE_MAIN_OPTION_IDS.includes(value.selected[0])) return undefined;
+      const projections = await (await durable.store()).listProjections(selection.projectRoot);
+      if (registeredProjectLifecycle?.selectionId !== selection.selectionId) return undefined;
+      const previous = projections.find(projection => projection.release?.requestId === id)?.release?.decision;
+      if (!previous) return undefined;
+      return previous.action === (value.selected[0] === MERGE_MAIN_OPTION_IDS[0] ? "approve" : "reject")
+        ? { ok: true } : { ok: false, error: "A different decision was already recorded for this release." };
+    },
     disposeProjectDocuments() {
       changeProjectSource([], () => {
+        openedDeliveryViews.clear();
+        workflowChiefStart?.select();
+        unobserveDurableProject?.();
+        unobserveDurableProject = undefined;
+        observedDurableProjectRoot = undefined;
         ++nativeSelectionSequence; nativeSelection = undefined; registeredProjectLifecycle = undefined;
         documentReader.dispose();
       });
@@ -2515,17 +2635,6 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (report.restored > 0) {
           createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).record("tasks.restored", { count: report.restored });
         }
-        // 2026-11-17（app-dispatch/v1 第一步）：启动/打开项目对账（只处理 app-dispatch/v1；旧协议在服务层
-        // 跳过，不动在飞 fixed-v2.1）。幂等修复 + 桌面投递一致性（未送达的应用任务重新入队）。
-        return manager.reconcileAppDispatch(listing.projectRoot).then((summary) => {
-          if (summary.corrupt.length > 0 || summary.errors.length > 0) {
-            createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).record("app-dispatch.reconcile.issues", {
-              workflows: summary.activeWorkflows,
-              corrupt: summary.corrupt.length,
-              errors: summary.errors.length,
-            });
-          }
-        });
       }).catch((error) => {
         createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).error("tasks.restore.failed", error);
       });
@@ -2604,9 +2713,20 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (picked && path.resolve(picked.root) === path.resolve(listing.projectRoot)) {
           registeredProjectLifecycle = { selectionId: picked.selectionId, selectedRoot: picked.root, projectRoot: listing.projectRoot,
             source: "native-directory-selection", selectedAt: picked.selectedAt, listingGeneration: generation };
+          workflowChiefStart?.select(listing.projectRoot);
+          if (observedDurableProjectRoot !== listing.projectRoot) {
+            unobserveDurableProject?.();
+            unobserveDurableProject = manager.observeDurableProject(listing.projectRoot);
+            observedDurableProjectRoot = listing.projectRoot;
+          }
         } else if (registeredProjectLifecycle?.projectRoot !== listing.projectRoot) {
+          openedDeliveryViews.clear();
+          workflowChiefStart?.select();
           registeredProjectLifecycle = undefined;
           nativeSelection = undefined;
+          unobserveDurableProject?.();
+          unobserveDurableProject = undefined;
+          observedDurableProjectRoot = undefined;
         }
       });
       const documentListing = documentReader.updateListing(documentSequence, listing.projectRoot, roles.map(projectDocumentCandidates));
@@ -3069,7 +3189,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return result;
     },
 
-    async sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult> {
+    async sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }, isMainFrameCurrent?: () => boolean): Promise<SendResult> {
       const customerTarget = resolveDirectiveTarget(input?.target);
       if (!customerTarget.ok || customerTarget.roleId !== "chief") {
         return { ok: false, error: mainT("ui.composer.customerEntryChiefOnly") };
@@ -3078,7 +3198,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const customerMetadata: SessionMessageMetadata | undefined = typeof input?.metadata?.clientMessageId === "string"
         ? { clientMessageId: input.metadata.clientMessageId } : undefined;
       const text = input && typeof input.text === "string" ? input.text : "";
+      const ordinaryMetadata = () => {
+        const workflowInput = workflowChiefStart?.issueInput(customerTarget.projectRoot, text, isMainFrameCurrent);
+        return workflowInput ? { ...customerMetadata, workflowInput } : customerMetadata;
+      };
       const rawImages = input && Array.isArray(input.images) ? input.images : [];
+      if (text.trim() === A11_STOP_COMMAND) {
+        if (rawImages.length || !isMainFrameCurrent?.()) {
+          return { ok: false, error: "请在当前项目主窗口的幕僚输入框单独输入停止指令。" };
+        }
+        const result = await durableCall({ projectRoot: customerTarget.projectRoot }, (durable, projectRoot, _request, isCurrent) =>
+          openWorkflowStopConfirmation(durable, projectRoot, () => isCurrent() && isMainFrameCurrent()));
+        return result.ok ? { ok: true } : { ok: false, error: result.message };
+      }
       // —— 客户授权平面（C1，2026-11-03）：**先**解析标记（纯函数、零副作用），早于图片校验/manager.send。——
       // 命中：带图 ⇒ 直接拒绝（不解码、不投递、不落账）；无图 ⇒ 只调用指令控制器（绝不 manager.send/handle.send），
       // 不产生角色轮次、不写 lastUserText/inputAccepted/turnId/outcome/sessionCurrent、不发 session:events。
@@ -3117,7 +3249,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 逐张：严格 base64 解码 → 魔数嗅探定类型（声明 mime 不作数）→ ≤5MB；**全过才放行**，
       // 任一张不合格 ⇒ 整条拒发（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
       if (rawImages.length === 0) {
-        return manager.send(text, undefined, customerTarget, customerMetadata);
+        return manager.send(text, undefined, customerTarget, ordinaryMetadata());
       }
       const cleaned: PromptImage[] = [];
       for (const it of rawImages) {
@@ -3141,7 +3273,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       // 组**契约形状** `PromptOptions`（单一来源 `src/model/runtime.ts`）——之后整包同一引用透传。
       const opts: PromptOptions = { images: cleaned };
-      return manager.send(text, opts, customerTarget, customerMetadata);
+      return manager.send(text, opts, customerTarget, ordinaryMetadata());
     },
 
     async stopSession(input?: { roleId?: string | null; projectRoot?: string; runtime?: RuntimeKind }): Promise<StopResult> {

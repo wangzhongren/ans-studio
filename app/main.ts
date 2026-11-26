@@ -49,6 +49,7 @@ import {
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
 import { createCustomerInputChannel, type AutoReworkCallbackInfo } from "./desktop/customer-input.ts";
+import { DesktopDurableWorkflow, durableFailure } from "./desktop/durable-workflow.ts";
 // 客户授权平面（C1，2026-11-03）：主进程侧指令控制器——每项目 B1 Pipeline 公共句柄、确认面板、
 // 指令 IPC 与 `directivesEnabled` 能力位；系统行复用既有 delivery-note（A3 文案）。
 import { createDirectiveInputController } from "./desktop/directive-input.ts";
@@ -87,6 +88,7 @@ if (smokeRequest) {
   app.setPath("userData", smokeRequest.userDataPath);
 }
 let desktopEnvPath: string | undefined;
+let durableWorkflow: DesktopDurableWorkflow | undefined;
 // i18n B0（2026-10-23）：启动早期读取偏好后设置；默认 zh-CN（读不到/损坏时保持默认，不阻塞启动）。
 // main.ts 与 Interface 共享同一 translator 实例——窗口标题、对话框、启动错误框与 IPC 错误文案同一 locale。
 const mainI18n = createMainI18n();
@@ -100,7 +102,7 @@ let initialJudgeSwitches: JudgeSwitchesPreference = DEFAULT_JUDGE_SWITCHES;
  * **状态本体在模块级**：同一次应用运行内**跨窗口重开保留**（macOS `activate` 重建窗口时仍是同一实例）；
  * 应用重启时模块重新初始化 ⇒ **清零**并回到持久化开关值。**不写偏好、不持久化**。
  * **只作用于 shell 操作者通道**（有效 `isEnabled = shellJudgeSwitch.isEnabled() && !paused`）：
- * 不改持久化开关值、**不影响治理 approval 组**（客户交互通道的判断组仍只看全局开关）。
+ * 不改持久化开关值，命令暂停随窗口关闭释放。
  */
 const shellSessionPaused = createShellSessionPauseState();
 /**
@@ -348,7 +350,7 @@ function registerIpc(win: BrowserWindow): void {
   // 两个**独立**状态机：启动初值来自应用偏好（2026-10-29 客户缺陷修复）、跨渲染重载保持、互不影响；
   // 变更由 Interface 经偏好服务持久化到 userData（不写项目文件）。只在主进程内存中**当前值**由两处共享。
   // 同一实例交给通道（调用当刻读 `isEnabled()`）与 Interface（`shell:judge-*` / `decision:judge-*`），
-  // 两处永不漂移。代码符号沿用 `shellJudgeSwitch`（approval 组现为「shell + 写盘族」），通道名不改。
+  // 命令审批和业务决策各读自己的开关。
   const shellJudgeSwitch = createShellJudgeSwitch(initialJudgeSwitches.approval);
   const decisionJudgeSwitch = createDecisionDelegationSwitch(initialJudgeSwitches.decision);
   win.webContents.on("did-start-loading", () => { decisionJudgeSwitch.set({ enabled: decisionJudgeSwitch.isEnabled() }); });
@@ -621,10 +623,9 @@ function registerIpc(win: BrowserWindow): void {
         event: { kind: "message", summary: event.summary, detail: { source: "delivery-note" } },
       });
     },
-    // 判断 agent（2026-10-18 双开关评审 §8.1/§8.3）：按卡种所属组读**各自**开关（主进程权威）；
-    // 两开关互不影响；判断闭包由每会话上下文（`ctx.governanceJudge`）提供。
+    // 通用治理卡只接业务决策开关。命令开关由独立的 shell 操作者通道读取。
     judge: {
-      isGroupEnabled: (group) => (group === "approval" ? shellJudgeSwitch.isEnabled() : decisionJudgeSwitch.isEnabled()),
+      isGroupEnabled: (group) => group === "decision" && decisionJudgeSwitch.isEnabled(),
     },
     // 代批结果行：推达失败**必须抛错**（结果行是 approve 的条件，通道据此回落 manual/row-failed）。
     emitJudgeResult: (payload) => {
@@ -717,7 +718,7 @@ function registerIpc(win: BrowserWindow): void {
   });
   // 2026-10-31（判拒升级方案 v1.3 §4.6/§6.5(e)/§7.2）：**「本次运行暂停自动审批」**——
   // 独立状态（模块级 `shellSessionPaused`），**只影响 shell 操作者通道**的 `isEnabled()`：
-  // 不写偏好、不改持久化开关、不影响治理 approval 组；sender 校验沿用既有 `shell:judge-*` 模式。
+  // 暂停应用命令审批，持久开关和 sender 校验沿用 `shell:judge-*` 模式。
   registerHandler("shell:judge-pause", (event, input) => {
     if (!isShellJudgeIpcSender(event.sender, win.webContents)) {
       shellJudgeLog.record("shell-judge.pause.rejected", { reason: "sender-mismatch" });
@@ -795,8 +796,7 @@ function registerIpc(win: BrowserWindow): void {
     shellArming !== undefined
       ? buildDesktopOperatorChannel(shellConfirm.presenter, {
           // 2026-10-31（判拒升级方案 §4.6）：**有效值 = 持久化开关 && !本次运行暂停**。
-          // 暂停是 shell-only 的临时覆盖：不动持久化开关，也不影响治理 approval 组（后者在
-          // `customerChannel` 的 `isGroupEnabled` 里仍只读 `shellJudgeSwitch`）。
+          // 命令暂停是窗口内的临时覆盖，持久开关按原设置读取。
           isEnabled: () => shellJudgeSwitch.isEnabled() && !shellSessionPaused.isPaused(),
           // 推达失败**必须抛错**：allow 的结果行是放行条件（通道据此降级 manual/row-failed）。
           emitJudgeResult: (payload) => {
@@ -810,6 +810,7 @@ function registerIpc(win: BrowserWindow): void {
   if (!preferencesPath) throw new Error("语言偏好路径尚未初始化。");
   const desktop = createDesktopInterface({
     envFilePath: desktopEnvPath,
+    durableWorkflow,
     // P2（2026-10-30）：网络状态门经运行时选项透传（Service → Provider → 适配器 deadline 暂停/恢复）；
     // 同一实例经 Interface 交给 SessionManager（离线队列保留、恢复继续）。
     runtimeOptions: { networkGate: networkMonitor.gate },
@@ -832,6 +833,13 @@ function registerIpc(win: BrowserWindow): void {
       if (result.canceled || result.filePaths.length === 0) return null;
       return result.filePaths[0];
     },
+    pickWorkflowDefinition: async () => {
+      const result = await dialog.showOpenDialog(win, {
+        properties: ["openFile"],
+        filters: [{ name: "YAML", extensions: ["yaml", "yml"] }],
+      });
+      return result.canceled ? null : result.filePaths[0] ?? null;
+    },
     emitEvent,
     // L-1 + 状态准确性 + 右栏「待办 / 队列」（2026-10-12 追加）：真实状态快照（busy × 队列[结构化] × 进行中，
     // 变化时）原样透传渲染侧——徽标「工作中 · N 待办」、队列行与右栏待办组都只信它（同一通道，不造第二套）。
@@ -850,6 +858,7 @@ function registerIpc(win: BrowserWindow): void {
     },
     // 客户交互通道（A-5）：仅内置治理角色（su）会话消费（见 session.ts 的注入判据）。
     customerInput: customerChannel.customerInput,
+    hasPendingProjectCard: projectRoot => customerChannel.hasPendingProjectCard(projectRoot),
     // 2026-11-04 trunk-amendment-model D1：`trunk:state` 单一状态源推送（主→渲；事件去抖在 Interface）。
     emitTrunkState: (payload) => {
       if (!win.isDestroyed()) win.webContents.send("trunk:state", payload);
@@ -962,12 +971,43 @@ function registerIpc(win: BrowserWindow): void {
 
   // 交互回包（A-5）：渲染侧提交决定 → 通道按**请求快照**校验（选项 id ⊆ 已发、单选恰一个、类型相符）
   // → 解挂为冻结三态；非法回包不受理（pending 保留，界面可重试失败后修正）。
-  registerHandler("session:operator-response", (_e, input) =>
-    customerChannel.respond(input && typeof input === "object" ? input : {}),
-  );
+  registerHandler("session:operator-response", async (event, input) => {
+    const isMainFrameCurrent = () => !win.isDestroyed() && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;
+    const invalid = { ok: false, error: "Invalid customer decision source." };
+    if (!isMainFrameCurrent()) return invalid;
+    const response = input && typeof input === "object" ? input : {};
+    const durable = await customerChannel.respondDurable(response, isMainFrameCurrent);
+    if (durable) return durable;
+    if (!isMainFrameCurrent()) return invalid;
+    const replay = await desktop.replayDurableReleaseDecision(response);
+    return isMainFrameCurrent() ? replay ?? customerChannel.respond(response) : invalid;
+  });
 
   registerHandler("app:pick-project", () => desktop.pickProject());
   registerHandler("project:document-read", (_e, input) => desktop.readProjectDocument(input));
+  const workflowSourceError = () => durableFailure("workflow-source-invalid", "Invalid workflow request source.");
+  registerHandler("durable-workflow:list", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.listDurableWorkflows(input) : workflowSourceError());
+  registerHandler("durable-workflow:validate", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.validateDurableWorkflow(input) : workflowSourceError());
+  registerHandler("durable-workflow:preset-copy", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.copyDurableWorkflowPreset(input) : workflowSourceError());
+  registerHandler("durable-workflow:import", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.importDurableWorkflow(input) : workflowSourceError());
+  registerHandler("durable-workflow:start", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.startDurableWorkflow(input) : workflowSourceError());
+  registerHandler("durable-workflow:start-proposals", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.listWorkflowStartProposals(input) : workflowSourceError());
+  registerHandler("durable-workflow:start-proposal-revoke", (event, input) => {
+    const isMainFrameCurrent = () => !win.isDestroyed() && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;
+    return isMainFrameCurrent() ? desktop.revokeWorkflowStartProposal(input, isMainFrameCurrent) : workflowSourceError();
+  });
+  registerHandler("durable-workflow:projection", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.getDurableWorkflowProjection(input) : workflowSourceError());
+  registerHandler("durable-workflow:delivery-read", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.readDurableWorkflowDelivery(input) : workflowSourceError());
+  registerHandler("durable-workflow:delivery-acknowledge", (event, input) =>
+    event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame ? desktop.acknowledgeDurableWorkflowDelivery(input) : workflowSourceError());
   registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
   registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
   registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));
@@ -1047,7 +1087,10 @@ function registerIpc(win: BrowserWindow): void {
     if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
     return desktop.requestTrunkRecover(input);
   });
-  registerHandler("session:send", (_e, input: Parameters<DesktopInterface["sendSession"]>[0]) => desktop.sendSession(input));
+  registerHandler("session:send", (event, input: Parameters<DesktopInterface["sendSession"]>[0]) => {
+    const isMainFrameCurrent = () => !win.isDestroyed() && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;
+    return isMainFrameCurrent() ? desktop.sendSession(input, isMainFrameCurrent) : { ok: false, error: "Invalid customer input source." };
+  });
   // —————— 客户授权平面（C1，2026-11-03）：渲→主 invoke 三通道（sender 校验同既有模式）——————
   // `directive:confirm-request`/`directive:state` 只做主→渲推送，无入站 handler。
   registerHandler("directive:confirm-response", (event, input) => {
@@ -1195,6 +1238,12 @@ app.whenReady().then(async () => {
   // Resolve once after Electron initialization; package resources are never the settings write target.
   const userDataPath = app.getPath("userData");
   if (app.isPackaged) await fs.promises.mkdir(userDataPath, { recursive: true, mode: 0o700 });
+  durableWorkflow = new DesktopDurableWorkflow({
+    userDataRoot: path.join(userDataPath, "ans", "durable-workflow"),
+    resourceRoot: app.isPackaged ? process.resourcesPath : app.getAppPath(),
+    presetRoot: app.getAppPath(),
+  });
+  void durableWorkflow.resume().catch(error => mainDiagnostic.error("workflow.recovery.failed", error));
   // i18n B0（2026-10-23）：建窗前**尽早**读取应用级语言偏好（`<userData>/ans/preferences.json`）。
   // 缺失 ⇒ zh-CN 且**不写文件**；损坏/不可读/非法 locale/未知 version ⇒ zh-CN + 稳定诊断，不阻塞启动。
   preferencesPath = preferencesFilePath(userDataPath);
@@ -1279,11 +1328,15 @@ process.on("unhandledRejection", (error) => {
   showMainFailure?.(); // 明确显示故障，不把被拒绝的业务当成功或自动重发。
 });
 let diagnosticsFlushed = false;
+let closingApplication = false;
 app.on("before-quit", (event) => {
   if (diagnosticsFlushed) return;
   event.preventDefault();
+  if (closingApplication) return;
+  closingApplication = true;
   mainDiagnostic.record("app.quit");
-  void flushDiagnostics().then(() => disposeDiagnostics()).finally(() => {
+  void Promise.resolve(durableWorkflow?.close()).catch(error => mainDiagnostic.error("workflow.shutdown.failed", error))
+    .then(() => flushDiagnostics()).then(() => disposeDiagnostics()).finally(() => {
     diagnosticsFlushed = true;
     app.quit();
   });

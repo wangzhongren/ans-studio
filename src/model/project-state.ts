@@ -194,14 +194,7 @@ export interface ProjectStateTask {
   lastReport?: ProjectStateReportedEvent;
   closed?: { outcome: ProjectStateClosedOutcome; note?: string; at: string };
   reports: ProjectStateReportedEvent[];
-  /**
-   * 任务创建者（冻结结构镜像字段：与 `TaskCardView` 双向可赋值的旧契约只含 chief/convener）。
-   * 2026-11-17（app-dispatch/v1）：应用创建的 fixed 任务运行时值可为 `"application"`（如实保留）；
-   * 需要按创建者分支的新消费者请读可选 `creator`（含 application）；旧消费者按未知来源 fail-closed/忽略。
-   */
   from: "chief" | "convener";
-  /** 2026-11-17（app-dispatch/v1）：真实任务创建者（含 `"application"`）；旧记录缺省 = `from`。 */
-  creator?: "chief" | "convener" | "application";
   blocked: boolean;
   failed: boolean;
   redispatchCount: number;
@@ -292,41 +285,6 @@ export interface ProjectStateCounts {
   tasks: number;
 }
 
-// —————————————— Block 生命周期只读派生（2026-11-20 block resolver 地基） ——————————————
-//
-// 依据：`docs/planning/2026-11-20_design_block-resolution-paths.md` §5.2/§7.5。
-// 只读展示 `.ans/state/blocks.jsonl` 的 open blocks（raised/routed/escalated；escalated 不是终态）；
-// 不改变 workflows/tasks 投影，不引入第二套阶段状态；旧记录无本字段 = 兼容。
-
-/** open block 状态（resolved 不在此视图；escalated 等待新 routed）。 */
-export type ProjectStateOpenBlockStatus = "raised" | "routed" | "escalated";
-
-/** open block 摘要（blockId/类/状态/责任方/等待对象/年龄/证据入口）。 */
-export interface ProjectStateOpenBlock {
-  blockId: string;
-  /** 9 类之一（missing-resource/.../budget-quota）。 */
-  class: string;
-  /** `B1`..`B9`（展示/审计编码）。 */
-  classCode: string;
-  status: ProjectStateOpenBlockStatus;
-  owner?: string;
-  waitingOn?: "engine" | "role" | "judge" | "customer";
-  ageMs?: number;
-  evidenceRefs: string[];
-  workflowId?: string;
-  flowId?: string;
-  stage?: string;
-  taskId?: string;
-  summary: string;
-  /** 最近一次路由（2026-11-20 R1 收尾修补）：修复任务/卡链接（旧记录可缺席）。 */
-  routeKind?: string;
-  routeReason?: string;
-  routeAttempt?: number;
-  routeTargetRoleId?: string;
-  routeTaskId?: string;
-  cardRequestId?: string;
-}
-
 /** `project-state/v1` 完整只读视图（UI 与工具同一 builder；工具只做文本投影）。 */
 export interface ProjectStateView {
   schema: typeof PROJECT_STATE_SCHEMA;
@@ -343,11 +301,6 @@ export interface ProjectStateView {
   errors: ProjectStateError[];
   truncated: boolean;
   counts: ProjectStateCounts;
-  /**
-   * 2026-11-20（block resolver 地基）：open blocks 只读派生；缺席 = 无 open block 或旧记录
-   * （**加法可选**，旧消费者读取不变）。
-   */
-  openBlocks?: ProjectStateOpenBlock[];
 }
 
 // —————————————— 工具输入/回执（只读视图 + 受控备注 + 版本决策申请） ——————————————

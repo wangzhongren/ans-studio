@@ -26,7 +26,6 @@ import type {
   BasisEvent,
   BasisTeamPlanRef,
   FixedActivateRoleDocumentsInput,
-  FixedTaskKind,
   ReleaseConfirmedEvent,
   ReleaseEvent,
   ReleaseFailedEvent,
@@ -37,34 +36,25 @@ import type {
   ReleaseRequestedEvent,
   RequestResolvedEvent,
   TaskClosedOutcome,
-  TaskCreatedEvent,
-  TaskSideEffect,
   TaskStateEvent,
-  WorkflowAcceptanceStrength,
   WorkflowAction,
   WorkflowArtifactRef,
   WorkflowClosedOutcome,
   WorkflowDocumentRef,
   WorkflowEvent,
   WorkflowPath,
-  WorkflowProtocol,
   WorkflowRepoSnapshot,
   WorkflowStage,
-  WorkflowStageExecutorKind,
 } from "../../model/runtime.ts";
 import {
   BASIS_LEDGER_SCHEMA,
   RELEASE_LEDGER_SCHEMA,
   WORKFLOW_LEDGER_SCHEMA,
-  WORKFLOW_PROTOCOL_APP_DISPATCH,
-  WORKFLOW_PROTOCOL_FIXED_V2_1,
   isBasisEvent,
   isReleaseEvent,
-  isWorkflowAcceptanceStrength,
   isWorkflowEvent,
   isWorkflowPath,
   isWorkflowStage,
-  workflowProtocolOf,
 } from "../../model/runtime.ts";
 import type { BoundaryEntry } from "../../model/boundary.ts";
 import type { GitOid } from "../../model/trunk.ts";
@@ -80,32 +70,17 @@ import {
 } from "../shared/jsonl-ledger.ts";
 import { ANS_DIR_NAME, ansProjectPath, loadEffectiveConfig } from "../shared/config-loader.ts";
 import { readIntentEntryFacts } from "../shared/intent-entry-contract.ts";
-import {
-  appendTaskEvent,
-  findTaskByIdempotencyKey,
-  newTaskId,
-  readTaskState,
-  taskEvent,
-  type TaskRecord,
-} from "./task-state.ts";
+import { appendTaskEvent, newTaskId, readTaskState, taskEvent, type TaskRecord } from "./task-state.ts";
 import {
   WORKFLOW_CORRUPT_CODE,
   WORKFLOW_REWORK_FALLBACKS,
   canCompleteStage,
   canDispatchStage,
   canRequestStage,
+  currentWorkflowValidation,
   deriveWorkflowView,
   type WorkflowView,
 } from "./workflow-state.ts";
-import {
-  ACCEPTANCE_STRENGTHS,
-  getWorkflowDefinition,
-  workflowDefinitionIdForPath,
-  type AcceptanceStrength,
-  type WorkflowCardDefinition,
-  type WorkflowDefinition,
-  type WorkflowStageDefinition,
-} from "./workflow-definitions.ts";
 import {
   DEFAULT_REVIEW_ROLE_ID,
   loadLatestRoster,
@@ -123,14 +98,9 @@ import {
   verifyBasisDocuments,
 } from "./basis-guard.ts";
 import { stageRequestIdempotencyKey, stageStopIdempotencyKey } from "./workflow-dispatch.ts";
-import {
-  blockFactFromReconcileReceipt,
-  blockFactFromServiceFailure,
-  blockFactFromTaskReport,
-  type BlockFact,
-  type BlockDispatchRejectionInput,
-} from "./block-resolution.ts";
-import { readBlockLedger, replayBlockLifecycles } from "./block-ledger.ts";
+import { changeWorkspaceOwner, releaseOwner, repositoryIdentity, repositoryOwner, reserveOwner, reserveWorkspace,
+  workspaceIdentity, workspaceOwner } from "../../provider/durable-workflow/public.ts";
+import type { RepositoryIdentity } from "../../provider/durable-workflow/public.ts";
 
 // —————————————— 账本路径 / schema / 轮转 ——————————————
 
@@ -246,6 +216,8 @@ function appendFixedLedgerEvent<T extends { idempotencyKey: string }>(
 
 /** `ans-workflow/v1`（`.ans/state/workflows.jsonl`）读取；坏行计数不阻塞。 */
 export function readWorkflowLedger(projectRoot: string): Promise<FixedLedgerReadResult<WorkflowEvent>> {
+  const context = currentWorkflowValidation(projectRoot);
+  if (context) return Promise.resolve({ files: [], events: [...context.events], errors: [], badLines: 0, ignoredLines: 0 });
   return readFixedLedger(workflowsStatePath(projectRoot), isWorkflowEvent);
 }
 
@@ -260,11 +232,59 @@ export function readReleaseLedger(projectRoot: string): Promise<FixedLedgerReadR
 }
 
 /** 追加 workflow 事件；同幂等键 replay 返回原事件、不重复追加。 */
-export function appendWorkflowEvent(
+export async function appendWorkflowEvent(
   projectRoot: string,
   event: WorkflowEvent,
 ): Promise<FixedLedgerAppendResult<WorkflowEvent>> {
-  return appendFixedLedgerEvent(workflowsStatePath(projectRoot), event, isWorkflowEvent, "ans-workflow/v1");
+  const context = currentWorkflowValidation(projectRoot);
+  if (context) {
+    if (!isWorkflowEvent(event) || context.view.workflowId !== event.workflowId || context.view.flowId !== event.flowId) {
+      return { ok: false, code: 'workflow-domain-scope-mismatch', message: '兼容校验的事件与当前持久实例不匹配。' };
+    }
+    const previous = context.events.find(item => item.idempotencyKey === event.idempotencyKey);
+    if (!previous) {
+      context.events.push(event);
+      if (event.kind === 'stage.requested' || event.kind === 'stage.completed') {
+        context.view.stage = event.stage;
+        const stage = context.view.stages[event.stage];
+        stage.status = event.kind === 'stage.requested' ? 'requested' : 'completed';
+        context.view.status = stage.status;
+      }
+    }
+    return { ok: true, path: 'durable-domain-validation', replay: previous !== undefined, event: previous ?? event };
+  }
+  const result = await appendFixedLedgerEvent(workflowsStatePath(projectRoot), event, isWorkflowEvent, "ans-workflow/v1");
+  if (result.ok && result.event.kind === "workflow.closed") {
+    const repo = await legacyRepository(projectRoot);
+    if (repo && repositoryOwner(repo)?.engine === "legacy") {
+      releaseOwner(repo, { engine: "legacy", instanceId: result.event.workflowId, dataDir: repo.root });
+    }
+    const workspace = await workspaceIdentity(projectRoot).catch(() => undefined);
+    const owner = workspace ? workspaceOwner(workspace.root) : undefined;
+    if (workspace && owner?.engine === 'legacy' && owner.instanceId === result.event.workflowId) changeWorkspaceOwner(workspace.root, owner, false);
+  }
+  return result;
+}
+
+async function legacyRepository(projectRoot: string): Promise<RepositoryIdentity | undefined> {
+  try {
+    await fs.lstat(path.join(projectRoot, ".git"));
+    return await repositoryIdentity(projectRoot);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function legacyWorkflowHasPrototypeOwner(projectRoot: string): Promise<boolean> {
+  if (currentWorkflowValidation(projectRoot)) return false;
+  const workspace = await workspaceIdentity(projectRoot).catch(() => undefined);
+  if (workspace) {
+    const direct = workspaceOwner(workspace.root);
+    const primary = workspace.repository ? workspaceOwner(path.dirname(workspace.repository.commonDir)) : undefined;
+    if (direct?.engine === 'dapr' || primary?.engine === 'dapr') return true;
+  }
+  const repo = await legacyRepository(projectRoot);
+  return repo !== undefined && repositoryOwner(repo)?.engine === "dapr";
 }
 
 /** 追加 basis 事件（`basis.recorded`/`amended`/`verified`/`drift`）。 */
@@ -694,52 +714,15 @@ function activeWorkflowIdsOf(events: readonly WorkflowEvent[]): string[] {
   });
 }
 
-export type WorkflowServiceFailure = {
-  ok: false;
-  code: string;
-  message: string;
-  missing?: string[];
-  /**
-   * 2026-11-20（block resolver 地基）：可序列化的 block 事实（供桌面 router 消费）。
-   * 只做事实出口——本服务**不调用 resolver、不写 blocks 账本**，现有阶段/收口/错误码语义不变。
-   */
-  blockFact?: BlockFact;
-};
+export type WorkflowServiceFailure = { ok: false; code: string; message: string; missing?: string[] };
 
 function serviceFailure(code: string, message: string, missing?: string[]): WorkflowServiceFailure {
   return { ok: false, code, message, ...(missing !== undefined ? { missing } : {}) };
 }
 
-type BlockFailureContext = Omit<BlockDispatchRejectionInput, "code" | "message">;
-
-/** 携带 block 事实的服务拒绝（错误码/消息保持不变；额外附 `blockFact`）。 */
-function blockServiceFailure(
-  context: BlockFailureContext,
-  code: string,
-  message: string,
-  missing?: string[],
-): WorkflowServiceFailure {
-  return {
-    ...serviceFailure(code, message, missing),
-    blockFact: blockFactFromServiceFailure({ ...context, code, message }),
-  };
-}
-
-function viewFailure(view: WorkflowView, protocol: WorkflowProtocol = WORKFLOW_PROTOCOL_FIXED_V2_1): WorkflowServiceFailure | undefined {
+function viewFailure(view: WorkflowView): WorkflowServiceFailure | undefined {
   if (view.blocked?.code === WORKFLOW_CORRUPT_CODE) {
-    return blockServiceFailure(
-      {
-        protocol,
-        workflowId: view.workflowId,
-        flowId: view.flowId,
-        stage: view.stage,
-        source: "workflow-service.viewFailure",
-        detailCode: "protocol-conflict",
-        engineCanRepair: true,
-      },
-      WORKFLOW_CORRUPT_CODE,
-      `工作流账本损坏：${view.blocked.summary}（不猜、不自动推进）`,
-    );
+    return serviceFailure(WORKFLOW_CORRUPT_CODE, `工作流账本损坏：${view.blocked.summary}（不猜、不自动推进）`);
   }
   return undefined;
 }
@@ -803,27 +786,15 @@ export type StageRequestResult = ({ ok: true } & StageRequestReceipt) | Workflow
  */
 export async function requestStage(input: StageRequestInput): Promise<StageRequestResult> {
   const now = input.now ?? (() => new Date());
-  const fail = (code: string, message: string, missing?: string[]): WorkflowServiceFailure =>
-    blockServiceFailure(
-      {
-        protocol: WORKFLOW_PROTOCOL_FIXED_V2_1,
-        source: "workflow-service.requestStage",
-        ...(isWorkflowStage(input.stage) ? { stage: input.stage } : {}),
-        ...(typeof input.workflowId === "string" && input.workflowId !== "" ? { workflowId: input.workflowId } : {}),
-      },
-      code,
-      message,
-      missing,
-    );
   const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
-  if (!isWorkflowSlug(flowId)) return fail("stage-request-invalid", `flowId 非法（须小写 slug）：${String(input.flowId)}`);
-  if (!isWorkflowStage(input.stage)) return fail("stage-request-invalid", `stage 非法：${String(input.stage)}`);
-  if (!isNonEmptyText(input.text)) return fail("stage-request-invalid", "stage-request 任务文本不得为空。");
+  if (!isWorkflowSlug(flowId)) return serviceFailure("stage-request-invalid", `flowId 非法（须小写 slug）：${String(input.flowId)}`);
+  if (!isWorkflowStage(input.stage)) return serviceFailure("stage-request-invalid", `stage 非法：${String(input.stage)}`);
+  if (!isNonEmptyText(input.text)) return serviceFailure("stage-request-invalid", "stage-request 任务文本不得为空。");
   if (!isSha256Hex(input.requestDigest)) {
-    return fail("stage-request-invalid", "requestDigest 非法：必须是请求文本的 64 hex SHA-256（应用计算）。");
+    return serviceFailure("stage-request-invalid", "requestDigest 非法：必须是请求文本的 64 hex SHA-256（应用计算）。");
   }
   if (!isNonEmptyText(input.sourceTaskId)) {
-    return fail(
+    return serviceFailure(
       "stage-request-source-missing",
       "stage-request 未创建：缺少 chief 当前真实客户轮次（sourceTaskId 由 host 捕获，不可模型自报）。",
       ["sourceTaskId"],
@@ -831,7 +802,7 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   }
   const action: WorkflowAction = input.workflowAction ?? "advance";
   if (action !== "advance" && action !== "stop") {
-    return fail("stage-request-invalid", `workflowAction 非法：${String(action)}`);
+    return serviceFailure("stage-request-invalid", `workflowAction 非法：${String(action)}`);
   }
 
   const ledger = await readWorkflowLedger(input.projectRoot);
@@ -850,15 +821,15 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
       if (action === "advance" && activeForFlowAll.length === 0) {
         workflowId = undefined;
       } else {
-        return fail("workflow-not-found", `workflow ${workflowId} 不存在（账本无记录）。`);
+        return serviceFailure("workflow-not-found", `workflow ${workflowId} 不存在（账本无记录）。`);
       }
     } else if (!list.some((event) => event.kind === "workflow.started")) {
-      return fail(WORKFLOW_CORRUPT_CODE, `workflow ${workflowId} 缺少 workflow.started（关键事件缺失，不猜）。`);
+      return serviceFailure(WORKFLOW_CORRUPT_CODE, `workflow ${workflowId} 缺少 workflow.started（关键事件缺失，不猜）。`);
     }
   } else {
     const activeForFlow = activeForFlowAll;
     if (activeForFlow.length > 1) {
-      return fail("workflow-active-conflict", `flow ${flowId} 存在多个活动 fixed workflow；不猜。`);
+      return serviceFailure("workflow-active-conflict", `flow ${flowId} 存在多个活动 fixed workflow；不猜。`);
     }
     workflowId = activeForFlow[0];
   }
@@ -867,29 +838,29 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   let resolvedPath: WorkflowPath;
   if (startingNew) {
     if (action === "stop") {
-      return fail("workflow-not-found", `flow ${flowId} 没有活动 fixed workflow（stop 需活动 workflow）。`);
+      return serviceFailure("workflow-not-found", `flow ${flowId} 没有活动 fixed workflow（stop 需活动 workflow）。`);
     }
     if (!isWorkflowPath(input.workflowPath)) {
-      return fail("stage-request-invalid", "首次 advance 请求必须给出 workflowPath（A/B）。");
+      return serviceFailure("stage-request-invalid", "首次 advance 请求必须给出 workflowPath（A/B）。");
     }
     resolvedPath = input.workflowPath;
     const otherActive = active.filter((id) => !workflowEventList(events, id).some((event) => event.flowId === flowId));
     if (otherActive.length > 0) {
-      return fail(
+      return serviceFailure(
         "workflow-workspace-busy",
         `项目已有活动 fixed workflow（${otherActive[0]}）；每项目同时至多一个活动 fixed workflow。`,
       );
     }
     const firstStage: WorkflowStage = resolvedPath === "B" ? "B1" : "A1";
     if (input.stage !== firstStage) {
-      return fail(
+      return serviceFailure(
         "stage-transition-invalid",
         `新 workflow 的首个阶段必须是 ${firstStage}（收到 ${input.stage}）；不原地跳阶段。`,
       );
     }
     const computed = workflowIdFor(flowId, resolvedPath, input.sourceTaskId, input.requestDigest);
     if (input.workflowId !== undefined && input.workflowId !== computed) {
-      return fail(
+      return serviceFailure(
         "stage-request-invalid",
         `首请求 workflowId 必须是确定性计算值 ${computed}（收到 ${input.workflowId}；不采信模型自报）。`,
       );
@@ -897,35 +868,20 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
     workflowId = computed;
   } else {
     const first = workflowEventList(events, workflowId!).find((event) => event.kind === "workflow.started");
-    if (first === undefined) return fail(WORKFLOW_CORRUPT_CODE, `workflow ${workflowId} 缺少 workflow.started。`);
+    if (first === undefined) return serviceFailure(WORKFLOW_CORRUPT_CODE, `workflow ${workflowId} 缺少 workflow.started。`);
     if (first.flowId !== flowId) {
-      return fail("workflow-active-conflict", `workflow ${workflowId} 属于 flow ${first.flowId}，与请求 flow ${flowId} 不一致。`);
+      return serviceFailure("workflow-active-conflict", `workflow ${workflowId} 属于 flow ${first.flowId}，与请求 flow ${flowId} 不一致。`);
     }
     resolvedPath = first.path;
   }
   if (workflowId === undefined) {
-    return fail(WORKFLOW_CORRUPT_CODE, "workflowId 解析失败（不猜）");
+    return serviceFailure(WORKFLOW_CORRUPT_CODE, "workflowId 解析失败（不猜）");
   }
   const resolvedWorkflowId: string = workflowId;
-  const wfEvents = workflowEventList(events, resolvedWorkflowId);
-  // 2026-11-18（收尾修补）：反向驱动守卫——app-dispatch/v1 workflow 不接受旧 stage-request
-  // （含 advance/stop/重放）。在任何账本/任务写入之前 fail-closed（旧 fixed-v2.1/legacy 逐字不变）。
-  const startedForProtocol = wfEvents.find((event) => event.kind === "workflow.started");
-  if (startedForProtocol !== undefined && workflowProtocolOf(startedForProtocol) === WORKFLOW_PROTOCOL_APP_DISPATCH) {
-    return blockServiceFailure(
-      {
-        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-        workflowId: resolvedWorkflowId,
-        flowId,
-        stage: input.stage,
-        source: "workflow-service.requestStage",
-        detailCode: "protocol-conflict",
-        engineCanRepair: true,
-      },
-      "stage-request-removed",
-      `workflow ${resolvedWorkflowId} 使用 app-dispatch/v1（应用侧流程驱动）；旧 stage-request 已移除，不写任何事件/任务。`,
-    );
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已经独占此 Git 仓库，旧引擎不能推进。");
   }
+  const wfEvents = workflowEventList(events, resolvedWorkflowId);
   const view: WorkflowView | undefined = startingNew
     ? undefined
     : deriveWorkflowView(wfEvents, taskState.events);
@@ -933,7 +889,7 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
     const corrupted = viewFailure(view);
     if (corrupted !== undefined) return corrupted;
     if (view.closed !== undefined) {
-      return fail("workflow-closed", `workflow ${resolvedWorkflowId} 已关闭（${view.closed.outcome}），不再接受请求。`);
+      return serviceFailure("workflow-closed", `workflow ${resolvedWorkflowId} 已关闭（${view.closed.outcome}），不再接受请求。`);
     }
   }
 
@@ -945,7 +901,7 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   // 不建任务，B1 completed/B2 pending 保持不变，并给出可直接执行的下一步（直接发 B3 advance）。
   // 首次 B2 请求（新 workflow）仍由上面的「首阶段必须 B1」拒绝；Path A/legacy/stop/rework 不经过本检查。
   if (resolvedPath === "B" && input.stage === "B2" && action === "advance") {
-    return fail(
+    return serviceFailure(
       "b2-stage-request-forbidden",
       "路径 B 不发 B2 stage-request；B1 完成后直接发 B3 advance stage-request（应用在受理 B3 时记录 B2 change.scope-decided）；B2 保持 pending。",
     );
@@ -1000,8 +956,7 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
     && isStageRequestTask(record.created)
     && record.closed === undefined);
   if (openAdvance !== undefined) {
-    return blockServiceFailure(
-      { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", detailCode: "protocol-conflict" },
+    return serviceFailure(
       "stage-request-open",
       `${action === "stop" ? "stop 之前必须" : "下一 advance 之前必须"}收口当前 open advance 请求（${openAdvance.taskId}）；否则 stage-request-open。`,
     );
@@ -1011,16 +966,14 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   let idempotencyKey: string;
   if (action === "advance") {
     if (view !== undefined && !canRequestStage(view, input.stage)) {
-      return blockServiceFailure(
-        { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", stateConflict: true },
+      return serviceFailure(
         "stage-transition-invalid",
         `stage 转移非法：当前 ${view.stage}(${view.stages[view.stage].status}) 不允许推进 ${input.stage}（A10 未完成发 A11 等均拒绝）。`,
       );
     }
     // AC-09/G-1（实施前写标准）：A11 stage-request 派发实现前，A12a criteria 必须已创建（不得 pending）。
     if (view !== undefined && input.stage === "A11" && view.stages.A12a.status === "pending") {
-      return blockServiceFailure(
-        { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", stateConflict: true },
+      return serviceFailure(
         "stage-transition-invalid",
         "A11 派发前必须先创建 A12a criteria 任务（AC-09：实施前写标准）。",
       );
@@ -1030,19 +983,14 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
       .map((event) => (event.kind === "stage.requested" ? event.attempt : 0));
     attempt = input.attempt ?? (priorAttempts.length === 0 ? 1 : Math.max(...priorAttempts) + 1);
     if (!Number.isSafeInteger(attempt) || attempt < 1) {
-      return blockServiceFailure(
-        { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", detailCode: "parameter-misuse" },
-        "stage-request-invalid",
-        `attempt 非法：${String(attempt)}`,
-      );
+      return serviceFailure("stage-request-invalid", `attempt 非法：${String(attempt)}`);
     }
     idempotencyKey = stageRequestIdempotencyKey(resolvedWorkflowId, input.stage, attempt);
   } else {
     const priorStops = wfEvents.filter((event) => event.kind === "workflow.stop-requested").length;
     // stop 的 stage 必须是当前阶段（application 核验；不猜）。
     if (view !== undefined && (view.stage !== input.stage || view.stopping === true)) {
-      return blockServiceFailure(
-        { protocol: WORKFLOW_PROTOCOL_FIXED_V2_1, workflowId: resolvedWorkflowId, flowId, stage: input.stage, source: "workflow-service.requestStage", stateConflict: true },
+      return serviceFailure(
         "stage-transition-invalid",
         `stop 请求阶段非法：当前 ${view.stage}(${view.stages[view.stage].status})，请求 ${input.stage}${view.stopping === true ? "（stop 已在办）" : ""}。`,
       );
@@ -1059,6 +1007,19 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
   // 1) workflow 账本事件（先记请求，再创建任务；任务失败如实上抛）。
   if (startingNew) {
     const legacy = await detectLegacyStateIgnored(input.projectRoot);
+    const workspace = await workspaceIdentity(input.projectRoot).catch(() => undefined);
+    if (workspace) {
+      const held = reserveWorkspace(workspace.root, { engine: 'legacy', instanceId: resolvedWorkflowId,
+        dataDir: workspace.root, projectId: workspace.projectId, requestId: input.sourceTaskId,
+        fingerprint: input.requestDigest, state: 'active' });
+      if (held.engine !== 'legacy' || held.instanceId !== resolvedWorkflowId) {
+        return serviceFailure('workflow-owner-conflict', '其他流程已独占此工作区，旧引擎无法启动。');
+      }
+    }
+    const repo = await legacyRepository(input.projectRoot);
+    if (repo && !reserveOwner(repo, { engine: "legacy", instanceId: resolvedWorkflowId, dataDir: repo.root })) {
+      return serviceFailure("workflow-owner-conflict", "其他工作流已独占此 Git 仓库，旧引擎无法启动。");
+    }
     const startedEvent: WorkflowEvent = {
       v: 1,
       at,
@@ -1195,69 +1156,30 @@ export async function recordStageDispatch(input: {
   moduleId?: string;
   now?: () => Date;
 }): Promise<{ ok: true; replay: boolean } | WorkflowServiceFailure> {
-  const now = input.now ?? (() => new Date());
-  const fail = (code: string, message: string, missing?: string[]): WorkflowServiceFailure =>
-    blockServiceFailure(
-      {
-        protocol: WORKFLOW_PROTOCOL_FIXED_V2_1,
-        source: "workflow-service.recordStageDispatch",
-        ...(isNonEmptyText(input.workflowId) ? { workflowId: input.workflowId } : {}),
-        ...(isWorkflowStage(input.stage) ? { stage: input.stage } : {}),
-        ...(isNonEmptyText(input.taskId) ? { taskId: input.taskId } : {}),
-      },
-      code,
-      message,
-      missing,
-    );
-  if (!isNonEmptyText(input.workflowId) || !isNonEmptyText(input.taskId) || !isNonEmptyText(input.targetRoleId)) {
-    return fail("stage-request-invalid", "recordStageDispatch 缺少 workflowId/taskId/targetRoleId。");
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有仓库的推进权。");
   }
-  if (!isWorkflowStage(input.stage)) return fail("stage-request-invalid", `stage 非法：${String(input.stage)}`);
+  const now = input.now ?? (() => new Date());
+  if (!isNonEmptyText(input.workflowId) || !isNonEmptyText(input.taskId) || !isNonEmptyText(input.targetRoleId)) {
+    return serviceFailure("stage-request-invalid", "recordStageDispatch 缺少 workflowId/taskId/targetRoleId。");
+  }
+  if (!isWorkflowStage(input.stage)) return serviceFailure("stage-request-invalid", `stage 非法：${String(input.stage)}`);
   const ledger = await readWorkflowLedger(input.projectRoot);
   const wfEvents = workflowEventList(ledger.events, input.workflowId);
-  const started = wfEvents.find((event) => event.kind === "workflow.started");
-  if (started === undefined) {
-    return fail("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
-  }
-  // 2026-11-18（收尾修补）：app-dispatch/v1 的 stage.dispatched 只由应用驱动写（含 issuedBy/
-  // executorKind）；旧入口 fail-closed，不写任何事件。
-  if (workflowProtocolOf(started) === WORKFLOW_PROTOCOL_APP_DISPATCH) {
-    return blockServiceFailure(
-      {
-        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-        workflowId: input.workflowId,
-        stage: input.stage,
-        taskId: input.taskId,
-        source: "workflow-service.recordStageDispatch",
-        detailCode: "protocol-conflict",
-      },
-      "workflow-protocol-mismatch",
-      `workflow ${input.workflowId} 使用 app-dispatch/v1；stage.dispatched 由应用驱动记录，旧 recordStageDispatch 入口拒绝。`,
-    );
+  if (!wfEvents.some((event) => event.kind === "workflow.started")) {
+    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
   }
   const tasks = await readTaskState(input.projectRoot);
   const task = tasks.records.get(input.taskId);
-  if (task?.created === undefined) return fail("stage-request-required", `任务 ${input.taskId} 不存在。`);
+  if (task?.created === undefined) return serviceFailure("stage-request-required", `任务 ${input.taskId} 不存在。`);
   if (task.created.workflowId !== input.workflowId || task.created.stage !== input.stage || task.created.to !== input.targetRoleId) {
-    return fail("stage-workflow-mismatch", `任务 ${input.taskId} 的 workflow/stage/受派人与派发事实不一致。`);
+    return serviceFailure("stage-workflow-mismatch", `任务 ${input.taskId} 的 workflow/stage/受派人与派发事实不一致。`);
   }
   const view = deriveWorkflowView(wfEvents, tasks.events);
   const vf = viewFailure(view);
   if (vf !== undefined) return vf;
   if (!canDispatchStage(view, input.stage)) {
-    return blockServiceFailure(
-      {
-        protocol: WORKFLOW_PROTOCOL_FIXED_V2_1,
-        workflowId: input.workflowId,
-        flowId: view.flowId,
-        stage: input.stage,
-        taskId: input.taskId,
-        source: "workflow-service.recordStageDispatch",
-        stateConflict: true,
-      },
-      "stage-transition-invalid",
-      `stage.dispatched 非法：当前 ${view.stage}(${view.stages[view.stage].status}) → ${input.stage}。`,
-    );
+    return serviceFailure("stage-transition-invalid", `stage.dispatched 非法：当前 ${view.stage}(${view.stages[view.stage].status}) → ${input.stage}。`);
   }
   const event: WorkflowEvent = {
     v: 1,
@@ -1282,8 +1204,7 @@ export async function recordStageDispatch(input: {
 
 export interface AssignedTaskFacts {
   taskId: string;
-  /** 2026-11-17（app-dispatch/v1）：application 创建的任务也可被 inspect（worker-dispatch 绑定证据）。 */
-  from: "chief" | "convener" | "application";
+  from: "chief" | "convener";
   to: string;
   flowId?: string;
   workflowId?: string;
@@ -1434,6 +1355,9 @@ function closeStageCompletionCheck(
  * - **不写** `.ans/runs`/`.ans/trunk`、不做 CAS/snapshot；legacy 实现逐字保留（本函数只服务 fixed）。
  */
 export async function closeTask(input: CloseTaskInput): Promise<CloseTaskResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型实例须从自身的受信收口入口处理。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.operationId) || input.operationId.length > 500) {
     return serviceFailure("close-task-invalid", "operationId 缺失或超过 500 字符。");
@@ -1776,23 +1700,6 @@ export async function prepareIntent(input: { projectRoot: string; flowId: string
   if (view.closed !== undefined) {
     return serviceFailure("workflow-closed", `workflow ${workflowId} 已关闭（${view.closed.outcome}）；不发 A3 意图卡。`);
   }
-  // 2026-11-18（收尾修补）：app-dispatch/v1 的 A3 由应用驱动（card-prompt 任务 + 应用计算
-  // documentRefs）；旧 prepareIntent 只返回意图证据，**不写** stage.requested A3（避免反向驱动）。
-  const startedForProtocol = wfEvents.find((event) => event.kind === "workflow.started");
-  if (startedForProtocol !== undefined && workflowProtocolOf(startedForProtocol) === WORKFLOW_PROTOCOL_APP_DISPATCH) {
-    return {
-      ok: true,
-      flowId,
-      ...(intentId !== undefined ? { intentId } : {}),
-      path: rel,
-      version: latest.version,
-      sha256,
-      bytes: bytes.byteLength,
-      documentRefs,
-      marker: `[ans-intent-evidence path=${rel} sha256=${sha256} version=${latest.version}]`,
-      text,
-    };
-  }
   const a3InFlight = view.stage === "A3"
     && (view.stages.A3.status === "requested" || view.stages.A3.status === "dispatched" || view.stages.A3.status === "in-progress");
   if (!a3InFlight) {
@@ -1970,6 +1877,7 @@ export async function finalizeIntent(input: FinalizeIntentInput): Promise<Finali
 
 export interface ActivateRoleDocumentsFixedInput {
   projectRoot: string;
+  evidenceCollectorRoleId?: string;
   operationId: string;
   flowId: string;
   workflowId: string;
@@ -2128,7 +2036,7 @@ export async function activateRoleDocumentsFixed(input: ActivateRoleDocumentsFix
   if (sha256Of(Buffer.from(rosterText, "utf8")) !== input.roster.sha256) {
     return serviceFailure("activation-roster-mismatch", `名单字节 hash 与入参不一致：${input.roster.path}。`);
   }
-  const parsedRoster = parseProjectRoster(rosterText, input.flowId);
+  const parsedRoster = parseProjectRoster(rosterText, input.flowId, input.evidenceCollectorRoleId);
   if (!parsedRoster.ok) return serviceFailure("activation-roster-mismatch", `名单非法：${parsedRoster.reason}`);
   if (!parsedRoster.roster.roles.some((role) => role.id === input.targetRoleId)) {
     return serviceFailure("activation-role-not-selected", `目标角色 ${input.targetRoleId} 不在名单内。`);
@@ -2245,6 +2153,7 @@ export interface BasisDocumentView {
 
 export interface RecordBasisInput {
   projectRoot: string;
+  evidenceCollectorRoleId?: string;
   flowId: string;
   workflowId: string;
   operationId: string;
@@ -2380,7 +2289,7 @@ export async function recordBasis(input: RecordBasisInput): Promise<RecordBasisR
       }
     }
   }
-  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId });
+  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId, evidenceCollectorRoleId: input.evidenceCollectorRoleId });
   let reviewRoleId: string = DEFAULT_REVIEW_ROLE_ID;
   if (roster.ok) {
     reviewRoleId = reviewRoleIdOfRoster(roster.roster);
@@ -3036,6 +2945,9 @@ export type ConfirmStopResult =
  * 任一缺失 ⇒ 记 `workflow.stop-unconfirmed`、返回 `workflow-stop-unconfirmed`（**不写 stopped**）。
  */
 export async function confirmStop(input: ConfirmStopInput): Promise<ConfirmStopResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有仓库的停止权。");
+  }
   const now = input.now ?? (() => new Date());
   const outcome: WorkflowClosedOutcome = input.outcome ?? "stopped";
   if (outcome !== "stopped" && outcome !== "reclassified") {
@@ -3355,6 +3267,9 @@ export async function findAcceptanceArchive(input: {
  * 返回 preview（应用据此构造 merge-main 非判断卡）；**本函数不构成客户确认**，执行须 `executeReleaseMerge`。
  */
 export async function prepareReleaseMerge(input: PrepareReleaseMergeInput): Promise<PrepareReleaseMergeResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有仓库的发布权。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.workflowId)) return serviceFailure("release-workflow-not-ready", "workflowId 缺失。");
   if (!isNonEmptyText(input.operationId)) return serviceFailure("release-workflow-not-ready", "operationId 缺失。");
@@ -3706,6 +3621,9 @@ async function completeReleaseWorkflow(input: {
  * - 幂等 `release:<workflowId>:<tipOid>`；已合并 ⇒ no-op 成功（`release-already-merged`）。
  */
 export async function executeReleaseMerge(input: ExecuteReleaseMergeInput): Promise<ExecuteReleaseMergeResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有仓库的发布合并权。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.workflowId)) return serviceFailure("release-workflow-not-ready", "workflowId 缺失。");
   if (!isNonEmptyText(input.releaseId)) return serviceFailure("release-workflow-not-ready", "releaseId 缺失。");
@@ -4052,12 +3970,20 @@ async function prepareBaselineGit(input: {
   workflowId: string;
   reason: "baseline" | "path-b" | "amendment";
   port: BaselineGitPort;
+  durable?: true;
 }): Promise<{ ok: true; repo: WorkflowRepoSnapshot; receipt: BaselineGitReceipt } | WorkflowServiceFailure> {
   const repository = await input.port.ensureRepository({
     projectRoot: input.projectRoot,
     allowInit: input.reason === "baseline",
   });
   if (!repository.ok) return repository;
+  const graphContext = currentWorkflowValidation(input.projectRoot);
+  if (input.durable !== true && !(graphContext?.operation === 'team-baseline' && graphContext.view.workflowId === input.workflowId)) {
+    const repo = await legacyRepository(input.projectRoot);
+    if (repo && !reserveOwner(repo, { engine: "legacy", instanceId: input.workflowId, dataDir: repo.root })) {
+      return serviceFailure("workflow-owner-conflict", "其他工作流已独占此 Git 仓库，旧引擎无法准备基线。");
+    }
+  }
   const gitignore = await input.port.ensureGitignore({ projectRoot: input.projectRoot });
   if (!gitignore.ok) return gitignore;
   const worktree = await input.port.inspectWorktree({ projectRoot: input.projectRoot });
@@ -4073,7 +3999,7 @@ async function prepareBaselineGit(input: {
     );
   }
   const expectedBranch = taskBranchName(input.workflowId);
-  const allowReuse = await workflowOwnsTaskBranch(input.projectRoot, input.workflowId, expectedBranch);
+  const allowReuse = input.durable !== true && await workflowOwnsTaskBranch(input.projectRoot, input.workflowId, expectedBranch);
   const branchResult = await input.port.prepareTaskBranch({
     projectRoot: input.projectRoot,
     workflowId: input.workflowId,
@@ -4151,6 +4077,7 @@ async function appendBaselineBlocked(input: {
 /** `complete_team_plan` v4 fixed 输入（v1.3 §5.1；运营专属；应用执行顺序编排）。 */
 export interface CompleteTeamPlanFixedInput {
   projectRoot: string;
+  evidenceCollectorRoleId?: string;
   flowId: string;
   workflowId: string;
   operationId: string;
@@ -4215,6 +4142,7 @@ export async function completeTeamPlanFixed(input: CompleteTeamPlanFixedInput): 
   }
   const recorded = await recordBasis({
     projectRoot: input.projectRoot,
+    evidenceCollectorRoleId: input.evidenceCollectorRoleId,
     flowId: input.flowId,
     workflowId: input.workflowId,
     operationId: input.operationId,
@@ -4250,6 +4178,11 @@ export async function completeTeamPlanFixed(input: CompleteTeamPlanFixedInput): 
     replay: recorded.replay,
     stageCompleted: recorded.stageCompleted,
   };
+}
+
+/** 复用路径 B 的 Git 初始化守卫。原型在调用前领取实际基线作用权，并持久化回执。 */
+export function prepareDurablePathBBaseline(input: { projectRoot: string; workflowId: string; port: BaselineGitPort }) {
+  return prepareBaselineGit({ ...input, reason: "path-b", durable: true });
 }
 
 export interface PreparePathBStartInput {
@@ -4428,9 +4361,42 @@ export type DerivePathBWriteSetsResult =
  *    要求走路径 A）；`.ans/**`、`角色卡/**` 永不进入实现写集。
  */
 export async function derivePathBWriteSets(input: DerivePathBWriteSetsInput): Promise<DerivePathBWriteSetsResult> {
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const started = ledger.events.find((event) => event.workflowId === input.workflowId && event.kind === "workflow.started");
+  if (started === undefined || started.kind !== "workflow.started") {
+    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+  }
+  if (started.path !== "B") {
+    return serviceFailure("b-change-scope-invalid", "B3 写集派生只适用于路径 B workflow（A 路径用团队计划 writesets）。");
+  }
+  return derivePathBScope(input, false);
+}
+
+/** 只读派生。原型所有权与 B1/B2 前置由调用方的权威账本核对。 */
+export function deriveDurablePathBWriteSets(input: Omit<DerivePathBWriteSetsInput, "workflowId">): Promise<DerivePathBWriteSetsResult> {
+  return derivePathBScope(input, true);
+}
+
+export async function deriveDurableEvidenceWriter(projectRoot: string, flowId: string, roleId: string): Promise<readonly string[] | undefined> {
+  if (!isWorkflowSlug(flowId) || !isWorkflowSlug(roleId)) return;
+  const prefix = `docs/verification/${flowId}/`;
+  const boundaries = await loadProjectRoleBoundaries(projectRoot);
+  const root = prefix.slice(0, -1);
+  if (!boundaries.get(roleId)?.some(entry => entry.root === "project" && entry.kind === "directory"
+    && boundaryContainsPath([entry], root))) return;
+  const conflicts = [...boundaries.entries()].some(([other, entries]) => other !== roleId && entries.some(entry => {
+    if (entry.root !== "project") return false;
+    const otherPath = entry.path.toLowerCase();
+    return otherPath === root || otherPath.startsWith(prefix) || entry.kind !== "file" && root.startsWith(otherPath + "/");
+  }));
+  if (conflicts) return;
+  return [prefix];
+}
+
+async function derivePathBScope(input: Omit<DerivePathBWriteSetsInput, "workflowId">, requireRosterBoundary: boolean): Promise<DerivePathBWriteSetsResult> {
   const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
   if (!isWorkflowSlug(flowId)) return serviceFailure("b-change-scope-invalid", `flowId 非法：${String(input.flowId)}`);
-  if (!isNonEmptyText(input.workflowId)) return serviceFailure("b-change-scope-invalid", "workflowId 缺失。");
+
   if (!Array.isArray(input.scopeFiles) || input.scopeFiles.length === 0) {
     return serviceFailure("b-change-scope-invalid", "scope.files 为空：B3 写集来源缺失（要求至少一个候选路径）。", ["scope.files"]);
   }
@@ -4446,17 +4412,9 @@ export async function derivePathBWriteSets(input: DerivePathBWriteSetsInput): Pr
     }
     if (!normalized.includes(candidate)) normalized.push(candidate);
   }
-  const ledger = await readWorkflowLedger(input.projectRoot);
-  const wfEvents = workflowEventList(ledger.events, input.workflowId);
-  const started = wfEvents.find((event) => event.kind === "workflow.started");
-  if (started === undefined || started.kind !== "workflow.started") {
-    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
-  }
-  if (started.path !== "B") {
-    return serviceFailure("b-change-scope-invalid", "B3 写集派生只适用于路径 B workflow（A 路径用团队计划 writesets）。");
-  }
   const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId });
   if (roster.ok) {
+    const boundaries = requireRosterBoundary ? await loadProjectRoleBoundaries(input.projectRoot) : undefined;
     const byRole = new Map<string, string[]>();
     for (const candidate of normalized) {
       const owners = new Set<string>();
@@ -4476,6 +4434,9 @@ export async function derivePathBWriteSets(input: DerivePathBWriteSetsInput): Pr
         );
       }
       const owner = [...owners][0]!;
+      if (boundaries && !boundaryContainsPath(boundaries.get(owner) ?? [], candidate)) {
+        return serviceFailure("b-change-scope-invalid", `名单属主 ${owner} 的边界未授权此路径：${candidate}。`);
+      }
       if (isGovernanceDocPath(candidate) && owner !== "rapporteur" && owner !== "product") {
         return serviceFailure(
           "b-change-scope-requires-rapporteur",
@@ -4555,6 +4516,9 @@ export type RecordChangeScopeDecisionResult =
  * 投影据此完成 B2；scope 越界/无法唯一归属 ⇒ `b-change-scope-invalid`（要求走 A/新 basis）。
  */
 export async function recordChangeScopeDecision(input: RecordChangeScopeDecisionInput): Promise<RecordChangeScopeDecisionResult> {
+  if (await legacyWorkflowHasPrototypeOwner(input.projectRoot)) {
+    return serviceFailure("workflow-owner-conflict", "原型已持有本仓库的 B2 范围记录权。");
+  }
   const now = input.now ?? (() => new Date());
   if (!isNonEmptyText(input.workflowId)) return serviceFailure("b-change-scope-invalid", "workflowId 缺失。");
   if (!isNonEmptyText(input.requestTaskId)) return serviceFailure("b-change-scope-invalid", "requestTaskId 缺失。");
@@ -4639,2149 +4603,5 @@ export async function recordChangeScopeDecision(input: RecordChangeScopeDecision
     eventId: appended.event.idempotencyKey,
     replay: appended.replay,
   };
-}
-
-// —————————————— 2026-11-17 app-dispatch/v1：应用侧流程驱动（第一步） ——————————————
-//
-// 依据：docs/planning/2026-11-17_design_app-dispatch-builtins.md §三（阶段→执行者）、§4.3（幂等键/
-// 恢复）、§四.4（定义注册表）、§五（客户卡）、§七（状态机/失败面）；Q1–Q10 已裁定。
-//
-// 纪律：
-//  · 旧 `requestStage`/stage-request 路径**逐字保留**（fixed-v2.1 在飞协议 compat-only；本驱动不触碰）；
-//  · 本驱动只处理 `workflow.started.protocol === "app-dispatch/v1"` 的 workflow；协议不符 ⇒
-//    `workflow-protocol-mismatch`（禁止中途换驱动，Q10）；
-//  · 事件先写且携带 taskId（taskId 由幂等键确定性派生，重启对账可幂等重建/补投递）；
-//  · 不采信模型自报：卡 prompt/选项/文档 hash/完成证据全部应用计算；不一致 ⇒ fail-closed；
-//  · 旧能力内核（closeTask/recordBasis/archiveAcceptance/prepareReleaseMerge/...）复用，不复制。
-
-/** 应用侧驱动协议 token（= Model 常量再导出；调用方不复制字面量）。 */
-export const APP_DISPATCH_PROTOCOL = WORKFLOW_PROTOCOL_APP_DISPATCH;
-
-/** 应用侧创建的 fixed 任务种类（`stage-request` 属旧协议，不在新驱动内产生）。 */
-export type AppDispatchTaskKind = Extract<FixedTaskKind, "stage-execution" | "worker-dispatch" | "card-prompt">;
-
-/** 卡文档读取预算（与 basis 文档一致：8 MiB）。 */
-const APP_DISPATCH_DOC_MAX_BYTES = 8 * 1024 * 1024;
-
-/** 内置阶段任务幂等键（设计 §4.3）：`stage-exec:<workflowId>:<stage>:<executorRoleId>:<attempt>`。 */
-export function stageExecutionIdempotencyKey(
-  workflowId: string,
-  stage: WorkflowStage,
-  executorRoleId: string,
-  attempt: number,
-): string {
-  return `stage-exec:${workflowId}:${stage}:${executorRoleId}:${attempt}`;
-}
-
-/** worker-dispatch 任务幂等键（设计 §4.3）：`worker-dispatch:<workflowId>:<stage>:<attempt>`。 */
-export function workerDispatchIdempotencyKey(workflowId: string, stage: WorkflowStage, attempt: number): string {
-  return `worker-dispatch:${workflowId}:${stage}:${attempt}`;
-}
-
-/** card-prompt 任务幂等键（设计 §4.3）：`card-prompt:<workflowId>:<stage>:<requestId>`。 */
-export function cardPromptIdempotencyKey(workflowId: string, stage: WorkflowStage, requestId: string): string {
-  return `card-prompt:${workflowId}:${stage}:${requestId}`;
-}
-
-/** 应用任务 id（确定性：由幂等键派生；事件先写携带该 id，任务缺失时按同一 id 幂等重建）。 */
-export function appDispatchTaskId(idempotencyKey: string): string {
-  return `t-app-${sha256Of(idempotencyKey).slice(0, 24)}`;
-}
-
-/** 卡 prompt 确定性 id（与尝试绑定；= requestId 与 promptId，`card-prompt` 幂等键使用）。 */
-export function appDispatchPromptId(workflowId: string, stage: WorkflowStage, attempt: number): string {
-  return `prompt-${sha256Of(`${workflowId}\u0000${stage}\u0000${attempt}`).slice(0, 24)}`;
-}
-
-type AppDispatchTaskState = Awaited<ReturnType<typeof readTaskState>>;
-type WorkflowStartedView = Extract<WorkflowEvent, { kind: "workflow.started" }>;
-type StageRequestedView = Extract<WorkflowEvent, { kind: "stage.requested" }>;
-
-interface AppDispatchContext {
-  started: WorkflowStartedView;
-  definition: WorkflowDefinition;
-  definitionHash: string;
-  view: WorkflowView;
-  wfEvents: WorkflowEvent[];
-  taskState: AppDispatchTaskState;
-}
-
-/**
- * 载入 app-dispatch 上下文（协议/定义/投影；fail-closed）：
- * 未知/版本不符定义 ⇒ `workflow-definition-unknown`/`workflow-definition-version-unsupported`；
- * 定义 hash 与注册表不一致 ⇒ 版本不受支持（不静默迁移）；投影损坏 ⇒ `workflow-corrupt`。
- */
-async function loadAppDispatchContext(
-  projectRoot: string,
-  workflowId: string,
-): Promise<({ ok: true } & AppDispatchContext) | WorkflowServiceFailure> {
-  if (!isNonEmptyText(workflowId)) return serviceFailure("stage-request-invalid", "workflowId 缺失。");
-  const ledger = await readWorkflowLedger(projectRoot);
-  const wfEvents = workflowEventList(ledger.events, workflowId);
-  const started = wfEvents.find((event): event is WorkflowStartedView => event.kind === "workflow.started");
-  if (started === undefined) return serviceFailure("workflow-not-found", `workflow ${workflowId} 不存在（账本无 workflow.started）。`);
-  const protocol = workflowProtocolOf(started);
-  if (protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH) {
-    return serviceFailure(
-      "workflow-protocol-mismatch",
-      `workflow ${workflowId} 使用 ${protocol} 协议；应用侧驱动只处理 app-dispatch/v1（旧协议走 requestStage）。`,
-    );
-  }
-  const ref = started.definition;
-  if (ref === undefined) {
-    return serviceFailure("workflow-corrupt", `workflow ${workflowId} 缺少 definition 引用（app-dispatch/v1 必填）。`);
-  }
-  const lookup = getWorkflowDefinition(ref.id, ref.version);
-  if (lookup.ok !== true) return serviceFailure(lookup.code, lookup.message);
-  if (lookup.hash !== ref.sha256) {
-    return serviceFailure(
-      "workflow-definition-version-unsupported",
-      `workflow ${workflowId} 定义 hash 与注册表不一致（${ref.id}@${ref.version}）；不静默迁移。`,
-    );
-  }
-  const taskState = await readTaskState(projectRoot);
-  const view = deriveWorkflowView(wfEvents, taskState.events);
-  const vf = viewFailure(view, WORKFLOW_PROTOCOL_APP_DISPATCH);
-  if (vf !== undefined) return vf;
-  if (view.closed !== undefined) {
-    return serviceFailure("workflow-closed", `workflow ${workflowId} 已关闭（${view.closed.outcome}），不再驱动。`);
-  }
-  if (view.stopping === true) {
-    return serviceFailure("workflow-stopping", `workflow ${workflowId} 正在停止（workflow.stop-requested）；应用不再创建/投递任务。`);
-  }
-  return { ok: true, started, definition: lookup.definition, definitionHash: lookup.hash, view, wfEvents, taskState };
-}
-
-// —————————————— 2026-11-20（SMOKE-1 seams）：单一创建者 / 确定性 taskId / 进程内串行 ——————————————
-//
-// 客户第一不变量：**任务必须由工作流/应用侧唯一派发，taskId 必须一致且确定，任何其它路径不得重复建任务**。
-// SMOKE-1（A2/product 同秒两条 t-app-*）暴露的接缝：Q8 重试、并发 reconcile、block resolver 属主修复
-// 可能各自建任务。本段把「读账本 → 派生 attempt/key/taskId → 写 task.created」收敛为唯一核心：
-//  · taskId = appDispatchTaskId((workflowId, stage, targetRole, taskKind, attempt) 派生的幂等键)；
-//  · 同键/同 taskId 重复调用返回同一条任务（replay receipt），不追加第二条；
-//  · 同 key 不同 payload/taskId ⇒ fail-closed（workflow-corrupt / invalid-task-binding）；
-//  · 进程内按 projectRoot+workflowId 串行化 drive/observe/reconcile/select 的关键段（本地 I/O 有界，
-//    不做跨进程锁；跨进程并发不在本批范围）。
-//
-// 兼容：键格式与在飞 app-dispatch v1 任务一致（`stage-exec:<wf>:<stage>:<role>:<attempt>` /
-// `worker-dispatch:<wf>:<stage>:<attempt>` / `card-prompt:<wf>:<stage>:<requestId>`）；
-// fixed-v2.1/legacy 路径不经过本核心（逐字保持）。
-
-/** 服务进程内串行锁（key = projectRoot+workflowId 或 projectRoot；settled tail，异常不毒化后继）。 */
-const serviceLockTails = new Map<string, Promise<void>>();
-
-function withServiceLock<T>(key: string, task: () => Promise<T>): Promise<T> {
-  const previous = serviceLockTails.get(key) ?? Promise.resolve();
-  const run = previous.then(task, task);
-  const settled = run.then(() => undefined, () => undefined);
-  serviceLockTails.set(key, settled);
-  void settled.finally(() => {
-    if (serviceLockTails.get(key) === settled) serviceLockTails.delete(key);
-  });
-  return run;
-}
-
-function workflowLockKey(projectRoot: string, workflowId: string): string {
-  return `${path.resolve(projectRoot)}\u0000workflow\u0000${workflowId}`;
-}
-
-function projectLockKey(projectRoot: string): string {
-  return `${path.resolve(projectRoot)}\u0000project`;
-}
-
-/** taskKind 显式参与键派生（不在名单内 ⇒ 不派生、不建任务）。 */
-export function isAppDispatchTaskKind(value: unknown): value is AppDispatchTaskKind {
-  return value === "stage-execution" || value === "worker-dispatch" || value === "card-prompt";
-}
-
-/**
- * 应用任务幂等键（taskKind 显式分派；格式与在飞 v1 任务逐字兼容）：
- *  · stage-execution：`stage-exec:<workflowId>:<stage>:<targetRoleId>:<attempt>`；
- *  · worker-dispatch：`worker-dispatch:<workflowId>:<stage>:<attempt>`（targetRoleId 固定 convener）；
- *  · card-prompt：`card-prompt:<workflowId>:<stage>:<requestId>`（requestId 含 attempt）。
- */
-export function appDispatchIdempotencyKey(input: {
-  workflowId: string;
-  stage: WorkflowStage;
-  targetRoleId: string;
-  taskKind: AppDispatchTaskKind;
-  attempt: number;
-}): string {
-  switch (input.taskKind) {
-    case "stage-execution":
-      return stageExecutionIdempotencyKey(input.workflowId, input.stage, input.targetRoleId, input.attempt);
-    case "worker-dispatch":
-      return workerDispatchIdempotencyKey(input.workflowId, input.stage, input.attempt);
-    case "card-prompt":
-      return cardPromptIdempotencyKey(
-        input.workflowId,
-        input.stage,
-        appDispatchPromptId(input.workflowId, input.stage, input.attempt),
-      );
-  }
-  throw new TypeError(`未知应用任务种类：${String(input.taskKind)}`);
-}
-
-/** 账本派生本阶段 attempt（与 drive 既有口径逐字一致：in-flight 取当前/已请求最大；否则 prior+1）。 */
-function deriveAppDispatchAttempt(context: AppDispatchContext, stage: WorkflowStage): number {
-  const priorAttempts = context.wfEvents
-    .filter((event): event is StageRequestedView => event.kind === "stage.requested" && event.stage === stage)
-    .map((event) => event.attempt);
-  const status = context.view.stages[stage].status;
-  const inFlight = status === "requested" || status === "dispatched" || status === "in-progress";
-  return inFlight
-    ? Math.max(context.view.stages[stage].attempt, ...priorAttempts, 1)
-    : Math.max(0, ...priorAttempts) + 1;
-}
-
-/** 核心入参（内部；外部桌面只经 `createAppDispatchTask`）。 */
-interface AppDispatchTaskSpec {
-  readonly taskKind: AppDispatchTaskKind;
-  readonly to: string;
-  readonly text: string;
-  readonly sideEffect: TaskSideEffect;
-  readonly attempt: number;
-  /** 恢复：`stage.requested.requestTaskId`（必须等于确定性派生值，否则 workflow-corrupt）。 */
-  readonly expectedTaskId?: string;
-  readonly promptId?: string;
-  readonly cardKind?: NonNullable<TaskCreatedEvent["cardKind"]>;
-  readonly cardDocumentRefs?: WorkflowDocumentRef[];
-  readonly cardOptions?: { id: string; label: string; recommended?: boolean }[];
-  readonly cardRecommended?: string[];
-  readonly moduleId?: string;
-  readonly moduleDirectory?: string;
-  readonly modulePaths?: string[];
-}
-
-function validateAppDispatchTaskSpec(spec: AppDispatchTaskSpec): string | undefined {
-  if (!Number.isSafeInteger(spec.attempt) || spec.attempt < 1) return `attempt 必须是正整数（收到 ${String(spec.attempt)}）。`;
-  if (!isNonEmptyText(spec.to)) return "应用任务必须给出非空目标角色（to）。";
-  if (!isNonEmptyText(spec.text)) return "应用任务文本不得为空（应用构造，非模型自报）。";
-  if (spec.taskKind === "stage-execution") {
-    if (spec.sideEffect !== "read-only" && spec.sideEffect !== "docs") return "stage-execution 只允许 sideEffect=read-only/docs。";
-    if (spec.promptId !== undefined || spec.cardKind !== undefined) return "stage-execution 不得携带 card-prompt 字段。";
-    return undefined;
-  }
-  if (spec.taskKind === "worker-dispatch") {
-    if (spec.to !== "convener") return "worker-dispatch 只允许 application→convener（Q6）。";
-    if (spec.sideEffect !== "read-only") return "worker-dispatch 必须为 sideEffect=read-only。";
-    if (spec.promptId !== undefined || spec.cardKind !== undefined) return "worker-dispatch 不得携带 card-prompt 字段。";
-    return undefined;
-  }
-  // card-prompt
-  if (spec.to !== "chief") return "card-prompt 只允许 application→chief。";
-  if (spec.sideEffect !== "read-only") return "card-prompt 必须为 sideEffect=read-only。";
-  if (spec.promptId === undefined || spec.promptId.trim() === "") return "card-prompt 必须携带非空 promptId。";
-  if (spec.cardKind === undefined) return "card-prompt 必须携带 cardKind。";
-  return undefined;
-}
-
-/** 从应用任务键解析 attempt（stage-execution/worker-dispatch 末段；card-prompt 按 promptId 反查）。 */
-function attemptOfAppDispatchTaskKey(
-  idempotencyKey: string,
-  taskKind: AppDispatchTaskKind,
-  workflowId: string,
-  stage: WorkflowStage,
-): number | undefined {
-  if (taskKind === "card-prompt") {
-    // promptId 是 (workflowId, stage, attempt) 的哈希；尝试预算有界（≤50），确定性反查。
-    for (let candidate = 1; candidate <= 50; candidate += 1) {
-      if (idempotencyKey === cardPromptIdempotencyKey(workflowId, stage, appDispatchPromptId(workflowId, stage, candidate))) {
-        return candidate;
-      }
-    }
-    return undefined;
-  }
-  const parts = idempotencyKey.split(":");
-  const attempt = Number(parts[parts.length - 1]);
-  return Number.isSafeInteger(attempt) && attempt >= 1 ? attempt : undefined;
-}
-
-/**
- * **同阶段同尝试唯一**（SMOKE-1 根因防线）：taskId 由键派生，而 stage-execution 的键含 targetRole；
- * 若两次驱动解析出不同执行者（名单变化/并发窗口），仅靠键相等无法阻止第二条任务。此处按
- * (workflowId, stage, taskKind, attempt) 槽位检查：已有任务但键不同 ⇒ fail-closed（不静默并列第二条）。
- */
-function findAppDispatchSlotConflict(
-  state: AppDispatchTaskState,
-  input: { workflowId: string; stage: WorkflowStage; taskKind: AppDispatchTaskKind; attempt: number; idempotencyKey: string },
-): TaskRecord | undefined {
-  for (const record of state.records.values()) {
-    const created = record.created;
-    if (created === undefined) continue;
-    if (created.workflowId !== input.workflowId || created.stage !== input.stage) continue;
-    if (created.taskKind !== input.taskKind) continue;
-    if (created.idempotencyKey === input.idempotencyKey) continue;
-    const attempt = attemptOfAppDispatchTaskKey(created.idempotencyKey, input.taskKind, input.workflowId, input.stage);
-    if (attempt === input.attempt) return record;
-  }
-  return undefined;
-}
-
-
-/**
- * **唯一 appl 任务创建核心**：所有应用任务（drive/observe/reconcile/select/桌面 API）都经此。
- * 前置：调用方已持有 projectRoot+workflowId 锁，并已载入 `AppDispatchContext`（同一账本快照）。
- * 幂等/唯一性由 `appendTaskEvent` 账本 guard 最终保证（同键/同 taskId ⇒ replay；冲突 ⇒ fail-closed）。
- */
-async function createAppDispatchTaskCore(
-  projectRoot: string,
-  context: AppDispatchContext,
-  workflowId: string,
-  stage: WorkflowStage,
-  spec: AppDispatchTaskSpec,
-  now: () => Date,
-): Promise<CreateAppDispatchTaskResult> {
-  const invalid = validateAppDispatchTaskSpec(spec);
-  if (invalid !== undefined) return serviceFailure("stage-request-invalid", invalid);
-  const idempotencyKey = appDispatchIdempotencyKey({
-    workflowId,
-    stage,
-    targetRoleId: spec.to,
-    taskKind: spec.taskKind,
-    attempt: spec.attempt,
-  });
-  const taskId = appDispatchTaskId(idempotencyKey);
-  if (spec.expectedTaskId !== undefined && spec.expectedTaskId !== taskId) {
-    return serviceFailure(
-      "workflow-corrupt",
-      `stage.requested.requestTaskId ${spec.expectedTaskId} 与真实任务不一致（确定性派生 ${taskId}；不猜、不自动推进）。`,
-    );
-  }
-  // 同阶段同尝试槽位唯一（键含 targetRole；执行者漂移/并发窗口不得并列第二条任务）。
-  const slotConflict = findAppDispatchSlotConflict(await readTaskState(projectRoot), {
-    workflowId, stage, taskKind: spec.taskKind, attempt: spec.attempt, idempotencyKey,
-  });
-  if (slotConflict !== undefined) {
-    return serviceFailure(
-      "workflow-corrupt",
-      `阶段 ${stage} 尝试 ${spec.attempt} 已存在任务 ${slotConflict.taskId}（→${slotConflict.created?.to ?? "?"}，键 ${slotConflict.created?.idempotencyKey ?? "?"}）；不得以不同执行者/键重复建任务。`,
-    );
-  }
-  const event = taskEvent("task.created", {
-    taskId,
-    from: "application",
-    to: spec.to,
-    text: spec.text,
-    sideEffect: spec.sideEffect,
-    idempotencyKey,
-    flowId: context.view.flowId,
-    workflowId,
-    stage,
-    taskKind: spec.taskKind,
-    ...(spec.promptId !== undefined ? { promptId: spec.promptId } : {}),
-    ...(spec.cardKind !== undefined ? { cardKind: spec.cardKind } : {}),
-    ...(spec.cardDocumentRefs !== undefined ? { cardDocumentRefs: spec.cardDocumentRefs.map((ref) => ({ ...ref })) } : {}),
-    ...(spec.cardOptions !== undefined ? { cardOptions: spec.cardOptions.map((option) => ({ ...option })) } : {}),
-    ...(spec.cardRecommended !== undefined ? { cardRecommended: [...spec.cardRecommended] } : {}),
-    ...(spec.moduleId !== undefined ? { moduleId: spec.moduleId } : {}),
-    ...(spec.moduleDirectory !== undefined ? { moduleDirectory: spec.moduleDirectory } : {}),
-    ...(spec.modulePaths !== undefined ? { modulePaths: [...spec.modulePaths] } : {}),
-  }, now);
-  const appended = await appendTaskEvent(projectRoot, event);
-  if (appended.ok !== true) {
-    return serviceFailure(
-      appended.code === "invalid-task-binding" ? "workflow-corrupt" : (appended.code ?? "stage-request-invalid"),
-      `应用任务创建被账本唯一 guard 拒绝：${appended.message}`,
-    );
-  }
-  const created = appended.created ?? event;
-  return {
-    ok: true,
-    taskId: appended.taskId ?? taskId,
-    idempotencyKey: created.idempotencyKey,
-    attempt: spec.attempt,
-    taskKind: spec.taskKind,
-    to: created.to,
-    ...(created.promptId !== undefined ? { promptId: created.promptId } : {}),
-    replay: appended.replay === true,
-  };
-}
-
-/** 桌面/route 可调的应用任务创建入参（幂等；attempt 一律由账本派生，不接受模型/调用方自报）。
- *  **对外只允许 `taskKind:"worker-dispatch"`**（应用请运营派 worker；定义阶段 B1/A11）。
- *  `stage-execution` / `card-prompt` 是阶段驱动任务，只能由 `driveAppDispatchStage` /
- *  `reconcileFixedWorkflow` 按流程/卡定义唯一创建（先建后驱会因文本/绑定不一致而冲突）。 */
-export interface CreateAppDispatchTaskInput {
-  projectRoot: string;
-  workflowId: string;
-  stage: WorkflowStage;
-  targetRoleId: string;
-  taskKind: AppDispatchTaskKind;
-  text: string;
-  sideEffect: TaskSideEffect;
-  moduleId?: string;
-  moduleDirectory?: string;
-  modulePaths?: string[];
-  now?: () => Date;
-}
-
-/** 幂等创建回执（desktop B 面；`replay=true` ⇒ 同一条任务，不追加）。 */
-export interface CreateAppDispatchTaskReceipt extends AppDispatchTaskReceipt {
-  attempt: number;
-}
-
-export type CreateAppDispatchTaskResult =
-  | ({ ok: true } & CreateAppDispatchTaskReceipt)
-  | WorkflowServiceFailure;
-
-/**
- * 幂等创建应用任务（桌面/route 的 app-dispatch API）：
- * - **只允许 `taskKind:"worker-dispatch"`**（application→convener 请派 worker；定义阶段 B1/A11）；
- *   `stage-execution` / `card-prompt` 是阶段驱动任务，按「单一创建路径」只能由
- *   `driveAppDispatchStage` / `reconcileFixedWorkflow` 按流程/卡定义创建；
- *   对外请求这两类 ⇒ 稳定拒绝 `app-dispatch-drive-required`（不得先建后驱造成文本/绑定冲突）；
- * - attempt 由账本派生；taskId 由 (workflowId, stage, targetRole, taskKind, attempt) 确定性派生；
- * - 同 tuple 重复调用 ⇒ replay 同一条任务；同 key/payload 冲突 ⇒ workflow-corrupt（fail-closed）；
- * - 进程内按 projectRoot+workflowId 串行（与 drive/observe/reconcile/select 共用锁）；
- * - **不改变阶段状态机/完成判定**：本 API 只建任务，不写任何 workflow/stage 事件；
- *   `stage.requested/stage.dispatched` 仍由既有 drive/reconcile 幂等补齐（同 taskId 复用）。
- */
-export async function createAppDispatchTask(input: CreateAppDispatchTaskInput): Promise<CreateAppDispatchTaskResult> {
-  const now = input.now ?? (() => new Date());
-  if (!isNonEmptyText(input.workflowId)) return serviceFailure("stage-request-invalid", "workflowId 缺失。");
-  if (!isWorkflowStage(input.stage)) {
-    return serviceFailure("stage-transition-invalid", `stage 非法：${String(input.stage)}。`);
-  }
-  if (!isAppDispatchTaskKind(input.taskKind)) {
-    return serviceFailure("stage-request-invalid", `taskKind 非法：${String(input.taskKind)}（只允许 ${["stage-execution", "worker-dispatch", "card-prompt"].join("/")}）。`);
-  }
-  if (input.taskKind === "stage-execution" || input.taskKind === "card-prompt") {
-    // 「单一创建路径」：阶段任务只能由 drive/reconcile 按流程/卡定义创建；桌面先建后驱会因
-    // 文本/绑定不一致触发 workflow-corrupt（测试批 API 混用缺陷）。稳定码供桌面/测试判定。
-    return serviceFailure(
-      "app-dispatch-drive-required",
-      input.taskKind === "stage-execution"
-        ? `stage-execution 任务只能由应用驱动（driveAppDispatchStage/reconcileFixedWorkflow）按流程定义创建；桌面 API 不得先建阶段任务（${input.stage}）。`
-        : `card-prompt 任务由应用驱动按卡定义创建（driveAppDispatchStage）；桌面 API 不直接建卡 prompt（${input.stage}）。`,
-    );
-  }
-  return withServiceLock(workflowLockKey(input.projectRoot, input.workflowId), async () => {
-    const context = await loadAppDispatchContext(input.projectRoot, input.workflowId);
-    if (context.ok !== true) return context;
-    const defStage = context.definition.stages.find((entry) => entry.stage === input.stage);
-    if (defStage === undefined) {
-      return serviceFailure("stage-transition-invalid", `阶段 ${input.stage} 不在流程定义 ${context.definition.id}@${context.definition.version} 内。`);
-    }
-    if (defStage.taskKind !== input.taskKind) {
-      return serviceFailure(
-        "stage-transition-invalid",
-        `阶段 ${input.stage} 的定义任务种类为 ${defStage.taskKind}，与请求 ${input.taskKind} 不一致（不建定义外任务）。`,
-      );
-    }
-    const status = context.view.stages[input.stage].status;
-    if (status === "completed") {
-      return serviceFailure("stage-transition-invalid", `阶段 ${input.stage} 已完成；不再创建应用任务。`);
-    }
-    const attempt = deriveAppDispatchAttempt(context, input.stage);
-    if (status === "blocked" && defStage.retry.highRiskNoRedispatch) {
-      return serviceFailure("stage-transition-invalid", `阶段 ${input.stage} 已 blocked 且属高风险零重派；不自动重试（交客户/运营）。`);
-    }
-    if (status === "blocked" && attempt > defStage.retry.autoRetries + 1) {
-      return serviceFailure("stage-transition-invalid", `阶段 ${input.stage} 自动重试预算已耗尽（autoRetries=${defStage.retry.autoRetries}）；交客户/运营。`);
-    }
-    if (!canRequestStage(context.view, input.stage)) {
-      return serviceFailure(
-        "stage-transition-invalid",
-        `stage 转移非法：当前 ${context.view.stage}(${context.view.stages[context.view.stage].status}) 不允许在 ${input.stage} 建任务。`,
-      );
-    }
-    return createAppDispatchTaskCore(
-      input.projectRoot,
-      context,
-      input.workflowId,
-      input.stage,
-      {
-        taskKind: input.taskKind,
-        to: input.targetRoleId,
-        text: input.text,
-        sideEffect: input.sideEffect,
-        attempt,
-        ...(input.moduleId !== undefined ? { moduleId: input.moduleId } : {}),
-        ...(input.moduleDirectory !== undefined ? { moduleDirectory: input.moduleDirectory } : {}),
-        ...(input.modulePaths !== undefined ? { modulePaths: [...input.modulePaths] } : {}),
-      },
-      now,
-    );
-  });
-}
-
-/** 任务文本模板（定义 taskText 要点 + 种类专属提示；应用构造，非模型自报）。 */
-function renderAppDispatchTaskText(
-  defStage: WorkflowStageDefinition,
-  flowId: string,
-  planned: PlannedAppDispatchTask,
-): string {
-  const lines = [
-    `${defStage.title}（${defStage.stage}）`,
-    defStage.taskText.summary,
-    ...defStage.taskText.details.map((detail) => `- ${detail}`),
-    `flowId：${flowId}；任务由应用按流程定义创建（app-dispatch/v1）；报告用 submit_report 回交，应用观察后按完成条件收口。`,
-  ];
-  if (planned.taskKind === "worker-dispatch") {
-    lines.push("运营：请按本任务派项目 worker；worker 报告与收口由你按既有 close_created_task 处理（Q6）。");
-  }
-  if (planned.taskKind === "card-prompt" && planned.cardFacts !== undefined && planned.card !== undefined) {
-    lines.push(
-      `客户卡：${planned.card.cardKind}｜promptId=${planned.cardFacts.requestId}；用 request_choice 原样回传 promptId/cardKind/选项/documentRefs（不一致 ⇒ card-prompt-mismatch，不发卡）。`,
-    );
-    lines.push(
-      `选项：${planned.cardFacts.options.map((option) => option.id).join("/") || "（按名单角色）"}`
-      + `${planned.cardFacts.recommended.length > 0 ? `；推荐：${planned.cardFacts.recommended.join("/")}` : ""}`,
-    );
-  }
-  return lines.join("\n");
-}
-
-/** 卡文档种类 → 目录/文件名后缀（版本化文档；最新版本为当前）。 */
-const CARD_DOC_KIND_LOCATIONS: Readonly<Record<string, { readonly dir: string; readonly suffix: string }>> = Object.freeze({
-  intent: { dir: "docs/product", suffix: "intent" },
-  proposal: { dir: "docs/proposals", suffix: "proposal" },
-  modules: { dir: "docs/proposals", suffix: "modules" },
-  roster: { dir: "docs/proposals", suffix: "roster" },
-  architecture: { dir: "docs/contracts", suffix: "architecture" },
-});
-
-/** 最新版本文档引用（path + bytes SHA-256 + version；应用计算，不采信模型自报）。 */
-async function latestCardDocumentRef(
-  projectRoot: string,
-  flowId: string,
-  kind: string,
-): Promise<{ ok: true; ref: FixedDocumentRef } | WorkflowServiceFailure> {
-  const location = CARD_DOC_KIND_LOCATIONS[kind];
-  if (location === undefined) return serviceFailure("card-prompt-document-invalid", `未知卡文档种类：${kind}。`);
-  let names: string[];
-  try {
-    names = await fs.readdir(path.join(projectRoot, ...location.dir.split("/")));
-  } catch {
-    return serviceFailure("baseline-document-missing", `未找到 ${location.dir}/（${flowId} 的 ${kind} 文档缺失）。`);
-  }
-  const escaped = flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`^${escaped}-${location.suffix}-v(\\d+)\\.md$`);
-  let best: { name: string; version: number } | undefined;
-  for (const name of names) {
-    const match = pattern.exec(name);
-    if (match === null) continue;
-    const version = Number(match[1]);
-    if (!Number.isSafeInteger(version) || version < 1) continue;
-    if (best === undefined || version > best.version) best = { name, version };
-  }
-  if (best === undefined) {
-    return serviceFailure(
-      "baseline-document-missing",
-      `未找到 ${location.dir}/${flowId}-${location.suffix}-vN.md（${kind} 文档缺失；不呈卡）。`,
-    );
-  }
-  const rel = `${location.dir}/${best.name}`;
-  let bytes: Buffer;
-  try {
-    bytes = await fs.readFile(path.join(projectRoot, ...rel.split("/")));
-  } catch {
-    return serviceFailure("baseline-document-unreadable", `${kind} 文档不可读：${rel}。`);
-  }
-  if (bytes.byteLength > APP_DISPATCH_DOC_MAX_BYTES) {
-    return serviceFailure("baseline-document-budget", `${kind} 文档超出读取预算：${rel}。`);
-  }
-  return { ok: true, ref: { kind, path: rel, sha256: sha256Of(bytes), version: best.version } };
-}
-
-/** 应用计算的卡 prompt 事实（documentRefs/选项/推荐集）。 */
-interface AppDispatchCardPromptFacts {
-  readonly requestId: string;
-  readonly documentRefs: FixedDocumentRef[];
-  readonly options: { id: string; label: string; recommended?: boolean }[];
-  readonly recommended: string[];
-}
-
-/**
- * 计算卡 prompt 事实（应用侧）：
- * - documentRefs = 定义声明的版本化文档（path+version+字节 SHA-256）；
- * - A3 intent 卡：保留 B24——呈卡前校验 `docs/intents/<intentId>.md` 入口存在且与产品意图一致；
- * - appointment（optionIds 为空）：选项/推荐集 = 最新名单角色 id（应用从名单生成，不采信模型自报）。
- */
-async function computeAppDispatchCardPrompt(input: {
-  projectRoot: string;
-  flowId: string;
-  card: WorkflowCardDefinition;
-  requestId: string;
-}): Promise<({ ok: true } & AppDispatchCardPromptFacts) | WorkflowServiceFailure> {
-  const documentRefs: FixedDocumentRef[] = [];
-  for (const kind of input.card.documentKinds) {
-    const resolved = await latestCardDocumentRef(input.projectRoot, input.flowId, kind);
-    if (resolved.ok !== true) return resolved;
-    documentRefs.push(resolved.ref);
-  }
-  const intentRef = documentRefs.find((ref) => ref.kind === "intent");
-  if (intentRef !== undefined) {
-    let text: string;
-    try {
-      text = await fs.readFile(path.join(input.projectRoot, ...intentRef.path.split("/")), "utf8");
-    } catch {
-      return serviceFailure("baseline-document-missing", `意图不可读：${intentRef.path}。`);
-    }
-    const front = frontmatterRecord(text);
-    const intentId = front !== undefined && typeof front["intentId"] === "string" ? front["intentId"].trim() : undefined;
-    const facts = await readIntentEntryFacts({
-      projectRoot: input.projectRoot,
-      flowId: input.flowId,
-      productIntentPath: intentRef.path,
-    });
-    if (intentId === undefined || facts.intentEntryExists !== true || facts.intentEntryIntentId !== intentId) {
-      return serviceFailure(
-        "intent-entry-missing",
-        `意图入口缺失或 intentId 不一致：docs/intents/${intentId ?? "<intentId>"}.md（B24；不呈卡）。`,
-        ["docs/intents/<intentId>.md"],
-      );
-    }
-  }
-  if (input.card.optionIds.length > 0) {
-    const options = input.card.optionIds.map((id) => ({
-      id,
-      label: id,
-      ...(input.card.recommended.includes(id) ? { recommended: true } : {}),
-    }));
-    return { ok: true, requestId: input.requestId, documentRefs, options, recommended: [...input.card.recommended] };
-  }
-  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId: input.flowId });
-  if (roster.ok !== true) {
-    return serviceFailure("baseline-document-missing", `任命卡需要最新名单：${roster.reason}`);
-  }
-  const roleIds = roster.roster.roles.map((role) => role.id);
-  if (roleIds.length === 0) {
-    return serviceFailure("baseline-document-missing", "任命卡名单角色为空（不呈卡）。");
-  }
-  return {
-    ok: true,
-    requestId: input.requestId,
-    documentRefs,
-    options: roleIds.map((id) => ({ id, label: id, recommended: true })),
-    recommended: roleIds,
-  };
-}
-
-interface PlannedAppDispatchTask {
-  readonly key: string;
-  readonly taskKind: AppDispatchTaskKind;
-  readonly to: string;
-  readonly executorKind: WorkflowStageExecutorKind;
-  readonly sideEffect: TaskSideEffect;
-  readonly promptId?: string;
-  readonly cardFacts?: AppDispatchCardPromptFacts;
-  readonly card?: WorkflowCardDefinition;
-}
-
-type AppDispatchReviewRoleResolution =
-  | { ok: true; roleId: string }
-  | { ok: false; reason: string; blockFact: BlockFact };
-
-/**
- * 验收角色解析（Q3）：roster `roles[].review===true` 优先，否则内置 verifier（不采信模型自报）。
- * 2026-11-20（block resolver 地基）：**名单不可读不再静默回落 verifier**——返回明确歧义事实
- * （`review-role-unavailable` + blockFact，B1 属主修复），由 resolver 路由；测试批覆盖。
- */
-async function resolveAppDispatchReviewRole(input: {
-  projectRoot: string;
-  flowId: string;
-  workflowId: string;
-  stage: WorkflowStage;
-}): Promise<AppDispatchReviewRoleResolution> {
-  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId: input.flowId });
-  if (roster.ok !== true) {
-    return {
-      ok: false,
-      reason: `${roster.code}: ${roster.reason}`,
-      blockFact: blockFactFromServiceFailure({
-        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-        code: "review-role-unavailable",
-        detailCode: "roster-unreadable",
-        message: `名单不可读（${roster.code}）；不再静默回落 verifier（供 resolver 路由属主修复）。`,
-        workflowId: input.workflowId,
-        flowId: input.flowId,
-        stage: input.stage,
-        source: "workflow-service.resolveAppDispatchReviewRole",
-        ownerRoleId: "rapporteur",
-      }),
-    };
-  }
-  return { ok: true, roleId: reviewRoleIdOfRoster(roster.roster) };
-}
-
-/** 按定义规划本阶段任务（主任务一个；B1 的 rapporteur 分支由应用按 B1 报告另行直派）。 */
-async function planAppDispatchStageTasks(input: {
-  projectRoot: string;
-  workflowId: string;
-  flowId: string;
-  stage: WorkflowStage;
-  defStage: WorkflowStageDefinition;
-  attempt: number;
-}): Promise<{ ok: true; tasks: PlannedAppDispatchTask[] } | WorkflowServiceFailure> {
-  const { defStage } = input;
-  if (defStage.taskKind === "stage-execution") {
-    let to: string;
-    let executorKind: WorkflowStageExecutorKind;
-    if (defStage.executor === "review") {
-      const resolved = await resolveAppDispatchReviewRole({
-        projectRoot: input.projectRoot,
-        flowId: input.flowId,
-        workflowId: input.workflowId,
-        stage: input.stage,
-      });
-      if (resolved.ok !== true) {
-        return {
-          ok: false,
-          code: "review-role-unavailable",
-          message: `阶段 ${input.stage} 验收角色不可解析：${resolved.reason}（名单不可读不再静默回落 verifier；交 block resolver 路由）。`,
-          blockFact: resolved.blockFact,
-        };
-      }
-      to = resolved.roleId;
-      executorKind = "review";
-    } else {
-      const role = defStage.executorRole;
-      if (role === undefined || role === "review-role") {
-        return serviceFailure("workflow-definition-unknown", `阶段 ${input.stage} 缺少内置执行者（定义非法）。`);
-      }
-      to = role;
-      executorKind = "built-in";
-    }
-    return {
-      ok: true,
-      tasks: [{
-        key: stageExecutionIdempotencyKey(input.workflowId, input.stage, to, input.attempt),
-        taskKind: "stage-execution",
-        to,
-        executorKind,
-        sideEffect: defStage.sideEffect,
-      }],
-    };
-  }
-  if (defStage.taskKind === "worker-dispatch") {
-    return {
-      ok: true,
-      tasks: [{
-        key: workerDispatchIdempotencyKey(input.workflowId, input.stage, input.attempt),
-        taskKind: "worker-dispatch",
-        to: "convener",
-        executorKind: "worker-dispatch",
-        sideEffect: "read-only",
-      }],
-    };
-  }
-  if (defStage.taskKind === "card-prompt") {
-    if (defStage.card === undefined) {
-      return serviceFailure("workflow-definition-unknown", `阶段 ${input.stage} 缺少卡定义（定义非法）。`);
-    }
-    const requestId = appDispatchPromptId(input.workflowId, input.stage, input.attempt);
-    const facts = await computeAppDispatchCardPrompt({
-      projectRoot: input.projectRoot,
-      flowId: input.flowId,
-      card: defStage.card,
-      requestId,
-    });
-    if (facts.ok !== true) return facts;
-    return {
-      ok: true,
-      tasks: [{
-        key: cardPromptIdempotencyKey(input.workflowId, input.stage, requestId),
-        taskKind: "card-prompt",
-        to: "chief",
-        executorKind: "card-prompt",
-        sideEffect: "read-only",
-        promptId: requestId,
-        cardFacts: facts,
-        card: defStage.card,
-      }],
-    };
-  }
-  return serviceFailure("stage-transition-invalid", `阶段 ${input.stage} 无任务（application/aggregate）；不驱动。`);
-}
-
-/** 默认驱动阶段：当前阶段未完成 ⇒ 同阶段（重试/恢复）；已完成 ⇒ driveOrder 中首个可请求且有任务的阶段。 */
-function selectDefaultDriveStage(view: WorkflowView, definition: WorkflowDefinition): WorkflowStage | undefined {
-  if (view.stages[view.stage].status !== "completed") return view.stage;
-  for (const stage of definition.driveOrder) {
-    if (view.stages[stage].status === "completed") continue;
-    if (!canRequestStage(view, stage)) continue;
-    const defStage = definition.stages.find((entry) => entry.stage === stage);
-    if (defStage === undefined || defStage.taskKind === "none") continue;
-    return stage;
-  }
-  return undefined;
-}
-
-/** `select_workflow`：幕僚显式选流程（A/B + 可选验收强度），应用写 `workflow.started` 并启动首阶段。 */
-export interface SelectWorkflowInput {
-  projectRoot: string;
-  flowId: string;
-  /** A＝新增 / B＝修改（定义 id 默认 add/modify）。 */
-  workflowPath: WorkflowPath;
-  definitionId?: string;
-  definitionVersion?: number;
-  /** Q2：验收强度参数（缺省 = 定义默认 standard）。 */
-  acceptanceStrength?: WorkflowAcceptanceStrength;
-  /** chief 当前真实客户轮次 id（host 捕获；缺失 ⇒ `stage-request-source-missing`）。 */
-  sourceTaskId?: string;
-  /** 显式 workflowId（可选；首请求须等于确定性计算值，不采信模型自报）。 */
-  workflowId?: string;
-  reason?: string;
-  now?: () => Date;
-}
-
-export interface AppDispatchTaskReceipt {
-  taskId: string;
-  idempotencyKey: string;
-  taskKind: AppDispatchTaskKind;
-  to: string;
-  promptId?: string;
-  replay: boolean;
-}
-
-export interface SelectWorkflowReceipt {
-  workflowId: string;
-  flowId: string;
-  workflowPath: WorkflowPath;
-  protocol: typeof WORKFLOW_PROTOCOL_APP_DISPATCH;
-  definition: { id: string; version: number; sha256: string };
-  acceptanceStrength: AcceptanceStrength;
-  stage: WorkflowStage;
-  tasks: AppDispatchTaskReceipt[];
-  replay: boolean;
-}
-
-export type SelectWorkflowResult = ({ ok: true } & SelectWorkflowReceipt) | WorkflowServiceFailure;
-
-/**
- * 2026-11-20（SMOKE-1 seams）：select 的「读活动 workflow → 写 workflow.started → 首阶段驱动」整段
- * 按 projectRoot 串行（两个并发 select 不得同时看到「无活动 workflow」而各启一条）；内部驱动在
- * project 锁内再取 workflow 锁（锁序固定 project→workflow，其它入口只取 workflow 锁，无死锁）。
- */
-export async function selectWorkflow(input: SelectWorkflowInput): Promise<SelectWorkflowResult> {
-  return withServiceLock(projectLockKey(input.projectRoot), () => selectWorkflowLocked(input));
-}
-
-async function selectWorkflowLocked(input: SelectWorkflowInput): Promise<SelectWorkflowResult> {
-  const now = input.now ?? (() => new Date());
-  const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
-  if (!isWorkflowSlug(flowId)) {
-    return serviceFailure("stage-request-invalid", `flowId 非法（须小写 slug）：${String(input.flowId)}`);
-  }
-  if (!isWorkflowPath(input.workflowPath)) {
-    return serviceFailure("stage-request-invalid", "workflowPath 只允许 A/B。");
-  }
-  if (!isNonEmptyText(input.sourceTaskId)) {
-    return serviceFailure(
-      "stage-request-source-missing",
-      "select_workflow 未受理：缺少 chief 当前真实客户轮次（sourceTaskId 由 host 捕获，不可模型自报）。",
-      ["sourceTaskId"],
-    );
-  }
-  const definitionId = input.definitionId ?? workflowDefinitionIdForPath(input.workflowPath);
-  const lookup = getWorkflowDefinition(definitionId, input.definitionVersion);
-  if (lookup.ok !== true) return serviceFailure(lookup.code, lookup.message);
-  if (lookup.definition.path !== input.workflowPath) {
-    return serviceFailure(
-      "workflow-definition-unknown",
-      `流程定义 ${lookup.definition.id} 属于路径 ${lookup.definition.path}，与请求路径 ${input.workflowPath} 不一致。`,
-    );
-  }
-  if (input.acceptanceStrength !== undefined && !isWorkflowAcceptanceStrength(input.acceptanceStrength)) {
-    return serviceFailure(
-      "stage-request-invalid",
-      `验收强度非法：${String(input.acceptanceStrength)}（只允许 ${ACCEPTANCE_STRENGTHS.join("/")}）。`,
-    );
-  }
-  const strength: AcceptanceStrength = input.acceptanceStrength ?? lookup.definition.acceptance.defaultStrength;
-
-  const ledger = await readWorkflowLedger(input.projectRoot);
-  const events = ledger.events;
-  const active = activeWorkflowIdsOf(events);
-  const activeForFlow = active.filter((id) => workflowEventList(events, id).some((event) => event.flowId === flowId));
-  const startKey = workflowStartIdempotencyKey(flowId, input.workflowPath, input.sourceTaskId);
-  const existingStart = events.find(
-    (event): event is WorkflowStartedView => event.kind === "workflow.started" && event.idempotencyKey === startKey,
-  );
-  let workflowId: string;
-  let replay = false;
-  if (existingStart !== undefined) {
-    // 幂等重放：同一 start 键只接受同定义/同参数；不同 ⇒ fail-closed（不静默迁移）。
-    if (workflowProtocolOf(existingStart) !== WORKFLOW_PROTOCOL_APP_DISPATCH
-      || existingStart.definition?.id !== lookup.definition.id
-      || existingStart.definition?.sha256 !== lookup.hash) {
-      return serviceFailure(
-        "workflow-definition-version-unsupported",
-        `同一 workflow-start 键已存在不同定义/协议的工作流 ${existingStart.workflowId}；不静默迁移。`,
-      );
-    }
-    const requestedStrength = existingStart.parameters?.acceptanceStrength
-      ?? lookup.definition.acceptance.defaultStrength;
-    if (requestedStrength !== strength) {
-      return serviceFailure(
-        "stage-request-invalid",
-        `同一 workflow-start 键已按验收强度 ${requestedStrength} 启动；不得重放为 ${strength}。`,
-      );
-    }
-    workflowId = existingStart.workflowId;
-    replay = true;
-  } else if (activeForFlow.length > 1) {
-    return serviceFailure("workflow-active-conflict", `flow ${flowId} 存在多个活动 fixed workflow；不猜。`);
-  } else if (activeForFlow.length === 1) {
-    const firstId = activeForFlow[0]!;
-    const first = workflowEventList(events, firstId).find(
-      (event): event is WorkflowStartedView => event.kind === "workflow.started",
-    );
-    const sameDefinition = first !== undefined
-      && workflowProtocolOf(first) === WORKFLOW_PROTOCOL_APP_DISPATCH
-      && first.definition?.id === lookup.definition.id
-      && first.definition?.sha256 === lookup.hash
-      && (first.parameters?.acceptanceStrength ?? lookup.definition.acceptance.defaultStrength) === strength;
-    if (!sameDefinition) {
-      return serviceFailure(
-        "workflow-active-conflict",
-        `flow ${flowId} 已有活动 fixed workflow ${firstId}（定义/协议/验收强度不同）；不猜、不覆盖。`,
-      );
-    }
-    workflowId = firstId;
-    replay = true;
-  } else {
-    const otherActive = active.filter((id) => !workflowEventList(events, id).some((event) => event.flowId === flowId));
-    if (otherActive.length > 0) {
-      return serviceFailure(
-        "workflow-workspace-busy",
-        `项目已有活动 fixed workflow（${otherActive[0]}）；每项目同时至多一个活动 fixed workflow。`,
-      );
-    }
-    const requestDigest = sha256Of(`${lookup.hash}|acceptance:${strength}`);
-    workflowId = workflowIdFor(flowId, input.workflowPath, input.sourceTaskId, requestDigest);
-    if (input.workflowId !== undefined && input.workflowId !== workflowId) {
-      return serviceFailure(
-        "stage-request-invalid",
-        `首请求 workflowId 必须是确定性计算值 ${workflowId}（收到 ${input.workflowId}；不采信模型自报）。`,
-      );
-    }
-  }
-
-  if (!replay) {
-    const legacy = await detectLegacyStateIgnored(input.projectRoot);
-    const started: WorkflowEvent = {
-      v: 1,
-      at: now().toISOString(),
-      schema: WORKFLOW_LEDGER_SCHEMA,
-      kind: "workflow.started",
-      workflowId,
-      flowId,
-      path: input.workflowPath,
-      idempotencyKey: startKey,
-      trigger: { by: "chief", reason: isNonEmptyText(input.reason) ? input.reason : "chief select_workflow" },
-      sourceTaskId: input.sourceTaskId,
-      protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-      definition: { id: lookup.definition.id, version: lookup.definition.version, sha256: lookup.hash },
-      parameters: { acceptanceStrength: strength },
-      ...(legacy.present ? { legacyStateIgnored: true } : {}),
-    };
-    const appended = await appendWorkflowEvent(input.projectRoot, started);
-    if (appended.ok !== true) {
-      return serviceFailure("workflow-ledger-write-failed", `workflow.started 写入失败：${appended.message}`);
-    }
-    if (appended.replay) replay = true;
-  }
-
-  const firstStage = lookup.definition.driveOrder[0];
-  if (firstStage === undefined) {
-    return serviceFailure("workflow-definition-unknown", `流程定义 ${lookup.definition.id} 未声明阶段顺序（定义非法）。`);
-  }
-  // 幂等重放：首阶段任务已存在 ⇒ 直接返回该任务（不重复驱动；后续阶段由正常驱动/对账推进）。
-  if (replay) {
-    const firstDef = lookup.definition.stages.find((entry) => entry.stage === firstStage);
-    let firstKey: string | undefined;
-    if (firstDef?.taskKind === "stage-execution" && firstDef.executorRole !== undefined
-      && firstDef.executorRole !== "review-role") {
-      firstKey = stageExecutionIdempotencyKey(workflowId, firstStage, firstDef.executorRole, 1);
-    } else if (firstDef?.taskKind === "worker-dispatch") {
-      firstKey = workerDispatchIdempotencyKey(workflowId, firstStage, 1);
-    }
-    if (firstKey !== undefined) {
-      const replayState = await readTaskState(input.projectRoot);
-      const replayTask = findTaskByIdempotencyKey(replayState, firstKey);
-      if (replayTask?.created !== undefined) {
-        return {
-          ok: true,
-          workflowId,
-          flowId,
-          workflowPath: input.workflowPath,
-          protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-          definition: { id: lookup.definition.id, version: lookup.definition.version, sha256: lookup.hash },
-          acceptanceStrength: strength,
-          stage: firstStage,
-          tasks: [{
-            taskId: replayTask.taskId,
-            idempotencyKey: firstKey,
-            taskKind: replayTask.created.taskKind as AppDispatchTaskKind,
-            to: replayTask.created.to,
-            ...(replayTask.created.promptId !== undefined ? { promptId: replayTask.created.promptId } : {}),
-            replay: true,
-          }],
-          replay: true,
-        };
-      }
-    }
-  }
-  const driven = await withServiceLock(
-    workflowLockKey(input.projectRoot, workflowId),
-    () => driveAppDispatchStageLocked({ projectRoot: input.projectRoot, workflowId, stage: firstStage, now }),
-  );
-  if (driven.ok !== true) return driven;
-  return {
-    ok: true,
-    workflowId,
-    flowId,
-    workflowPath: input.workflowPath,
-    protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-    definition: { id: lookup.definition.id, version: lookup.definition.version, sha256: lookup.hash },
-    acceptanceStrength: strength,
-    stage: driven.stage,
-    tasks: driven.tasks,
-    replay: replay || driven.replay,
-  };
-}
-
-export interface DriveAppDispatchStageInput {
-  projectRoot: string;
-  workflowId: string;
-  /** 缺省 = 当前阶段（未完成）/ driveOrder 首个可请求阶段（已完成）。 */
-  stage?: WorkflowStage;
-  now?: () => Date;
-}
-
-export interface DriveAppDispatchStageReceipt {
-  workflowId: string;
-  stage: WorkflowStage;
-  attempt: number;
-  tasks: AppDispatchTaskReceipt[];
-  requested: boolean;
-  dispatched: boolean;
-  completed: boolean;
-  replay: boolean;
-  /**
-   * 2026-11-20（SMOKE-3 S3 地基）：有界等待回执（如 A3 卡 prompt 的前置入口
-   * `docs/intents/<intentId>.md` 尚未落盘）。**成功形态、不是失败**：
-   * 检查发生在 stage.requested 等第一笔写之前 ⇒ `tasks=[]`、`requested/dispatched/completed=false`、
-   * 不写任何 workflow/task 事件、不产生 blockFact；入口出现后下一次 drive 正常走既有路径
-   * （等待期间重复 drive 仍为零事件幂等）。
-   */
-  waiting?: { code: string; message: string };
-}
-
-export type DriveAppDispatchStageResult = ({ ok: true } & DriveAppDispatchStageReceipt) | WorkflowServiceFailure;
-
-/**
- * 驱动一个阶段（app-dispatch/v1）：`stage.requested` → `task.created`（from:"application"）→
- * `stage.dispatched`（issuedBy:"application" + executorKind）。
- * - 幂等：taskId 由幂等键确定性派生；同键任务存在 ⇒ 复用（不重复投递）；同尝试已请求 ⇒ 不重复请求；
- * - A1/A4/A7：完成于 `stage.dispatched`（沿用 DISPATCH_COMPLETES；receipt.completed=true）；
- * - A11/B3：worker-dispatch 任务由运营派 worker 并收口（Q6）；应用只按阶段完成条件判定；
- * - 卡阶段：先写 `request.created`（应用计算 documentRefs/promptId），再建 `card-prompt` 任务给幕僚。
- *
- * 2026-11-20（SMOKE-1 seams）：公开入口按 projectRoot+workflowId 串行；任务创建收敛到
- * `createAppDispatchTaskCore`（确定性 taskId + 账本唯一 guard）。并发双触发 ⇒ 同一条任务。
- */
-export async function driveAppDispatchStage(input: DriveAppDispatchStageInput): Promise<DriveAppDispatchStageResult> {
-  return withServiceLock(
-    workflowLockKey(input.projectRoot, input.workflowId),
-    () => driveAppDispatchStageLocked(input),
-  );
-}
-
-async function driveAppDispatchStageLocked(input: DriveAppDispatchStageInput): Promise<DriveAppDispatchStageResult> {
-  const now = input.now ?? (() => new Date());
-  const context = await loadAppDispatchContext(input.projectRoot, input.workflowId);
-  if (context.ok !== true) return context;
-  const { definition, view } = context;
-  const targetStage = input.stage ?? selectDefaultDriveStage(view, definition);
-  if (targetStage === undefined) {
-    return serviceFailure(
-      "stage-transition-invalid",
-      `workflow ${input.workflowId} 当前没有可驱动的任务阶段（当前 ${view.stage}）；检查卡/聚合/关闭状态。`,
-    );
-  }
-  if (!isWorkflowStage(targetStage)) {
-    return serviceFailure("stage-transition-invalid", `stage 非法：${String(targetStage)}`);
-  }
-  const defStage = definition.stages.find((entry) => entry.stage === targetStage);
-  if (defStage === undefined) {
-    return serviceFailure("stage-transition-invalid", `阶段 ${targetStage} 不在流程定义 ${definition.id}@${definition.version} 内。`);
-  }
-  if (defStage.taskKind === "none") {
-    return serviceFailure(
-      "stage-transition-invalid",
-      targetStage === "B2"
-        ? "B2 由应用确定性派生（recordChangeScopeDecision），不建任务、不发 stage-request。"
-        : "A12 由 A12b accepted + 归档后应用聚合完成（无任务）。",
-    );
-  }
-  if (targetStage === "A11" && view.stages.A12a.status === "pending") {
-    return serviceFailure("stage-transition-invalid", "A11 派发前必须先创建 A12a criteria 任务（AC-09：实施前写标准）。");
-  }
-  if (!canRequestStage(view, targetStage)) {
-    return serviceFailure(
-      "stage-transition-invalid",
-      `stage 转移非法：当前 ${view.stage}(${view.stages[view.stage].status}) 不允许推进 ${targetStage}。`,
-    );
-  }
-  const status = view.stages[targetStage].status;
-  const attempt = deriveAppDispatchAttempt(context, targetStage);
-  if (status === "blocked" && defStage.retry.highRiskNoRedispatch) {
-    return serviceFailure(
-      "stage-transition-invalid",
-      `阶段 ${targetStage} 已 blocked 且属高风险零重派；不自动重试（交客户/运营）。`,
-    );
-  }
-  if (status === "blocked" && attempt > defStage.retry.autoRetries + 1) {
-    return serviceFailure(
-      "stage-transition-invalid",
-      `阶段 ${targetStage} 自动重试预算已耗尽（autoRetries=${defStage.retry.autoRetries}）；交客户/运营。`,
-    );
-  }
-  const plan = await planAppDispatchStageTasks({
-    projectRoot: input.projectRoot,
-    workflowId: input.workflowId,
-    flowId: view.flowId,
-    stage: targetStage,
-    defStage,
-    attempt,
-  });
-  if (plan.ok !== true) {
-    // 2026-11-20（SMOKE-3 S3 地基）：卡 prompt 事实计算的入口前置检查（`docs/intents/<intentId>.md`，
-    // computeAppDispatchCardPrompt 的唯一 intent-entry-missing 出口）尚未就绪 ⇒ **有界等待回执**：
-    // 成功形态、零事件/零任务/不产生 blockFact（检查先于 stage.requested 第一笔写）。
-    // 入口出现后下一次 drive 走既有路径；等待期间重复 drive 仍返回等待、零事件。
-    if (plan.code === "intent-entry-missing") {
-      return {
-        ok: true,
-        workflowId: input.workflowId,
-        stage: targetStage,
-        attempt,
-        tasks: [],
-        requested: false,
-        dispatched: false,
-        completed: false,
-        replay: false,
-        waiting: { code: plan.code, message: plan.message },
-      };
-    }
-    return plan;
-  }
-  const primary = plan.tasks[0];
-  if (primary === undefined) return serviceFailure("workflow-definition-unknown", `阶段 ${targetStage} 任务计划为空（定义非法）。`);
-
-  // 1) stage.requested（事件先写、携带 taskId；taskId 由幂等键确定性派生）。
-  const existingRequest = context.wfEvents.find(
-    (event): event is StageRequestedView =>
-      event.kind === "stage.requested" && event.stage === targetStage && event.attempt === attempt,
-  );
-  const primaryTaskId = existingRequest?.requestTaskId ?? appDispatchTaskId(primary.key);
-  if (existingRequest === undefined) {
-    const requestEvent: WorkflowEvent = {
-      v: 1,
-      at: now().toISOString(),
-      schema: WORKFLOW_LEDGER_SCHEMA,
-      kind: "stage.requested",
-      workflowId: input.workflowId,
-      flowId: view.flowId,
-      path: view.path,
-      idempotencyKey: stageRequestIdempotencyKey(input.workflowId, targetStage, attempt),
-      stage: targetStage,
-      ...(view.stage !== targetStage ? { fromStage: view.stage } : {}),
-      requestTaskId: primaryTaskId,
-      requestDigest: sha256Of(`${context.definitionHash}|${targetStage}|${attempt}|${primary.executorKind}|${primary.to}`),
-      attempt,
-      issuedBy: "application",
-    };
-    const appended = await appendWorkflowEvent(input.projectRoot, requestEvent);
-    if (appended.ok !== true) {
-      return serviceFailure("workflow-ledger-write-failed", `stage.requested ${targetStage} 写入失败：${appended.message}`);
-    }
-  }
-
-  // 2) 任务创建（唯一核心：确定性 taskId + 账本唯一 guard；卡阶段先写 request.created）。
-  const receipts: AppDispatchTaskReceipt[] = [];
-  for (let index = 0; index < plan.tasks.length; index += 1) {
-    const planned = plan.tasks[index]!;
-    if (planned.taskKind === "card-prompt" && planned.cardFacts !== undefined && planned.card !== undefined) {
-      const facts = planned.cardFacts;
-      const existingRequestRow = context.taskState.events.find(
-        (event) => event.kind === "request.created" && event.requestId === facts.requestId,
-      );
-      if (existingRequestRow === undefined) {
-        const titleByKind: Readonly<Record<string, string>> = {
-          "intent-confirm": "意图确认",
-          proposal: "方案确认",
-          appointment: "任命确认",
-          decision: "材料性选择",
-          acceptance: "验收确认",
-        };
-        const requestCreated = taskEvent("request.created", {
-          requestId: facts.requestId,
-          flowId: view.flowId,
-          cardKind: planned.card.cardKind,
-          workflowId: input.workflowId,
-          stage: targetStage,
-          promptId: facts.requestId,
-          sourceRoleId: "application",
-          title: titleByKind[planned.card.cardKind] ?? planned.card.cardKind,
-          options: facts.options.map((option) => ({ ...option })),
-          ...(facts.recommended.length > 0 ? { recommended: [...facts.recommended] } : {}),
-          ...(facts.documentRefs.length > 0
-            ? { documentRefs: facts.documentRefs.map((ref) => ({ ...ref })) }
-            : {}),
-        }, now);
-        const requestAppended = await appendTaskEvent(input.projectRoot, requestCreated);
-        if (requestAppended.ok !== true) {
-          return serviceFailure(
-            requestAppended.code ?? "stage-request-invalid",
-            `request.created 写入失败：${requestAppended.message}`,
-          );
-        }
-      }
-    }
-    const cardFacts = planned.taskKind === "card-prompt" ? planned.cardFacts : undefined;
-    const card = planned.taskKind === "card-prompt" ? planned.card : undefined;
-    const task = await createAppDispatchTaskCore(
-      input.projectRoot,
-      context,
-      input.workflowId,
-      targetStage,
-      {
-        taskKind: planned.taskKind,
-        to: planned.to,
-        text: renderAppDispatchTaskText(defStage, view.flowId, planned),
-        sideEffect: planned.sideEffect,
-        attempt,
-        ...(index === 0 ? { expectedTaskId: primaryTaskId } : {}),
-        ...(planned.promptId !== undefined ? { promptId: planned.promptId } : {}),
-        ...(cardFacts !== undefined && card !== undefined
-          ? {
-              cardKind: card.cardKind,
-              ...(cardFacts.documentRefs.length > 0
-                ? { cardDocumentRefs: cardFacts.documentRefs.map((ref) => ({ ...ref })) }
-                : {}),
-              ...(cardFacts.options.length > 0
-                ? { cardOptions: cardFacts.options.map((option) => ({ ...option })) }
-                : {}),
-              ...(cardFacts.recommended.length > 0
-                ? { cardRecommended: [...cardFacts.recommended] }
-                : {}),
-            }
-          : {}),
-      },
-      now,
-    );
-    if (task.ok !== true) return task;
-    receipts.push({
-      taskId: task.taskId,
-      idempotencyKey: task.idempotencyKey,
-      taskKind: task.taskKind,
-      to: task.to,
-      ...(task.promptId !== undefined ? { promptId: task.promptId } : {}),
-      replay: task.replay,
-    });
-  }
-
-  // 3) stage.dispatched（每任务一条；幂等键 stage-dispatch:<wf>:<stage>:<taskId>）。
-  let dispatched = false;
-  const afterLedger = await readWorkflowLedger(input.projectRoot);
-  const afterTasks = await readTaskState(input.projectRoot);
-  let afterView = deriveWorkflowView(workflowEventList(afterLedger.events, input.workflowId), afterTasks.events);
-  const vfAfter = viewFailure(afterView, WORKFLOW_PROTOCOL_APP_DISPATCH);
-  if (vfAfter !== undefined) return vfAfter;
-  for (const receipt of receipts) {
-    const dispatchKey = `stage-dispatch:${input.workflowId}:${targetStage}:${receipt.taskId}`;
-    const already = workflowEventList(afterLedger.events, input.workflowId)
-      .some((event) => event.kind === "stage.dispatched" && event.idempotencyKey === dispatchKey);
-    if (already) {
-      dispatched = true;
-      continue;
-    }
-    if (!canDispatchStage(afterView, targetStage)) continue;
-    const executorKind = plan.tasks.find((task) => task.key === receipt.idempotencyKey)?.executorKind ?? "built-in";
-    const dispatchEvent: WorkflowEvent = {
-      v: 1,
-      at: now().toISOString(),
-      schema: WORKFLOW_LEDGER_SCHEMA,
-      kind: "stage.dispatched",
-      workflowId: input.workflowId,
-      flowId: afterView.flowId,
-      path: afterView.path,
-      idempotencyKey: dispatchKey,
-      stage: targetStage,
-      taskId: receipt.taskId,
-      targetRoleId: receipt.to,
-      issuedBy: "application",
-      executorKind,
-    };
-    const appended = await appendWorkflowEvent(input.projectRoot, dispatchEvent);
-    if (appended.ok !== true) {
-      return serviceFailure("workflow-ledger-write-failed", `stage.dispatched ${targetStage} 写入失败：${appended.message}`);
-    }
-    dispatched = true;
-    const reread = await readWorkflowLedger(input.projectRoot);
-    afterView = deriveWorkflowView(workflowEventList(reread.events, input.workflowId), afterTasks.events);
-  }
-  const completed = defStage.completion === "on-dispatch" || afterView.stages[targetStage].status === "completed";
-  return {
-    ok: true,
-    workflowId: input.workflowId,
-    stage: targetStage,
-    attempt,
-    tasks: receipts,
-    requested: true,
-    dispatched,
-    completed,
-    replay: existingRequest !== undefined && receipts.every((receipt) => receipt.replay),
-  };
-}
-
-// —————————————— 2026-11-20（SMOKE-2 S1）：block resolved 后阶段重入场 ——————————————
-//
-// B8 owner-repair / B9 决策在 block 记 `resolved(fixed|decided)` 之后，阶段仍停在 `stage.blocked`；
-// `driveAppDispatchStage` 对 blocked 阶段的预算拒绝只约束**普通自动重试**（Q8）。block 的解法是
-// 既成事实（blocks.jsonl，应用写入），阶段重入必须是一条显式账本事件：
-// `stage.reworked`（带 `blockId`，`stage === reworkOf === 当前 blocked 阶段`，新 attempt），随后才 drive。
-// 幂等：同一 (blockId, stage) 只写一条 rework；attempt/幂等键由账本确定性派生；重复调用复跑
-// drive（同 attempt/同任务键 ⇒ replay）；并发由 projectRoot+workflowId 锁串行（与 drive/reconcile 共用）。
-
-/** 允许阶段重入场的 block 决策选项（修订/返工/换执行者/限次重试；设计 §7.3）。 */
-export const BLOCK_STAGE_REENTRY_OPTION_IDS: readonly string[] = Object.freeze([
-  "block-revise-scope",
-  "block-rework",
-  "block-replace-executor",
-  "block-retry-with-cap",
-]);
-
-/** block 终态后阶段重入场输入（桌面 `executeChosenOption` / `reEnterAfterFixed` 调用）。 */
-export interface ReenterBlockedStageAfterResolutionInput {
-  projectRoot: string;
-  workflowId: string;
-  /** 当前 blocked 的阶段（与 block 账本记录的 stage 一致，若账本有记录）。 */
-  stage: WorkflowStage;
-  /** blocks.jsonl 中已 `block.resolved` 的 block id。 */
-  blockId: string;
-  /** 调用方期望的终态；必须与账本事实一致（应用事实，不采信调用方自报）。 */
-  resolution: "fixed" | "decided";
-  reason?: string;
-  now?: () => Date;
-}
-
-/** 已写入/已存在的同阶段重入场事实。 */
-export interface BlockStageReentryReceipt {
-  stage: WorkflowStage;
-  attempt: number;
-  /** `stage.reworked` 事件幂等键（账本内 id）。 */
-  eventId: string;
-  /** 新 attempt 的应用任务 id（drive 成功后回填）。 */
-  taskId?: string;
-}
-
-export interface ReenterBlockedStageAfterResolutionReceipt {
-  workflowId: string;
-  stage: WorkflowStage;
-  /** `already-completed` / `already-in-flight` 时缺省（不写 rework）。 */
-  reentry?: BlockStageReentryReceipt;
-  /** drive 回执（新 attempt 任务创建/复用 + stage.requested/dispatched）。 */
-  driven?: DriveAppDispatchStageReceipt;
-  /** 阶段已由引擎重试完成：不写 rework；调用方继续 advance 下一阶段。 */
-  alreadyCompleted?: boolean;
-  /** 阶段已有在飞尝试（引擎重试/先前重入已驱动）：不写第二条 rework、不建第二个任务。 */
-  alreadyInFlight?: boolean;
-  /** 重入场事件已写、但同锁 drive 未成功（如实返回；可重试本 API 或由 reconcile 补驱动）。 */
-  driveError?: { code: string; message: string };
-  replay: boolean;
-}
-
-export type ReenterBlockedStageAfterResolutionResult =
-  | ({ ok: true } & ReenterBlockedStageAfterResolutionReceipt)
-  | WorkflowServiceFailure;
-
-type StageReworkedEventView = Extract<WorkflowEvent, { kind: "stage.reworked" }>;
-
-/** 指定 block 已写入的同阶段重入场事件（幂等判定；无 ⇒ undefined）。 */
-function findBlockReentryEvent(
-  events: readonly WorkflowEvent[],
-  stage: WorkflowStage,
-  blockId: string,
-): StageReworkedEventView | undefined {
-  return events.find((event): event is StageReworkedEventView =>
-    event.kind === "stage.reworked" && event.blockId === blockId
-    && event.stage === stage && event.reworkOf === stage);
-}
-
-/** 最近一条同阶段 block 重入场事件的 attempt（对账补驱动判定；无 ⇒ undefined）。 */
-function latestBlockReentryAttempt(events: readonly WorkflowEvent[], stage: WorkflowStage): number | undefined {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index]!;
-    if (event.kind === "stage.reworked" && event.blockId !== undefined
-      && event.stage === stage && event.reworkOf === stage) {
-      return event.attempt;
-    }
-  }
-  return undefined;
-}
-
-/**
- * block `resolved(fixed|decided)` 后重入原 blocked 阶段（SMOKE-2 S1）：
- * 1. 校验 block 账本事实：block 存在、已 resolved、resolution 与请求一致；decided 的裁决选项必须属于
- *    修订/返工/换执行者/限次重试类（终止/接受现状等按既有语义，不重入场）；
- * 2. 阶段已 completed ⇒ `alreadyCompleted`（引擎重试已成功，调用方继续 advance；不写 rework）；
- *    阶段已在飞 ⇒ `alreadyInFlight`（不并列第二条 rework/任务）；
- * 3. 写 `stage.reworked`（stage=reworkOf=stage、attempt=max 已有 attempt+1、blockId、reason；
- *    幂等键 `stage-rework:<wf>:<stage>:<attempt>`），随后**同锁**调用 drive 生成新 attempt 任务；
- * 4. 重复调用/并发：同 (blockId, stage) 只一条 rework、一条新 attempt 任务（drive/账本 guard 归一）；
- *    drive 失败如实返回 `driveError`，不伪造完成。
- */
-export async function reenterBlockedStageAfterResolution(
-  input: ReenterBlockedStageAfterResolutionInput,
-): Promise<ReenterBlockedStageAfterResolutionResult> {
-  return withServiceLock(
-    workflowLockKey(input.projectRoot, input.workflowId),
-    () => reenterBlockedStageAfterResolutionLocked(input),
-  );
-}
-
-async function reenterBlockedStageAfterResolutionLocked(
-  input: ReenterBlockedStageAfterResolutionInput,
-): Promise<ReenterBlockedStageAfterResolutionResult> {
-  const now = input.now ?? (() => new Date());
-  if (!isNonEmptyText(input.workflowId)) return serviceFailure("stage-request-invalid", "workflowId 缺失。");
-  if (!isWorkflowStage(input.stage)) {
-    return serviceFailure("stage-transition-invalid", `stage 非法：${String(input.stage)}。`);
-  }
-  if (!isNonEmptyText(input.blockId)) {
-    return serviceFailure("block-reentry-invalid", "blockId 缺失（block 重入场必须携带 blockId）。");
-  }
-  if (input.resolution !== "fixed" && input.resolution !== "decided") {
-    return serviceFailure("block-reentry-invalid", `resolution 只允许 fixed/decided（收到 ${String(input.resolution)}）。`);
-  }
-  // 1) block 账本事实（应用写入；不采信调用方自报）。
-  const blocks = await readBlockLedger(input.projectRoot);
-  if (blocks.badLines > 0) {
-    return serviceFailure(
-      "block-ledger-corrupt",
-      `blocks.jsonl 存在 ${blocks.badLines} 条坏行；fail-closed：不猜、不重入场（先按审计修复账本）。`,
-    );
-  }
-  const lifecycle = replayBlockLifecycles(blocks.events).records.get(input.blockId);
-  if (lifecycle === undefined) {
-    return serviceFailure("block-not-found", `block ${input.blockId} 不存在（blocks.jsonl 无 block.raised）。`);
-  }
-  if (lifecycle.workflowId !== undefined && lifecycle.workflowId !== input.workflowId) {
-    return serviceFailure(
-      "block-resolution-mismatch",
-      `block ${input.blockId} 绑定 workflow ${lifecycle.workflowId}，与请求 ${input.workflowId} 不一致。`,
-    );
-  }
-  if (lifecycle.stage !== undefined && lifecycle.stage !== input.stage) {
-    return serviceFailure(
-      "block-resolution-mismatch",
-      `block ${input.blockId} 绑定阶段 ${lifecycle.stage}，与请求 ${input.stage} 不一致。`,
-    );
-  }
-  if (lifecycle.status !== "resolved") {
-    return serviceFailure(
-      "block-not-resolved",
-      `block ${input.blockId} 尚未 resolved（当前 ${lifecycle.status}）；raised→routed→resolved 后才允许重入场。`,
-    );
-  }
-  if (lifecycle.resolution !== input.resolution) {
-    return serviceFailure(
-      "block-resolution-mismatch",
-      `block ${input.blockId} 终态为 ${String(lifecycle.resolution)}，与请求 ${input.resolution} 不一致。`,
-    );
-  }
-  if (input.resolution === "decided") {
-    const option = lifecycle.reEntry;
-    if (option === undefined || !BLOCK_STAGE_REENTRY_OPTION_IDS.includes(option)) {
-      return serviceFailure(
-        "block-reentry-inapplicable",
-        `block ${input.blockId} 的裁决选项 ${option ?? "（未记录）"} 不属于修订/返工/换执行者/限次重试类；按既有语义不重入场。`,
-      );
-    }
-  }
-  // 2) workflow 上下文（协议/定义/投影；loadAppDispatchContext 已对 closed/stopping/corrupt fail-closed）。
-  const context = await loadAppDispatchContext(input.projectRoot, input.workflowId);
-  if (context.ok !== true) return context;
-  const defStage = context.definition.stages.find((entry) => entry.stage === input.stage);
-  if (defStage === undefined) {
-    return serviceFailure(
-      "stage-transition-invalid",
-      `阶段 ${input.stage} 不在流程定义 ${context.definition.id}@${context.definition.version} 内。`,
-    );
-  }
-  if (defStage.taskKind === "none") {
-    return serviceFailure(
-      "stage-transition-invalid",
-      `阶段 ${input.stage} 无任务（应用派生/聚合）；其重入走各自确定性路径，不写 stage.reworked。`,
-    );
-  }
-  const status = context.view.stages[input.stage].status;
-  if (status === "completed") {
-    // 引擎重试（engine-auto-fix）已成功完成阶段：不写 rework；调用方继续 advance 下一阶段。
-    return { ok: true, workflowId: input.workflowId, stage: input.stage, alreadyCompleted: true, replay: false };
-  }
-  // 3) 幂等：同一 block 的重入场事件已存在 ⇒ 复跑确定性 drive（同 attempt/同任务键 ⇒ replay）。
-  const existingReentry = findBlockReentryEvent(context.wfEvents, input.stage, input.blockId);
-  if (existingReentry !== undefined) {
-    const driven = await driveAppDispatchStageLocked({
-      projectRoot: input.projectRoot,
-      workflowId: input.workflowId,
-      stage: input.stage,
-      now,
-    });
-    const taskId = driven.ok === true ? driven.tasks[0]?.taskId : undefined;
-    return {
-      ok: true,
-      workflowId: input.workflowId,
-      stage: input.stage,
-      reentry: {
-        stage: input.stage,
-        attempt: existingReentry.attempt,
-        eventId: existingReentry.idempotencyKey,
-        ...(taskId !== undefined ? { taskId } : {}),
-      },
-      ...(driven.ok === true ? { driven } : { driveError: { code: driven.code, message: driven.message } }),
-      replay: true,
-    };
-  }
-  if (status === "requested" || status === "dispatched" || status === "in-progress") {
-    // 阶段已有在飞尝试（如引擎自动重试已成功驱动）：不得并列第二条 rework/任务。
-    return { ok: true, workflowId: input.workflowId, stage: input.stage, alreadyInFlight: true, replay: false };
-  }
-  if (status !== "blocked") {
-    return serviceFailure(
-      "stage-transition-invalid",
-      `阶段 ${input.stage} 当前 ${status}；block 重入场只接受 blocked 阶段（completed/在飞分别返回 alreadyCompleted/alreadyInFlight）。`,
-    );
-  }
-  // 4) 写重入场事件（stage=reworkOf=当前 blocked 阶段；attempt=已有最大 attempt+1；带 blockId）。
-  const priorAttempts = context.wfEvents
-    .filter((event): event is StageRequestedView => event.kind === "stage.requested" && event.stage === input.stage)
-    .map((event) => event.attempt);
-  const attempt = Math.max(0, context.view.stages[input.stage].attempt, ...priorAttempts) + 1;
-  const reworkEvent: WorkflowEvent = {
-    v: 1,
-    at: now().toISOString(),
-    schema: WORKFLOW_LEDGER_SCHEMA,
-    kind: "stage.reworked",
-    workflowId: input.workflowId,
-    flowId: context.view.flowId,
-    path: context.view.path,
-    idempotencyKey: `stage-rework:${input.workflowId}:${input.stage}:${attempt}`,
-    stage: input.stage,
-    reworkOf: input.stage,
-    reason: isNonEmptyText(input.reason) ? input.reason.trim() : `block ${input.blockId} resolved(${input.resolution})`,
-    attempt,
-    blockId: input.blockId,
-  };
-  const appended = await appendWorkflowEvent(input.projectRoot, reworkEvent);
-  if (appended.ok !== true) {
-    return serviceFailure("workflow-ledger-write-failed", `stage.reworked（block 重入场）写入失败：${appended.message}`);
-  }
-  // 5) 同锁驱动新 attempt（drive 幂等；失败如实返回，不伪造完成）。
-  const driven = await driveAppDispatchStageLocked({
-    projectRoot: input.projectRoot,
-    workflowId: input.workflowId,
-    stage: input.stage,
-    now,
-  });
-  const taskId = driven.ok === true ? driven.tasks[0]?.taskId : undefined;
-  return {
-    ok: true,
-    workflowId: input.workflowId,
-    stage: input.stage,
-    reentry: {
-      stage: input.stage,
-      attempt,
-      eventId: appended.event.idempotencyKey,
-      ...(taskId !== undefined ? { taskId } : {}),
-    },
-    ...(driven.ok === true ? { driven } : { driveError: { code: driven.code, message: driven.message } }),
-    replay: appended.replay === true,
-  };
-}
-
-/** 应用收口决策（缺省确定性派生；应用策略可显式覆盖，A12b `rework` 驱动 stage.reworked A12b→A11）。 */
-export type AppDispatchClosureDecision = "accept" | "rework" | "reject";
-
-export interface ObserveAppDispatchTaskReportInput {
-  projectRoot: string;
-  taskId: string;
-  /**
-   * 应用策略覆盖（可选；缺省：报告 done ⇒ accept；blocked/failed ⇒ reject；
-   * A12b 轻量验收（定义参数 light + 应用归档存在）blocked ⇒ accept，保留 B31 审计口径）。
-   */
-  decision?: AppDispatchClosureDecision;
-  now?: () => Date;
-}
-
-export interface ObserveAppDispatchTaskReportReceipt {
-  taskId: string;
-  taskKind: AppDispatchTaskKind;
-  outcome: TaskClosedOutcome;
-  workflowId: string;
-  stage: WorkflowStage;
-  stageCompleted: boolean;
-  retried?: { stage: WorkflowStage; attempt: number };
-  blocked?: { retryBudgetExhausted: boolean; highRiskNoRedispatch: boolean };
-  /**
-   * 2026-11-20（block resolver 地基）：重试耗尽/高风险零重派时的事实出口（B9/B4；
-   * `onExhausted` v2 语义 = route-block-resolver）。本服务不写 blocks 账本，由桌面 router 消费。
-   * 2026-11-20（SMOKE-1 seams）：每个 blocked/failed 报告（rework 除外见 blockOutcome）都返回事实；
-   * `detailCode:"reconcile"` 表示引擎重试/对账路径在办 ⇒ resolver 走 engine-auto-fix（不得并发建属主修复任务）。
-   */
-  blockFact?: BlockFact;
-  /**
-   * 2026-11-20（SMOKE-1 seams）：blockFact 的处置方向（桌面可判）：
-   * retrying = 引擎重试已触发（fact.detailCode=reconcile）；fixed = 确定性动作已收口（重试即完成/rework）；
-   * escalated = 重试不可用或失败（预算耗尽/高风险），交 resolver 路由。
-   */
-  blockOutcome?: "retrying" | "fixed" | "escalated";
-  /**
-   * 2026-11-18（收尾修补）：显式 rework 收口成功后的返工事实（写 `stage.reworked`；
-   * `reworkOf`=被返工阶段、`stage`=回落目标、`attempt`=回落阶段新尝试）。由桌面后续 advance 驱动，
-   * 本函数**不再**尝试重驱原阶段（避免把已成功的 rework 误报为失败）。
-   */
-  reworked?: { reworkOf: WorkflowStage; stage: WorkflowStage; attempt: number };
-  replay: boolean;
-}
-
-export type ObserveAppDispatchTaskReportResult =
-  | ({ ok: true } & ObserveAppDispatchTaskReportReceipt)
-  | WorkflowServiceFailure;
-
-/**
- * 观察 `task.reported`：应用按定义自动收口自己创建的 `stage-execution` 任务——
- * - 报告 done + 应用证据 ⇒ accepted（closeTask 按既有完成判定写 stage.completed）；
- * - 报告 blocked/failed ⇒ rejected（closeTask 写 stage.blocked）；Q8：1 次自动重试（新尝试、
- *   新幂等键），高风险零重派；重试预算耗尽 ⇒ 保持 blocked 交客户/运营；
- * - 显式 `decision:"rework"`（A12b）：写 stage.reworked A12b→A11 后**即成功回执**（receipt.reworked），
- *   不再尝试重驱原阶段（后续 advance 由桌面调用）；
- * - A12b：轻量验收按定义策略（blocked + acceptanceArchive + 决策 note ⇒ accepted；B31 语义保留）。
- * `worker-dispatch` 任务由运营收口（Q6），本函数拒绝。
- *
- * 2026-11-20（SMOKE-1 seams）：公开入口按 projectRoot+workflowId 串行（先只读取 workflowId 定锁）；
- * 重试驱动走 `driveAppDispatchStageLocked`（同锁内，不重复取锁）；每个 blocked/failed 报告都在
- * 重试决策前产出 blockFact，并带 `blockOutcome`（retrying/fixed/escalated）供桌面判定。
- */
-export async function observeAppDispatchTaskReport(
-  input: ObserveAppDispatchTaskReportInput,
-): Promise<ObserveAppDispatchTaskReportResult> {
-  const state = await readTaskState(input.projectRoot);
-  const workflowId = state.records.get(input.taskId)?.created?.workflowId;
-  if (workflowId === undefined) return observeAppDispatchTaskReportLocked(input);
-  return withServiceLock(
-    workflowLockKey(input.projectRoot, workflowId),
-    () => observeAppDispatchTaskReportLocked(input),
-  );
-}
-
-async function observeAppDispatchTaskReportLocked(
-  input: ObserveAppDispatchTaskReportInput,
-): Promise<ObserveAppDispatchTaskReportResult> {
-  const now = input.now ?? (() => new Date());
-  const state = await readTaskState(input.projectRoot);
-  const record = state.records.get(input.taskId);
-  const created = record?.created;
-  if (record === undefined || created === undefined) {
-    return serviceFailure("close-task-invalid", `任务 ${input.taskId} 不存在。`);
-  }
-  if (created.from !== "application") {
-    return serviceFailure("close-identity-invalid", `只有真实创建者（application）可以收口应用任务；任务 ${input.taskId} 创建者 ${created.from}。`);
-  }
-  if (created.taskKind !== "stage-execution") {
-    return serviceFailure(
-      "close-task-invalid",
-      created.taskKind === "worker-dispatch"
-        ? "worker-dispatch 任务由运营收口（Q6）；应用只按阶段完成条件判定阶段完成。"
-        : `任务种类 ${String(created.taskKind)} 不由应用报告观察收口。`,
-    );
-  }
-  if (created.workflowId === undefined || created.stage === undefined || !isWorkflowStage(created.stage)) {
-    return serviceFailure("close-task-invalid", `应用任务 ${input.taskId} 缺 workflowId/stage 绑定。`);
-  }
-  const workflowId = created.workflowId;
-  const stage = created.stage;
-  const context = await loadAppDispatchContext(input.projectRoot, workflowId);
-  if (context.ok !== true) return context;
-  const defStage = context.definition.stages.find((entry) => entry.stage === stage);
-  if (defStage === undefined) {
-    return serviceFailure("workflow-definition-unknown", `阶段 ${stage} 不在流程定义内。`);
-  }
-  const strength: AcceptanceStrength = context.started.parameters?.acceptanceStrength
-    ?? context.definition.acceptance.defaultStrength;
-  if (record.closed !== undefined) {
-    return {
-      ok: true,
-      taskId: input.taskId,
-      taskKind: "stage-execution",
-      outcome: record.closed.outcome,
-      workflowId,
-      stage,
-      stageCompleted: context.view.stages[stage].status === "completed",
-      replay: true,
-    };
-  }
-  const lastReport = record.reports[record.reports.length - 1];
-  if (lastReport === undefined) {
-    return serviceFailure("close-report-missing", `任务 ${input.taskId} 尚无 task.reported；报告只是报告，应用不伪造收口。`);
-  }
-  if (input.decision === "rework" && stage !== "A12b") {
-    return serviceFailure("close-task-invalid", "只有 A12b 验收返工（rework）驱动 stage.reworked A12b→A11；其它阶段不支持 rework 收口。");
-  }
-  if (input.decision === "accept" && lastReport.status !== "done") {
-    const lightA12b = stage === "A12b" && lastReport.status === "blocked"
-      && strength === "light"
-      && context.definition.acceptance.lightBlockedDisposition === "accept-with-archive";
-    if (!lightA12b) {
-      return serviceFailure("close-report-missing", "accepted 收口要求 task.reported(status=done)；blocked/failed 报告不得被接受。");
-    }
-  }
-
-  // 应用证据：报告 evidence[] 中的可读项目文件（应用重算字节 hash，不采信模型自报）。
-  const artifacts: WorkflowArtifactRef[] = [];
-  for (const raw of lastReport.evidence ?? []) {
-    if (!isProjectRelativePath(raw)) continue;
-    try {
-      const bytes = await fs.readFile(path.join(input.projectRoot, ...raw.split("/")));
-      if (bytes.byteLength <= APP_DISPATCH_DOC_MAX_BYTES) {
-        artifacts.push({ path: raw, sha256: sha256Of(bytes), kind: "report-evidence" });
-      }
-    } catch {
-      /* 不可读证据跳过（缺证据由 finish 前校验 fail-closed） */
-    }
-  }
-
-  let decision: AppDispatchClosureDecision;
-  let archive: { path: string; sha256: string } | undefined;
-  let note = lastReport.summary;
-  if (input.decision !== undefined) {
-    decision = input.decision;
-  } else if (lastReport.status === "done") {
-    decision = "accept";
-  } else if (stage === "A12b" && lastReport.status === "blocked" && strength === "light"
-    && context.definition.acceptance.lightBlockedDisposition === "accept-with-archive") {
-    const found = await findAcceptanceArchive({ projectRoot: input.projectRoot, flowId: context.view.flowId, workflowId });
-    if (found !== undefined) {
-      archive = { path: found.path, sha256: found.sha256 };
-      artifacts.push({ path: found.path, sha256: found.sha256, kind: "acceptance-archive" });
-      decision = "accept";
-      // B31：轻量验收 accepted 必须有归档证据 + 应用决策 note（审计口径保留；note 不解析）。
-      note = `app-dispatch light acceptance: blocked report accepted with acceptance archive (${strength})`;
-    } else {
-      decision = "reject";
-    }
-  } else {
-    decision = "reject";
-  }
-  const outcome: TaskClosedOutcome = decision === "accept" ? "accepted" : decision === "rework" ? "rework" : "rejected";
-
-  const closed = await closeTask({
-    projectRoot: input.projectRoot,
-    operationId: `app-observe:${input.taskId}:${lastReport.at}`,
-    taskId: input.taskId,
-    outcome,
-    note,
-    actorRoleId: "application",
-    ...(artifacts.length > 0 || archive !== undefined
-      ? { evidence: { artifacts, ...(archive !== undefined ? { acceptanceArchive: archive } : {}) } }
-      : {}),
-    now,
-  });
-  if (closed.ok !== true) return closed;
-
-  const afterTasks = await readTaskState(input.projectRoot);
-  const ledgerAfter = await readWorkflowLedger(input.projectRoot);
-  const afterView = deriveWorkflowView(workflowEventList(ledgerAfter.events, workflowId), afterTasks.events);
-  const stageCompleted = afterView.stages[stage].status === "completed";
-  const attempt = Math.max(1, context.view.stages[stage].attempt);
-  let retried: { stage: WorkflowStage; attempt: number } | undefined;
-  let blocked: { retryBudgetExhausted: boolean; highRiskNoRedispatch: boolean } | undefined;
-  let resultBlockFact: BlockFact | undefined;
-  let blockOutcome: "retrying" | "fixed" | "escalated" | undefined;
-  let reworked: { reworkOf: WorkflowStage; stage: WorkflowStage; attempt: number } | undefined;
-  // 2026-11-20（SMOKE-1 seams）：blocked/failed 报告在**重试决策前**生成事实（taskId/attempt/证据/状态）。
-  // retrying/fixed 事实使用 detailCode:"reconcile"（resolver 现有分类 ⇒ engine-auto-fix 的确定性
-  // advance/reconcile）——**不得**在引擎重试路由期间并发建属主修复任务（owner-repair）。
-  const reportBlockFact = lastReport.status === "done"
-    ? undefined
-    : blockFactFromTaskReport({
-        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-        report: lastReport,
-        workflowId,
-        flowId: context.view.flowId,
-        stage,
-        options: {
-          source: "workflow-service.observeAppDispatchTaskReport",
-          attempts: attempt,
-          detailCode: "reconcile",
-          engineCanRepair: true,
-          evidencePaths: (lastReport.evidence ?? []).filter((entry) => isProjectRelativePath(entry)),
-          fingerprintMaterial: [
-            "app-dispatch-report", workflowId, stage, `attempt:${attempt}`, `task:${input.taskId}`,
-            `status:${lastReport.status}`,
-          ],
-        },
-      });
-  if (outcome === "rework") {
-    // 2026-11-18（收尾修补）：rework 成功即成功回执——closeTask 已写 `stage.reworked`（A12b→A11）；
-    // 不再尝试重驱原阶段（当前阶段已回落，重驱只会得到 stage-transition-invalid）。后续 advance 由桌面调用。
-    const reworkEvent = [...workflowEventList(ledgerAfter.events, workflowId)].reverse().find(
-      (event) => event.kind === "stage.reworked" && event.reworkOf === stage,
-    );
-    if (reworkEvent !== undefined && reworkEvent.kind === "stage.reworked") {
-      reworked = { reworkOf: reworkEvent.reworkOf, stage: reworkEvent.stage, attempt: reworkEvent.attempt };
-      // 确定性返工 = 引擎已处置：block 记 fixed（桌面 raise 后 engine advance 幂等收口）。
-      resultBlockFact = reportBlockFact;
-      blockOutcome = "fixed";
-    }
-  } else if (outcome === "rejected") {
-    const highRisk = defStage.retry.highRiskNoRedispatch;
-    const retryAllowed = !highRisk && defStage.retry.autoRetries > 0 && attempt <= defStage.retry.autoRetries;
-    if (retryAllowed) {
-      // 同锁内直接驱动（不重复取锁）：新 attempt/新幂等键；并发 observe/drive 由锁 + 账本 guard 归一。
-      const driveResult = await driveAppDispatchStageLocked({ projectRoot: input.projectRoot, workflowId, stage, now });
-      if (driveResult.ok !== true) {
-        // 重试未成功：不伪造重试；事实升级（如实带原错误码/消息）交 resolver。
-        blocked = { retryBudgetExhausted: attempt > defStage.retry.autoRetries, highRiskNoRedispatch: highRisk };
-        resultBlockFact = blockFactFromServiceFailure({
-          protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-          code: driveResult.code,
-          message: `阶段 ${stage} 引擎重试未成功（${driveResult.code}）：${driveResult.message}`,
-          workflowId,
-          flowId: context.view.flowId,
-          stage,
-          taskId: input.taskId,
-          attempts: attempt,
-          source: "workflow-service.observeAppDispatchTaskReport",
-          fingerprintMaterial: ["app-dispatch-retry-failed", workflowId, stage, driveResult.code, input.taskId],
-        });
-        blockOutcome = "escalated";
-      } else {
-        retried = { stage, attempt: driveResult.attempt };
-        resultBlockFact = reportBlockFact;
-        blockOutcome = driveResult.completed ? "fixed" : "retrying";
-      }
-    } else {
-      blocked = { retryBudgetExhausted: attempt > defStage.retry.autoRetries, highRiskNoRedispatch: highRisk };
-      // block resolver 事实出口：高风险零重派 ⇒ B4（客户主权）；预算耗尽 ⇒ B9（judge/客户）。
-      resultBlockFact = blockFactFromServiceFailure({
-        protocol: WORKFLOW_PROTOCOL_APP_DISPATCH,
-        code: highRisk ? "high-risk-blocked" : "retry-budget-exhausted",
-        message: highRisk
-          ? `阶段 ${stage} 高风险零重派（Q8）；blocked 交 block resolver 路由（客户主权，judge 不可代批）。`
-          : `阶段 ${stage} 自动重试预算已耗尽（autoRetries=${defStage.retry.autoRetries}）；blocked 交 block resolver 路由。`,
-        workflowId,
-        flowId: context.view.flowId,
-        stage,
-        taskId: input.taskId,
-        attempts: attempt,
-        ...(highRisk ? { highRisk: true } : {}),
-        source: "workflow-service.observeAppDispatchTaskReport",
-      });
-      blockOutcome = "escalated";
-    }
-  }
-  return {
-    ok: true,
-    taskId: input.taskId,
-    taskKind: "stage-execution",
-    outcome,
-    workflowId,
-    stage,
-    stageCompleted,
-    ...(retried !== undefined ? { retried } : {}),
-    ...(blocked !== undefined ? { blocked } : {}),
-    ...(resultBlockFact !== undefined ? { blockFact: resultBlockFact } : {}),
-    ...(blockOutcome !== undefined ? { blockOutcome } : {}),
-    ...(reworked !== undefined ? { reworked } : {}),
-    replay: closed.replay,
-  };
-}
-
-/** 卡 prompt 校验结果（应用侧；成功后幕僚继续走既有 request_choice 通道）。 */
-export interface VerifyCardPromptInput {
-  projectRoot: string;
-  workflowId: string;
-  stage: WorkflowStage;
-  promptId: string;
-  cardKind: string;
-  /** 幕僚将呈交的选项 id（顺序也须一致）。 */
-  optionIds?: readonly string[];
-  /** 幕僚将携带的 documentRefs（缺省 = 不携带 ⇒ 与 prompt 不一致时拒绝）。 */
-  documentRefs?: readonly WorkflowDocumentRef[];
-}
-
-export interface VerifyCardPromptReceipt {
-  requestId: string;
-  promptId: string;
-  cardKind: string;
-}
-
-export type VerifyCardPromptResult = ({ ok: true } & VerifyCardPromptReceipt) | WorkflowServiceFailure;
-
-function sameDocumentRefs(
-  a: readonly WorkflowDocumentRef[] | undefined,
-  b: readonly WorkflowDocumentRef[] | undefined,
-): boolean {
-  const left = a ?? [];
-  const right = b ?? [];
-  if (left.length !== right.length) return false;
-  return left.every((ref, index) => {
-    const other = right[index]!;
-    return ref.path === other.path && ref.sha256 === other.sha256
-      && ref.kind === other.kind && ref.version === other.version;
-  });
-}
-
-/**
- * 校验幕僚呈卡与**应用发放的 prompt 逐项一致**（Q1/§五）：
- * promptId/cardKind/选项（含顺序）/documentRefs 任一不一致 ⇒ `card-prompt-mismatch`，不发卡、不写记录。
- */
-export async function verifyCardPrompt(input: VerifyCardPromptInput): Promise<VerifyCardPromptResult> {
-  if (!isNonEmptyText(input.workflowId) || !isNonEmptyText(input.promptId)) {
-    return serviceFailure("card-prompt-mismatch", "卡 prompt 校验缺少 workflowId/promptId。");
-  }
-  if (!isWorkflowStage(input.stage)) {
-    return serviceFailure("card-prompt-mismatch", `卡 prompt 阶段非法：${String(input.stage)}。`);
-  }
-  const ledger = await readWorkflowLedger(input.projectRoot);
-  const wfEvents = workflowEventList(ledger.events, input.workflowId);
-  const started = wfEvents.find((event): event is WorkflowStartedView => event.kind === "workflow.started");
-  if (started === undefined) return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
-  if (workflowProtocolOf(started) !== WORKFLOW_PROTOCOL_APP_DISPATCH) {
-    return serviceFailure("workflow-protocol-mismatch", `workflow ${input.workflowId} 不是 app-dispatch/v1；旧卡无 promptId 校验。`);
-  }
-  const state = await readTaskState(input.projectRoot);
-  const request = state.events.find(
-    (event) => event.kind === "request.created" && event.promptId === input.promptId,
-  );
-  if (request === undefined || request.kind !== "request.created") {
-    return serviceFailure("card-prompt-mismatch", `未找到应用发放的卡 prompt ${input.promptId}（不采信模型自报）。`);
-  }
-  if (request.workflowId !== input.workflowId || request.stage !== input.stage) {
-    return serviceFailure("card-prompt-mismatch", `卡 prompt ${input.promptId} 的 workflow/stage 与当前不符。`);
-  }
-  if (request.cardKind !== input.cardKind) {
-    return serviceFailure("card-prompt-mismatch", `卡种不一致：prompt=${String(request.cardKind)}，呈交=${input.cardKind}。`);
-  }
-  const expectedOptions = request.options.map((option) => option.id);
-  if (input.optionIds !== undefined) {
-    const submitted = [...input.optionIds];
-    const same = submitted.length === expectedOptions.length
-      && submitted.every((id, index) => id === expectedOptions[index]);
-    if (!same) {
-      return serviceFailure("card-prompt-mismatch", `卡选项与 prompt 不一致（须逐项一致）：prompt=${expectedOptions.join("/")}。`);
-    }
-  }
-  if (!sameDocumentRefs(request.documentRefs, input.documentRefs)) {
-    return serviceFailure("card-prompt-mismatch", "documentRefs 与 prompt 不一致（应用计算，不得改写）。");
-  }
-  const promptKey = cardPromptIdempotencyKey(input.workflowId, input.stage, input.promptId);
-  const promptTask = findTaskByIdempotencyKey(state, promptKey);
-  if (promptTask?.created === undefined || promptTask.created.promptId !== input.promptId) {
-    return serviceFailure("card-prompt-mismatch", `card-prompt 任务缺失或 promptId 不一致（${input.promptId}）。`);
-  }
-  if (promptTask.closed !== undefined) {
-    return serviceFailure("card-prompt-mismatch", `card-prompt 任务已收口（${promptTask.closed.outcome}），不得再次呈卡。`);
-  }
-  return { ok: true, requestId: request.requestId, promptId: input.promptId, cardKind: input.cardKind };
-}
-
-/** 对账结果（单 workflow；`skipped` 用于旧协议/已关闭；`corrupt` 为 fail-closed 结论）。 */
-export interface ReconcileWorkflowReceipt {
-  workflowId: string;
-  protocol: WorkflowProtocol;
-  stage?: WorkflowStage;
-  driven?: DriveAppDispatchStageReceipt;
-  closedTasks: string[];
-  errors: string[];
-  corrupt?: string;
-  skipped?: string;
-  /**
-   * 2026-11-20（block resolver 地基）：corrupt/errors 的可序列化 block 事实（B6 输入；
-   * 桌面 router 消费，本服务不写 blocks 账本）。
-   * 2026-11-20（SMOKE-1 seams）：对账内观察收口产生的 blocked/failed 报告事实（retrying/fixed/
-   * escalated）也在此列——并发 reconcile/observe 不丢块，且不重复建任务。
-   */
-  blockFacts?: BlockFact[];
-}
-
-export interface ReconcileFixedWorkflowReceipt {
-  workflows: ReconcileWorkflowReceipt[];
-}
-
-/**
- * 启动/打开项目对账（设计 §4.3/§7.2）：只对 `app-dispatch/v1` 活动 workflow 做**幂等修复**——
- * 1. 已报告未收口的应用 stage-execution 任务 ⇒ 重新执行观察收口（closeTask operationId 幂等）；
- * 2. 当前 open 阶段（requested/dispatched/in-progress）⇒ `driveAppDispatchStage` 幂等补建/补投递，
- *    并核对 `stage.requested.requestTaskId` 与真实任务一致；
- * 3. `stage.dispatched` 引用的任务必须存在；任何不一致 ⇒ `corrupt`（不猜、不自动推进）。
- * fixed-v2.1/legacy 一律不触碰（旧驱动在飞，Q10）。
- */
-export async function reconcileFixedWorkflow(input: {
-  projectRoot: string;
-  workflowId?: string;
-  now?: () => Date;
-}): Promise<({ ok: true } & ReconcileFixedWorkflowReceipt) | WorkflowServiceFailure> {
-  const now = input.now ?? (() => new Date());
-  const ledger = await readWorkflowLedger(input.projectRoot);
-  let ids: string[];
-  if (input.workflowId !== undefined) {
-    if (!isNonEmptyText(input.workflowId)) return serviceFailure("stage-request-invalid", "workflowId 非法。");
-    if (!ledger.events.some((event) => event.workflowId === input.workflowId)) {
-      return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
-    }
-    ids = [input.workflowId];
-  } else {
-    ids = activeWorkflowIdsOf(ledger.events);
-  }
-  const workflows: ReconcileWorkflowReceipt[] = [];
-  for (const workflowId of ids) {
-    // 2026-11-20（SMOKE-1 seams）：每个 workflow 的「收口观察 + 补建/补投递 + 引用核验」整段
-    // 与 drive/observe/select 共用 projectRoot+workflowId 锁；reconcile 自身不直接 append task.created。
-    const receipt = await withServiceLock(workflowLockKey(input.projectRoot, workflowId), async () => {
-      const current = await readWorkflowLedger(input.projectRoot);
-      const wfEvents = workflowEventList(current.events, workflowId);
-      const started = wfEvents.find((event): event is WorkflowStartedView => event.kind === "workflow.started");
-      const workflowReceipt: ReconcileWorkflowReceipt = {
-        workflowId,
-        protocol: workflowProtocolOf(started),
-        closedTasks: [],
-        errors: [],
-      };
-      if (started === undefined) {
-        workflowReceipt.corrupt = "缺少 workflow.started（关键事件缺失，不猜）";
-        return workflowReceipt;
-      }
-      if (workflowReceipt.protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH) {
-        workflowReceipt.skipped = "fixed-v2.1（旧协议驱动；对账不触碰，Q10）";
-        return workflowReceipt;
-      }
-      const ref = started.definition;
-      if (ref === undefined) {
-        workflowReceipt.corrupt = "缺少 definition 引用（app-dispatch/v1 必填）";
-        return workflowReceipt;
-      }
-      const lookup = getWorkflowDefinition(ref.id, ref.version);
-      if (lookup.ok !== true) {
-        workflowReceipt.corrupt = `${lookup.code}: ${lookup.message}`;
-        return workflowReceipt;
-      }
-      if (lookup.hash !== ref.sha256) {
-        workflowReceipt.corrupt = "定义 hash 与注册表不一致（不静默迁移）";
-        return workflowReceipt;
-      }
-      let taskState = await readTaskState(input.projectRoot);
-      let view = deriveWorkflowView(wfEvents, taskState.events);
-      const vf = viewFailure(view, WORKFLOW_PROTOCOL_APP_DISPATCH);
-      if (vf !== undefined) {
-        workflowReceipt.corrupt = vf.message;
-        return workflowReceipt;
-      }
-      workflowReceipt.stage = view.stage;
-      if (view.closed !== undefined) {
-        workflowReceipt.skipped = `workflow 已关闭（${view.closed.outcome}）`;
-        return workflowReceipt;
-      }
-      // 1) 已报告未收口的应用阶段任务 ⇒ 幂等收口（失败如实记 errors，不伪造成功）。
-      for (const record of taskState.records.values()) {
-        if (record.created?.workflowId !== workflowId) continue;
-        if (record.created.from !== "application" || record.created.taskKind !== "stage-execution") continue;
-        if (record.closed !== undefined || record.reports.length === 0) continue;
-        const observed = await observeAppDispatchTaskReportLocked({ projectRoot: input.projectRoot, taskId: record.taskId, now });
-        if (observed.ok === true) {
-          workflowReceipt.closedTasks.push(record.taskId);
-          // 2026-11-20（SMOKE-1 seams）：对账先于桌面观察收口时，blockFact（retrying/fixed/escalated）
-          // 必须随对账回执交给桌面 router（否则并发路径会丢块）；由桌面 observeFactListLater 消费。
-          if (observed.blockFact !== undefined) {
-            workflowReceipt.blockFacts = [...(workflowReceipt.blockFacts ?? []), observed.blockFact];
-          }
-        } else {
-          workflowReceipt.errors.push(`${record.taskId}: ${observed.code}: ${observed.message}`);
-        }
-      }
-      // 2) 当前 open 阶段补建/补投递（仅 requested/dispatched/in-progress；不新开阶段尝试）。
-      const ledgerAfter = await readWorkflowLedger(input.projectRoot);
-      taskState = await readTaskState(input.projectRoot);
-      view = deriveWorkflowView(workflowEventList(ledgerAfter.events, workflowId), taskState.events);
-      const vfAfter = viewFailure(view, WORKFLOW_PROTOCOL_APP_DISPATCH);
-      if (vfAfter !== undefined) {
-        workflowReceipt.corrupt = vfAfter.message;
-        return workflowReceipt;
-      }
-      workflowReceipt.stage = view.stage;
-      if (view.closed !== undefined || view.stopping === true) {
-        workflowReceipt.skipped = view.closed !== undefined ? `workflow 已关闭（${view.closed.outcome}）` : "workflow 正在停止";
-        return workflowReceipt;
-      }
-      const status = view.stages[view.stage].status;
-      // 2026-11-20（SMOKE-2 S1）：block 重入场后若进程在「已写 stage.reworked、未驱动」之间中断，
-      // 阶段为 pending 且账本有对应 block rework（attempt 一致）⇒ 对账补驱动同一 attempt（不新开尝试）。
-      const reentryAttempt = status === "pending"
-        ? latestBlockReentryAttempt(workflowEventList(ledgerAfter.events, workflowId), view.stage)
-        : undefined;
-      const awaitingBlockReentryDrive = reentryAttempt !== undefined
-        && view.stages[view.stage].attempt === reentryAttempt;
-      if (status === "requested" || status === "dispatched" || status === "in-progress" || awaitingBlockReentryDrive) {
-        const driven = await driveAppDispatchStageLocked({ projectRoot: input.projectRoot, workflowId, stage: view.stage, now });
-        if (driven.ok === true) {
-          workflowReceipt.driven = driven;
-          // 2026-11-20（SMOKE-3 S3 地基）：有界等待（入口未就绪）不是账本不一致——本调用未建任务，
-          // 不做 requestTaskId 一致性判定；入口出现后的下一次对账正常补建并校验。
-          if (driven.waiting === undefined) {
-            const requestEvent = workflowEventList(ledgerAfter.events, workflowId).find(
-              (event): event is StageRequestedView =>
-                event.kind === "stage.requested" && event.stage === view.stage
-                && event.attempt === view.stages[view.stage].attempt,
-            );
-            if (requestEvent !== undefined
-              && !driven.tasks.some((task) => task.taskId === requestEvent.requestTaskId)) {
-              workflowReceipt.corrupt = `stage.requested ${view.stage} 的 requestTaskId ${requestEvent.requestTaskId} 与真实任务不一致`;
-              // 2026-11-18（收尾修补）：不一致 ⇒ 不把该 workflow 计入 driven（只记 corrupt/errors）。
-              delete workflowReceipt.driven;
-            }
-          }
-        } else if (driven.code === "workflow-corrupt") {
-          // 账本一致性结论（如 requestTaskId 与确定性派生不一致）⇒ 对账 corrupt（不猜、不自动推进）。
-          workflowReceipt.corrupt = driven.message;
-        } else {
-          workflowReceipt.errors.push(`${driven.code}: ${driven.message}`);
-        }
-      }
-      // 3) stage.dispatched 引用的任务必须存在（不存在且无法补建 ⇒ corrupt）。
-      const finalTasks = await readTaskState(input.projectRoot);
-      const rebuiltIds = new Set((workflowReceipt.driven?.tasks ?? []).map((task) => task.taskId));
-      for (const event of wfEvents) {
-        if (event.kind !== "stage.dispatched") continue;
-        if (!finalTasks.records.has(event.taskId) && !rebuiltIds.has(event.taskId)) {
-          workflowReceipt.corrupt = `stage.dispatched ${event.stage} 引用不存在的任务 ${event.taskId}（不猜、不自动推进）`;
-        }
-      }
-      // 2026-11-18（收尾修补）：任何 corrupt 结论都不得与 driven 同时出现（避免调用方误判为已修复）。
-      if (workflowReceipt.corrupt !== undefined) delete workflowReceipt.driven;
-      return workflowReceipt;
-    });
-    workflows.push(receipt);
-  }
-  // 2026-11-20（block resolver 地基）：corrupt/errors ⇒ 可序列化 block 事实（B6；不改变 reconcile 结论）。
-  // 2026-11-20（SMOKE-1 seams）：保留对账中观察收口产生的 blockFact（retrying/fixed/escalated），不覆盖。
-  for (const receipt of workflows) {
-    const facts = blockFactFromReconcileReceipt({
-      workflowId: receipt.workflowId,
-      protocol: receipt.protocol,
-      ...(receipt.stage !== undefined ? { stage: receipt.stage } : {}),
-      ...(receipt.corrupt !== undefined ? { corrupt: receipt.corrupt } : {}),
-      errors: receipt.errors,
-    });
-    if (facts.length > 0) receipt.blockFacts = [...(receipt.blockFacts ?? []), ...facts];
-  }
-  return { ok: true, workflows };
 }
 

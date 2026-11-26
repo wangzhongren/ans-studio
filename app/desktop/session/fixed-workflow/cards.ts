@@ -33,15 +33,18 @@ import {
 import { canCompleteStage, deriveWorkflowView } from "../../../../src/common/编排/workflow-state.ts";
 import { loadLatestRoster as loadLatestWorkflowRoster } from "../../../../src/common/编排/workflow-preconditions.ts";
 import type { CompleteTeamPlanFn, CustomerInputRequest, TaskStateEvent, WorkflowDocumentRef, WorkflowEvent } from "../../../../src/model/runtime.ts";
-import { WORKFLOW_PROTOCOL_APP_DISPATCH, WORKFLOW_LEDGER_SCHEMA } from "../../../../src/model/runtime.ts";
-import { workflowProtocolForWorkflowId } from "../../workflow.ts";
-import { closeApplicationTaskDirect, type FixedWorkflowStageDispatch } from "./stage-dispatch.ts";
+import { WORKFLOW_LEDGER_SCHEMA } from "../../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
+import type { DurableCapabilityEvent, DurableFact, DurablePendingTask, DurableProjection } from "../../../../src/model/durable-workflow.ts";
 import type { RoleSessionHandle } from "../../../../src/pipeline/orchestration/run-role.ts";
+import { implementationTestRulesText } from "../../../../src/pipeline/orchestration/durable-workflow.ts";
 import { isFixedReleaseTriggerStage, type FixedReleaseTriggerStage } from "../../workflow.ts";
+import { evidenceOperatorBinding, completeGraphBaseline, graphTurn, operationsTasks, operationsWakeKey, parkDesktopA11Disposition, workflowTaskEffectMatches } from "../../durable-workflow-a.ts";
+import { durableHash } from "../../durable-workflow.ts";
+import { appendTaskEvent, taskEvent } from "../../../../src/common/编排/task-state.ts";
 import type { SessionManagerDeps } from "../contracts/deps.ts";
 import type { LiveSession } from "../contracts/session-types.ts";
-import { createDesktopBaselineGitPort } from "../git-ports.ts";
+import { createDesktopBaselineGitPort, verifyDurableTaskCommit } from "../git-ports.ts";
 import { now } from "../shared/clock.ts";
 import { sessionKey } from "../shared/keys.ts";
 import { emitDeliveryNote } from "../shared/notifier.ts";
@@ -54,13 +57,11 @@ export class FixedWorkflowCards {
   private readonly refs: FixedWorkflowRefs;
   private readonly port: FixedWorkflowPorts;
   private readonly release: FixedWorkflowRelease;
-  private readonly stageDispatch: FixedWorkflowStageDispatch;
   private readonly deps: SessionManagerDeps;
-  constructor(refs: FixedWorkflowRefs, port: FixedWorkflowPorts, release: FixedWorkflowRelease, stageDispatch: FixedWorkflowStageDispatch, deps: SessionManagerDeps) {
+  constructor(refs: FixedWorkflowRefs, port: FixedWorkflowPorts, release: FixedWorkflowRelease, deps: SessionManagerDeps) {
     this.refs = refs;
     this.port = port;
     this.release = release;
-    this.stageDispatch = stageDispatch;
     this.deps = deps;
   }
 
@@ -195,21 +196,24 @@ export class FixedWorkflowCards {
     if (!current() || signal?.aborted) {
       return blocked("plan-task-changed", "核验期间真实受派回合已变化，未登记团队计划。");
     }
-    const completed = await completeTeamPlanFixed({
+    const planInput = {
       projectRoot,
       flowId: request.flowId,
       workflowId: assigned.task.workflowId,
       operationId: request.operationId,
       plan: request.plan,
       port: createDesktopBaselineGitPort(),
-      actorRoleId: "convener",
+      actorRoleId: "convener" as const,
       ...(request.runId !== undefined ? { runId: request.runId } : {}),
       ...(request.baseDigest !== undefined ? { baseDigest: request.baseDigest } : {}),
-    });
-    if (completed.ok === true && assigned.task.workflowId !== undefined) {
-      // 2026-11-17（app-dispatch/v1）：A9「团队计划 + 基线」完成（stage.completed A9 由服务写）⇒ 驱动 A10 卡 prompt。
-      void this.stageDispatch.advance(projectRoot, assigned.task.workflowId, runtime);
+    };
+    const durable = this.deps.durableWorkflow;
+    if (durable && await durable.owns(projectRoot, assigned.task.workflowId)) {
+      const live = await graphTurn(durable, () => this.sessions.get(key))();
+      if (!live || live.entry.handle !== handle || signal?.aborted) return blocked("plan-task-unavailable", "缺少当前实际工作流的运营基线任务。");
+      return completeGraphBaseline(durable, live, planInput);
     }
+    const completed = await completeTeamPlanFixed(planInput);
     // B29：成功/失败都**原样返回 fixed 服务形状**——成功 `{ok:true,operationId,flowId,workflowId,
     // basisId,plan,documents,replay,stageCompleted}`；失败 `{ok:false,code,message[,missing]}`。
     // 不再包装成 legacy `DirectActionReceipt`（工具层 B25 校验要求 fixed 形状；包装后的 `bas-…`
@@ -231,45 +235,17 @@ export class FixedWorkflowCards {
     if (signal?.aborted) {
       return { ok: false, code: "close-task-invalid", message: "本轮已中止，未执行收口。" };
     }
-    // 2026-11-17（app-dispatch/v1，Q6）：**运营收口应用创建的 worker-dispatch 任务**——任务真实创建者
-    // 是应用；运营的 close_created_task 触发应用以真实创建者身份写 `task.closed(by:"application")`，
-    // **不写阶段事件**（阶段完成只按完成条件由 worker 任务收口/聚合判定）。其它 application 任务不得
-    // 经本工具收口（stage-execution/card-prompt 由应用观察/卡裁决收口）。
-    const taskState = await readTaskState(projectRoot);
-    const appRecord = taskState.records.get(input.taskId);
-    const appCreated = appRecord?.created;
-    if (appCreated?.from === "application") {
-      const protocol = appCreated.workflowId !== undefined ? await workflowProtocolForWorkflowId(projectRoot, appCreated.workflowId) : undefined;
-      if (protocol !== WORKFLOW_PROTOCOL_APP_DISPATCH) {
-        return { ok: false, code: "workflow-protocol-mismatch", message: "应用任务收口只适用于 app-dispatch/v1（旧协议应用任务不存在）。" };
+    const durable = this.deps.durableWorkflow;
+    if (durable && (input.taskId.startsWith("dw-") || await durable.owns(projectRoot))) {
+      const store = await durable.store();
+      for (const view of await store.listProjections(projectRoot)) {
+        const pending = view.schema === 2 && view.pendingTasks?.find(task => task.taskId === input.taskId);
+        if (pending && (pending.evidenceWorkOrder || pending.capability === "operations-implementation" && pending.workItemId && view.workflowOwnedDispatch)) {
+          return this.closeOperationsChild(view, pending, actorRoleId, input, signal);
+        }
+        if (pending) return this.closeGraphTask(view, pending, actorRoleId, input, signal);
       }
-      if (appCreated.taskKind !== "worker-dispatch" || appCreated.to !== actorRoleId) {
-        return { ok: false, code: "close-identity-invalid", message: "只有受派运营可以收口应用创建的 worker-dispatch 任务；其它应用任务由应用观察/卡裁决收口。" };
-      }
-      if (input.outcome === "accepted" && appRecord?.reports[appRecord.reports.length - 1]?.status !== "done") {
-        return { ok: false, code: "close-report-missing", message: "worker-dispatch 任务 accepted 收口要求已有 task.reported(status=done)；报告只是报告，不是收口。" };
-      }
-      const closed = await closeApplicationTaskDirect({
-        projectRoot,
-        taskId: input.taskId,
-        outcome: input.outcome,
-        operationId: input.operationId,
-        note: input.note ?? `worker-dispatch closed by ${actorRoleId}`,
-      });
-      if (!closed.ok) return closed;
-      const workflowId = appCreated.workflowId;
-      if (workflowId !== undefined) void this.stageDispatch.afterWorkerDispatchClosed(projectRoot, workflowId, actorRoleId);
-      return {
-        ok: true,
-        taskId: input.taskId,
-        outcome: input.outcome,
-        ...(workflowId !== undefined ? { workflowId } : {}),
-        ...(appCreated.stage !== undefined ? { stage: appCreated.stage } : {}),
-        eventId: "",
-        operationId: input.operationId,
-        replay: closed.replay,
-        stageCompleted: false,
-      };
+      return this.closeDurableTask(projectRoot, actorRoleId, input, signal);
     }
     // T3 B2.1（AC-19/T-08；MF-B2-02）：fixed verifier 的 A12a/A12b accepted 收口（criteria/report
     // 收口，含 A12b 应用验收归档）前 basis drift 复核——A12a/A12b 为 chief→verifier 直派，
@@ -292,11 +268,6 @@ export class FixedWorkflowCards {
     });
     if (closed.ok) {
       void this.drainAllQueuesFor(projectRoot);
-      // 2026-11-17（app-dispatch/v1）：A11/B3 全部实现任务 accepted ⇒ 阶段完成（服务已写 stage.completed）
-      // ⇒ 驱动下一阶段（A12b / B4）；旧协议下 advance 内部跳过（只处理 app-dispatch/v1）。
-      if (closed.stageCompleted && closed.workflowId !== undefined) {
-        void this.stageDispatch.advance(projectRoot, closed.workflowId, this.refs.lastGovernanceRuntime.get(projectRoot) ?? "pi");
-      }
       // T3 B3.1（AC-11/AC-14/AC-22；MF-IR-8）：fixed **A12b accepted（A13 前）/ B3 accepted（B4 前）**
       // ⇒ 应用自动调用 `prepareReleaseMerge` 并呈 merge-main 客户卡（不新增工具/客户门）。
       // 异步执行：收口工具立即返回；前置不满足 ⇒ 只回运营/幕僚（不弹注定失败卡）；同一 workflow/tip 幂等。
@@ -319,6 +290,206 @@ export class FixedWorkflowCards {
       }
     }
     return closed;
+  }
+
+  private async closeOperationsChild(
+    view: DurableProjection, child: DurablePendingTask, actorRoleId: string, input: FixedCloseCreatedTaskToolInput, signal?: AbortSignal,
+  ): Promise<Awaited<ReturnType<typeof closeFixedWorkflowTask>>> {
+    const fail = (code: string, message: string) => ({ ok: false as const, code, message });
+    const { parent: a11, children } = operationsTasks(view);
+    const parent = a11?.state === "pending" ? a11.task : child.evidenceWorkOrder ? evidenceOperatorBinding(view) : undefined;
+    const { ref, projectRoot } = view;
+    const assigned = child.evidenceWorkOrder ? view.evidenceAudit?.collector?.taskId === child.taskId
+      : children.some(task => task.taskId === child.taskId);
+    if (!parent || actorRoleId !== parent.roleId || !assigned) return fail("workflow-a11-close-forbidden", "收口需要本次活动运营任务。");
+    const durable = this.deps.durableWorkflow!;
+    const live = await graphTurn(durable, () => [...this.sessions.values()].find(entry => entry.projectRoot === projectRoot
+      && entry.roleId === actorRoleId && entry.assignedTaskId === parent.taskId && entry.origins.running?.taskId === parent.taskId))();
+    const current = () => !!live && live.current() && !signal?.aborted;
+    if (!live || !current() || live.view.ref.instanceId !== ref.instanceId || live.delivery.intent.task?.taskId !== parent.taskId) {
+      return fail("workflow-a11-close-forbidden", "收口需要绑定本次真实运营父任务的已投递回合。");
+    }
+    const store = await durable.store();
+    if (child.evidenceWorkOrder) {
+      if (!child.report || (input.outcome !== "accepted" && input.outcome !== "rework" && input.outcome !== "rejected")) {
+        return fail("workflow-evidence-close-invalid", "收口需要当前取证角色的正式回交。");
+      }
+      const saved = await store.closeEvidenceCollection(ref, { parentTask: parent, task: child.task,
+        originId: live.source.originId, reportKey: child.report.key, outcome: input.outcome }, current);
+      if (!saved.ok) return saved;
+      if (saved.value.state === "ignored") return fail("workflow-evidence-close-stale", saved.value.reason ?? "原取证工单已退役。");
+      if (!(await this.readTasks(projectRoot)).records.get(child.taskId)?.closed) {
+        const at = new Date(this.now()).toISOString();
+        const mirrored = await appendTaskEvent(projectRoot, taskEvent("task.closed", {
+          taskId: child.taskId, by: "convener", outcome: input.outcome, operationId: input.operationId, eventId: saved.value.key,
+          actionSource: { kind: "role-direct", actorRoleId, action: "close-created-task", operationId: input.operationId,
+            applicationId: "ans-durable-workflow", baseDigest: child.report.evidence.sha256,
+            targetDigest: durableHash(JSON.stringify([child.taskId, child.report.key, input.outcome])), at },
+        }, () => new Date(at)));
+        if (!mirrored.ok) return fail(mirrored.code ?? "workflow-evidence-close-journal", mirrored.message);
+      }
+      durable.activate();
+      return { ok: true, taskId: child.taskId, workflowId: ref.instanceId, stage: child.task.stage === "B3" ? "B3" : "A11", operationId: input.operationId,
+        outcome: input.outcome, eventId: saved.value.key, replay: false, stageCompleted: false };
+    }
+    const key = `a11-close:${child.taskId}:${durableHash(input.operationId).slice(0, 32)}`;
+    const prior = store.listCapabilityEvents(ref).find(row => row.event.key === key && row.event.input.kind === "task-closed");
+    if (prior?.event.input.kind === "task-closed" && prior.event.input.outcome !== input.outcome) {
+      return fail("workflow-a11-close-conflict", "同一收口操作已记录不同结论。");
+    }
+    const answer = (replay: boolean, stageCompleted: boolean) => ({ ok: true as const, taskId: child.taskId, workflowId: ref.instanceId,
+      stage: "A11" as const, operationId: input.operationId, outcome: input.outcome, eventId: key, replay, stageCompleted });
+    if (prior && prior.receipt.state !== "ignored") return answer(true, false);
+    if (child.state !== "reported" || !child.report) return fail("close-report-missing", "子任务缺少尚待处置的原始回交。");
+    const disposition = store.lookup(ref)?.a11Disposition;
+    const retest = disposition?.state === "resumed" && disposition.childTask.taskId === child.taskId ? disposition.retest : undefined;
+    if (retest && live.delivery.intent.key !== `model:${operationsWakeKey(child.taskId, child.report.key, retest.reportReviewGeneration)}`) {
+      return fail("workflow-a11-retest-close-turn", "同候选补测须由原运营收到当期正式回交后核对收口。");
+    }
+    const commit = store.listEffects(ref, "task-commit").findLast(effect => effect.state === "succeeded" && workflowTaskEffectMatches(effect, child));
+    const parked = (close?: DurableCapabilityEvent) => parkDesktopA11Disposition(durable, view, child, current, close);
+    const onParked = (disposition: Exclude<Awaited<ReturnType<typeof parked>>, false>) => disposition.retest?.pendingReportReview
+      ? fail("workflow-a11-self-test-review-parked", "应用已保全正式补测回交。核对原签发标准和同一候选后，再回到当前运营复核。")
+      : disposition.retest ? fail("workflow-a11-self-test-parked", `应用已保全当前候选 ${disposition.candidateOid}，缺少以下符合原审批、运行与审计要求的工单回执。等待原属主当期正式回交后再核对接受。\n${implementationTestRulesText(disposition.retest.missingRequirements)}`)
+      : fail("workflow-a11-disposition-parked", "当前 A11 工作项因实测 Git 状态已挂起。应用将核对原暂存回执或提供处置选项。");
+    const proven = commit?.intent.expected?.head === child.baseOid && commit?.intent.expected
+      ? await verifyDurableTaskCommit(projectRoot, commit.intent.expected) : undefined;
+    const indexBlocked = commit && await parked();
+    if (indexBlocked) return onParked(indexBlocked);
+    const candidateOid = commit?.result?.result?.oid;
+    const commitVerified = proven && proven.oid === candidateOid;
+    const tipOid = commitVerified ? proven.oid : retest && typeof candidateOid === "string" ? candidateOid : undefined;
+    if (!current()) return fail("workflow-a11-close-forbidden", "原运营回合在核验期间已变化。");
+    const close: DurableCapabilityEvent = { key, stepId: child.stepId, attempt: child.attempt, flowId: child.flowId,
+      source: { roleId: actorRoleId, originId: live.source.originId, parentTaskId: parent.taskId },
+      input: { kind: "task-closed", task: child.task, reportKey: child.report.key, outcome: input.outcome, ...(tipOid ? { tipOid } : {}),
+        ...(retest && input.outcome !== "accepted" && input.note ? { defectNote: input.note } : {}) } };
+    const missingReceipts = input.outcome === "accepted" && (commitVerified || retest) && await parked(close);
+    if (missingReceipts) return onParked(missingReceipts);
+    if ((commit || input.outcome === "accepted") && !commitVerified) {
+      return fail("workflow-a11-commit-unverified", "已交回子任务缺少匹配的真实提交。");
+    }
+    const event = await store.submitCapability(ref, close, current);
+    if (!event.ok) {
+      const changed = commit && await parked();
+      if (changed) return onParked(changed);
+      return event;
+    }
+    if (event.value.state === "ignored") return fail("workflow-a11-close-forbidden", event.value.reason ?? "原子任务已退役。");
+    if (!(await this.readTasks(projectRoot)).records.get(child.taskId)?.closed) {
+      const effective = store.lookup(ref)?.pendingTasks?.find(task => task.taskId === child.taskId)?.outcome ?? input.outcome;
+      await appendTaskEvent(projectRoot, taskEvent("task.closed", { taskId: child.taskId, by: "convener", outcome: effective,
+        operationId: input.operationId, eventId: key, ...(input.note ? { note: input.note } : {}) }, () => new Date(this.now())));
+    }
+    return answer(false, false);
+  }
+
+  private async closeGraphTask(
+    view: DurableProjection, pending: DurablePendingTask, actorRoleId: string,
+    input: FixedCloseCreatedTaskToolInput, signal?: AbortSignal,
+  ): Promise<Awaited<ReturnType<typeof closeFixedWorkflowTask>>> {
+    const fail = (code: string, message: string) => ({ ok: false as const, code, message });
+    const { ref, projectRoot } = view;
+    if (view.workflowOwnedDispatch) return fail("workflow-dispatch-owned", "固定工作流根据已回交的事实收口任务。");
+    const { task, report, stepId, attempt, flowId } = pending;
+    const durable = this.deps.durableWorkflow!;
+    const store = await durable.store();
+    if (view.status !== "waiting" || view.engine !== "healthy" || !report || task.stage === "readonly"
+      || (actorRoleId !== "convener" && actorRoleId !== "chief")) {
+      return fail("close-task-invalid", "The workflow needs the assigned role's saved report and its actual creator.");
+    }
+    const entry = [...this.sessions.values()].find(session => session.projectRoot === projectRoot &&
+      session.roleId === actorRoleId && session.origins.running?.turnId &&
+      durable.delivery(projectRoot, session.origins.running.clientMessageId)?.intent.key === `model:graph-report:${task.taskId}:${report.key}`);
+    const origin = entry?.origins.running;
+    const isCurrent = () => !!entry && !!origin && entry.busy && entry.origins.running === origin && !origin.settled
+      && !signal?.aborted && !entry.interactionState.turn.signal.aborted && !entry.interactionState.lifetime.signal.aborted;
+    if (!isCurrent() || !origin?.turnId) return fail("close-task-invalid", "This decision requires the actual creator's report review turn.");
+    const snapshot = store.getEvidence(ref, report.evidence) as { handback?: TaskHandback; artifacts?: { path: string; sha256: string }[] } | undefined;
+    const lightweight = task.stage === "A12b" && snapshot?.handback?.status === "blocked" && !!input.note?.trim();
+    if (!snapshot?.handback || input.outcome === "accepted" && snapshot.handback.status !== "completed" && !lightweight) {
+      return fail("close-report-missing", "The report does not support that disposition.");
+    }
+    const key = `close:${task.taskId}:${input.operationId}`;
+    const replay = store.listCapabilityEvents(ref).some(row => row.event.key === key);
+    const evidence = input.outcome === "accepted" && task.stage !== "A12b"
+      ? await this.buildFixedCloseEvidence(projectRoot, task.taskId, input.note) : { ok: true as const, evidence: undefined };
+    if (!evidence.ok) return evidence;
+    const documents = evidence.evidence?.artifacts?.flatMap(({ path, sha256 }) => sha256 ? [{ path, sha256 }] : []) ?? snapshot.artifacts;
+    if (!isCurrent()) return fail("close-task-invalid", "The creator's role turn changed during verification.");
+    const event = await store.submitCapability(ref, { key, stepId, attempt, flowId,
+      source: { roleId: actorRoleId, originId: origin.turnId, parentTaskId: task.parentTaskId },
+      input: { kind: "task-closed", task, reportKey: report.key, outcome: input.outcome,
+        ...(documents ? { documents } : {}), ...(evidence.evidence?.branchTipOid ? { tipOid: evidence.evidence.branchTipOid } : {}) } }, isCurrent);
+    if (!event.ok) return event;
+    if (event.value.state === "ignored") return fail("close-task-invalid", event.value.reason ?? "The original task was retired.");
+    const state = await readTaskState(projectRoot);
+    if (!state.records.get(task.taskId)?.closed) {
+      const at = new Date(this.now()).toISOString();
+      const mirrored = await appendTaskEvent(projectRoot, taskEvent("task.closed", { taskId: task.taskId, by: actorRoleId,
+        outcome: input.outcome, operationId: input.operationId, eventId: key,
+        actionSource: { kind: "role-direct", actorRoleId, action: "close-created-task", operationId: input.operationId,
+          applicationId: "ans-durable-workflow", baseDigest: report.evidence.sha256,
+          targetDigest: durableHash(JSON.stringify([task.taskId, report.key, input.outcome, input.note ?? ""])), at },
+        ...(input.note ? { note: input.note } : {}),
+      }, () => new Date(at)));
+      if (!mirrored.ok) return fail(mirrored.code ?? "close-task-write-failed", mirrored.message ?? "The task receipt could not be written.");
+    }
+    void this.drainAllQueuesFor(projectRoot);
+    return { ok: true, taskId: task.taskId, workflowId: ref.instanceId, stage: task.stage,
+      operationId: input.operationId, outcome: input.outcome, eventId: event.value.key, replay, stageCompleted: event.value.state === "consumed" };
+  }
+
+  private async closeDurableTask(
+    projectRoot: string, actorRoleId: string, input: FixedCloseCreatedTaskToolInput, signal?: AbortSignal,
+  ): Promise<Awaited<ReturnType<typeof closeFixedWorkflowTask>>> {
+    const durable = this.deps.durableWorkflow!;
+    const store = await durable.store();
+    const projection = (await store.listProjections(projectRoot)).find(view => view.task?.taskId === input.taskId && view.status === "waiting");
+    const task = projection?.task;
+    const reject = (code: string, message: string) => ({ ok: false as const, code, message });
+    if (!projection || projection.status !== "waiting" || !task || task.taskId !== input.taskId) {
+      return reject("close-task-invalid", "The task is not the current durable production task.");
+    }
+    const { ref, attempt, stepId, action } = projection;
+    const current = () => !signal?.aborted && [...this.sessions.values()].some(entry =>
+      entry.projectRoot === projectRoot && entry.roleId === actorRoleId && entry.assignedTaskId === task.parentTaskId
+      && entry.busy && !entry.origins.running?.settled
+      && durable.delivery(projectRoot, entry.origins.running?.clientMessageId)?.ref.instanceId === ref.instanceId);
+    if (actorRoleId !== "convener" || !current()) {
+      return reject("close-task-invalid", "The current operations turn must hold the real parent task.");
+    }
+    const facts = store.listFacts(ref);
+    const report = facts.find(({ fact, receipt }) => fact.kind === "task-report" && fact.task.taskId === task.taskId
+      && receipt.state !== "ignored")?.fact;
+    if (report?.kind !== "task-report") {
+      return reject("close-report-missing", "A saved report from the assigned project role is required.");
+    }
+    const snapshot = store.getEvidence(ref, report.evidence) as { handback?: TaskHandback } | undefined;
+    if (!snapshot?.handback || (input.outcome === "accepted" && snapshot.handback.status !== "completed")) {
+      return reject("close-report-missing", "Accepted work requires the assigned role's completed report.");
+    }
+    const key = `close:${stepId}:${attempt}:${task.taskId}`;
+    const address = { key, stepId, attempt };
+    let fact: DurableFact;
+    if (task.stage === "B1" && action === "b1-impact-readonly") {
+      fact = { ...address, kind: "analysis-disposition", source: "convener", task, reportKey: report.key,
+        outcome: input.outcome === "accepted" ? "usable" : input.outcome === "rework" ? "needsFollowup" : "blocked" };
+    } else if (task.stage === "B3" && action === "b3-implement-and-accept" && input.outcome === "accepted") {
+      fact = { ...address, kind: "implementation-close", source: "convener", task, reportKey: report.key };
+    } else if (task.stage === "readonly" && action === "wait-for-review") {
+      fact = { ...address, kind: "readonly-review", source: "convener", reportKey: report.key,
+        outcome: input.outcome === "accepted" ? "accepted" : "blocked" };
+    } else {
+      return reject("close-task-invalid", "This disposition has no authorized transition for the current definition.");
+    }
+    if (!current()) return reject("close-task-invalid", "The operations turn changed during validation.");
+    const saved = await store.submit(ref, fact);
+    if (!saved.ok) return saved;
+    if (saved.value.state === "ignored") return reject("close-task-invalid", "The task attempt has been retired.");
+    return { ok: true, eventId: saved.value.key, taskId: task.taskId, operationId: input.operationId,
+      outcome: input.outcome, workflowId: ref.instanceId, ...(task.stage === "readonly" ? {} : { stage: task.stage }),
+      replay: facts.some(item => item.fact.key === key), stageCompleted: saved.value.state === "consumed" };
   }
   // —— verifyFixedReviewCloseBasis（B6 自 session.ts 逐字搬移）——
   /**

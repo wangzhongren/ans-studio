@@ -38,9 +38,7 @@ const FIXED = "two-fixed-paths/v1" as const;
 const BUILT_IN_ROLE_IDS = ["chief", "product", "rapporteur", "nominator", "convener", "verifier"] as const;
 const LEGACY_FIVE_TARGETS = ["product", "rapporteur", "nominator", "convener", "verifier"] as const;
 const FIXED_CARDS_EXPECTED = ["intent-confirm", "proposal", "appointment"] as const;
-// 2026-11-17（app-dispatch/v1，设计 §2.1/§6.1）：fixed 目标集按设计清零——内置任务由应用按流程定义
-// 创建，幕僚只选流程 + 按应用 prompt 呈卡；旧冻结值 [convener, verifier] 仅为 fixed-v2.1 历史。
-const FIXED_TARGETS_EXPECTED: readonly string[] = [];
+const FIXED_TARGETS_EXPECTED = ["convener", "verifier"] as const;
 
 function listTsFiles(dir: string): string[] {
   const files: string[] = [];
@@ -81,16 +79,19 @@ test("fixedCards：恰 [intent-confirm, proposal, appointment]（3 张客户确�
 
 // —————————————————————— fixedTargetRoleIds（MF-IR-4 冻结值） ——————————————————————
 
-test("fixedTargetRoleIds：按设计清零 []（应用建内置任务；幕僚只选流程+呈卡）；legacy CHIEF_HUB_DISPATCH 五内置逐字冻结", () => {
-  assert.ok(chiefRoleModule.fixedTargetRoleIds !== undefined, "chief 必须提供 fixedTargetRoleIds（清零为 []，不是移除字段）");
+test("fixedTargetRoleIds：恰 [convener, verifier]；legacy CHIEF_HUB_DISPATCH 五内置逐字冻结", () => {
+  assert.ok(chiefRoleModule.fixedTargetRoleIds !== undefined, "chief 必须提供 fixedTargetRoleIds");
   const fixedTargets = chiefRoleModule.fixedTargetRoleIds!;
-  assert.deepEqual([...fixedTargets], [...FIXED_TARGETS_EXPECTED], "fixed 目标按设计清零 []（app-dispatch/v1；旧值 [convener, verifier] 仅 v2.1 历史）");
+  assert.deepEqual([...fixedTargets], [...FIXED_TARGETS_EXPECTED], "fixed 目标冻结为 [convener, verifier]（v1.3 §3.2）");
   assert.equal(Object.isFrozen(fixedTargets), true, "fixedTargetRoleIds 必须是冻结只读数组");
-  assert.equal(fixedTargets.length, 0, "fixed 目标集不得含任何目标");
   assert.equal(new Set(fixedTargets).size, fixedTargets.length, "fixed 目标不得重复");
-  // 新矩阵：幕僚无任何内置派发目标（chief-dispatch-removed）；应用建全部内置任务。
-  for (const target of BUILT_IN_ROLE_IDS) {
-    assert.equal(fixedTargets.includes(target), false, `fixed 下幕僚不得派 ${target}（应用按流程定义创建）`);
+  for (const target of fixedTargets) {
+    assert.ok((BUILT_IN_ROLE_IDS as readonly string[]).includes(target), `fixed 目标必须是内置角色：${target}`);
+  }
+  // 语义边界：fixed 下 convener 仅 stage-request、verifier 为 review/preparation；
+  // 生产线三内置（product/rapporteur/nominator）不在 chief 的 fixed 目标集内。
+  for (const productionRole of ["product", "rapporteur", "nominator"] as const) {
+    assert.equal(fixedTargets.includes(productionRole), false, `fixed 下幕僚不得派生产线角色 ${productionRole}`);
   }
 
   // legacy hub 派发纯数据冻结：五内置目标、routing/source/report/purpose/schema 逐字不变。
@@ -126,74 +127,50 @@ test("fixed context：matrix=two-fixed-paths/v1 返回 4 个 fixed 段（顺序�
   assert.equal(chiefRoleModule.context({ governanceModel: "single", matrix: FIXED }), fixedSections, "fixed 段与治理模型无关");
 });
 
-test("fixed context 内容：select_workflow/应用驱动 / 3 张卡按 prompt / 应用直派验收 / 不派发·不收口·不停止 / 理会专业建议", () => {
+test("fixed context 内容：产线调度 / 3 张卡 / 独立验收 / 依据专业建议决定 / 不派生产线角色 / 不自行做专业判断", () => {
   const fixedSections = chiefRoleModule.context({ governanceModel: "trio", matrix: FIXED });
   const text = fixedSections.map((section) => section.text).join("\n");
 
-  // 流程选择与驱动（app-dispatch/v1）：两条固定路径 + select_workflow + 应用建内置任务/驱动阶段。
-  assert.match(text, /固定路径流程选择与驱动/);
+  // 产线调度：两条固定路径 + stage-request 原语 + 收口/open 不变量 + stop 顺序。
+  assert.match(text, /产线调度/);
   assert.match(text, /A1–A13/);
   assert.match(text, /B1–B4/);
-  assert.match(text, /select_workflow/);
-  assert.match(text, /workflowPath:"A"\|"B"/);
-  assert.match(text, /acceptanceStrength:"light"\|"standard"/);
-  assert.match(text, /workflow\.started/);
-  assert.match(text, /workflow-start:<flowId>:<path>:<sourceTaskId>/);
-  assert.match(text, /由应用按流程定义创建并投递/);
-  assert.match(text, /运营只派项目 worker/);
-  assert.match(text, /worker-dispatch-required/);
+  assert.match(text, /stage-request/);
+  assert.match(text, /sideEffect=read-only/);
+  assert.match(text, /open advance 请求/);
+  assert.match(text, /workflowAction:"stop"/);
 
-  // 幕僚动作面收窄：不派发/不收口/不重派/不停止/不直派验收。
-  assert.match(text, /chief-dispatch-removed/);
-  assert.match(text, /不收口任务、不重派、不停止、不直派验收/);
-  assert.match(text, /workflow-definition-unknown/);
-  assert.match(text, /workflow-protocol-mismatch/);
-  assert.match(text, /workflow-corrupt/);
-  assert.match(text, /workflow\.stop-unconfirmed/);
+  // 不派生产线角色（fixed 分裂）。
+  assert.match(text, /不直接向生产线角色派发任务/);
+  assert.match(text, /chief-production-dispatch-forbidden/);
+  assert.match(text, /只由运营（convener）派发/);
 
-  // 3 张卡：应用开卡 + card-prompt 逐项一致；merge-main 应用自有、仅客户本人（judge 不可代批）。
+  // 3 张卡：intent-confirm / proposal / appointment，不合并；固定路径不发 acceptance 卡；
+  // merge-main 应用自有、仅客户本人（judge 不可代批）。
   assert.match(text, /3 张且不合并/);
   assert.match(text, /intent-confirm/);
   assert.match(text, /proposal/);
   assert.match(text, /appointment/);
-  assert.match(text, /card-prompt/);
-  assert.match(text, /promptId/);
-  assert.match(text, /documentRefs/);
-  assert.match(text, /card-prompt-mismatch/);
+  assert.match(text, /不发 acceptance 卡/);
   assert.match(text, /merge-main/);
   assert.match(text, /客户本人/);
   assert.match(text, /不可代批/);
 
-  // 独立验收：A12a/A12b 由应用直派、criteria/report、docs/acceptance 归档、强度=定义参数。
+  // 独立验收：A12a/A12b、criteria/report、docs/acceptance 归档、强度由幕僚调节。
   assert.match(text, /独立验收/);
   assert.match(text, /A12a/);
   assert.match(text, /A12b/);
   assert.match(text, /criteria/);
   assert.match(text, /report/);
   assert.match(text, /docs\/acceptance/);
-  assert.match(text, /验收强度 = 流程定义参数/);
+  assert.match(text, /验收强度由你/);
 
   // 决策纪律：依据专业建议决定；不自行做专业判断；不代客户批准。
   assert.match(text, /专业建议/);
   assert.match(text, /不自行做专业判断/);
   assert.match(text, /不替客户批准/);
 
-  // 负例防「旧句删除后子串假绿」：旧 stage-request 驱动/生产线派发口径必须整体消失（不是仅个别词消失）。
-  for (const oldProtocol of [
-    "产线调度",
-    "stage-request",
-    "sideEffect=read-only",
-    "open advance 请求",
-    'workflowAction:"stop"',
-    "不直接向生产线角色派发任务",
-    "chief-production-dispatch-forbidden",
-    "只由运营（convener）派发",
-    "验收强度由你",
-  ]) {
-    assert.equal(text.includes(oldProtocol), false, `fixed 段不得保留旧协议口径：${oldProtocol}`);
-  }
-
-  // fixed 段不得复制 legacy workflow 资源引用（fixed 资源由编排按协议注入 v2/v3）。
+  // fixed 段不得复制 legacy workflow 资源引用（fixed 资源由编排注入 chief-workflow-v2）。
   assert.equal(text.includes("chief-workflow/v1"), false);
   assert.equal(text.includes("chief-workflow.md"), false);
   assert.equal(fixedSections.some((section) => section.resources !== undefined), false);
@@ -232,10 +209,10 @@ test("context 矩阵缺省/显式 legacy-v1/空输入：返回同一 legacy 冻�
 
 // —————————————————————— tools：不新增 requestReleaseMerge（G-IR 拒绝项） ——————————————————————
 
-test("tools：fixed 批次不新增发布合并工具；trio 声明仍为冻结的 6 项（含 closeCreatedTask）", () => {
+test("tools：fixed 批次保留六项工具并追加工作流启用提议，发布和合并继续由应用授权", () => {
   const policy = chiefRoleModule.tools({ governanceModel: "trio" });
   assert.deepEqual([...policy.tools], [...CHIEF_TOOL_IDS], "tools 声明与 CHIEF_TOOL_IDS 同源");
-  assert.deepEqual([...policy.tools], [
+  assert.deepEqual(policy.tools.slice(0, 6), [
     "roleActivityLog",
     "terminateRoleRun",
     "redispatchTask",
@@ -243,7 +220,7 @@ test("tools：fixed 批次不新增发布合并工具；trio 声明仍为冻结�
     "requestVersionDecision",
     "closeCreatedTask",
   ], "trio 工具 6 项/顺序逐字冻结");
-  assert.equal(policy.tools.length, 6);
+  assert.deepEqual(policy.tools.slice(6), ["requestWorkflowStart"]);
   assert.equal(policy.tools.some((id) => /release|merge/i.test(id)), false, "不得出现发布/合并类工具 id");
   assert.equal(Object.keys(chiefRoleModule).some((key) => /release|merge/i.test(key)), false, "模块对象不得新增发布/合并字段");
 });

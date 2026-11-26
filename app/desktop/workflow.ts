@@ -12,13 +12,18 @@
 //  · 本模块不授予任何写权/派发权：fixed 路由的硬授权仍在 `workflow-dispatch.ts` 谓词与
 //    `app/desktop/session.ts::routeFixedPathDispatch`；本层只提供模式选择与注入形态。
 //  · legacy 注入集合/顺序由 `session.ts` 原样保留；本模块的常量只供 fixed 过滤消费。
+export { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
+export { loadLatestRoster, parseTeamPlan } from "../../src/common/编排/workflow-preconditions.ts";
+export { activateRoleDocumentsFixed, archiveAcceptance, completeTeamPlanFixed, finalizeIntent, prepareIntent, readBasisLedger, taskBranchName,
+  type CompleteTeamPlanFixedInput, type CompleteTeamPlanFixedResult, type FixedActivateRoleDocumentsDep } from "../../src/common/编排/workflow-service.ts";
+export type { TaskHandback } from "../../src/common/编排/handback.ts";
 
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { WORKFLOW_LEDGER_SCHEMA, WORKFLOW_PROTOCOL_APP_DISPATCH, WORKFLOW_PROTOCOL_FIXED_V2_1, workflowProtocolOf } from "../../src/model/runtime.ts";
-import type { DispatchTaskPayload, WorkflowEvent, WorkflowProtocol, WorkflowStage } from "../../src/model/runtime.ts";
+import { WORKFLOW_LEDGER_SCHEMA } from "../../src/model/runtime.ts";
+import type { DispatchTaskPayload, WorkflowEvent, WorkflowStage } from "../../src/model/runtime.ts";
 import { TRUNK_MANIFEST_SCHEMA } from "../../src/model/trunk.ts";
 import { readTaskState } from "../../src/common/编排/task-state.ts";
 import { FIXED_DISPATCH_MATRIX, stageRequestIdempotencyKey } from "../../src/common/编排/workflow-dispatch.ts";
@@ -696,96 +701,4 @@ export async function recordFixedPathBScopeDecisionForDispatch(input: {
   });
   if (!decision.ok) return decision;
   return { ok: true, writesets: decision.writesets, replay: decision.replay, recorded: true };
-}
-
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// 2026-11-17（app-dispatch/v1 第一步，桌面窗口）：**工作流协议解析**（只读、fail-closed）
-//
-// 依据：docs/planning/2026-11-17_design_app-dispatch-builtins.md §9.1（协议版本钉死、Q10 在飞
-// fixed-v2.1 不迁移）；协调者任务「协议感知注入」。
-// 纪律：协议只从 `workflow.started.protocol` 读取（缺省 = fixed-v2.1，Q10）；本层不缓存、不写盘、
-// 不授予任何权限/写权。旧协议一律保持旧工具面与旧行为（逐字）；无 workflow 的新项目按新协议处理。
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-
-/** 该 workflowId 的驱动协议（`workflow.started.protocol` 缺省 = fixed-v2.1）；不存在/读失败 ⇒ undefined。 */
-export async function workflowProtocolForWorkflowId(
-  projectRoot: string,
-  workflowId: string,
-): Promise<WorkflowProtocol | undefined> {
-  const id = typeof workflowId === "string" ? workflowId.trim() : "";
-  if (id === "") return undefined;
-  try {
-    const ledger = await readWorkflowLedger(projectRoot);
-    const started = ledger.events.find((event): event is Extract<WorkflowEvent, { kind: "workflow.started" }> =>
-      event.kind === "workflow.started" && event.workflowId === id);
-    return started === undefined ? undefined : workflowProtocolOf(started);
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * 任务会话协议：按 `task.created.workflowId` 的 `workflow.started.protocol` 解析（fixed 任务必带
- * workflowId）；无 workflowId / 账本不可读 ⇒ undefined（调用方按旧协议 fail-closed）。
- */
-export async function sessionWorkflowProtocolForTask(
-  projectRoot: string,
-  taskId: string | undefined,
-): Promise<WorkflowProtocol | undefined> {
-  const id = typeof taskId === "string" ? taskId.trim() : "";
-  if (id === "") return undefined;
-  try {
-    const state = await readTaskState(projectRoot);
-    const workflowId = state.records.get(id)?.created?.workflowId;
-    return workflowId === undefined ? undefined : await workflowProtocolForWorkflowId(projectRoot, workflowId);
-  } catch {
-    return undefined;
-  }
-}
-
-/** 活动 workflow（有 `workflow.started` 且未 `workflow.closed`）的 id + 协议。 */
-async function activeWorkflowProtocolFacts(
-  projectRoot: string,
-): Promise<Array<{ workflowId: string; protocol: WorkflowProtocol }>> {
-  const ledger = await readWorkflowLedger(projectRoot);
-  const byWorkflow = new Map<string, { protocol: WorkflowProtocol; closed: boolean }>();
-  for (const event of ledger.events) {
-    if (event.kind === "workflow.started") {
-      byWorkflow.set(event.workflowId, { protocol: workflowProtocolOf(event), closed: false });
-    } else if (event.kind === "workflow.closed") {
-      const current = byWorkflow.get(event.workflowId);
-      if (current !== undefined) current.closed = true;
-    }
-  }
-  return [...byWorkflow.entries()]
-    .filter(([, value]) => !value.closed)
-    .map(([workflowId, value]) => ({ workflowId, protocol: value.protocol }));
-}
-
-/**
- * 聊天（无 taskId）会话协议：
- * 1. 存在活动 `fixed-v2.1` workflow ⇒ `fixed-v2.1`（在飞旧协议必须保持旧工具面，Q10；旧项目可能没有
- *    任何 workflow 事件，此时按第 3 条）；
- * 2. 存在活动 `app-dispatch/v1` workflow ⇒ `app-dispatch/v1`；
- * 3. 无活动 workflow（新项目首条客户消息）⇒ `app-dispatch/v1`（协调者口径：无 workflow 时按新协议）；
- * 4. 账本读失败 ⇒ `fixed-v2.1`（fail-closed：保持旧工具面，不猜测升级）。
- */
-export async function sessionWorkflowProtocolForChat(projectRoot: string): Promise<WorkflowProtocol> {
-  try {
-    const active = await activeWorkflowProtocolFacts(projectRoot);
-    if (active.some((entry) => entry.protocol === WORKFLOW_PROTOCOL_FIXED_V2_1)) return WORKFLOW_PROTOCOL_FIXED_V2_1;
-    return WORKFLOW_PROTOCOL_APP_DISPATCH;
-  } catch {
-    return WORKFLOW_PROTOCOL_FIXED_V2_1;
-  }
-}
-
-/** 活动 app-dispatch/v1 workflow id 列表（启动对账/恢复用；读失败 ⇒ 空集，不猜）。 */
-export async function activeAppDispatchWorkflowIds(projectRoot: string): Promise<string[]> {
-  try {
-    const active = await activeWorkflowProtocolFacts(projectRoot);
-    return active.filter((entry) => entry.protocol === WORKFLOW_PROTOCOL_APP_DISPATCH).map((entry) => entry.workflowId);
-  } catch {
-    return [];
-  }
 }

@@ -9,7 +9,7 @@ import type * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type * as Zod from "zod";
 import type { ResolvedRole } from "../../model/role.ts";
 import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1, RuntimeReasoningFactsV1, RuntimeNativeLifecycleFacts, RuntimeActiveToolFact, RuntimeApplicationToolSurfaceFacts, JsonSchema } from "../../model/runtime.ts";
-import { MODEL_REQUEST_FAILED, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../model/runtime.ts";
+import { isChiefDecisionExecutionContext, MODEL_REQUEST_FAILED, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../model/runtime.ts";
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
@@ -82,6 +82,7 @@ const INSTALLED_MCP_TOOL_TIMEOUT_MS = 60_000;
 // proved the CLI otherwise hands its full env, including the gateway key, to the process server).
 const MCP_ENV_LAUNCHER = fileURLToPath(new URL("../../common/claude-adapter/mcp-launcher.mjs", import.meta.url));
 const CALL_CONTEXT_ARG = "__ans_call_context";
+const CHIEF_DECISION_TOOL_NAME = "decide_pending_request";
 /** `not(anyOf(required(key)))` forbids each named property, exactly as property:false does.
  * Only lower this narrow root shape; the strict converter must still reject every other not.
  */
@@ -253,15 +254,28 @@ const markRetryable = <T extends Error>(error: T, retryable: boolean): T => {
 
 export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies: ClaudeAdapterDependencies = {}): RuntimeAdapter {
   if (options.runtime !== "claude") throw new Error("Claude 适配器只接受 runtime=claude");
-  // 判断模式（「替我审」/「替我审批」「替我决策」）：`judgeMode` 由 Service 在注入 `shellJudge`
-  // **或** `governanceJudge` 只读能力时置位，此时 `options.tools` 必须恰为运行时核心注入的对应
-  // 三件套（shell 的 report_shell_judgement 或治理的 report_governance_judgement，二者不可混用）。
-  // 工具集不匹配 ⇒ SDK 加载前抛错，零副作用（写/编辑/shell/交互/回交/派发工具即便被误注入
-  // 也不会进入判断会话）。普通角色会话 `judgeMode` 缺席，以下分支全部不成立（逐字不变）。
+  // `judgeMode` 隔离原生能力。只读判断和幕僚决策各自校验注入的完整工具集。
   const judgeMode = options.judgeMode === true;
-  if (judgeMode) assertClaudeJudgeToolSet(options.tools);
-  // allowlist 用运行时核心并集（PM 双开关评审 §6.2）；装配仍只认上面校验过的三件套之一。
-  const judgeToolNames: ReadonlySet<string> = CLAUDE_JUDGE_TOOL_NAMES;
+  const assertIsolatedToolSet = (role?: ResolvedRole) => {
+    if (options.chiefDecisionContext !== undefined) {
+      if (!judgeMode || options.judgeMode !== true || !isChiefDecisionExecutionContext(options.chiefDecisionContext)
+        || options.tools.length !== 1 || options.tools[0]?.name !== CHIEF_DECISION_TOOL_NAME) {
+        throw new Error(`Claude 有界幕僚会话需要有效的决策上下文且只接受 ${CHIEF_DECISION_TOOL_NAME}`);
+      }
+      if (role && (role.id !== "chief" || role.kind !== "built-in-governance" || role.governanceFunction !== "chief")) {
+        throw new Error("Claude 有界幕僚会话需要真实内置 Chief 角色");
+      }
+      return;
+    }
+    if (judgeMode) assertClaudeJudgeToolSet(options.tools);
+  };
+  assertIsolatedToolSet();
+  const chiefDecision = options.chiefDecisionContext === undefined ? undefined : structuredClone(options.chiefDecisionContext);
+  const assertMode = (role: ResolvedRole) => {
+    assertIsolatedToolSet(role);
+    if (!isDeepStrictEqual(options.chiefDecisionContext, chiefDecision)) throw new Error("Claude 有界幕僚决策上下文已变更");
+  };
+  const isolatedToolNames = chiefDecision ? new Set([CHIEF_DECISION_TOOL_NAME]) : CLAUDE_JUDGE_TOOL_NAMES;
   if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
     throw new Error("Claude required-v1 工具展示缺少 projector/register 能力");
   }
@@ -301,6 +315,13 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   // 不改写、不重排、不判定。判断会话即使误传也不拼接（与 installedMcpServers/技能节的既有收口同型）；
   // 空数组/缺省以及全空串元素视为无片段（PM 裁决 R-5/R-6/R-7），系统提示逐字不变。
   const systemPrompt = (role: ResolvedRole) => {
+    if (chiefDecision) {
+      return [
+        `你是内置幕僚。此独立会话只处理以下固定待决请求：${JSON.stringify(chiefDecision.request)}。`,
+        `只可用 mcp__ans__${CHIEF_DECISION_TOOL_NAME} 提交本卡的合法选项和理由。依据宿主提供的材料作决定，将推荐项作为参考，并明确决定来自委托幕僚。宿主核验请求标识、摘要、委托世代、选项与次数。应如实保留失败或未决状态。`,
+        ...options.tools.flatMap((tool) => tool.promptGuidelines ?? []),
+      ].join("\n\n");
+    }
     // 判断会话不拼接项目技能注入节：判断只按稳定 rubric + 按需 judge_read_file 读证据，
     // 不让角色/技能文本进入系统提示（普通角色会话逐字不变）。
     const installedSkills = judgeMode ? "" : renderInstalledSkillsSection(options.projectRoot, role.id);
@@ -351,10 +372,13 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   }));
 
   return {
-    async composeContext(role) { return { systemPrompt: systemPrompt(role) }; },
+    async composeContext(role) {
+      assertMode(role);
+      return { systemPrompt: systemPrompt(role) };
+    },
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
-      // 判断模式再校验一次（options 在工厂与 bind 之间可能被误改；仍零副作用）。
-      if (judgeMode) assertClaudeJudgeToolSet(options.tools);
+      // options 在工厂与 bind 之间可能被误改，副作用前重新校验。
+      assertMode(role);
       options.registerToolDisplayProfile?.({
         apiKeyEnvVar: credentialName,
         credentials: [...new Set([credentialName, ...(options.toolDisplayCredentialEnvNames ?? [])])]
@@ -622,12 +646,11 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         return {};
       };
       const startEngine = async (turn: Turn, compatible: boolean): Promise<Engine> => {
+        // 工厂或绑定后的配置漂移必须在加载 SDK 前被拒绝。
+        assertMode(role);
         if (engine && !engine.closed) return engine;
         teardownError = undefined;
         if (!storage && nativeId) { nativeId = undefined; warning = "Claude 活会话已中断；下一条输入将新建上下文。"; }
-        // 判断模式：新建引擎前再校验一次（防止工厂→bind→引擎构造之间 options 被误改）；
-        // 必须在加载 SDK 之前，保证零副作用。
-        if (judgeMode) assertClaudeJudgeToolSet(options.tools);
         const sdk = await (dependencies.loadSdk?.() ?? import("@anthropic-ai/claude-agent-sdk"));
         const z = await (dependencies.loadZod?.() ?? import("zod"));
         if (turn.controller.signal.aborted || disposed) {
@@ -665,6 +688,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("Claude base URL 必须是 HTTP(S) 且不包含用户名或密码");
           childEnv.ANTHROPIC_BASE_URL = baseUrl;
         }
+        // SDK 加载和配置目录准备会让出执行，注册前再核对工具集。
+        assertMode(role);
         const names = new Set(options.tools.map((tool) => `mcp__ans__${tool.name}`));
         if (names.size !== options.tools.length || options.tools.some((tool) => !/^[a-zA-Z0-9_-]+$/.test(tool.name))) throw new Error("Claude ANS 工具名无效或重复");
         const controller = new AbortController();
@@ -684,8 +709,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             description: tool.description,
             inputSchema: toClaudeSchema(inputSchema, z),
             annotations: judgeMode
-              // 判断会话三件套（shell 或治理 report）全部只读、不破坏、不触网。
-              ? { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
+              ? { readOnlyHint: chiefDecision === undefined, destructiveHint: false, openWorldHint: false }
               : { readOnlyHint: tool.name === "read_file", destructiveHint: tool.name !== "read_file", openWorldHint: tool.name === "run_shell" },
             _meta: { "anthropic/alwaysLoad": true },
           }, async (args, extra) => {
@@ -754,11 +778,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           tools: webSearchEnabled ? ["WebSearch"] : [],
           // SDK 事实（真机诊断 CLAUDE_SDK_CAN_USE_TOOL_SHADOWED）：裸 allowedTools 条目会在
           // canUseTool 之前自动放行整个工具。本适配器的逐次拦截一直由 PreToolUse hook 承担
-          // （hook deny 先于 allowedTools）；判断模式下 allowedTools 只含三只 judge 工具，
-          // 不存在任何写/编辑/shell/交互/回交/派发/网络条目的自动放行面。
+          // （hook deny 先于 allowedTools）；隔离会话的 allowedTools 只含经校验的注入集合。
           allowedTools: [...names, ...installedAllowedTools, ...(webSearchEnabled ? ["WebSearch"] : [])],
           // 判断模式第三层结构性禁用：内置原生工具显式钉死（tools:[] 已清空内置面；strictMcpConfig
-          // 保证只有注入的 ans server；PreToolUse 仍对任何非三项调用兜底 deny）。
+          // 保证只有注入的 ans server；PreToolUse 复核工具名、SDK 来源和轮次）。
           // 普通角色会话不出现该字段（逐字不变）。
           ...(judgeMode ? { disallowedTools: [...CLAUDE_JUDGE_DISALLOWED_TOOLS] } : {}),
           settingSources: [], strictMcpConfig: true,
@@ -767,7 +790,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           persistSession: !!storage, ...(nativeId ? { resume: nativeId } : {}),
           ...(options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() ? { model: options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() } : {}),
           ...reasoningOptions(compatible),
-          canUseTool: async () => ({ behavior: "deny", message: judgeMode
+          canUseTool: async () => ({ behavior: "deny", message: chiefDecision
+            ? `有界幕僚会话仅允许已注册的 ${CHIEF_DECISION_TOOL_NAME}` : judgeMode
             ? "判断会话仅允许已注册的只读 judge 工具"
             : "仅允许已注册且预批准的 ANS MCP 工具" }),
           hooks: {
@@ -792,9 +816,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             if (hook.hook_event_name !== "PreToolUse") return {};
             const original = hook.prompt_id ? current.nativeTurns.get(hook.prompt_id) : undefined;
             const originalTurn = original?.turn;
-            // 判断模式：只放行冻结的 judge 三件套之一（shell 或治理；名字还必须确实已注册，
-            // 因此混合/缺失集合在入口已被拒绝）。这是结构性最后一道闸，兜底文案在下方 deny 分支。
-            if (names.has(hook.tool_name) && (!judgeMode || judgeToolNames.has(hook.tool_name.slice("mcp__ans__".length))) && hook.mcp_server?.name === "ans" && hook.mcp_server.source === "sdk" && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted && hook.tool_input && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input)) {
+            // 隔离会话按各自的白名单放行已注册且绑定活动轮次的工具。
+            if (names.has(hook.tool_name) && (!judgeMode || isolatedToolNames.has(hook.tool_name.slice("mcp__ans__".length))) && hook.mcp_server?.name === "ans" && hook.mcp_server.source === "sdk" && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted && hook.tool_input && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input)) {
               originalTurn.replayUnsafe = true;
               const token = randomUUID();
               current.contexts.set(token, { turn: originalTurn, toolName: hook.tool_name.slice("mcp__ans__".length), toolUseId: hook.tool_use_id, signal: AbortSignal.any([original!.signal, hookOptions.signal]) });
@@ -829,12 +852,14 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             }
             if (originalTurn) {
               const tool = options.tools.find((candidate) => `mcp__ans__${candidate.name}` === hook.tool_name);
-              const blocked = judgeMode ? "拒绝非判断工具或已中止轮次的调用" : "拒绝非 ANS 工具或已中止轮次的调用";
+              const blocked = chiefDecision ? "拒绝幕僚会话中的越权工具或已中止轮次的调用" : judgeMode
+                ? "拒绝非判断工具或已中止轮次的调用" : "拒绝非 ANS 工具或已中止轮次的调用";
               emitTool(originalTurn, { origin: "governance-hook", phase: "blocked", toolName: tool?.name ?? hook.tool_name,
                 toolCallId: `${originalTurn.id}:${hook.tool_use_id}`,
                 result: { ok: false, message: blocked } }, "denied", blocked);
             } else emitUnattributed();
-            return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: judgeMode
+            return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: chiefDecision
+              ? `有界幕僚会话仅允许当前轮注册的 ${CHIEF_DECISION_TOOL_NAME}` : judgeMode
               ? `判断会话仅允许 ${options.tools.map((tool) => tool.name).join("/")}`
               : "仅允许当前轮注册的 ANS MCP 工具" } };
           }] }],

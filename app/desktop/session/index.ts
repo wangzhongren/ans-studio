@@ -34,12 +34,12 @@ import type { StableWriteCardOutcome } from "../../../src/pipeline/orchestration
 import { appointmentStableWriteInputs, buildAmendmentItemCard, buildStableBoundaryRisk, buildStableWriteCard, buildVersionChangeCard, mergeAcknowledgements, toAmendmentItemOutcome, toStableWriteOutcome, toVersionChangeOutcome, validateStableWriteCardShape, type AmendmentItemPresentation, type StableWritePreview, type VersionChangeStack, } from "../version-change.ts";
 import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "../watchdog.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage, WorkflowProtocol } from "../../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage } from "../../../src/model/runtime.ts";
 import type { PlanEscalationFn, PlanEscalationInput, PlanEscalationResult } from "../../../src/model/runtime.ts";
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn, WorkflowEvent, WorkflowArtifactRef, BasisEvent } from "../../../src/model/runtime.ts";
 import type { InstallSkillFn, InstallSkillPayload, InstallSkillReceipt, UninstallSkillFn, ReportHandbackMetadata } from "../../../src/model/runtime.ts";
 import type { InstallMcpFn, InstallMcpPayload, InstallMcpReceipt, UninstallMcpFn } from "../../../src/model/runtime.ts";
-import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn, ChiefDecisionBasis, ChiefDecisionHost } from "../customer-input.ts";
+import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn, ChiefDecisionBasis, ChiefDecisionExecutor, ChiefDecisionHost } from "../customer-input.ts";
 import type { ProjectListing } from "../../../src/service/role/resolve-role.ts";
 import { loadEffectiveConfig as defaultLoadEffectiveConfig, type ConfigSourceKind, type LoadConfigOptions, type LoadedConfig } from "../../../src/common/shared/config-loader.ts";
 import { RUNTIME_KINDS, type RuntimeKind } from "../../../src/common/shared/runtime-shared.ts";
@@ -71,11 +71,10 @@ import { FixedWorkflowRoute, type FixedWorkflowPorts, type FixedWorkflowRefs } f
 import { FixedWorkflowCards } from "./fixed-workflow/cards.ts";
 import { FixedWorkflowRelease } from "./fixed-workflow/release-merge.ts";
 import { FixedWorkflowPanel } from "./fixed-workflow/panel.ts";
-import { FixedWorkflowStageDispatch, type AppDispatchReconcileSummary } from "./fixed-workflow/stage-dispatch.ts";
 import type { FixedDispatchPort, HandbackSink } from "./contracts/ports.ts";
 import { Lifecycle, type LifecyclePorts } from "./lifecycle/index.ts";
+import { durableChiefDecisionExecutor } from "../durable-workflow.ts";
 import type { LifecycleManagerPeer } from "./lifecycle/host.ts";
-import { createDesktopBlockRouter } from "../block-router.ts";
 
 /** 同时**保活**的会话数上限（B-2 路线 a 的 LRU 上限；设计建议 3）。超出即淘汰**最久未用**者（dispose；界面侧历史由渲染层自持——切回时恢复并明示「模型上下文已重启」）。淘汰候选不含 busy 会话（P1-2），也不含各项目的主理（`primaryRoleId`，2026-10-26 客户指令）。 */
 export const MAX_LIVE_SESSIONS = 3;
@@ -228,10 +227,6 @@ export class SessionManager {
   private readonly fixedWorkflowRelease: FixedWorkflowRelease;
   /** B6：fixed 面板只读投影 + advisory 摘要（2 方法 → `./session/fixed-workflow/panel.ts`）。 */
   private readonly fixedWorkflowPanel: FixedWorkflowPanel;
-  /** 2026-11-17（app-dispatch/v1）：应用侧阶段投递桥/驱动钩子/启动对账（→ `./session/fixed-workflow/stage-dispatch.ts`）。 */
-  private readonly fixedWorkflowStageDispatch: FixedWorkflowStageDispatch;
-  /** 2026-11-20（block resolver 桌面批）：block 生命周期运行时（事实→路由→修复/卡→重入场；`../block-router.ts`）。 */
-  private readonly blockRouter: ReturnType<typeof createDesktopBlockRouter>;
   /** B6：`FixedDispatchPort`（dispatch → fixed-workflow；构造注入箭头、运行期调用、参数逐位转发）。 */
   private readonly fixedDispatchPort: FixedDispatchPort;
   /** B6：`HandbackSink`（persistence → handback；构造注入箭头、运行期调用、参数逐位转发）。 */
@@ -276,7 +271,6 @@ export class SessionManager {
    directory: { governanceOwner: (projectRoot) => this.governanceOwnerRoleId(projectRoot), governanceRuntime: (projectRoot) => this.governanceRuntimeFor(projectRoot), lastTurn: (projectRoot, roleId, runtime) => this.lastTurnOf(projectRoot, roleId, runtime), }, }, { afterAppointmentWriteApproved: (...args: Parameters<LifecyclePorts["afterAppointmentWriteApproved"]>) => this.afterAppointmentWriteApproved(...args),
    afterStableWrite: (...args: Parameters<LifecyclePorts["afterStableWrite"]>) => this.afterStableWrite(...args), appTaskClientMessageId: (...args: Parameters<LifecyclePorts["appTaskClientMessageId"]>) => this.appTaskClientMessageId(...args), appTaskClientMessageIdFromSeed: (...args: Parameters<LifecyclePorts["appTaskClientMessageIdFromSeed"]>) => this.appTaskClientMessageIdFromSeed(...args),
    appendRoleActivity: (...args: Parameters<LifecyclePorts["appendRoleActivity"]>) => this.appendRoleActivity(...args), applyMcpChange: (...args: Parameters<LifecyclePorts["applyMcpChange"]>) => this.applyMcpChange(...args), applySkillChange: (...args: Parameters<LifecyclePorts["applySkillChange"]>) => this.applySkillChange(...args),
-   appDispatchSelectWorkflow: (...args: Parameters<LifecyclePorts["appDispatchSelectWorkflow"]>) => this.fixedWorkflowStageDispatch.selectWorkflowAndDeliver({ projectRoot: args[0].projectRoot, runtime: args[0].runtime, workflowPath: args[0].workflowPath, flowId: args[0].flowId, ...(args[0].acceptanceStrength !== undefined ? { acceptanceStrength: args[0].acceptanceStrength } : {}), ...(args[0].sourceTaskId !== undefined ? { sourceTaskId: args[0].sourceTaskId } : {}) }), appDispatchDriveWorkflow: (...args: Parameters<LifecyclePorts["appDispatchDriveWorkflow"]>) => this.fixedWorkflowStageDispatch.advance(args[0], args[1], this.lastGovernanceRuntime.get(args[0]) ?? "pi").then(() => undefined),
    closeCreatedTaskFixedForSession: (...args: Parameters<LifecyclePorts["closeCreatedTaskFixedForSession"]>) => this.closeCreatedTaskFixedForSession(...args), completeTeamPlanFixedForHandle: (...args: Parameters<LifecyclePorts["completeTeamPlanFixedForHandle"]>) => this.completeTeamPlanFixedForHandle(...args),
    completeTeamPlanForHandle: (...args: Parameters<LifecyclePorts["completeTeamPlanForHandle"]>) => this.completeTeamPlanForHandle(...args), contractCheckText: (...args: Parameters<LifecyclePorts["contractCheckText"]>) => this.contractCheckText(...args), currentSkillPaths: (...args: Parameters<LifecyclePorts["currentSkillPaths"]>) => this.currentSkillPaths(...args),
    deliveryIsStopped: (...args: Parameters<LifecyclePorts["deliveryIsStopped"]>) => this.deliveryIsStopped(...args), deliveryLifecycle: (...args: Parameters<LifecyclePorts["deliveryLifecycle"]>) => this.deliveryLifecycle(...args), displayHandback: (...args: Parameters<LifecyclePorts["displayHandback"]>) => this.displayHandback(...args),
@@ -302,7 +296,7 @@ export class SessionManager {
   // B6（2026-11-13）两阶段装配：回交状态由 ./session/handback.ts 的 Handback 单 owner 持有并创建 （方案 §3.6 的 2 个字段）；其余簇状态/未迁出方法经 refs 访问器与端口箭头延迟取值（构造期不触发）。
   this.handback = new Handback( { starTaskIds: this.starTaskIds, reportedTaskKeys: this.reportedTaskKeys, governanceHandbackMirrored: this.governanceHandbackMirrored, lastGovernanceRuntime: this.lastGovernanceRuntime, taskHandbackCommits: () => this.taskHandbackCommits, taskDeliveryCommits: () => this.taskDeliveryCommits,
    planEscalations: () => this.planEscalations, planEscalationPrompted: () => this.planEscalationPrompted, }, { findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId), activeRuntimeFor: (projectRoot) => this.activeRuntimeFor(projectRoot), enqueueDelivery: (projectRoot, targetRoleId,
-   item) => this.enqueueDelivery(projectRoot, targetRoleId, item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), observeApplicationTaskReport: (projectRoot, taskId) => this.fixedWorkflowStageDispatch.observeApplicationTaskReport(projectRoot, taskId), observeBlockTaskReport: (projectRoot, taskId) => this.blockRouter.observeTaskReportLater(projectRoot, taskId), }, deps, );
+   item) => this.enqueueDelivery(projectRoot, targetRoleId, item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), }, deps, );
   // B3 两阶段装配：模块构造时注入只读端口/状态引用；端口方法只在运行期调用（不改变构造期语义）。
   this.sessionEnv = new SessionEnv( { sessions: this.sessions, rebuildChains: this.rebuildChains, installationRefusals: this.installationRefusals, getSelectionVersion: () => this.selectionVersion, getBoundaryRefreshVersion: () => this.boundaryRefreshVersion, getActiveRoleId: () => this.activeRoleId, setActiveRoleId: (roleId) => {
    this.activeRoleId = roleId; }, }, { disposeEntry: (roleId, entry) => this.disposeEntry(roleId, entry), hasBusyRuntime: (runtime) => this.hasBusyRuntime(runtime), openInternalUnsafe: (req, userInitiated, selectionVersion, internalReopen) => this.openInternalUnsafe(req, userInitiated, selectionVersion,
@@ -324,7 +318,7 @@ export class SessionManager {
    lastRoleActivity: this.lastRoleActivity, }, { restoreRequestState: (projectRoot, state) => this.restoreRequestState(projectRoot, state), restoreVersionDecisions: (projectRoot, state) => this.restoreVersionDecisions(projectRoot, state), findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot,
    roleId), enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), appDispatchClientMessageId: (dedupKey) => this.appDispatchClientMessageId(dedupKey),
    stopExactController: (input, caller) => this.stopExactController(input, caller), ensureFreshRoleSession: (projectRoot, roleId, runtime) => this.ensureFreshRoleSession(projectRoot, roleId, runtime), withRequestLifecycle: (projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride,
-   lifecycle) => this.withRequestLifecycle(projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle), noteBlockFact: (projectRoot, fact) => this.blockRouter.observeFact(projectRoot, fact), escalateRedispatchBlock: (projectRoot, input) => this.blockRouter.escalateRedispatchBlock(projectRoot, input), recoverBlocks: (projectRoot) => this.blockRouter.recover(projectRoot), }, deps, ); this.diagnostics = new Diagnostics( { sessions: this.sessions, deliveryQueues: this.deliveryQueues, activeDeliveries: this.activeDeliveries, openChains: this.openChains,
+   lifecycle) => this.withRequestLifecycle(projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle), }, deps, ); this.diagnostics = new Diagnostics( { sessions: this.sessions, deliveryQueues: this.deliveryQueues, activeDeliveries: this.activeDeliveries, openChains: this.openChains,
    rebuildChains: this.rebuildChains, lastGovernanceRuntime: this.lastGovernanceRuntime, lastRoleActivity: this.lastRoleActivity, lastTurns: this.lastTurns, lastAssistantText: this.lastAssistantText, governanceHandbackMirrored: this.governanceHandbackMirrored, governanceClientProjections: this.governanceClientProjections,
    getNetworkState: () => this.networkState, setNetworkState: (state) => { this.networkState = state; }, getActiveRoleId: () => this.activeRoleId, }, { openBackground: (req) => this.openBackground(req), sendBackground: (input) => this.sendBackground(input), notifyRoleState: (projectRoot, targetRoleId,
    runtime) => this.notifyRoleState(projectRoot, targetRoleId, runtime), drainAllQueuesFor: (projectRoot) => this.drainAllQueuesFor(projectRoot), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot,
@@ -332,7 +326,7 @@ export class SessionManager {
   // B5（2026-11-13）两阶段装配：cards 簇（方案 §3.6 的 7 个状态字段由 `Cards` 单 owner 持有并创建； version-decisions 经同一实例引用读写 versionDecisionPending/versionDecisionChains）； fixed 卡钩子（prepareFixedAppointmentCardRequest/recordFixedCardWorkflowResolution）经门面箭头注入。
   this.acceptanceFacts = new AcceptanceFacts(deps); this.cards = new Cards( { sessions: this.sessions, lastGovernanceRuntime: this.lastGovernanceRuntime, lastRoleActivity: this.lastRoleActivity, loadEffectiveConfig: this.loadEffectiveConfig, }, { findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot,
    roleId), activeRuntimeFor: (projectRoot) => this.activeRuntimeFor(projectRoot), enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), }, deps,
-   this.evidence, this.acceptanceFacts, { prepareFixedAppointmentCardRequest: (projectRoot, flowId, request) => this.prepareFixedAppointmentCardRequest(projectRoot, flowId, request), recordFixedCardWorkflowResolution: (input) => this.recordFixedCardWorkflowResolution(input), afterAppDispatchCardResolved: (input) => this.fixedWorkflowStageDispatch.afterCardResolved(input), }, ); this.versionDecisions = new VersionDecisions( this.cards,
+   this.evidence, this.acceptanceFacts, { prepareFixedAppointmentCardRequest: (projectRoot, flowId, request) => this.prepareFixedAppointmentCardRequest(projectRoot, flowId, request), recordFixedCardWorkflowResolution: (input) => this.recordFixedCardWorkflowResolution(input), }, ); this.versionDecisions = new VersionDecisions( this.cards,
    { sessions: this.sessions, lastGovernanceRuntime: this.lastGovernanceRuntime }, { findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId) }, deps, this.acceptanceFacts, );
   // B5 端口实例（方案 §3.3：由门面构造注入、运行期调用；B6/B7 的 fixed-workflow/lifecycle 经 CardGateway 发卡）。
   this.cardGateway = { presentAppCard: (input) => this.cards.presentAppCard(input), withRequestLifecycle: (projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle) => this.cards.withRequestLifecycle(projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride,
@@ -341,15 +335,31 @@ export class SessionManager {
   // B6（2026-11-13）两阶段装配：fixed-workflow 模块（L5；白名单 card-gateway/evidence/run-change/git-ports） 与 dispatch 模块（L4；fixed 经 FixedDispatchPort 端口）。模块构造器零副作用（只存引用/箭头）； 端口只在运行期调用（两阶段装配）。构造顺序沿用 B3–B5 口径：全部下游模块实例先于本段就绪。
   this.fixedDispatchPort = { routeFixedPathDispatch: (projectRoot, runtime, fromRoleId, d, targetRoleId, task, source, dispatchFlowId) => this.routeFixedPathDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source, dispatchFlowId), dispatchAdvisorySummary: (advisories) => this.dispatchAdvisorySummary(advisories),
    }; const fixedWorkflowRefs: FixedWorkflowRefs = { sessions: this.sessions, activeDispatchKeys: this.activeDispatchKeys, starTaskIds: this.starTaskIds, lastGovernanceRuntime: this.lastGovernanceRuntime, lastRoleActivity: this.lastRoleActivity, runChange: this.runChange, evidence: this.evidence, cardGateway: this.cardGateway,
-   }; const fixedWorkflowPorts: FixedWorkflowPorts = { openInternal: (req, userInitiated) => this.openInternal(req, userInitiated), findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId), drainAllQueuesFor: (projectRoot) => this.drainAllQueuesFor(projectRoot), enqueueDelivery: (projectRoot,
-   targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), appDispatchClientMessageId: (dedupKey) => this.appDispatchClientMessageId(dedupKey), pendingAppTaskDelivery: (projectRoot, targetRoleId, runtime, clientMessageId) => this.pendingAppTaskDelivery(projectRoot, targetRoleId, runtime, clientMessageId), onBlockFact: (projectRoot, fact) => this.blockRouter.observeFactLater(projectRoot, fact), }; this.blockRouter = createDesktopBlockRouter({ ...(deps.now !== undefined ? { now: deps.now } : {}), ...(deps.customerInput !== undefined ? { customerInput: deps.customerInput } : {}), getListing: (root) => this.deps.getListing(root), findLiveRuntime: (root, role) => this.findLiveRuntime(root, role), activeRuntimeFor: (root) => this.activeRuntimeFor(root), lastGovernanceRuntime: this.lastGovernanceRuntime, governanceOwner: (root) => this.handbackOwnerRoleId(root) ?? this.chiefTaskRoleIdOf(root), decisionDelegationEnabled: () => this.deps.decisionDelegationEnabled?.() === true, withRequestLifecycle: (projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle) => this.withRequestLifecycle(projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle), enqueueDelivery: (root, role, item) => this.enqueueDelivery(root, role, item), drainQueue: (root, role, runtime) => this.drainQueue(root, role, runtime), emitSystemRow: (root, roleId, summary) => this.emitDeliveryNote(root, this.findLiveRuntime(root, roleId ?? "") ?? this.lastGovernanceRuntime.get(root) ?? "pi", roleId, roleId ?? "chief", summary), appendRoleActivity: (root, roleId, input) => this.appendRoleActivity(root, roleId, input), isBusy: (root) => this.watchdogSnapshot(root)?.roles.some((role) => role.busy) === true, reconcileAppDispatch: (root) => this.fixedWorkflowStageDispatch.reconcile(root).then((summary) => ({ corrupt: summary.corrupt, errors: summary.errors, delivered: summary.delivered, activeWorkflows: summary.activeWorkflows })), advanceAppDispatch: (root, workflowId) => this.fixedWorkflowStageDispatch.advance(root, workflowId, this.lastGovernanceRuntime.get(root) ?? "pi").then((receipt) => receipt !== undefined), redispatchTask: (root, taskId, to) => this.redispatchTask({ projectRoot: root, taskId, ...(to !== undefined ? { to } : {}) }).then((result) => ({ ok: result.ok, safety: result.safety, ...(result.taskId !== undefined ? { taskId: result.taskId } : {}), message: result.message })), selectRedispatchTarget: (root, roleId, attempts) => this.chooseRedispatchTarget(root, roleId, attempts), registerAppTask: (taskId, creator) => { this.starTaskIds.add(taskId); taskCreators.set(taskId, creator); }, redeliverAppTask: (root, taskId) => this.fixedWorkflowStageDispatch.redeliverAppTask(root, taskId), scanAppCardPromptFacts: (root, options) => this.fixedWorkflowStageDispatch.scanAppCardPromptFacts(root, options), reenterBlockedStage: (root, input) => this.fixedWorkflowStageDispatch.reenterBlockedStage(root, input), }); this.fixedWorkflowRoute = new FixedWorkflowRoute(fixedWorkflowRefs,
-   fixedWorkflowPorts, deps); this.fixedWorkflowRelease = new FixedWorkflowRelease(fixedWorkflowRefs, fixedWorkflowPorts, deps); this.fixedWorkflowStageDispatch = new FixedWorkflowStageDispatch(fixedWorkflowRefs, fixedWorkflowPorts, this.fixedWorkflowRelease, deps, this.blockRouter); this.fixedWorkflowCards = new FixedWorkflowCards(fixedWorkflowRefs, fixedWorkflowPorts, this.fixedWorkflowRelease, this.fixedWorkflowStageDispatch, deps); this.fixedWorkflowPanel = new FixedWorkflowPanel();
+   }; const fixedWorkflowPorts: FixedWorkflowPorts = { openInternal: (req, userInitiated) => this.openInternal(req, userInitiated),
+   durableDecisionExecutor: (projectRoot, runtime) => this.durableDecisionExecutor(projectRoot, runtime),
+   findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId), drainAllQueuesFor: (projectRoot) => this.drainAllQueuesFor(projectRoot), enqueueDelivery: (projectRoot,
+   targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), pendingAppTaskDelivery: (projectRoot, targetRoleId, runtime, clientMessageId) => this.pendingAppTaskDelivery(projectRoot, targetRoleId, runtime, clientMessageId), appDispatchClientMessageId: (dedupKey) => this.appDispatchClientMessageId(dedupKey), }; this.fixedWorkflowRoute = new FixedWorkflowRoute(fixedWorkflowRefs,
+   fixedWorkflowPorts, deps); this.fixedWorkflowRelease = new FixedWorkflowRelease(fixedWorkflowRefs, fixedWorkflowPorts, deps); this.fixedWorkflowCards = new FixedWorkflowCards(fixedWorkflowRefs, fixedWorkflowPorts, this.fixedWorkflowRelease, deps); this.fixedWorkflowPanel = new FixedWorkflowPanel();
    this.dispatch = new Dispatch( { sessions: this.sessions, activeDispatchKeys: this.activeDispatchKeys, starTaskIds: this.starTaskIds, deliveredAppTaskIds: this.deliveredAppTaskIds, deliveredDeliveryKeys: this.deliveredDeliveryKeys, deliveryQueues: () => this.deliveryQueues, activeDeliveries: () => this.activeDeliveries,
    lastRoleActivity: this.lastRoleActivity, }, { openInternal: (req, userInitiated) => this.openInternal(req, userInitiated), findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId), enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId,
    item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), appDispatchClientMessageId: (dedupKey) => this.appDispatchClientMessageId(dedupKey), appTaskClientMessageIdFromSeed: (seed) => this.appTaskClientMessageIdFromSeed(seed), deliveryIsStopped: (key) => this.deliveryIsStopped(key),
-   runTaskIsFenced: (projectRoot, taskId, runId) => this.runTaskIsFenced(projectRoot, taskId, runId), routeStarDispatch: (projectRoot, runtime, fromRoleId, d, targetRoleId, task, source) => this.routeStarDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source), onBlockFact: (projectRoot, fact) => this.blockRouter.observeFactLater(projectRoot, fact), }, this.fixedDispatchPort,
+   runTaskIsFenced: (projectRoot, taskId, runId) => this.runTaskIsFenced(projectRoot, taskId, runId), routeStarDispatch: (projectRoot, runtime, fromRoleId, d, targetRoleId, task, source) => this.routeStarDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source),
+   routeDurableDispatch: (...args) => this.fixedWorkflowRoute.routeDurableDispatch(...args), }, this.fixedDispatchPort,
    deps, ); }
   // —————————————— G-2（W1）：看护的观察/活动转发与时钟 ——————————————
+  observeDurableProject(projectRoot: string): () => void {
+    return this.fixedWorkflowRoute.observeDurableProject(projectRoot, {
+      resumeReports: (projection, roleBusy) => this.handback.resumeDurableReports(projection, roleBusy),
+      syncRelease: projection => this.fixedWorkflowRelease.syncDurableRelease(projection),
+      closeRelease: () => this.fixedWorkflowRelease.closeDurablePresentation(projectRoot),
+    });
+  }
+  hasActiveRoleTurn(projectRoot: string): boolean { return this.fixedWorkflowRoute.hasActiveRoleTurn(projectRoot); }
+
+  durableDecisionExecutor(projectRoot: string, runtime: unknown): ChiefDecisionExecutor | undefined {
+    return durableChiefDecisionExecutor(this.deps, this.lifecycle, projectRoot, runtime);
+  }
+
   /** 时钟（薄委托 → `shared/clock.ts`；注入以便单测；缺省 Date.now——与会话时间戳、投递入队时间同源）。 */
   private now(): number { return now(this.deps); }
   /** 转发一条结构化事件给看护器（隔离：看护回调抛错绝不影响会话/投递——看护永不阻断判定链）。 */
@@ -502,7 +512,7 @@ export class SessionManager {
   /** **回交主人**角色 id（评审 §5.6，数据驱动、不硬编码）： · trio → `governanceFunction === "schedule"` 的角色（Convener）； · single → 门禁枚举给的 `primaryRoleId`（旧 su）。 回交、看护系统消息、恢复回执、投递失败系统行全部用它；`primaryRoleId` 只用于主入口/客户镜像。 枚举不到 → null（投递机按既有「目标未枚举」路径保留待重试，绝不静默丢）。 */
   private handbackOwnerRoleId(projectRoot: string): string | null { return handbackOwnerRoleId(projectRoot, this.deps); }
   /** B 批：任务/汇报主链的幕僚角色 id（**只认真实 chief**，不把旧 liaison 别名算作星形主链）。 */ /** 登记任务创建者（读盘重放/新建/重派共用；缺字段的旧记录按 chief 兼容）。 */
-  private rememberTaskCreator(taskId: string, created: { from?:"chief" | "convener" | "application" } | undefined): void { rememberTaskCreator(taskId, created); }
+  private rememberTaskCreator(taskId: string, created: { from?:"chief" | "convener" } | undefined): void { rememberTaskCreator(taskId, created); }
   private chiefTaskRoleIdOf(projectRoot: string): string | null { return chiefTaskRoleIdOf(projectRoot, this.deps); }
   /** B 批：任务/汇报状态读取（坏行跳过；读失败按空状态 + 诊断，不阻塞）。 */
   private async readTasks(projectRoot: string): Promise<TaskReplay> { return readTasks(projectRoot); }
@@ -545,7 +555,7 @@ export class SessionManager {
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async projectStateView(projectRoot: string, scope: { roleId?: string; viewerRoleId?: string; full?: boolean; flowId?: string; now?: Date } = {}): Promise<ProjectStateView> { return this.tasks.projectStateView(projectRoot, scope); }
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
-  private async projectStateTool(projectRoot: string, roleId: string, query: { flowId?: string }): Promise<ProjectStateToolResult> { return this.tasks.projectStateTool(projectRoot, roleId, query); }
+  private async projectStateTool(projectRoot: string, roleId: string, query: { flowId?: string; definitionId?: string }): Promise<ProjectStateToolResult> { return this.tasks.projectStateTool(projectRoot, roleId, query); }
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async projectNote(input: { projectRoot: string; roleId: string; input: ProjectNoteInput }): Promise<ProjectNoteResult> { return this.tasks.projectNote(input); }
   /** 薄委托 → `session/cards/version-decisions.ts`（JSDoc/方法体见模块）。 */
@@ -586,8 +596,6 @@ export class SessionManager {
   private async restoreRequestState( projectRoot: string, state: TaskReplay, ): Promise<{ orphaned: number; expired: number }> { return this.versionDecisions.restoreRequestState(projectRoot, state); }
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async restoreTasks(projectRoot: string): Promise<TaskRestoreReport> { return this.tasks.restoreTasks(projectRoot); }
-  /** 2026-11-17（app-dispatch/v1）：启动/打开项目对账（旧协议跳过；投递一致性由本层补齐）。 */
-  async reconcileAppDispatch(projectRoot: string): Promise<AppDispatchReconcileSummary> { return this.fixedWorkflowStageDispatch.reconcile(projectRoot); } noteShellDenial(projectRoot: string, reason: string, command?: string, roleId?: string): void { this.blockRouter.observeShellDenialLater(projectRoot, { reason, ...(command !== undefined ? { command } : {}), ...(roleId !== undefined ? { roleId } : {}) }); } noteBlockTick(projectRoot: string): void { this.blockRouter.tickLater(projectRoot); } noteBlockFact(projectRoot: string, fact: import("../../../src/common/编排/block-resolution.ts").BlockFact): void { this.blockRouter.observeFactLater(projectRoot, fact); }
   private findLiveRuntime(projectRoot: string, roleId: string): RuntimeKind | undefined { return this.lifecycle.findLiveRuntime(projectRoot, roleId); }
   /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private async partialArtifactsFor(projectRoot: string, roleId: string, taskId: string | undefined, since?: string): Promise<string[]> { return this.tasks.partialArtifactsFor(projectRoot, roleId, taskId, since); }
@@ -752,7 +760,7 @@ export class SessionManager {
   /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   lastTurnOf(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined { return this.diagnostics.lastTurnOf(projectRoot, roleId, runtime); }
   /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
-  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string; uiOnlyWhenBusy?: boolean }): void { this.diagnostics.watchdogDeliver(projectRoot, message); }
+  watchdogDeliver(projectRoot: string, message: Parameters<Diagnostics["watchdogDeliver"]>[1]): ReturnType<Diagnostics["watchdogDeliver"]> { return this.diagnostics.watchdogDeliver(projectRoot, message); }
   /** **`rebuild-session` 恢复动作**（W4，2026-10-16 客户批准；设计 §6.3）——新公共入口： dispose＋重开（保留 ANS 回放；F-5-opt1 注记适用）；**在跑轮次不打断**（busy ⇒ 拒绝并如实回执）。 与陈旧重建（O-1）同链串行（`rebuildChains` 按会话键——同一角色至多一个重建在跑）。 */
   async rebuildSession(target: string | SessionTarget, beforeDispose?: (entry: LiveSession) => Promise<boolean>): Promise<RebuildSessionResult> { return this.lifecycle.rebuildSession(target, beforeDispose); }
   /** `rebuildSession` 的链内实现（同 `rebuildIfBoundaryStaleUnsafe` 同款步骤，**去掉陈旧判据**——手动触发）。 */
@@ -775,7 +783,7 @@ export class SessionManager {
   /** 调用角色的模块证据范围（薄委托 → `session/evidence.ts`；JSDoc/方法体见模块）。 */
   private async evidenceScopeRoots(projectRoot: string, flowId: string, run: RunManifest | undefined, roleId: string): Promise<string[]> { return this.evidence.evidenceScopeRoots(projectRoot, flowId, run, roleId); }
   /** `contract_check` 只读契约速查（薄委托 → `session/evidence.ts`；JSDoc/方法体见模块）。 */
-  private async contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput, mode: WorkflowMode = "legacy", protocol?: WorkflowProtocol): Promise<string> { return this.evidence.contractCheckText(projectRoot, callerRoleId, input, mode, protocol); }
+  private async contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput, mode: WorkflowMode = "legacy"): Promise<string> { return this.evidence.contractCheckText(projectRoot, callerRoleId, input, mode); }
   /** fixed 会话的契约速查（薄委托 → `session/evidence.ts`；JSDoc/方法体见模块）。 */
   private async contractCheckTextFixed(projectRoot: string, callerRoleId: string, input: ContractCheckInput): Promise<string> { return this.evidence.contractCheckTextFixed(projectRoot, callerRoleId, input); }
   /** `doc_format` 只读数据源（薄委托 → `session/evidence.ts`；JSDoc/方法体见模块）。 */

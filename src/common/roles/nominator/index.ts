@@ -161,8 +161,7 @@ const NOMINATOR_CARDS: readonly GovernanceCardKind[] = Object.freeze([
 /**
  * fixed 派发矩阵的卡种白名单（T3「两条固定工作流路径」B2；MF-IR-4 / v1.3 §3.4/G-3）。
  *
- * 固定路径任命确认卡由应用开卡、幕僚（chief）按应用 prompt 在 A10 呈交；`appointment-write`
- * 仅 legacy 通道，fixed 抑制。
+ * 固定路径任命确认卡由幕僚（chief）在 A10 呈交；`appointment-write` 仅 legacy 通道，fixed 抑制。
  * 因此 nominator fixedCards 恒为空集：fixed 矩阵只读本字段（门禁引擎门面 `cardKindsOf`），
  * **不从 legacy `cards` 过滤**。纯数据、无 I/O；legacy `cards` 逐字未动。
  */
@@ -825,15 +824,13 @@ const CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
 ]);
 
 /**
- * fixed 上下文段（T3「两条固定工作流路径」B2；v1.3 §3.4 nominator 行；2026-11-17 app-dispatch/v1）。
+ * fixed 上下文段（T3「两条固定工作流路径」B2；v1.3 §3.4 nominator 行）。
  *
  * 只在 `context({matrix:"two-fixed-paths/v1"})` 下返回；`context({})`（无 matrix）与
  * `matrix:"legacy-v1"` 仍逐字返回上面的 legacy `CONTEXT_SECTIONS`（legacy 数据冻结）。
  * run-role fixed 会话把本段追加在旧卡文本之后；与旧卡文本冲突时以本段为准（fixed 语义）：
- *  - 人事任务由**应用按流程定义创建并投递**（stage-execution；A7/A8；from:"application"）；
- *    应用观察 task.reported 后按完成条件收口（运营不再派内置角色）；
- *  - 任命确认卡由应用开卡、幕僚（chief）按 prompt 呈交；fixed 不发起 appointment /
- *    appointment-write 卡（fixedCards 空）；
+ *  - 人事任务由运营（convener）派发（幕僚 stage-request → 运营生产线派发，A7）；人事不派发；
+ *  - 任命卡由幕僚呈；fixed 不发起 appointment / appointment-write 卡（fixedCards 空）；
  *  - 接到 A7/A8 激活任务后，按名单 + 提案决定机械建三文档并整单激活（activate_role_documents v2）；
  *  - 不自行增删角色、不改名单/方案、不招名单外角色、不批准提案/验收、不代客户决定。
  * 纯静态数据（无资源引用、不读盘）；不新增工具/卡。
@@ -843,8 +840,8 @@ const FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
     id: "nominator-fixed-duty",
     text: [
       "## 固定路径人事（two-fixed-paths/v1；与旧卡文本冲突时以本段为准）",
-      "任务来源：固定路径的人事任务（A7/A8）由应用按流程定义创建并投递（stage-execution；from:\"application\"）；完成后用 `submit_report` 回交（应用观察 `task.reported` 后按完成条件收口）。",
-      "卡：任命确认卡由应用开卡、幕僚（chief）按应用 prompt 在 A10 呈交；固定路径不发起 appointment / appointment-write 卡（fixedCards 空；appointment-write 仅 legacy 兼容通道）。",
+      "派发：固定路径的人事任务由运营（convener）派发（幕僚 stage-request → 运营生产线派发，A7）；完成后报告回 `task.created.from`（运营）。",
+      "卡：任命确认卡由幕僚（chief）在 A10 呈交；固定路径不发起 appointment / appointment-write 卡（fixedCards 空；appointment-write 仅 legacy 兼容通道）。",
       "纪律：人事不派发任何任务；不自行增删角色；不招名单外的角色；不改名单/方案；不批准提案/验收、不代客户决定。",
     ].join("\n"),
   }),
@@ -855,16 +852,15 @@ const FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
       "接到 A7/A8 激活任务后，按最新名单 `docs/proposals/<flowId>-roster-vN.md`（只传 path；roster hash 由应用在激活时按实际字节计算）与 A6 提案决定（proposalDecisionId）机械处理；写卡前先核验名单/决定与任务事实一致。",
       "逐名单角色写 `角色卡/<roleId>/role-card.md`、`boundary.md`、`boundary.yaml`：角色卡必填章节齐备，boundary.md 与 boundary.yaml 同步，边界只能取该角色名下模块的文件/目录并集，模块属主唯一。",
       "对每个名单角色调用 `activate_role_documents` v2（targetRoleId、roster{path}、documents{card,boundaryMd,boundaryYaml}，**只传 path**）；roster/三文档 hash 由应用在激活前按实际字节计算并回填，模型不猜 hash、不得用 shell 计算；应用复核 roster 与 A6 documentRefs 一致性并记录真实 `role.activated`。",
-      "名单/提案决定缺失或非法 ⇒ 不写卡，如实阻塞回应用（任务创建者）与运营；激活失败保留旧有效卡，不伪造激活或完成。",
+      "名单/提案决定缺失或非法 ⇒ 不写卡，如实阻塞回运营；激活失败保留旧有效卡，不伪造激活或完成。",
     ].join("\n"),
   }),
   Object.freeze({
     id: "nominator-fixed-report",
     text: [
       "## 报告期望（fixed）",
-      "任务完成或阻塞必须用 `submit_report` 回交，报告回 `task.created.from`（固定路径任务创建者为应用 application；应用观察 `task.reported` 后按完成条件收口）。",
+      "任务完成后必须用 `submit_report` 回短报，报告回 `task.created.from`（固定路径通常为运营 convener）。",
       "报告至少含：完成/阻塞状态、真实证据（名单/提案决定、三文档摘要、`activate_role_documents` 回执与 activationDigest）、遗留项。",
-      "阻塞报告必须写缺失项与可核验证据路径及已尝试动作；如实报告即路由输入——应用按 block 类路由（属主修复/决策卡/升级），不空转、不代客户选择、不对同一 block 重弹卡。收到应用修复任务/修复简报时按简报执行并按 `repairId` 回交，不自行同文重试。",
       "阻塞先报原创建者，不猜、不伪造批准/激活/完成；不要只结束回合。",
     ].join("\n"),
   }),

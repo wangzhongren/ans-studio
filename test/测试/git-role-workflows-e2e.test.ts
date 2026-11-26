@@ -1323,15 +1323,6 @@ const firstNewBusinessTimeoutMs = () => process.env.ANS_Q39_CHILD === "1" ? q2P2
   : process.env.ANS_Q39_BUSINESS === "1" ? 300000
   : !standaloneBusiness && process.env.ANS_DIRECT_NODETEST !== "1" ? q2P2WholeTestBudgetMs
   : (process.env.ANS_Q38_BUSINESS === "1" || process.env.ANS_Q36_BUSINESS === "1" ? 300000 : (process.env.ANS_Q35_BUSINESS === "1" ? 300000 : process.env.ANS_Q34_QUEUE_DIAGNOSTIC === "1" || process.env.ANS_Q33_QUEUE_DIAGNOSTIC === "1" ? 90000 : process.env.ANS_Q32_BUSINESS === "1" || process.env.ANS_Q31_BUSINESS === "1" || process.env.ANS_Q30_BUSINESS === "1" || process.env.ANS_Q29_BUSINESS === "1" || process.env.ANS_Q28_BUSINESS === "1" || process.env.ANS_Q27_BUSINESS === "1" || process.env.ANS_Q26_BUSINESS === "1" ? 300000 : process.env.ANS_Q25_BUSINESS === "1" ? 240000 : process.env.ANS_Q24_BUSINESS === "1" ? 180000 : process.env.ANS_Q23_BUSINESS === "1" ? 180000 : process.env.ANS_Q21_BUSINESS === "1" ? 180000 : process.env.ANS_Q20_PROFILE === "1" ? 90000 : process.env.ANS_Q19_DIAGNOSTIC === "1" ? 120000 : 240000) );
-// v2.1.0 发布阻断处置（协调者裁决，2026-11-17）：darwin-x64（CI 的 macos-15-intel）显式跳过下方注册的 Q2 P2 父测试。
-// 依据：发布 run 44039948085（head b8813b3）x64 上本链恰 900,098ms 撞 E3 子进程硬上限（child 900s/父 960s），
-// 全量 5,828 用例中仅此 1 项失败；同一链此前在 x64 实例 729.88s 通过（角色卡/测试/docs/change/2026-11-17_b7-closure.md §4.1）
-// ——runner 实例间耗时波动极大（729s–900s+）。同轮 arm64 与 Windows 均完整执行并通过，功能覆盖不受影响；
-// 按 E3 规则不得再抬预算。528 步串行链的拆分已登记为发布后跟进任务
-//（角色卡/测试/docs/change/2026-11-17_change_q2p2-darwin-x64-skip.md），不阻塞 v2.1.0。
-// 仅该注册项在 darwin+x64 标 skipped（node:test options.skip 不执行函数体）；测试名、run 函数与其它平台行为逐字不变。
-const q2P2DarwinX64 = process.platform === "darwin" && process.arch === "x64";
-const q2P2DarwinX64SkipReason = "darwin-x64 runner 实测该 528 步串行链耗时 729s–900s+ 波动（发布 run 44039948085 x64 恰 900,098ms 撞 E3 硬上限；同一链此前 729.88s 通过）；E3 规则不再抬预算（child 900s/父 960s）；同轮 arm64 与 Windows 已完整覆盖并通过；协调者裁决 v2.1.0 在 darwin-x64 显式跳过，拆分该链为发布后跟进任务，不阻塞本次发布。";
 async function runOwnedCompleteBusinessChild() {
   const runNonce = process.env.ANS_HARNESS_RUN_ID ?? randomUUID();
   const caseTag = process.env.ANS_Q39_CASE_TAG ?? `default-new-${runNonce}`;
@@ -2364,7 +2355,7 @@ export async function runFirstNewBusinessCase() {
   }
 }
 
-test(firstNewBusinessName, { timeout: firstNewBusinessTimeoutMs(), skip: q2P2DarwinX64 ? q2P2DarwinX64SkipReason : undefined }, runFirstNewBusinessCase);
+test(firstNewBusinessName, { timeout: firstNewBusinessTimeoutMs() }, runFirstNewBusinessCase);
 
 // Prepared secondary observation only. Not registered as the P2 initial-order test.
 export async function preparedMaterialsFirstObservation() {

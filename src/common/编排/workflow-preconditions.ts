@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
+import type { DurableProposalDecisionField, DurableProposalDecisionValue, DurableResult } from "../../model/durable-workflow.ts";
 import { makeMechanicalRejection, type MechanicalRejection } from "./mechanical-rejection.ts";
 import { collectDispatchAdvisories } from "./dispatch-advisories.ts";
 import type { DispatchAdvisory } from "./dispatch-advisories.ts";
@@ -41,6 +42,113 @@ export const PROJECT_MODULES_SCHEMA = "project-modules/v2" as const;
 export const PROJECT_TOPOLOGY_SCHEMA = "project-topology/v2" as const;
 export const PROJECT_PROPOSAL_SCHEMA = "project-proposal/v2" as const;
 export const TEAM_PLAN_SCHEMA = "teamPlanSchema:3" as const;
+
+const decisionId = /^[a-z][A-Za-z0-9-]{0,63}$/;
+export const INTENT_DECISION_REQUIREMENTS_AUTHORING = "客户要求由 A6 定案时，YAML 前置区列出 requiredDecisionFields，例如 [outputFormat, review-mode]。标识最多 64 个字符，从小写英文字母开始，随后可用英文字母、数字和短横线。若客户无条件指定某个唯一值，用 requiredDecisionValues（例如 {outputFormat: html}），键必须与已列标识完全相同，包含大小写。条件性要求写在正文中，其中的条件或结果不另造定案标识。";
+const decisionLabel = (value: unknown): value is string => typeof value === "string" && value.trim() === value
+  && value.length > 0 && value.length <= 160 && !/[\x00-\x1f\x7f]/.test(value);
+const decisionValue = (value: unknown): value is DurableProposalDecisionValue => decisionLabel(value)
+  && !/^(?:tbd|to be decided|待定|未定|待确认|稍后决定)$/i.test(value)
+  || typeof value === "number" && Number.isSafeInteger(value) || typeof value === "boolean";
+
+function decisionRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function decisionHeader(text: string): Record<string, unknown> {
+  const source = text.replace(/^\ufeff/, "");
+  if (!/^---\r?\n/.test(source)) return {};
+  const header = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(source);
+  const parsed: unknown = header && parseYaml(header[1]!, { uniqueKeys: true, maxAliasCount: 0 });
+  if (!decisionRecord(parsed)) throw new Error("当前材料的 YAML 前置字段无法核对。");
+  return parsed;
+}
+
+function decisionIds(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length <= 16 && new Set(value).size === value.length
+    && value.every(id => typeof id === "string" && decisionId.test(id));
+}
+
+/** A3 only freezes declared dimensions and unconditional exact values for those dimensions. */
+export function parseIntentDecisionRequirements(text: string): DurableResult<{
+  fields: readonly string[]; values: Readonly<Record<string, DurableProposalDecisionValue>>;
+}> {
+  const failure = (message: string): DurableResult<never> => ({ ok: false, code: "intent-decision-requirements-invalid", message });
+  try {
+    const intent = decisionHeader(text);
+    const fields = intent.requiredDecisionFields === undefined ? [] : intent.requiredDecisionFields;
+    if (!decisionIds(fields)) return failure("意图定案标识须从小写英文字母开始，使用英文字母、数字或短横线，且不得重复。");
+    const values = intent.requiredDecisionValues === undefined ? {} : intent.requiredDecisionValues;
+    if (!decisionRecord(values) || Object.keys(values).length > 16
+      || Object.entries(values).some(([id, value]) => !fields.includes(id) || !decisionValue(value))) {
+      return failure("意图的固定值须使用已声明的同名定案标识及明确值。条件性要求写在正文中。");
+    }
+    return { ok: true, value: { fields, values: values as Record<string, DurableProposalDecisionValue> } };
+  } catch { return failure("当前意图的定案前置字段无法核对，须修订材料。"); }
+}
+
+/** Only the signed proposal/intent frontmatter supplies current approval choices. */
+export function parseProposalDecisionFields(proposalText: string, intentText: string): DurableResult<readonly DurableProposalDecisionField[]> {
+  const failure = (message: string): DurableResult<never> => ({ ok: false, code: "proposal-decision-fields-invalid", message });
+  try {
+    const intent = parseIntentDecisionRequirements(intentText);
+    if (!intent.ok) return failure(intent.message);
+    const proposal = decisionHeader(proposalText);
+    const proposalIds = proposal.requiredDecisionFields === undefined ? [] : proposal.requiredDecisionFields;
+    if (!decisionIds(proposalIds)) return failure("正式提案的必选定案标识无效或重复。");
+    const required = new Set([...intent.value.fields, ...proposalIds]);
+    const fixed = intent.value.values;
+    const raw = proposal.decisionFields;
+    if (raw === undefined && required.size === 0) return { ok: true, value: [] };
+    if (!Array.isArray(raw) || raw.length < 1 || raw.length > 16) return failure("当前提案缺少有限的可落实定案选项，须修订提案。");
+    const fields: DurableProposalDecisionField[] = [];
+    for (const field of raw) {
+      if (!decisionRecord(field) || Object.keys(field).some(key => !["id", "label", "required", "options", "defaultValue"].includes(key))
+        || typeof field.id !== "string" || !decisionId.test(field.id) || fields.some(item => item.id === field.id)
+        || !decisionLabel(field.label) || typeof field.required !== "boolean" || !Array.isArray(field.options)
+        || field.options.length < 1 || field.options.length > 16) return failure("提案定案维度缺字段、重复或超出上限。");
+      const options: DurableProposalDecisionField["options"][number][] = [];
+      for (const option of field.options) {
+        if (!decisionRecord(option) || Object.keys(option).length !== 2 || !decisionValue(option.value) || !decisionLabel(option.label)
+          || options.some(prior => prior.value === option.value || prior.label === option.label)) return failure("提案定案选项无效或重复。");
+        options.push({ value: option.value, label: option.label });
+      }
+      const requiredValue = Object.hasOwn(fixed, field.id) ? fixed[field.id] : undefined;
+      const available = requiredValue === undefined ? options : options.filter(option => option.value === requiredValue);
+      const chosenDefault = field.defaultValue;
+      if (!available.length || chosenDefault !== undefined && (!decisionValue(chosenDefault) || !available.some(option => option.value === chosenDefault))) {
+        return failure("提案默认值或实际选项与已确认意图不兼容，须修订提案。");
+      }
+      fields.push({ id: field.id, label: field.label, required: field.required || required.has(field.id), options: available,
+        ...(chosenDefault === undefined ? {} : { defaultValue: chosenDefault }) });
+    }
+    if ([...required].some(id => !fields.some(field => field.id === id))) return failure("当前提案没有覆盖已确认的必选定案维度，须修订提案。");
+    if (fields.reduce((count, field) => count * (field.options.length + Number(!field.required)), 1) > 16) {
+      return failure("当前定案超过 16 种可呈现组合，须缩小提案选项。");
+    }
+    return { ok: true, value: fields };
+  } catch { return failure("当前意图或提案的定案前置字段无法核对，须修订材料。"); }
+}
+
+export function proposalDecisionValuesValid(fields: readonly DurableProposalDecisionField[], values: unknown): boolean {
+  return decisionRecord(values) && fields.every(field => !field.required || Object.hasOwn(values, field.id))
+    && Object.entries(values).every(([id, value]) => fields.some(field => field.id === id && field.options.some(option => option.value === value)));
+}
+
+export function proposalDecisionChoiceId(values: Readonly<Record<string, DurableProposalDecisionValue>>): string {
+  const ordered = Object.entries(values).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+  return "choice-" + createHash("sha256").update(JSON.stringify(ordered)).digest("hex").slice(0, 32);
+}
+
+export function proposalDecisionChoices(fields: readonly DurableProposalDecisionField[]): Record<string, Readonly<Record<string, DurableProposalDecisionValue>>> {
+  let combinations: Record<string, DurableProposalDecisionValue>[] = [{}];
+  for (const field of fields) {
+    combinations = combinations.flatMap(values => [
+      ...field.options.map(({ value }) => ({ ...values, [field.id]: value })), ...(field.required ? [] : [values]),
+    ]);
+  }
+  return Object.fromEntries(combinations.map(values => [proposalDecisionChoiceId(values), values]));
+}
 
 export interface TeamPlanFacts {
   schema: typeof TEAM_PLAN_SCHEMA;
@@ -92,11 +200,13 @@ export function parseTeamPlan(text: string, context: {
       || seen.has(row.roleId) || !strings(row.modules) || !strings(row.writesets) || !strings(row.dependsOn, true)) return invalid("Team plan role, modules, writesets and explicit dependency arrays are required and unique");
     const role = context.rosterFacts.roles.find(role => role.id === row.roleId);
     if (!role || [...role.modules].sort().join("\0") !== [...row.modules].sort().join("\0")) return invalid("Team plan cannot assign unknown roles/modules or change the roster's module owner");
-    const roots = context.rosterFacts.modules.filter(module => role.modules.includes(module.id)).flatMap(module => module.paths);
+    const owned = context.rosterFacts.modules.filter(module => role.modules.includes(module.id));
+    const roots = owned.flatMap(module => module.paths);
+    const evidence = owned.find(module => approvedEvidenceModule(module.id, module.category, context.flowId, module.paths));
     const writesets = row.writesets;
     for (const raw of writesets) {
       const normalized = normalizeModulePath(raw);
-      if (!normalized || normalized.path !== raw || /[\\:\x00-\x1f]/.test(raw) || isGovernanceDirectory(raw)
+      if (!normalized || normalized.path !== raw || /[\\:\x00-\x1f]/.test(raw) || isGovernanceDirectory(raw) && raw !== evidence?.path
         || !roots.some(root => root === raw || (root.endsWith("/") && raw.startsWith(root)))) return invalid(`Team plan writeset exceeds its roster owner: ${row.roleId}`);
       if (writes.some(write => modulePathsOverlap(write.path, raw))) return invalid("Team plan contains overlapping writers or duplicate writesets");
       writes.push({ roleId: row.roleId, path: raw });
@@ -185,6 +295,16 @@ export const PROJECT_ROSTER_SCHEMA_EXAMPLE = [
   "```",
 ].join("\n");
 
+const EVIDENCE_MODULE_ID = "acceptance-evidence";
+const EVIDENCE_MODULE_CATEGORY = "evidence";
+const evidenceRoot = (flowId: string) => `docs/verification/${flowId}/`;
+const EVIDENCE_MODULE_GUIDANCE = `冻结定义声明取证角色时，模块清单与名单使用 id: ${EVIDENCE_MODULE_ID}、category: ${EVIDENCE_MODULE_CATEGORY} 和唯一字面路径 ${evidenceRoot("<flowId>")}。名单核对唯一属主；该角色只承担取证。`;
+export const EVIDENCE_TEAM_WRITESET_GUIDANCE = `已获当期冻结定义声明且经名单唯一归属核对的取证角色，使用 ${EVIDENCE_MODULE_ID} 和唯一的 ${evidenceRoot("<flowId>")} 写域。取证实际派工还须满足应用的当期授权。`;
+
+export function evidenceRosterScopeText(flowId: string, roleId: string): string {
+  return `冻结取证角色 ${roleId} 独占 id: ${EVIDENCE_MODULE_ID}、category: ${EVIDENCE_MODULE_CATEGORY}。模块清单、名单及该角色的 roleRows[].writesets 只列 ${evidenceRoot(flowId)}。沿原审批及派工。`;
+}
+
 const CONTRACT_MODULES_SCHEMA_TEXT = [
   "contract_check topic=modules（只读 schema；查询不构成放行/授权）",
   "（仅 schema 与示例；不含 run/写区；其余参数被忽略）",
@@ -204,7 +324,8 @@ const CONTRACT_MODULES_SCHEMA_TEXT = [
   "- paths: string[]；1–20 项（单值按 1 项）；仅 env-resources/entry-index 可多路径（名单解析强制）；与 path 同时给出时 paths[0] 必须等于 path（兼容写法，不建议同时写）",
   `- publicContract: string；非空（trim 后）；不能写 YAML 布尔 true/false；例 "internal（核心约定）" 或 docs/contracts/<flowId>-contract-v1.md`,
   `- architectureSource: string；非空（trim 后）；写作约定为项目相对路径（如 docs/contracts/<flowId>-architecture-v1.md）；解析器只校验非空，不校验路径形状`,
-  "约束：模块路径之间不得相同或包含（同父文件与目录合法）；不得落在治理写区（.ans/、角色卡/、docs/intents|product|proposals|contracts|scheduling|quality|verification|skills|mcp|audit/ 等）。",
+  "约束：模块路径互不相同或包含；普通模块位于治理写区外（.ans/、角色卡/、docs/intents|product|proposals|contracts|scheduling|quality|verification|skills|mcp|audit/ 等）。",
+  EVIDENCE_MODULE_GUIDANCE,
   "最小合法示例（flowId=demo；写入时把 demo 替换为实际 flowId）：",
   PROJECT_MODULES_SCHEMA_EXAMPLE,
 ].join("\n");
@@ -213,26 +334,27 @@ const CONTRACT_ROSTER_SCHEMA_TEXT = [
   "contract_check topic=roster（只读 schema；查询不构成放行/授权）",
   "（仅 schema 与示例；不含 run/写区；其余参数被忽略）",
   `文档：docs/proposals/<flowId>-roster-vN.md（schema 须为 ${PROJECT_ROSTER_SCHEMA} 或 ${PROJECT_ROSTER_SCHEMA_V4}；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
-  "frontmatter 顶层（必填项的值不可为 null；可选项见下）：",
+  "frontmatter 顶层（必填项不能为 null）：",
   `- schema: ${PROJECT_ROSTER_SCHEMA} 或 ${PROJECT_ROSTER_SCHEMA_V4}（v4 仅增可选 roles[].review）`,
   "- flowId: 非空 string（与派发一致）；version: 正整数（=文件名 -vN 的 N）",
   "- intent: docs/product/<flowId>-intent-vM.md；proposal: docs/proposals/<flowId>-proposal-vM.md；architecture: docs/contracts/<flowId>-architecture-vM.md（均完整路径，M≥1）",
   "- modulesDoc: 可选；docs/proposals/<flowId>-modules-vM.md",
-  `- envBootstrap: 对象（omitted:boolean），可省略；未写/omitted:false 时须含 env-bootstrap + env-resources(env)/entry-index(entry)（角色存在性由招人前置校验）；{omitted:true, omissionReason:"<非空理由>"} 时不得含 env-bootstrap 或 env/entry 模块；勿写旧扁平字段。`,
-  "- modules: 数组 1–12；每项同 topic=modules，另须每模块恰一属主",
+  `- envBootstrap: 对象；默认或 omitted:false 须含 env-bootstrap、env-resources(env)、entry-index(entry)；omitted:true 需非空 omissionReason，移除角色及 env/entry。`,
+  "- modules: 1–12 项，见 topic=modules",
   "- roles: 数组 1–12；每项：",
-  "  - id: 小写 slug（同模块 id）；唯一；不得为内置 id（chief/product/rapporteur/nominator/convener/verifier/su/liaison）",
+  "  - id: 唯一小写 slug；禁止 chief/product/rapporteur/nominator/convener/verifier/su/liaison",
   "  - displayName/purpose/capability: 非空 string",
   "  - modules: 非空 string[]；引用已定义模块 id；角色内不重复",
   `  - review: 可选 boolean；仅 v4；至多一个 true=验收角色`,
-  "绑定：roles[].modules[] 唯一来源；每模块恰一属主、每角色至少一模块；env/entry 只能归 env-bootstrap。",
-  "正文：必须有「人员+模块拓扑图」章节含 ```topology 块（见 topic=topology），与 frontmatter modules/roles 一致。",
+  "归属：roles[].modules[] 为准，每模块一属主。env/entry 只归 env-bootstrap，该角色可增 category=test，单路径限 test/env-bootstrap/ 或其子路径。",
+  EVIDENCE_MODULE_GUIDANCE,
+  "正文「人员+模块拓扑图」须含 ```topology，与前置区 modules/roles 一致。",
   "加载校验（硬拒绝；解析器之外）：",
-  "- 最新 roster 必须存在/可读（roster-missing）；文件名 vN 必须 = frontmatter version（roster-version-invalid）。",
-  "- 必须存在最新 modules 文档（roster-modules-doc-missing）；其 vN=version 且 parseProjectModules(flowId) 通过（roster-modules-doc-invalid）。",
-  "- roster modules[] 必须与最新 modules 文档逐项一致（roster-modules-drift）；modulesDoc 若写必须指向最新（roster-reference-stale）。",
-  "- intent/proposal/architecture 必须存在、非空（roster-reference-missing）且为各自最新版（roster-reference-stale）。",
-  "- proposal 必须 schema: project-proposal/v2 且正文含名单的 intent 路径（roster-reference-invalid/inconsistent）；architecture 正文必须含名单的 proposal 路径（roster-reference-inconsistent）。",
+  "- 读取最新 roster（roster-missing），vN=version（roster-version-invalid）。",
+  "- 读取最新 modules（roster-modules-doc-missing），核 vN 和结构（roster-modules-doc-invalid）。",
+  "- modules[] 与模块清单一致（roster-modules-drift），modulesDoc 指向最新版（roster-reference-stale）。",
+  "- intent/proposal/architecture 为非空可读最新版（roster-reference-missing/stale）。",
+  "- proposal 用 project-proposal/v2 并引用 intent；architecture 引用 proposal（roster-reference-invalid/inconsistent）。",
   "最小示例（flowId=demo；省略 env-bootstrap 仅为最小形状）：",
   "警告：示例只保证解析器通过；加载还需满足上方引用/模块清单/版本链校验。",
   "警告：默认项目不要照抄省略块；须含 env-bootstrap（或写真实省略理由）。",
@@ -263,12 +385,16 @@ const CONTRACT_SCHEMA_TEXTS: Record<ContractSchemaTopic, string> = {
 };
 
 /** `contract_check({topic})` 的只读 schema 文本：纯静态内容，不读盘、不混 run 摘要。 */
-export function contractSchemaText(topic: ContractSchemaTopic): string {
-  return CONTRACT_SCHEMA_TEXTS[topic];
+export function contractSchemaText(topic: ContractSchemaTopic, evidence?: { flowId: string; roleId: string }): string {
+  const schema = CONTRACT_SCHEMA_TEXTS[topic];
+  return evidence && (topic === "modules" || topic === "roster")
+    ? schema.replace(EVIDENCE_MODULE_GUIDANCE + "\n", "")
+      .replace("\n", "\n" + evidenceRosterScopeText(evidence.flowId, evidence.roleId) + "\n") : schema;
 }
 
 /** 2026-10-29（客户采纳）：标准固定角色「环境装配」；默认必带（小项目省略须写明理由）。 */
 export const ENV_BOOTSTRAP_ROLE_ID = "env-bootstrap" as const;
+const ENV_BOOTSTRAP_TEST_DIRECTORY = "test/env-bootstrap/";
 const ENV_MODULE_PATTERNS: readonly RegExp[] = [
   /^package\.json$/i,
   /^(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig\.json|Makefile|Dockerfile|requirements\.txt|pyproject\.toml|Cargo\.toml|go\.mod|pom\.xml|CMakeLists\.txt)$/i,
@@ -322,6 +448,11 @@ const GOVERNANCE_DIR_PREFIXES = [
   "docs/audit/",
   "docs/bootstrap-manifest.md",
 ];
+
+function approvedEvidenceModule(id: string, category: string, flowId: string, paths: readonly unknown[]): boolean {
+  return id === EVIDENCE_MODULE_ID && category === EVIDENCE_MODULE_CATEGORY && paths.length === 1
+    && paths[0] === evidenceRoot(flowId);
+}
 
 export interface ProjectRosterRole {
   id: string;
@@ -480,6 +611,18 @@ function normalizeModulePath(raw: unknown): { path: string; kind: "file" | "dire
   const normalized = segments.join("/");
   if (value.endsWith("/")) return { path: `${normalized}/`, kind: "directory" };
   return { path: normalized, kind: "file" };
+}
+
+function inEnvBootstrapTestDirectory(path: string): boolean {
+  const folded = path.toLowerCase();
+  return folded === ENV_BOOTSTRAP_TEST_DIRECTORY.slice(0, -1) || folded.startsWith(ENV_BOOTSTRAP_TEST_DIRECTORY);
+}
+
+function canonicalEnvBootstrapTestPath(module: Record<string, unknown>, rawPaths: readonly unknown[], paths: readonly string[]): boolean {
+  const [path] = paths;
+  return paths.length === 1 && path !== undefined && path.startsWith(ENV_BOOTSTRAP_TEST_DIRECTORY)
+    && rawPaths[0] === path && (module.path === undefined || module.path === path)
+    && !/[\\:\x00-\x1f]/.test(path) && !path.replace(/\/$/, "").split("/").some(segment => /[. ]$/.test(segment));
 }
 
 function modulePathKind(path: string): "file" | "directory" {
@@ -695,7 +838,7 @@ export function rosterTopologyText(roster: ProjectRoster): string {
  * 解析名单 Markdown：严格 YAML frontmatter（文件首行 `---`，闭合 `---`）。
  * `expectedFlowId` 给出时要求 frontmatter `flowId` 完全一致（M2/M3 的「名单与派发一致」）。
  */
-export function parseProjectRoster(text: string, expectedFlowId?: string): RosterParseResult {
+export function parseProjectRoster(text: string, expectedFlowId?: string, evidenceCollectorRoleId?: string): RosterParseResult {
   if (typeof text !== "string") return rosterError("roster-frontmatter-missing", "名单内容不是文本。");
   const normalized = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
   if (!normalized.startsWith("---\n")) {
@@ -812,6 +955,7 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   }
   const modules: ProjectRosterModule[] = [];
   const moduleIds = new Set<string>();
+  const canonicalEnvTests = new Set<string>();
   for (const [index, raw] of rawModules.entries()) {
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
       return rosterError("roster-module-fields-missing", `名单第 ${index + 1} 个模块不是对象。`);
@@ -884,7 +1028,8 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
       if (modulePath === undefined) {
         return rosterError("roster-module-directory-invalid", `模块「${name}」的 path 非法（项目相对、无通配/..；以 / 结尾=目录，否则=文件）：${String(rawPath)}`);
       }
-      if (isGovernanceDirectory(modulePath.path)) {
+      if (isGovernanceDirectory(modulePath.path) && !(evidenceCollectorRoleId && expectedFlowId === flowId
+        && approvedEvidenceModule(id, category, flowId, rawPaths))) {
         return rosterError("roster-module-directory-governance", `模块「${name}」的 path 落在治理/他人写区（含治理子路径）：${modulePath.path}`);
       }
       if (paths.includes(modulePath.path)) {
@@ -892,9 +1037,14 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
       }
       paths.push(modulePath.path);
     }
+    if (category === "test" && canonicalEnvBootstrapTestPath(module, rawPaths, paths)) canonicalEnvTests.add(id);
     modules.push({ id, name, purpose, paths, path: paths[0]!, category, publicContract, architectureSource });
   }
   const ownerOf = new Map<string, string[]>();
+  if (evidenceCollectorRoleId && roles.some(role => role.id === evidenceCollectorRoleId)
+    && !modules.some(module => approvedEvidenceModule(module.id, module.category, flowId, module.paths))) {
+    return rosterError('roster-module-owner-invalid', '契约声明的取证属主须使用唯一的当前实例非生产取证模块。');
+  }
   for (const role of roles) {
     for (const moduleId of role.modules) {
       if (!moduleIds.has(moduleId)) {
@@ -907,11 +1057,18 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   }
   for (const module of modules) {
     const owners = ownerOf.get(module.id) ?? [];
+    if (approvedEvidenceModule(module.id, module.category, flowId, module.paths)
+      && (!evidenceCollectorRoleId || owners.length !== 1 || owners[0] !== evidenceCollectorRoleId
+        || !roles.some(role => role.id === evidenceCollectorRoleId && role.review !== true && role.modules.length === 1)))
+      return rosterError('roster-module-owner-invalid', '取证写域须独占归于当前契约声明的取证属主。');
     if (owners.length === 0) {
       return rosterError("roster-module-unbound", `模块 ${module.id}（${module.name}）未绑定任何角色（退回策划补绑定）。`);
     }
     if (owners.length > 1) {
       return rosterError("roster-module-multi-owner", `模块 ${module.id} 有多个属主（${owners.join("、")}）；一模块一属主。`);
+    }
+    if (module.category === "test" && module.paths.some(inEnvBootstrapTestDirectory) && owners[0] !== ENV_BOOTSTRAP_ROLE_ID) {
+      return rosterError("roster-module-owner-invalid", `环境自测模块 ${module.id} 的专属写域只能归 ${ENV_BOOTSTRAP_ROLE_ID}。`);
     }
   }
   for (let i = 0; i < modules.length; i += 1) {
@@ -935,7 +1092,7 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
       return rosterError("roster-module-directory-invalid", `模块 ${module.id} 为普通模块，paths 只能 1 项（多路径仅限 env-bootstrap 固定模块）。`);
     }
   }
-  // 2026-10-29（客户采纳）：标准固定角色 env-bootstrap——默认必带，固定两个模块（环境装配/项目入口）；
+  // 标准固定角色 env-bootstrap 保留环境装配和项目入口，可带独立的角色自测模块。
   // 环境/入口类路径只能归它，误归属拒绝；小项目省略须有书面理由（预检检查）。
   let envBootstrap: { omitted: boolean; omissionReason?: string } | undefined;
   if (record.envBootstrap !== undefined) {
@@ -966,14 +1123,14 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   }
   if (envBootstrapRole !== undefined) {
     const owned = modules.filter((module) => envBootstrapRole.modules.includes(module.id));
-    const ownedIds = owned.map((module) => module.id).sort();
-    if (JSON.stringify(ownedIds) !== JSON.stringify(["entry-index", "env-resources"])) {
-      return rosterError("roster-env-bootstrap-invalid", `角色 ${ENV_BOOTSTRAP_ROLE_ID} 名下模块必须恰为 env-resources / entry-index，实际 ${ownedIds.join("、") || "无"}。`);
-    }
     const envResources = owned.find((module) => module.id === "env-resources");
     const entryIndex = owned.find((module) => module.id === "entry-index");
     if (envResources?.category !== "env" || entryIndex?.category !== "entry") {
       return rosterError("roster-env-bootstrap-invalid", `角色 ${ENV_BOOTSTRAP_ROLE_ID} 的固定模块必须为 env-resources（category=env）与 entry-index（category=entry）。`);
+    }
+    const invalidExtra = owned.find(module => module !== envResources && module !== entryIndex && !canonicalEnvTests.has(module.id));
+    if (invalidExtra) {
+      return rosterError("roster-env-bootstrap-invalid", `角色 ${ENV_BOOTSTRAP_ROLE_ID} 的额外模块 ${invalidExtra.id} 须为 category=test 且只有一个 ${ENV_BOOTSTRAP_TEST_DIRECTORY} 或其子路径。`);
     }
     const hasCategory = owned.some((module) => module.category !== undefined);
     const hasEnv = owned.some((module) => module.category === "env") || (!hasCategory && owned.some((module) => isEnvBootstrapModulePath(module.path)));
@@ -1048,6 +1205,7 @@ export function deriveFixedModuleWriteSet(
 export function parseProjectModules(
   text: string,
   expectedFlowId?: string,
+  evidenceCollectorRoleId?: string,
 ): { ok: true; doc: ProjectModulesDoc } | { ok: false; code: string; reason: string } {
   if (typeof text !== "string") return { ok: false, code: "modules-doc-frontmatter", reason: "模块清单内容不是文本。" };
   const normalized = text.replace(/^﻿/, "");
@@ -1155,13 +1313,17 @@ export function parseProjectModules(
       if (modulePath === undefined) {
         return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} path 非法：${String(rawPath)}` };
       }
-      if (isGovernanceDirectory(modulePath.path)) {
+      if (isGovernanceDirectory(modulePath.path) && !(evidenceCollectorRoleId && expectedFlowId === flowId
+        && approvedEvidenceModule(id, category, flowId, rawPaths))) {
         return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} path 落在治理/他人写区：${modulePath.path}` };
       }
       if (paths.includes(modulePath.path)) {
         return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} path 重复：${modulePath.path}` };
       }
       paths.push(modulePath.path);
+    }
+    if (category === "test" && paths.some(inEnvBootstrapTestDirectory) && !canonicalEnvBootstrapTestPath(module, rawPaths, paths)) {
+      return { ok: false, code: "modules-doc-directory", reason: `环境自测模块 ${id} 须声明一个规范的 ${ENV_BOOTSTRAP_TEST_DIRECTORY} 或其子路径。` };
     }
     modules.push({ id, name, purpose, paths, path: paths[0]!, category, publicContract, architectureSource });
   }
@@ -1236,6 +1398,7 @@ export async function loadLatestRoster(
   input: {
     projectRoot: string;
     flowId: string;
+    evidenceCollectorRoleId?: string;
     /** 测试注入（缺省 node:fs/promises）。 */
     readdirFn?: typeof readdir;
     readFileFn?: typeof readFile;
@@ -1265,7 +1428,7 @@ export async function loadLatestRoster(
   } catch {
     return { ok: false, code: "roster-missing", reason: `名单文件不可读：${relPath}。` };
   }
-  const parsed = parseProjectRoster(bytes.toString("utf8"), input.flowId);
+  const parsed = parseProjectRoster(bytes.toString("utf8"), input.flowId, input.evidenceCollectorRoleId);
   if (!parsed.ok) return parsed;
   if (parsed.roster.version !== selected.version) {
     return {
@@ -1310,7 +1473,7 @@ export async function loadLatestRoster(
   } catch {
     return { ok: false, code: "roster-modules-doc-missing", reason: `模块清单不可读：docs/proposals/${latestModules.file}。` };
   }
-  const modulesParsed = parseProjectModules(modulesText, input.flowId);
+  const modulesParsed = parseProjectModules(modulesText, input.flowId, input.evidenceCollectorRoleId);
   if (!modulesParsed.ok) {
     return { ok: false, code: "roster-modules-doc-invalid", reason: modulesParsed.reason };
   }
@@ -1734,11 +1897,9 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
  * 任务绑定报告的接收者：**按 `task.created.from` 回创建者**（项目 worker/质检 → 运营或幕僚；
  * 产品/策划/人事/运营由幕僚派发 → 幕僚）。
  * 返回 null = 找不到创建者（调用方保持既有防御路由，不猜）。
- * 2026-11-17（app-dispatch/v1）：`creator:"application"` ⇒ **null**——应用创建的任务报告只写账本，
- * 由应用观察 `task.reported` 后按流程定义收口（不唤醒第二个角色，不形成「应用→角色→应用」消息面）。
  */
 export function reportTargetForTaskCreator(input: {
-  creator: "chief" | "convener" | "application" | undefined;
+  creator: "chief" | "convener" | undefined;
   chiefRoleId: string | null;
   convenerRoleId: string | null;
 }): string | null {

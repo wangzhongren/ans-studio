@@ -1,5 +1,7 @@
 // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
-import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX, WORKFLOW_ACCEPTANCE_STRENGTHS, WORKFLOW_STAGES } from "../../model/runtime.ts";
+import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX, WORKFLOW_STAGES } from "../../model/runtime.ts";
+import { DOCUMENT_REVISION_CONTENT_MAX_BYTES, DOCUMENT_REVISION_PATH_MAX_CHARS, DOCUMENT_REVISION_REASON_MAX_CHARS } from "../../model/runtime.ts";
+import type { DurableChiefPendingDecisionRequest } from "../../model/runtime.ts";
 import {
   AMENDMENT_ID_PATTERN,
   REFACTOR_REASON_MAX,
@@ -23,6 +25,9 @@ import {
   DOWNLOAD_URL_MAX_BYTES,
 } from "../../model/download.ts";
 import { GIT_QUERY_TEMPLATES, GIT_CAPABILITY_PATHS_MAX, GIT_CAPABILITY_CANDIDATES_MAX, GIT_CAPABILITY_MESSAGE_MAX } from "../../model/trunk.ts";
+
+export const WORKFLOW_DEFINITION_ID_PATTERN = "^[a-z][a-z0-9-]{0,63}$";
+export const WORKFLOW_DEFINITION_DIGEST_PATTERN = "^[a-f0-9]{64}$";
 /** describeTool 的返回：Pi 侧参数 schema、说明与可选的提示/执行模式（均按工具名分派）。 */
 export interface ToolDescription {
   parameters: Record<string, unknown>;
@@ -31,6 +36,137 @@ export interface ToolDescription {
   promptGuidelines?: string[];
   /** 每工具执行模式覆盖（SDK types.d.ts:497-499）：交互工具 = "sequential"（设计 A-6）。 */
   executionMode?: "sequential" | "parallel";
+}
+
+const durableRoleDocumentWriteGuideline = "人事仅在已绑定的 A8 任务内，按本次已批准的名单和实际任务写域直接写角色卡与两份边界。三份文件写齐后逐个使用 activate_role_documents 完成校验和激活。";
+
+const durableImplementationDispatchFields: Readonly<Record<string, string>> = {
+  roleId: "Approved owner roleId shown with the exact current work item.",
+  moduleId: "Exact workItemId displayed for the current approved owner.",
+  task: "Self-contained implementation goal. Include applicable project-relative references and expected evidence, such as the formal report and actual commit OID.",
+  idempotencyKey: "Stable key for this work-item request, 1–100 letters, digits, underscores, dots, colons, or hyphens, starting with a letter or digit. Retry the same request with the same key; use a new stable key for a correction attempt.",
+  sideEffect: "Use code for the approved implementation work item.",
+  modulePaths: "Optional assertion of the full exact approved paths for this work item. The application derives the actual write scope.",
+  stage: "Use A11 for this implementation work item.",
+  reworkOf: "Use A11 only for a correction attempt. The application binds the latest child for the same work item that was formally closed as rework and verifies the remaining attempts.",
+  flowId: "Optional exact flow id of the assigned parent task.",
+  workflowId: "Optional exact workflow id of the assigned parent task.",
+  reason: "Include implementation context in task.",
+  expectedOutput: "Specify expected output in task.",
+  requestedEvidence: "Specify required evidence in task.",
+  stepId: "Omit. The application binds the current workflow step.",
+  taskKind: "Omit for this implementation work item.",
+  workflowAction: "Omit. The workflow owns node transitions.",
+  workflowPath: "Omit. The application binds the current workflow.",
+  resumeController: "Omit for this implementation work item.",
+  reviewTarget: "Omit for this implementation work item.",
+};
+
+const durableWorkflowToolPresentation: Partial<Record<string, Pick<ToolDescription, "description" | "promptGuidelines">>> = {
+  write_file: {
+    description: "写入当前任务授权的文件。应用逐次核对真实任务与写入范围，拒绝时不会写入。",
+    promptGuidelines: [durableRoleDocumentWriteGuideline],
+  },
+  edit_file: {
+    description: "编辑当前任务授权的文件。应用逐次核对真实任务与写入范围，拒绝时不会修改文件。",
+    promptGuidelines: [durableRoleDocumentWriteGuideline],
+  },
+  activate_role_documents: {
+    description: "人事在当前 A8 任务内，按已批准方案的名单逐个激活角色。填写 operationId、flowId、workflowId、proposalDecisionId、targetRoleId、roster 路径及 documents 的 card、boundaryMd、boundaryYaml 路径。proposalDecisionId 使用应用随任务提供的 A6 方案批准凭据。应用校验名单、三份文档和实际哈希，全部匹配才登记激活。所有必需角色均成功后再正式回报完成。",
+  },
+  complete_team_plan: {
+    description: "运营在当前基线任务中提交团队计划。填写 operationId、flowId、workflowId 以及 plan 的 path 和 version。应用核对实际受派任务、模块属主、写集及依赖，按回执登记计划与基线。基线完成后，由工作流进入配置的下一节点。",
+  },
+  dispatch_task: {
+    description: "在当前 A11 运营父任务中，申请派出一项已批准的实施工作。按任务所列属主填写 roleId，按 workItemId 填写 moduleId，提供自足的 task、稳定的 idempotencyKey 和 sideEffect=code。应用绑定实际父任务并核对批准写域。成功回执表示已受理，等待该子任务正式回交。",
+    promptGuidelines: [
+      "每次只派一项。task 写明具体目标、已有依据的项目相对路径和所需回交证据。应用从当前工作项取得写域。",
+      "同一次申请沿用同一个 idempotencyKey。收到正式回交后用 close_created_task 处置。最新一次子任务已登记为 rework 时，才可为同一工作项使用 reworkOf=A11 和新的稳定操作键申请纠正尝试。",
+    ],
+  },
+  close_created_task: {
+    description: "核对当前工作流交给运营的候选与正式报告，提交 operationId、taskId、outcome 和可选 note。A11 运营父任务使用实际子任务 ID 和 accepted、rework 或 rejected 结论。接受时应用核验该子任务的真实提交。应用核对实际任务、当前回交、合法状态和幂等性，后续节点由工作流决定。",
+  },
+  request_choice: {
+    description: "幕僚在工作流等待客户决定时，按当前节点提交意图、方案或任命确认卡。填写 flowId、cardKind、title 和合法 options。A3 意图确认使用 confirm、revise、reject；A6 方案确认使用 accept、revise、reject；A10 任命按获批名单列出真实角色 ID 并使用多选。应用校验卡种、证据及选择，记录真实决定。启用和合并由应用呈卡。",
+    promptGuidelines: [
+      "只有当前节点要求确认时才提交对应的卡。以实际决定为准；卡片内容和推荐选项本身不授予写权。",
+    ],
+  },
+  request_confirmation: {
+    description: "通过应用向客户请求确认，是否可呈卡由当前角色与工作流决定。角色卡与边界按 A8 的已批准名单和真实任务范围写入，并用 activate_role_documents 提交。意图、方案和任命确认使用工作流指定的卡种。",
+    promptGuidelines: [
+      "确认回执仅适用于其约定的事项及范围。实际写入仍由应用检查当前任务和边界。",
+    ],
+  },
+  submit_report: {
+    description: "将当前真实受派任务的结果交回工作流。完成时 status=completed，无法完成时 status=blocked。summary 写实际完成事项或阻塞原因，evidence 列关键产物路径、变更和验证结果。应用按任务与回合关联报告，后续节点由工作流选择。",
+    promptGuidelines: [
+      "任务完成或确认阻塞后，使用 submit_report 正式回交。保留可核对的证据和具体缺项；回交不代替审批、激活或验收。",
+      "A11 运营父任务在全部工作项均已接受后才回交 completed，evidence 逐项列实际子任务 ID 和提交 OID。等待子任务正式回交时可结束本回合，由工作流重新唤醒。确有阻塞时回交 blocked 并列出缺项。",
+    ],
+  },
+  project_state: {
+    description: "只读查询当前工作流、项目状态及相关任务。幕僚可以通过工作流目录和 definitionId 核对可选定义。依据当前事实判断需要确认、等待或说明的事项。",
+    promptGuidelines: [
+      "查询结果用于核对工作流进度和阻塞。审批、写入和验收以应用的实际回执为准。",
+    ],
+  },
+  contract_check: {
+    description: "只读查询契约格式和已有证据。写模块清单、名单或拓扑时，可传 topic=modules、roster 或 topology 查看静态字段表和样例。当前任务范围、分支和准入以 YAML 工作流及应用回执为准。",
+  },
+  role_status: {
+    description: "只读查询角色会话、投递队列、最近回合结果和待确认状态。可以按 roleId 收窄到单角色；includeDiagnostics=true 时附最近诊断。",
+    promptGuidelines: [
+      "收到异常通知时核对当前实例、节点、尝试和实际回执。后续处理按工作流及客户决定推进。",
+    ],
+  },
+  role_activity_log: {
+    description: "只读查看角色近期运行、任务报告、投递和错误。按排查最小必要读取，记录中的历史事件仅供核对。",
+  },
+  terminate_role_run: {
+    description: "确认会话卡死后，可申请终止该角色目前的回合。应用核对实际停止状态、子进程及可能的部分写入。保留真实回执，后续动作依据当前工作流。",
+  },
+  report_plan_escalation: {
+    description: "提交有实际证据的方案执行异常，供应用按当前权限与工作流呈现。说明具体环境、权限或方案问题，附上可核对的证据。",
+  },
+};
+
+export function describeTool(name: string, durableFixedWorkflow = false, taskGitAvailable = false, evidenceAuditAccess?: "audit" | "collect"): ToolDescription {
+  const description = describeSharedTool(name, durableFixedWorkflow, durableFixedWorkflow && taskGitAvailable);
+
+  if (evidenceAuditAccess !== undefined) {
+    const guidance = evidenceAuditAccess === "audit"
+      ? {
+        read_file: "读取已绑定到本次独立审计的标准、候选或证据文件。使用项目相对路径。",
+        list_dir: "仅列出本次独立审计可读的目录和条目。",
+        view_image: "查看本次独立审计已绑定的图片原件。以实际附图为准。",
+        evidence_check: "核对本次独立审计授权的标准、证据及适用的旁车。",
+        write_file: "写入本次独立审计的唯一规范报告。每次写入均复核现有权限。",
+        edit_file: "编辑本次独立审计的唯一规范报告。每次编辑均复核现有权限。",
+        submit_report: "提交当前任务的正式独立审计结论和证据引用。逐项说明依据和无法证实的原因。",
+      }
+      : {
+        read_file: "读取当前取证工单已绑定的文件。使用项目相对路径。",
+        list_dir: "仅列出当前取证工单可读的目录和条目。",
+        view_image: "查看当前取证工单已绑定的图片原件。以实际附图为准。",
+        evidence_check: "核对当前取证工单授权的标准、证据及适用的旁车。",
+        write_file: "在当前取证工单批准的证据位置登记文件。每次写入均复核现有权限。",
+        edit_file: "编辑当前取证工单批准的证据文件。每次编辑均复核现有权限。",
+        run_shell: "执行单条已获当前取证工单的严格审批及写审计的前台命令。提供原样 command 字符串。Git 命令在本工单中禁用。",
+        submit_report: "回交当前取证工单的实际原件引用、执行来源和仍缺的证据。",
+      };
+    const scoped = (guidance as Record<string, string>)[name];
+    return scoped ? { ...description, description: scoped, promptGuidelines: [scoped] } : description;
+  }
+  const workflow = durableFixedWorkflow ? durableWorkflowToolPresentation[name] : undefined;
+  if (!workflow) return description;
+  if (name === "dispatch_task") {
+    const properties = description.parameters.properties as Record<string, Record<string, unknown>>;
+    description.parameters = { ...description.parameters, properties: Object.fromEntries(Object.entries(properties).map(([field, schema]) =>
+      [field, { ...schema, description: durableImplementationDispatchFields[field] }])) };
+  }
+  return { ...description, ...workflow, promptGuidelines: workflow.promptGuidelines };
 }
 
 // R2: fixed narrow capability shapes, also consumed by the handlers' structural checks.
@@ -86,6 +222,30 @@ function directCapabilityDescription(name: string): ToolDescription | undefined 
   ] };
 }
 
+export function describeDurableChiefDecisionTool(request: DurableChiefPendingDecisionRequest): ToolDescription {
+  const base = describeTool("decide_pending_request");
+  const properties = base.parameters.properties as Record<string, Record<string, unknown>>;
+  return {
+    ...base,
+    description: request.cardKind === "workflow-blocked-scope"
+      ? "仅处理当前应用绑定的阻塞处置卡。用 select 提交当期卡片给出的具体选项 ID 和理由。后续申请修订或等待由原工作流处理。"
+      : "仅处理当前应用绑定的持久工作流卡。用 select 提交卡片上实际提供的选项 ID 和理由。若决定拒绝或修订，选择卡片对应的选项。",
+    parameters: {
+      type: "object", additionalProperties: false,
+      properties: {
+        ...properties,
+        disposition: { ...properties.disposition, enum: ["select"] },
+        selected: {
+          ...properties.selected,
+          maxItems: request.durableWorkflow.multiple ? Math.min(request.options.length, 64) : 1,
+          items: { ...(properties.selected?.items as Record<string, unknown>), enum: request.options.map(option => option.id) },
+        },
+      },
+      required: [...(base.parameters.required as string[]), "selected"],
+    },
+  };
+}
+
 function gitCapabilityDescription(name: string): ToolDescription | undefined {
   if (!["git_query", "git_candidate", "git_publish"].includes(name)) return undefined;
   const text = { type: "string", minLength: 1, maxLength: 500, pattern: "^[^\\u0000-\\u001f]+$" };
@@ -124,12 +284,54 @@ function gitCapabilityDescription(name: string): ToolDescription | undefined {
  *
  * 导出供**接线实测**使用（test/pi-adapter 的 executionMode/交互工具用例；本函数不调 SDK、纯数据）。
  */
-export function describeTool(name: string): ToolDescription {
+function describeSharedTool(name: string, durableFixedWorkflow: boolean, taskGitAvailable: boolean): ToolDescription {
   const git = gitCapabilityDescription(name);
   if (git) return git;
   const direct = directCapabilityDescription(name);
   if (direct) return direct;
+  if (name === "request_document_revision") {
+    return {
+      parameters: { type: "object", additionalProperties: false, required: ["path", "reason"], properties: {
+        path: { type: "string", minLength: 1, maxLength: DOCUMENT_REVISION_PATH_MAX_CHARS, description: "当前流程有问题的治理文件的项目相对路径。" },
+        reason: { type: "string", minLength: 1, maxLength: DOCUMENT_REVISION_REASON_MAX_CHARS, description: "说明实际执行受阻的原因及需要修订的问题。" },
+      } },
+      description: "当前 A11 运营提交有问题的内置角色治理文件和原因。应用核对文件与当前依据，按固定归属派发修订并记录原节点。已批准内容的修订由应用呈请客户本人确认。",
+      promptGuidelines: ["只提交 path 与 reason。根据回执区分受理、派发、审批和恢复。受理后结束当前回合，工作流在可恢复时重新唤醒。"],
+      executionMode: "sequential",
+    };
+  }
+  if (name === "submit_document_revision") {
+    return {
+      parameters: { type: "object", additionalProperties: false, required: ["content"], properties: {
+        content: { type: "string", minLength: 1, maxLength: DOCUMENT_REVISION_CONTENT_MAX_BYTES, description: "该应用绑定文件的完整修订候选文本，UTF-8 上限 128 KiB。" },
+      } },
+      description: "向应用回交本次内置角色修订任务的完整候选文本。文件、原依据及修订任务由宿主绑定。应用保存候选，在对应校验和本人确认完成后才可生效。",
+      promptGuidelines: ["把完整文件内容放入 content。按本次任务保留必要格式和依据，原生效文件由应用保护。回执为候选登记状态。"],
+      executionMode: "sequential",
+    };
+  }
+  if (name === "generate_package_lock") {
+    return {
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+      description: "从根目录 package.json 解析公共 npm registry 依赖，生成当前 A11 实施子任务有权写入的 package-lock.json。调用无需参数。应用在隔离目录解析，不运行项目脚本。成功回执表示实际文件已按任务写权限落盘。",
+      promptGuidelines: ["需要 package-lock.json 且此工具可用时，先写好根目录 package.json，再调用 generate_package_lock({})。根据真实回执继续暂存与回交。"],
+      executionMode: "sequential",
+    };
+  }
+  if (name === "restore_acceptance_environment") {
+    return {
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+      description: "请求按本次验收环境恢复任务安装已核验的项目本地依赖。应用提交核定命令审批，依实际结果回执。调用无需参数。",
+      promptGuidelines: ["提交 restore_acceptance_environment({})，按实际回执结束本次恢复任务。"],
+      executionMode: "sequential",
+    };
+  }
   if (name === "run_shell") {
+    const git = taskGitAvailable
+      ? "**当前 A11 任务 Git**：使用 `git add <获批文件>` 逐个列出要暂存的项目相对路径，再单独调用 `git commit -m \"提交说明\"`。应用核对实际任务、分支及暂存区，受信回执为准。`git status` 与 `git log -1` 可用于核查。"
+      : durableFixedWorkflow
+        ? "**Git**：本会话的 run_shell 使用应用固定 Git 传输执行白名单内的只读查询，例如 `git status`、`git log -1`。"
+        : "**Git**：只读子命令（status / log / diff / show / rev-parse / ls-files / ls-tree / merge-base / blame / cat-file，参数按精确白名单）由应用经固定 Git 传输执行；其他 `git` 形态一律拒绝——写/发布请用结构化 git_candidate / git_publish，查询请用 git_query（角色 ACL/策略/审计）。";
     return {
       parameters: {
         type: "object",
@@ -139,11 +341,11 @@ export function describeTool(name: string): ToolDescription {
         required: ["command"],
         additionalProperties: true,
       },
-      description: "受治理的程序执行工具。每次调用只执行一个程序及其参数，按 argv 直接启动，不经 shell。`&&`、`;`、`|`、重定向、变量展开和命令替换不会按 shell 语法执行；多条命令请分开调用。执行前必须过 ShellGate 审核；未获明确 allow 绝不执行。" +
-        "**Git**：只读子命令（status / log / diff / show / rev-parse / ls-files / ls-tree / merge-base / blame / cat-file，参数按精确白名单）由应用经固定 Git 传输执行；其他 `git` 形态一律拒绝——写/发布请用结构化 git_candidate / git_publish，查询请用 git_query（角色 ACL/策略/审计）。",
+      description: "受治理的程序执行工具。每次调用只执行一个程序及其参数，按 argv 直接启动，不经 shell。`&&`、`;`、`|`、重定向、变量展开和命令替换不会按 shell 语法执行；多条命令请分开调用。执行前必须过 ShellGate 审核；未获明确 allow 绝不执行。" + git,
       promptGuidelines: [
         "只读查看仓库状态/历史可用 `git status`、`git log -5`、`git diff`、`git show <完整oid>:<路径>` 等只读白名单形态；每个子命令只接受白名单参数，未列 flag 与全局选项（如 -c / -C / --git-dir）一律拒绝。",
-        "Git 写/发布不要用 run_shell 裸命令：查询用 git_query、提交用 git_candidate、发布用 git_publish（受角色 ACL/策略/审计与真实任务绑定）。",
+        ...(taskGitAvailable ? ["只暂存实际已写入或修改的获批文件。逐个列出具体路径。取得真实提交后，在 submit_report 回交提交 OID、改动和已完成的验证。后续集成验证单独说明。"]
+          : durableFixedWorkflow ? [] : ["Git 写/发布不要用 run_shell 裸命令：查询用 git_query、提交用 git_candidate、发布用 git_publish（受角色 ACL/策略/审计与真实任务绑定）。"]),
       ],
     };
   }
@@ -171,7 +373,8 @@ export function describeTool(name: string): ToolDescription {
         "当前会话同时最多运行 8 个后台任务（超限在审核前直接拒绝），最多保留 32 个（运行中的任务永不淘汰）。" +
         "**任务只属于当前会话、不跨重启**：任务表与日志只在内存，日志不落盘；会话关闭或应用重启后旧任务号只会返回「未知任务」。" +
         "**轮次结束或停止本轮不会终止后台任务**——只有 stop_background_task 或关闭会话才会清理；应用崩溃/被强杀时进程可能残留。" +
-        "**Git**：后台入口不接受 `git` 命令（包括只读形态）；只读 Git 请用 run_shell，写/发布请用结构化 git_query / git_candidate / git_publish。" +
+        (durableFixedWorkflow ? "**Git**：后台入口不受理 Git 命令。Git 操作请按当前任务的 run_shell 说明执行。" :
+          "**Git**：后台入口不接受 `git` 命令（包括只读形态）；只读 Git 请用 run_shell，写/发布请用结构化 git_query / git_candidate / git_publish。") +
         "启动后会返回任务号（如 bg-1）；用 list_background_tasks / read_background_task / stop_background_task 管理它。",
       promptGuidelines: [
         "启动开发服务器/长进程用 start_background_task，不要用 run_shell 占住整个回合；工具会立即返回任务号与 pid。",
@@ -313,19 +516,19 @@ export function describeTool(name: string): ToolDescription {
           intentId: { type: "string", description: "C 批：optional intent attribution key" },
           targetRoleId: {
             type: "string",
-            description:
+            description: durableFixedWorkflow ? "Role attribution for the request, where authorized by the application." :
               "C 批 appointment-write only: the project role (never a built-in id) whose 角色卡/** files are being written. " +
               "The application validates it against the customer's D3 `request.resolved` (decisionId + targetRoleIds) before showing the card",
           },
           decisionId: {
             type: "string",
-            description:
+            description: durableFixedWorkflow ? "Application-issued decision id if the current request requires one." :
               "C 批 appointment-write only: the D3 decision id from `request.resolved` that authorized this role-card/boundary write. " +
               "Missing/mismatched targetRoleId + decisionId ⇒ no card is shown (fail-closed)",
           },
           moduleId: {
             type: "string",
-            description:
+            description: durableFixedWorkflow ? "Optional module id verified against the current scope." :
               "2026-10-29 (v2.8/R8): optional module id from the latest roster for an acceptance/role-card card. The application cross-checks it against the roster modules and the D3-selected owners; the field grants no write power. The folder address is derived by the application.",
           },
           modulePaths: {
@@ -356,7 +559,7 @@ export function describeTool(name: string): ToolDescription {
           flowId: {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
-            description:
+            description: durableFixedWorkflow ? "Flow id for the current workflow request." :
               "Optional for ordinary project roles and the legacy single-role governance model (legacy calls). The six built-in governance roles " +
               "(chief / product / rapporteur / nominator / convener / verifier) MUST always provide an attribution key (flowId | intentId | taskId) + cardKind together; " +
               "the call is rejected by the application if either is missing, and NO card is shown to the customer — fix and resend",
@@ -369,7 +572,7 @@ export function describeTool(name: string): ToolDescription {
           cardKind: {
             type: "string",
             enum: ["appointment-write"],
-            description:
+            description: durableFixedWorkflow ? "Card kind validated by the application against the current task." :
               "Optional for ordinary project roles and the legacy single-role governance model (legacy calls). The six built-in governance roles " +
               "(chief / product / rapporteur / nominator / convener / verifier) MUST always provide an attribution key (flowId | intentId | taskId) + cardKind together; " +
               "a missing or out-of-role kind is rejected by the application and NO card is shown to the customer — fix and resend. " +
@@ -497,7 +700,7 @@ export function describeTool(name: string): ToolDescription {
                 description: { type: "string", description: "Optional extra explanation" },
                 recommended: {
                   type: "boolean",
-                  description:
+                  description: durableFixedWorkflow ? "Optional recommendation where the current card supports one." :
                     "Optional for cardKind \"decision\": mark the recommended option. A decision card must have exactly one " +
                     "option with `recommended: true` (validated by the application); when the customer has enabled " +
                     "\"decide for me\", the judging agent selects that recommended option by default. Other card kinds ignore this field.",
@@ -521,32 +724,6 @@ export function describeTool(name: string): ToolDescription {
             maxItems: 20,
             description: "2026-10-29 (v2.20): module path array for the choice card; application verifies against the roster.",
           },
-          promptId: {
-            type: "string",
-            description:
-              "2026-11-17 (app-dispatch/v1): optional card prompt id issued by the application (`card-prompt` task). " +
-              "Echo it unchanged; the application verifies promptId/cardKind/options/documentRefs item-by-item " +
-              "(mismatch ⇒ `card-prompt-mismatch`, no card is presented). Missing = legacy card (no prompt binding).",
-          },
-          documentRefs: {
-            type: "array",
-            maxItems: 16,
-            description:
-              "2026-11-17 (app-dispatch/v1): optional echo of the application-issued card documentRefs " +
-              "(path + 64-hex sha256 + kind + version?). The application compares them with the prompt/request " +
-              "record; mismatch ⇒ `card-prompt-mismatch` (no card).",
-            items: {
-              type: "object",
-              properties: {
-                path: { type: "string", description: "Project-relative document path" },
-                sha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Byte SHA-256 of the document" },
-                kind: { type: "string", description: "Document kind (intent/proposal/modules/roster/architecture…)" },
-                version: { type: "integer", minimum: 1, description: "Optional document version" },
-              },
-              required: ["path", "sha256", "kind"],
-              additionalProperties: false,
-            },
-          },
           flowId: {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
@@ -561,7 +738,7 @@ export function describeTool(name: string): ToolDescription {
           cardKind: {
             type: "string",
             enum: ["proposal", "appointment", "acceptance", "intent-confirm", "decision"],
-            description:
+            description: durableFixedWorkflow ? "Kind permitted by the current workflow node. The Chief presents intent, proposal, and appointment choices." :
               "Optional governance card kind for this choice; a missing or foreign kind cannot unlock any governance action. " +
               "Kinds: `proposal` = accept a proposal; `appointment` = appoint the recommended team (sent by Convener from the " +
               "customer-confirmed team plan; the old `nomination` flow is legacy); `acceptance` = accept a delivery; " +
@@ -591,10 +768,7 @@ export function describeTool(name: string): ToolDescription {
         "由客户本人回答，或在其开启「替我决策」时由判断 agent 代批 `confirm`（`revise` 仍交回客户/发起角色，判断 agent 不替客户修改）。" +
         "`cardKind=decision`（材料性选择卡）**仅运营（Steward）直接调用 `request_choice` 发出**：产品发现材料性选择（演示/验收证据方式、范围、标准/契约偏离、成本或客户可见行为）时**不自行决定**，交运营发本卡；需求变更审批 decision 卡由应用在 `request_requirement_change` 成功后自动经发起方会话呈现，发起方不得再调用 `request_choice` 重复发卡；" +
         "卡内必须有**恰一个** `recommended: true` 推荐项；客户开启「替我决策」时判断 agent 默认选推荐项。" +
-        "decision 卡**独立于提案/任命/验收**——**不等于验收/客户批准，不触发门禁/验收**；`pass` 选项不适用（不设）。" +
-        "**app-dispatch/v1（固定流程应用驱动）**：幕僚收到应用 `card-prompt` 任务时，本调用须原样回传 `promptId`（可选同时回传 `documentRefs`），" +
-        "并保持 `cardKind`/`options`/`documentRefs` 与 prompt 逐项一致；应用先 `verifyCardPrompt` 校验，不一致 ⇒ `card-prompt-mismatch`（不发卡、不写记录）。" +
-        "三卡内容/时序/文档引用由应用生成，幕僚只呈卡与解释，不得增删选项或改写 documentRefs。",
+        "decision 卡**独立于提案/任命/验收**——**不等于验收/客户批准，不触发门禁/验收**；`pass` 选项不适用（不设）。",
       promptGuidelines: [
         "需要客户在若干选项中做选择时用 request_choice；未获明确回答 → 不要据此写盘，也不得假设客户的选择。",
         "`cardKind=appointment` 是**任命**卡：由 Convener 依客户确认的团队计划发起；Crew 收到客户任命后才按名单写卡（appointment-write），不自行任命、不自行选角色。",
@@ -811,55 +985,6 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
-  if (name === "select_workflow") {
-    // 2026-11-17（app-dispatch/v1，设计 §2.2/§4.4/§6.1）：幕僚显式选择流程。仅 chief、仅 fixed
-    // 会话注入（注入开关与 handler 由桌面批接线；legacy `dispatch_task` schema 保持兼容不变）。
-    // 参数只表达选择意图：应用校验类型化流程定义注册表（id/version/hash）、阶段与幂等后写
-    // `workflow.started` 并启动应用侧流程驱动；字段本身不构成派发/授权，内置任务仍由应用创建。
-    return {
-      parameters: {
-        type: "object",
-        properties: {
-          workflowPath: {
-            type: "string",
-            enum: ["A", "B"],
-            description:
-              "Workflow path: `A` = add (A1–A13), `B` = modify/fix/refactor (B1–B4). " +
-              "The application validates the typed workflow-definition registry and pins definition id/version/sha256 in `workflow.started` (protocol app-dispatch/v1).",
-          },
-          flowId: {
-            type: "string",
-            pattern: GOVERNANCE_SLUG_PATTERN,
-            description:
-              "Governance flow id (slug) for this workflow; used with the path in the idempotency key `workflow-start:<flowId>:<path>:<sourceTaskId>`.",
-          },
-          acceptanceStrength: {
-            type: "string",
-            enum: [...WORKFLOW_ACCEPTANCE_STRENGTHS],
-            description:
-              "Optional acceptance strength override (Q2): `light` = lightweight (A12b blocked + archive evidence may be accepted, B31 audit), " +
-              "`standard` = standard (default). The application executes it per the workflow definition; the field alone grants nothing.",
-          },
-        },
-        required: ["workflowPath", "flowId"],
-        additionalProperties: false,
-      },
-      description:
-        "选择固定路径工作流（app-dispatch/v1；仅 fixed 幕僚会话）。" +
-        "参数：`workflowPath`（`A` 新增 / `B` 修改）+ `flowId`，可选 `acceptanceStrength`（`light`/`standard`，默认 standard）。" +
-        "应用据此校验类型化流程定义注册表（未知 id ⇒ `workflow-definition-unknown`；版本不符 ⇒ `workflow-definition-version-unsupported`；" +
-        "协议不符 ⇒ `workflow-protocol-mismatch`），通过后写 `workflow.started`（含 `protocol:\"app-dispatch/v1\"` 与 `definition:{id,version,sha256}`）并启动应用侧流程驱动。" +
-        "**本工具只选择流程，不派发任何 agent、不创建任务、不授权写盘**：内置角色任务（product/rapporteur/nominator/convener/verifier）由应用按流程定义创建；" +
-        "运营只派项目 worker；幕僚不再派发/收口/重派/停止/直派验收（`chief-dispatch-removed`）。客户明示流程时按客户明示选择（应用不做自然语言自动分类）。",
-      promptGuidelines: [
-        "首个流程动作调用 select_workflow；它只是**选择流程**，不是派发、不是授权、不创建任务。",
-        "客户在会话中明确「走 A / 走 B / 换方案 / 停止」时按其明示选择；否则按真实缺口判断，应用不做自然语言自动分类。",
-        "被拒时如实报告真实 code（workflow-definition-unknown / workflow-definition-version-unsupported / workflow-protocol-mismatch / workflow-corrupt），不换形重试、不自造定义或回执。",
-        "启动后不再逐阶段发请求/收口：阶段任务由应用按定义创建并投递；你的动作只剩按应用 card-prompt 呈三张客户卡与呈现 merge-main（客户本人）。",
-      ],
-      executionMode: "sequential",
-    };
-  }
   if (name === "report_shell_verdict") {
     // 审读结论工具（R-1，只给审读会话）：结构化结论（三值枚举）；**不得**暗示它授予任何权限。
     return {
@@ -925,7 +1050,7 @@ export function describeTool(name: string): ToolDescription {
         properties: {
           flowId: { type: "string", description: "Optional flow id; defaults to the active run flow" },
           roleId: { type: "string", description: "Optional role id; only the caller's own role is visible" },
-          taskKind: { type: "string", enum: ["dispatch", "appointment", "write", "acceptance", "shell", "stage-request"], description: "Optional task kind for required schema/fields" },
+          taskKind: { type: "string", enum: ["dispatch", "appointment", "write", "acceptance", "shell", "stage-request"], description: durableFixedWorkflow ? "Optional historical task metadata filter." : "Optional task kind for required schema/fields" },
           moduleId: { type: "string", description: "Optional module id for path/write-root detail" },
           topic: { type: "string", enum: [...CONTRACT_SCHEMA_TOPICS], description: "Optional schema topic; returns that document's field table and minimal valid YAML example (read-only; no run summary)" },
         },
@@ -1572,6 +1697,11 @@ export function describeTool(name: string): ToolDescription {
             pattern: GOVERNANCE_SLUG_PATTERN,
             description: "Optional flow id (slug) to filter the read-only snapshot",
           },
+          definitionId: {
+            type: "string",
+            pattern: WORKFLOW_DEFINITION_ID_PATTERN,
+            description: "Optional workflow definition ID to filter the available definition catalog",
+          },
         },
         required: [],
         additionalProperties: false,
@@ -1580,12 +1710,32 @@ export function describeTool(name: string): ToolDescription {
         "**只读**全局任务状态摘要（幕僚/内置治理角色工具，注入才存在）：当前 focus flow/run/阶段、未收口任务计数、" +
         "阻塞/卡点、版本/证据指针与下一步。数据与 UI 项目状态区来自**同一派生结果**——本工具不重算、不写第二份状态；" +
         "按调用角色裁剪：幕僚完整，其他内置治理角色只看到自己的任务与 focus 聚合，项目 worker 无本工具。" +
+        "如应用提供工作流目录，可传 definitionId 查询指定定义。" +
         "**纯读：不写账本/manifest/文档、不缓存、不改任何任务/run 状态或写权**；坏行/坏 manifest 进 errors 并返回可读部分，" +
         "不抛、不阻塞。文本输出有界（≤8 KiB），超限截断并如实标注 `truncated`；**本工具输出不是验收证据，查询不构成放行**。",
       promptGuidelines: [
         "派发/收口/巡检前先读 project_state，对齐当前 focus、未收口任务、阻塞与下一步；机器事实以应用为准。",
         "project_state 只读摘要：不要据此写盘，也不要把它当验收/批准证据；逐任务动作仍在任务中心/既有工具。",
       ],
+    };
+  }
+  if (name === "request_workflow_start") {
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          definitionId: { type: "string", pattern: WORKFLOW_DEFINITION_ID_PATTERN },
+          source: { type: "string", enum: ["project", "preset"] },
+          expectedDigest: { type: "string", pattern: WORKFLOW_DEFINITION_DIGEST_PATTERN },
+          reason: { type: "string", pattern: "\\S", description: "Why this workflow fits the customer's requirement" },
+        },
+        required: ["definitionId", "source", "expectedDigest", "reason"],
+        additionalProperties: false,
+      },
+      description:
+        "幕僚提议启用一份工作流定义。先用 project_state 查看定义目录，引用同一条目的 definitionId、source 和摘要，并说明选择理由。" +
+        "应用绑定当前客户需求，由客户本人确认启用。pending 表示提议已登记，等待客户确认。",
+      executionMode: "sequential",
     };
   }
   if (name === "governance_matrix") {

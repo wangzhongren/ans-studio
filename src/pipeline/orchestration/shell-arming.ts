@@ -38,6 +38,7 @@ import {
 import {
   buildShellGate,
   type ClassifyShellFn,
+  type PrepareImplementationSelfTest,
   type ShellRules,
   type ShellGateReviewedOutcome,
   type TakeDirectiveFn,
@@ -123,6 +124,7 @@ export interface AssembleShellGateOptions extends ShellEscalationWiring, ShellDi
   writeGuard?: (req: Parameters<ShellGate>[0]) => ShellWriteGuardDecision;
   /** 2026-10-29（§6.5）：执行前写审计快照。 */
   snapshotBefore?: (req: Parameters<ShellGate>[0]) => Promise<void> | void;
+  prepareImplementationSelfTest?: PrepareImplementationSelfTest;
   /** 2026-10-29（Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文加载器（有界脚本内容）。 */
   approvalContextLoader?: (req: Parameters<ShellGate>[0]) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
   /** (b) 打开审读会话的函数（测试替换点；缺省 = 编排 `openRoleSession`，pm-reviewer 内定）。 */
@@ -210,6 +212,7 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
     ...(opts.writeGuard !== undefined ? { writeGuard: opts.writeGuard } : {}),
     ...(opts.snapshotBefore !== undefined ? { snapshotBefore: opts.snapshotBefore } : {}),
+    ...(opts.prepareImplementationSelfTest ? { prepareImplementationSelfTest: opts.prepareImplementationSelfTest } : {}),
     ...(opts.approvalContextLoader !== undefined ? { approvalContextLoader: opts.approvalContextLoader } : {}),
     // 2026-10-31 判拒升级：升级注入点透传到闸（缺省不传 = 旧行为逐字不变）。
     ...(opts.onReviewed !== undefined ? { onReviewed: opts.onReviewed } : {}),

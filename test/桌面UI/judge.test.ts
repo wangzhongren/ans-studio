@@ -164,6 +164,11 @@ test("双开关视图：桥缺失禁用并显示固定文案；single 禁用代�
   assert.equal(single.disabled, true);
   assert.equal(single.label, DECISION_JUDGE_OFF_LABEL);
   assert.equal(single.note, DECISION_JUDGE_SINGLE_NOTE);
+
+  const decisionOff = judgeToggleView(JUDGE_GROUP_DECISION, true, false, false);
+  assert.equal(decisionOff.title, "手动处理工作流启用、意图确认、方案确认、角色任命、文件修订和合并卡（默认）");
+  const decisionOffEn = judgeToggleView(JUDGE_GROUP_DECISION, true, false, false, null, "en-US");
+  assert.equal(decisionOffEn.title, "Handle workflow activation, intent confirmation, proposal confirmation, role appointment, document revision, and merge cards manually (default)");
 });
 
 test("桥可用性：四个方法齐备才算可用（两组独立）", () => {
@@ -185,13 +190,23 @@ test("一次性警告：每次开启只显示一次；关闭复位；两组各�
   assert.deepEqual(judgeWarningStep(false, true), { shown: false, show: false });
 
   const approval = judgeWarningLines([JUDGE_GROUP_APPROVAL]);
-  assert.ok(approval[0].text.includes("替我审批中：shell 命令与写盘/写卡确认"));
-  assert.ok(approval.some((line) => line.text.includes("按所属开关回落逐张卡")));
-  assert.ok(approval.some((line) => line.text.includes("judge 代批 · 代审批/代决策")));
+  assert.equal(approval[0].text, "自动代理代你审核 shell 命令请求。");
+  assert.ok(approval.some((line) => line.text.includes("未获有效审批时，本次命令不会执行。关闭开关后，可手动审核后续命令请求。")));
+  assert.ok(approval.some((line) => line.text.includes("结果行与审计会标明代审批来源。")));
+  assert.doesNotMatch(approval.map((line) => line.text).join("\n"), /写盘|写卡/);
+  const approvalEn = judgeWarningLines([JUDGE_GROUP_APPROVAL], "en-US");
+  assert.equal(approvalEn[0].text, "The automatic agent reviews shell command requests for you.");
+  assert.ok(approvalEn.some((line) => line.text.includes("A command only runs with valid approval. Turn off the switch to review subsequent command requests manually.")));
+  assert.ok(approvalEn.some((line) => line.text.includes("Results and the audit trail identify the approval source.")));
+  assert.doesNotMatch(approvalEn.map((line) => line.text).join("\n"), /file writ|card writ/i);
   const both = judgeWarningLines([JUDGE_GROUP_APPROVAL, JUDGE_GROUP_DECISION]);
   assert.ok(both.some((line) => line.text === "幕僚代决策"));
   const decision = judgeWarningLines([JUDGE_GROUP_DECISION]);
   assert.equal(decision.some((line) => line.text.includes("不会代你拒绝")), false);
+  assert.deepEqual(decision, [{ text: "幕僚代决策", strong: true }]);
+  assert.deepEqual(judgeWarningLines([JUDGE_GROUP_DECISION], "en-US"), [
+    { text: "Chief-delegated decision", strong: true },
+  ]);
 });
 
 test("开关回包：ok 采用主进程值；失败保持原状态并给出错误", () => {

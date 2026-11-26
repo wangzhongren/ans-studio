@@ -24,6 +24,7 @@ import {
 } from "../../src/common/编排/write-journal.ts";
 import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 
 const req = (toolCallId = "call-1") => ({ command: "node script.mjs", argv: ["node", "script.mjs"], cwd: "/proj", toolCallId });
 
@@ -353,4 +354,66 @@ test("v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；�
     await fs.rm(root, { recursive: true, force: true });
     await fs.rm(outside, { recursive: true, force: true });
   }
+});
+
+test("A11 严格审计关联前后完整观察、同一工具调用与可靠落账", async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-retest-post-audit-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, ".git", "refs", "heads"), { recursive: true });
+  await fs.mkdir(path.join(root, "coverage"), { recursive: true });
+  const candidate = "a".repeat(40);
+  const index = "b".repeat(64);
+  const worktree = "c".repeat(64);
+  const binding = { key: "current-retest", candidateOid: candidate, branch: "ans/task/actual", isCurrent: () => true,
+    observeGit: async () => ({ branch: "ans/task/actual", head: candidate, indexDigest: index, worktreeDigest: worktree,
+      stagedPaths: [], untrackedPaths: [], trackedDirty: false, reason: "Actual candidate" }) };
+  const request = { ...req(), cwd: root, turnId: "bound-new-turn", roleId: "original-owner" };
+  const records: ShellPostAuditRecord[] = [];
+  const options = { projectRoot: root, forbiddenPrefixes: [], checkWrite: () => ({ allowed: true }) };
+  const auditor = createShellPostAudit({ ...options, auditWriter: entry => { records.push(entry); } });
+
+  assert.equal((await auditor.auditAfter(request, { exitCode: 0 })).strictAudit, undefined);
+  await auditor.snapshotRetest(request, binding);
+  const passed = await auditor.auditAfter(request, { exitCode: 0 });
+  assert.equal(passed.strictAudit?.status, "passed");
+  assert.deepEqual(passed.violations, []);
+  assert.equal(records[0]?.strict?.before, records[0]?.strict?.after);
+  if (passed.strictAudit?.status === "passed")
+    assert.equal(passed.strictAudit.digest, createHash("sha256").update(JSON.stringify(records[0])).digest("hex"));
+  const durable = createShellPostAudit(options);
+  await durable.snapshotRetest(request, binding);
+  assert.equal((await durable.auditAfter(request, { exitCode: 0 })).strictAudit?.status, "passed");
+  assert.match(await fs.readFile(path.join(root, "docs", "audit", "shell-gate.jsonl"), "utf8"), /current-retest/);
+
+  await auditor.snapshotRetest(request, binding);
+  execFileSync(process.execPath, ["-e", "require('node:fs').writeFileSync('coverage/write.log','observed')"], { cwd: root });
+  const wrote = await auditor.auditAfter(request, { exitCode: 0 });
+  assert.equal(wrote.strictAudit?.status, "failed");
+  assert.deepEqual(wrote.violations, [{ path: "coverage/write.log", change: "added" }]);
+  await auditor.snapshotRetest(request, binding);
+  const late = await auditor.auditAfter({ ...request, turnId: "retired-turn" }, { exitCode: 0 });
+  assert.equal(late.strictAudit?.status, "failed");
+  assert.deepEqual(late.violations, []);
+
+  const truncated = createShellPostAudit({ ...options, maxEntries: 1 });
+  await assert.rejects(truncated.snapshotRetest(request, binding), /覆盖上限/);
+  assert.equal((await truncated.auditAfter(request, { exitCode: 0 })).strictAudit, undefined);
+  const bounded = createShellPostAudit({ ...options, maxEntries: 14 });
+  await bounded.snapshotRetest(request, binding);
+  await Promise.all(Array.from({ length: 15 }, (_, i) => fs.writeFile(path.join(root, "coverage", `out-${i}`), "x")));
+  assert.equal((await bounded.auditAfter(request, { exitCode: 0 })).strictAudit?.status, "failed");
+  const unsafe = path.join(root, "uncovered");
+  try {
+    await fs.symlink(path.join(root, "coverage"), unsafe, "junction");
+    await assert.rejects(auditor.snapshotRetest(request, binding), /未能覆盖的符号链接/);
+  } catch (error) {
+    if (process.platform !== "win32" || !["EPERM", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+  } finally {
+    await fs.unlink(unsafe).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+  }
+  const unavailable = createShellPostAudit({ ...options, auditWriter: async () => { throw new Error("failed writer"); } });
+  await unavailable.snapshotRetest(request, binding);
+  const unpersisted = await unavailable.auditAfter(request, { exitCode: 0 });
+  assert.equal(unpersisted.strictAudit?.status, "failed");
+  assert.deepEqual(unpersisted.violations, []);
 });

@@ -44,7 +44,6 @@ import type {
   ProjectStateLatestVersionPointer,
   ProjectStateNextStep,
   ProjectStateNote,
-  ProjectStateOpenBlock,
   ProjectStateRunView,
   ProjectStateTask,
   ProjectStateVersion,
@@ -61,6 +60,7 @@ import {
 import {
   loadLatestRoster,
   parseProjectModules,
+  type LoadedRoster,
 } from "./workflow-preconditions.ts";
 import { shortenSummary, readTaskState, taskCardOf, taskCards, type TaskRecord } from "./task-state.ts";
 import {
@@ -70,7 +70,6 @@ import {
   readWorkflowLedger,
 } from "./workflow-service.ts";
 import { deriveWorkflowView, nextStages } from "./workflow-state.ts";
-import { readOpenBlockProjection } from "./block-ledger.ts";
 import { isVersionedDocPath, versionedDocVersionOf } from "../门禁引擎/versioned-doc-guard.ts";
 
 const FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
@@ -102,6 +101,8 @@ export interface ProjectStateScope {
   full?: boolean;
   /** 可选只读过滤（工具 `project_state` 入参）。 */
   flowId?: string;
+  /** Host-only lookup for the exact effective frozen workflow paired with a flow. */
+  evidenceCollectorRoleIdForFlow?: (flowId: string) => string | undefined | Promise<string | undefined>;
   now?: Date;
   limits?: Partial<ProjectStateLimits>;
   /** 派生下一步文案（A2/A3 可注入 i18n；缺省用机器可读英文短语）。 */
@@ -325,20 +326,8 @@ function collectRequests(events: readonly TaskStateEvent[]): Map<string, Request
     return created;
   };
   for (const event of events) {
-    if (event.kind === "request.created") {
-      // 2026-11-20（SMOKE-1 seams，桌面批）：orphaned 不是粘性状态——同一 requestId 的**重新呈现**
-      // （应用重投 card-prompt，同 requestId 新 request.created）表示仍在等待；不得因旧 orphaned
-      // 把请求从 project_state 的待决/等待投影里排除。
-      const view = get(event.requestId);
-      view.created = event;
-      delete view.orphaned;
-    } else if (event.kind === "request.presented") {
-      // 2026-11-20（SMOKE-3 S3 地基）：生命周期视图按**最后一条为准**——request.presented 晚于
-      // request.orphaned 表示同一请求已重新呈卡、仍在等待；清除 orphaned（与新 request.created
-      // 清除语义一致），pendingRequests/counts/blockers 随之恢复为等待态。
-      // 与 block-router `findRequestState`、桌面 `requestViewOf` 的最终状态口径一致。
-      delete get(event.requestId).orphaned;
-    } else if (event.kind === "request.resolved") get(event.requestId).resolved = event;
+    if (event.kind === "request.created") get(event.requestId).created = event;
+    else if (event.kind === "request.resolved") get(event.requestId).resolved = event;
     else if (event.kind === "request.orphaned") get(event.requestId).orphaned = event;
   }
   return requests;
@@ -420,13 +409,9 @@ function redispatchCounts(records: Map<string, TaskRecord>): Map<string, number>
 function projectTaskOf(record: TaskRecord, redispatchCount: number): ProjectStateTask | undefined {
   const card = taskCardOf(record);
   if (card === undefined || record.created === undefined) return undefined;
-  const creator = record.created.from;
   return {
     ...card,
-    // 2026-11-17（app-dispatch/v1）：运行时如实保留 `"application"`；类型按冻结结构镜像（旧契约
-    // 仅 chief/convener）收窄以保住双向可赋值断言；需要分支的新消费者读 `creator`。
-    from: creator as "chief" | "convener",
-    creator,
+    from: record.created.from,
     blocked: card.lastReport?.status === "blocked",
     failed: card.lastReport?.status === "failed",
     redispatchCount,
@@ -463,21 +448,23 @@ interface ReferenceIssueResult {
   blockers: ProjectStateBlocker[];
   errors: ProjectStateError[];
   issues: Map<ProjectStateDocKind, string>;
+  evidenceRoster?: boolean;
 }
 
 async function collectReferenceIssues(
   projectRoot: string,
-  flowId: string | undefined,
+  flowId: string,
   docs: Partial<Record<ProjectStateDocKind, VersionedDocPointer>>,
+  evidenceCollectorRoleId?: string,
 ): Promise<ReferenceIssueResult> {
   const blockers: ProjectStateBlocker[] = [];
   const errors: ProjectStateError[] = [];
   const issues = new Map<ProjectStateDocKind, string>();
-  if (flowId === undefined) return { blockers, errors, issues };
-
   const rosterDoc = docs.roster;
+  let evidenceRoster: LoadedRoster | undefined;
   if (rosterDoc !== undefined) {
-    const loaded = await loadLatestRoster({ projectRoot, flowId });
+    const loaded = await loadLatestRoster({ projectRoot, flowId, evidenceCollectorRoleId });
+    if (evidenceCollectorRoleId && loaded.ok && loaded.path === rosterDoc.path) evidenceRoster = loaded;
     if (!loaded.ok) {
       const message = `roster 解析/引用失败：${loaded.reason}`;
       issues.set("roster", message);
@@ -503,7 +490,10 @@ async function collectReferenceIssues(
       issues.set("modules", message);
     }
     if (text !== undefined) {
-      const parsed = parseProjectModules(text, flowId);
+      const paired = evidenceRoster ? parseProjectModules(text, flowId, evidenceCollectorRoleId) : undefined;
+      const parsed = evidenceRoster && paired?.ok && paired.doc.version === modulesDoc.version
+        && JSON.stringify(paired.doc.modules) === JSON.stringify(evidenceRoster.roster.modules)
+        ? paired : parseProjectModules(text, flowId);
       if (!parsed.ok) {
         const message = `modules 解析/引用失败：${parsed.reason}`;
         issues.set("modules", message);
@@ -518,7 +508,7 @@ async function collectReferenceIssues(
       }
     }
   }
-  return { blockers, errors, issues };
+  return { blockers, errors, issues, evidenceRoster: evidenceRoster !== undefined };
 }
 
 // —————————————— 质量报告存在性（evidence 指针） ——————————————
@@ -843,10 +833,6 @@ export async function buildProjectStateView(
   }
 
   const focus = focusOf(state.events, flowIds, manifests, derivationByFlow, unclosedCountByFlow, supersededBy, generatedAt);
-  const focusDocs = focus.flowId !== undefined ? (docCatalog.byFlow.get(focus.flowId) ?? {}) : {};
-  const reference = await collectReferenceIssues(projectRoot, focus.flowId, focusDocs);
-  errors.push(...reference.errors);
-
   // 版本漂移（focus pinned run 与磁盘更新契约文档）。
   let newerKinds = new Set<ProjectStateDocKind>();
   const focusActive = focus.flowId !== undefined ? derivationByFlow.get(focus.flowId)?.active : null;
@@ -854,19 +840,6 @@ export async function buildProjectStateView(
     const newer = await findNewerContractDocs(projectRoot, focusActive);
     newerKinds = new Set(newer.map((doc) => doc.kind));
   }
-
-  const { notes, nextStep: chiefNextStep } = collectNotes(state.events);
-  const blockers = buildBlockers({
-    tasks: allTasks,
-    unclosedIds,
-    focus,
-    derivationByFlow,
-    requests,
-    supersededBy,
-    notes,
-    referenceBlockers: reference.blockers,
-    newerKinds,
-  });
 
   // ———— flows ————
   const flowViews: ProjectStateFlow[] = [];
@@ -913,7 +886,7 @@ export async function buildProjectStateView(
     return (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? "") || a.flowId.localeCompare(b.flowId);
   });
   const flowsTruncated = flowViews.length > limits.flows;
-  let flows = flowViews.slice(0, limits.flows);
+  let flows = (scope.flowId === undefined ? flowViews : flowViews.filter((flow) => flow.flowId === scope.flowId)).slice(0, limits.flows);
 
   // ———— tasks ————
   const scopedTasks = scope.flowId !== undefined ? allTasks.filter((task) => task.flowId === scope.flowId) : allTasks;
@@ -925,10 +898,19 @@ export async function buildProjectStateView(
   // ———— versions ————
   const versionViews: ProjectStateVersion[] = [];
   let versionsTruncated = false;
-  const flowsForVersions = full ? [...flows] : flows.filter((flow) => flow.flowId === focus.flowId);
+  const flowsForVersions = full ? [...flows] : flows.filter((flow) => flow.flowId === focus.flowId
+    || scope.flowId === flow.flowId && viewerTasks.some((task) => task.flowId === flow.flowId));
+  const referenceBlockers: ProjectStateBlocker[] = [];
   for (const flow of flowsForVersions) {
     const docs = docCatalog.byFlow.get(flow.flowId) ?? {};
     const pinnedManifest = manifests.find((manifest) => manifest.flowId === flow.flowId && manifest.state === "pinned");
+    let evidenceCollectorRoleId: string | undefined;
+    if (!pinnedManifest && (docs.roster || docs.modules)) {
+      try { evidenceCollectorRoleId = await scope.evidenceCollectorRoleIdForFlow?.(flow.flowId); } catch { /* Ordinary reads keep their default checks. */ }
+    }
+    const reference = await collectReferenceIssues(projectRoot, flow.flowId, docs, evidenceCollectorRoleId);
+    errors.push(...reference.errors);
+    referenceBlockers.push(...reference.blockers);
     const kinds = full && flow.flowId === focus.flowId
       ? VERSIONED_DOC_KINDS
       : [...new Set([...Object.keys(docs), ...Object.keys(pinnedManifest?.documents ?? {})])] as ProjectStateDocKind[];
@@ -940,7 +922,9 @@ export async function buildProjectStateView(
       if (latest === undefined && (pinRef === undefined || pinRef === null) && !focusKind) continue;
       let latestPointer: ProjectStateLatestVersionPointer | undefined;
       if (latest !== undefined) {
-        const sha = flow.flowId === focus.flowId ? await fileSha256(projectRoot, latest.path) : undefined;
+        const withDigest = flow.flowId === focus.flowId || flow.flowId === scope.flowId
+          || reference.evidenceRoster && (kind === "modules" || kind === "roster");
+        const sha = withDigest ? await fileSha256(projectRoot, latest.path) : undefined;
         latestPointer = { path: latest.path, version: latest.version, ...(sha !== undefined ? { sha256: sha } : {}) };
       }
       const pinnedPointer = pinRef !== undefined && pinRef !== null
@@ -963,6 +947,9 @@ export async function buildProjectStateView(
     if (entries.length > limits.versionsPerFlow) versionsTruncated = true;
     versionViews.push(...entries.slice(0, limits.versionsPerFlow));
   }
+  const { notes, nextStep: chiefNextStep } = collectNotes(state.events);
+  const blockers = buildBlockers({ tasks: allTasks, unclosedIds, focus, derivationByFlow, requests,
+    supersededBy, notes, referenceBlockers, newerKinds });
 
   // ———— evidence（只做指针存在性） ————
   const evidenceViews: ProjectStateEvidence[] = [];
@@ -1078,41 +1065,6 @@ export async function buildProjectStateView(
     ? blockersForView.filter((blocker) => blocker.flowId === undefined || blocker.flowId === scope.flowId)
     : blockersForView;
 
-  // ———— open blocks（2026-11-20 block resolver 地基；只读派生，resolved 不展示） ————
-  // 不改变 workflows/tasks 投影；旧项目无 blocks.jsonl ⇒ 字段缺席（兼容）。
-  const blockProjection = await readOpenBlockProjection(projectRoot, {
-    now: new Date(generatedAt),
-    ...(scope.flowId !== undefined ? { flowId: scope.flowId } : {}),
-  });
-  let openBlocks: ProjectStateOpenBlock[] = blockProjection.summaries.map((summary) => ({
-    blockId: summary.blockId,
-    class: summary.class,
-    classCode: summary.classCode,
-    status: summary.status,
-    ...(summary.owner !== undefined ? { owner: summary.owner } : {}),
-    ...(summary.waitingOn !== undefined ? { waitingOn: summary.waitingOn } : {}),
-    ...(summary.ageMs !== undefined ? { ageMs: summary.ageMs } : {}),
-    evidenceRefs: [...summary.evidenceRefs],
-    ...(summary.workflowId !== undefined ? { workflowId: summary.workflowId } : {}),
-    ...(summary.flowId !== undefined ? { flowId: summary.flowId } : {}),
-    ...(summary.stage !== undefined ? { stage: summary.stage } : {}),
-    ...(summary.taskId !== undefined ? { taskId: summary.taskId } : {}),
-    summary: summary.summary,
-    ...(summary.routeKind !== undefined ? { routeKind: summary.routeKind } : {}),
-    ...(summary.routeReason !== undefined ? { routeReason: summary.routeReason } : {}),
-    ...(summary.routeAttempt !== undefined ? { routeAttempt: summary.routeAttempt } : {}),
-    ...(summary.routeTargetRoleId !== undefined ? { routeTargetRoleId: summary.routeTargetRoleId } : {}),
-    ...(summary.routeTaskId !== undefined ? { routeTaskId: summary.routeTaskId } : {}),
-    ...(summary.cardRequestId !== undefined ? { cardRequestId: summary.cardRequestId } : {}),
-  }));
-  if (!full && viewerRoleId !== undefined) {
-    // 角色裁剪：非完整视图只保留焦点 flow / 本人任务 flow 的 block（flowId 缺席的 block 不可判定 ⇒ 不展示）。
-    const allowedBlockFlows = new Set<string>();
-    if (focus.flowId !== undefined) allowedBlockFlows.add(focus.flowId);
-    for (const task of viewerTasks) if (task.flowId !== undefined) allowedBlockFlows.add(task.flowId);
-    openBlocks = openBlocks.filter((block) => block.flowId !== undefined && allowedBlockFlows.has(block.flowId));
-  }
-
   return {
     schema: PROJECT_STATE_SCHEMA,
     generatedAt,
@@ -1128,7 +1080,6 @@ export async function buildProjectStateView(
     errors,
     truncated: flowsTruncated || bounded.truncated || versionsTruncated || evidenceTruncated,
     counts,
-    ...(openBlocks.length > 0 ? { openBlocks } : {}),
   };
 }
 
@@ -1223,17 +1174,6 @@ export function renderProjectStateSummary(
     }
     for (const warning of workflow.warnings.slice(0, 10)) push(`- warning=${shortenSummary(warning, 160)}`);
   }
-  // 2026-11-20（block resolver 地基）：open blocks 可见——等待客户卡/修复任务/升级不是无声暂停。
-  const openBlocks = view.openBlocks ?? workflow?.openBlocks ?? [];
-  if (openBlocks.length > 0) {
-    push(`[blocks] count=${openBlocks.length}`);
-    for (const block of openBlocks.slice(0, 10)) {
-      if (!push(`- #${block.blockId} class=${block.class}(${block.classCode}) status=${block.status} ` +
-        `owner=${block.owner ?? text.none} waitingOn=${block.waitingOn ?? text.none} ageMs=${block.ageMs ?? text.none} ` +
-        `flow=${block.flowId ?? text.none} stage=${block.stage ?? text.none} evidence=${block.evidenceRefs.length} ` +
-        `summary=${shortenSummary(block.summary, 120)}`)) break;
-    }
-  }
   if (view.nextStep !== undefined) {
     push(`[${text.nextStep}] ${text.source}=${view.nextStep.source} text=${shortenSummary(view.nextStep.text, 200)}`);
   }
@@ -1294,8 +1234,6 @@ export interface ProjectStateWorkflowSummary {
   legacyStateIgnored: string[];
   roleActivations: ProjectStateRoleActivation[];
   warnings: string[];
-  /** 2026-11-20（block resolver 地基）：open blocks（raised/routed/escalated；只读派生）。 */
-  openBlocks: ProjectStateOpenBlock[];
 }
 
 /**
@@ -1306,8 +1244,6 @@ export interface ProjectStateWorkflowSummary {
  */
 export async function buildWorkflowStateProjection(input: {
   projectRoot: string;
-  /** 测试/调用方可注入时钟（open block 年龄）；缺省 `new Date()`。 */
-  now?: () => Date;
 }): Promise<ProjectStateWorkflowSummary> {
   const warnings: string[] = [];
   const workflowLedger = await readWorkflowLedger(input.projectRoot);
@@ -1318,31 +1254,6 @@ export async function buildWorkflowStateProjection(input: {
   if (legacy.present) warnings.push(`legacyStateIgnored: ${legacy.ignored.join(",")}（只读忽略，不删除/不迁移）`);
   if (workflowLedger.badLines > 0) warnings.push(`workflow-ledger-bad-lines: ${workflowLedger.badLines}`);
   if (basisLedger.badLines > 0) warnings.push(`basis-ledger-bad-lines: ${basisLedger.badLines}`);
-  const blockProjection = await readOpenBlockProjection(input.projectRoot, {
-    now: (input.now ?? (() => new Date()))(),
-  });
-  if (blockProjection.badLines > 0) warnings.push(`block-ledger-bad-lines: ${blockProjection.badLines}`);
-  const openBlocks: ProjectStateOpenBlock[] = blockProjection.summaries.map((summary) => ({
-    blockId: summary.blockId,
-    class: summary.class,
-    classCode: summary.classCode,
-    status: summary.status,
-    ...(summary.owner !== undefined ? { owner: summary.owner } : {}),
-    ...(summary.waitingOn !== undefined ? { waitingOn: summary.waitingOn } : {}),
-    ...(summary.ageMs !== undefined ? { ageMs: summary.ageMs } : {}),
-    evidenceRefs: [...summary.evidenceRefs],
-    ...(summary.workflowId !== undefined ? { workflowId: summary.workflowId } : {}),
-    ...(summary.flowId !== undefined ? { flowId: summary.flowId } : {}),
-    ...(summary.stage !== undefined ? { stage: summary.stage } : {}),
-    ...(summary.taskId !== undefined ? { taskId: summary.taskId } : {}),
-    summary: summary.summary,
-    ...(summary.routeKind !== undefined ? { routeKind: summary.routeKind } : {}),
-    ...(summary.routeReason !== undefined ? { routeReason: summary.routeReason } : {}),
-    ...(summary.routeAttempt !== undefined ? { routeAttempt: summary.routeAttempt } : {}),
-    ...(summary.routeTargetRoleId !== undefined ? { routeTargetRoleId: summary.routeTargetRoleId } : {}),
-    ...(summary.routeTaskId !== undefined ? { routeTaskId: summary.routeTaskId } : {}),
-    ...(summary.cardRequestId !== undefined ? { cardRequestId: summary.cardRequestId } : {}),
-  }));
 
   const workflowIds: string[] = [];
   for (const event of workflowLedger.events) if (!workflowIds.includes(event.workflowId)) workflowIds.push(event.workflowId);
@@ -1403,6 +1314,5 @@ export async function buildWorkflowStateProjection(input: {
     legacyStateIgnored: [...legacy.ignored],
     roleActivations,
     warnings,
-    openBlocks,
   };
 }

@@ -39,32 +39,28 @@ test("fixedCards：冻结值恰 [\"decision\"]；独立于 legacy cards，legacy
   assert.notEqual(fixedCards, MODULE.cards, "fixedCards 必须是独立冻结数据（不从 legacy cards 派生）");
 });
 
-test("fixedAllowedBuiltInRoleIds：按设计清零 []（应用建内置任务；运营只派项目 worker）；legacy allowedBuiltInRoleIds 仍 [verifier]", () => {
+test("fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]", () => {
   const fixedAllowed = MODULE.fixedAllowedBuiltInRoleIds;
-  assert.ok(fixedAllowed !== undefined, "convener 必须提供 fixedAllowedBuiltInRoleIds（清零为 []，不是移除字段）");
-  assert.deepEqual([...fixedAllowed!], [], "fixed 内置目标按设计清零（app-dispatch/v1；旧值 [product, rapporteur, nominator] 仅 v2.1 历史）");
+  assert.ok(fixedAllowed !== undefined, "convener 必须提供 fixedAllowedBuiltInRoleIds（MF-IR-4）");
+  assert.deepEqual([...fixedAllowed], ["product", "rapporteur", "nominator"]);
   assert.equal(Object.isFrozen(fixedAllowed), true);
-  assert.equal(fixedAllowed!.length, 0, "fixed 下 convener 不得派任何内置角色");
-  for (const builtIn of ["product", "rapporteur", "nominator", "verifier", "chief", "convener"]) {
-    assert.equal((fixedAllowed as readonly string[]).includes(builtIn), false, `fixed 下 convener 不得派内置角色 ${builtIn}`);
-  }
+  assert.equal((fixedAllowed as readonly string[]).includes("verifier"), false, "fixed 下 convener 不得派 verifier");
   // legacy 目标常量逐字冻结（legacy 消费点 apply-journal/trunk-runtime 不改读取源）。
   assert.deepEqual([...CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds], ["verifier"]);
   assert.equal(CONVENER_WORKER_DISPATCH_TARGETS.workerTargetKind, "project");
   assert.equal(CONVENER_WORKER_DISPATCH_TARGETS.reportToRoleId, "convener");
 });
 
-// —————————————————————— fixed 谓词（与空目标表同源，恒 false）——————————————————————
+// —————————————————————— fixed 谓词（与目标表同源）——————————————————————
 
-test("isConvenerFixedBuiltInDispatchTarget：目标集清零后恒 false（谓词必须存在）；大小写/空串/未知负例", () => {
+test("isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例", () => {
   const predicate = MODULE.isConvenerFixedBuiltInDispatchTarget;
-  assert.ok(predicate !== undefined, "convener 必须提供 fixed 谓词（不是移除字段）");
+  assert.ok(predicate !== undefined, "convener 必须提供 fixed 谓词（MF-IR-4）");
   assert.equal(typeof predicate, "function");
-  // 2026-11-17：内置任务由应用创建，运营只派项目 worker ⇒ 对任何内置目标恒 false。
-  for (const target of ["product", "rapporteur", "nominator", "verifier", "chief", "convener"]) {
-    assert.equal(predicate(target), false, `fixed 谓词须拒绝内置角色 ${target}`);
+  for (const target of ["product", "rapporteur", "nominator"]) {
+    assert.equal(predicate(target), true, `fixed 谓词须允许 ${target}`);
   }
-  for (const denied of ["su", "", "  ", "worker-x", "Product", "product "]) {
+  for (const denied of ["verifier", "chief", "convener", "su", "", "  ", "worker-x", "Product", "product "]) {
     assert.equal(predicate(denied), false, `fixed 谓词须拒绝 ${JSON.stringify(denied)}`);
   }
   // 同源：成员判定恰与 fixedAllowedBuiltInRoleIds 一致（不复制第二张表）。
@@ -81,7 +77,7 @@ test("isConvenerFixedBuiltInDispatchTarget：目标集清零后恒 false（谓�
 
 // —————————————————————— fixed context 段（仅显式 fixed 矩阵）——————————————————————
 
-test("context(fixed)：返回 fixed 段（只派项目 worker/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources", () => {
+test("context(fixed)：返回 fixed 段（生产线/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources", () => {
   const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
   assert.deepEqual(
     sections.map((section) => section.id),
@@ -100,20 +96,13 @@ test("context(fixed)：返回 fixed 段（只派项目 worker/任务证据与哈
     assert.equal(Object.isFrozen(section), true);
   }
   const text = sections.map((section) => section.text).join("\n");
-  // app-dispatch/v1 任务书固定主题：内置任务由应用创建、运营只派项目 worker（绑定 worker-dispatch）、
-  // A9 团队计划/基线 3 件小事、A13 集成汇总、不派验收。
+  // 任务书固定主题：生产线唯一派发者（product/rapporteur/nominator/项目生产角色/实现）、
+  // 团队计划、基线 3 件小事、集成汇总、不派 verifier。
   for (const token of [
-    "只派项目 worker",
-    "convener-builtin-dispatch-forbidden",
-    "worker-dispatch-required",
-    "stage-execution",
-    'from:"application"',
+    "生产线唯一派发者",
     "product",
     "rapporteur",
     "nominator",
-    "verifier",
-    "A12a",
-    "A12b",
     "项目生产角色",
     "实现",
     "团队计划",
@@ -123,14 +112,10 @@ test("context(fixed)：返回 fixed 段（只派项目 worker/任务证据与哈
     "ans/task/",
     "集成汇总",
     "报告期望",
-    "merge-main",
-    "客户本人确认",
+    "verifier",
+    "convener-to-verifier-forbidden",
   ]) {
     assert.equal(text.includes(token), true, `fixed 段缺主题：${token}`);
-  }
-  // 负例防「旧句删除后子串假绿」：旧生产线派发口径必须整体消失。
-  for (const oldProtocol of ["生产线唯一派发者", "convener-to-verifier-forbidden", "stage-request"]) {
-    assert.equal(text.includes(oldProtocol), false, `fixed 段不得保留旧协议口径：${oldProtocol}`);
   }
   // 纯数据：不携带权限/批准字段。
   for (const forbidden of ["allowed", "authorized", "approved", "grant"]) {
@@ -253,13 +238,11 @@ test("B32 fixed A11/B3 提交语法：git commit -m \"<message>\" 整体引号�
     assert.equal(production.includes(token), true, `生产线段缺 B32 返工口径：${token}`);
   }
 
-  // RR27：convener 代 worker 提交亦被拒（worker-dispatch 任务无实现任务 taskGitScope）⇒ 明令不得代提交。
+  // RR27：convener 代 worker 提交亦被拒（stage-request 无实现任务 taskGitScope）⇒ 明令不得代提交。
   assert.equal(production.includes("你不得代 worker 执行 `git commit`/`git add`（不得代提交）"), true);
-  for (const token of ["不得代 worker 执行", "不得代提交", "按应用发放的 worker-dispatch 任务派 worker", "按设计无实现任务 taskGitScope"]) {
+  for (const token of ["不得代 worker 执行", "不得代提交", "stage-request 会话", "按设计无实现任务 taskGitScope"]) {
     assert.equal(production.includes(token), true, `生产线段缺 B32 代提交禁令：${token}`);
   }
-  // 负例：旧 stage-request 会话来源已整体替换（防「只删一个词」子串假绿）。
-  assert.equal(production.includes("stage-request 会话"), false, "生产线段不得保留旧 stage-request 会话来源");
 
   // fixed-only：legacy context / legacy card.text 不混入 B32 文案（legacy 逐字冻结）。
   const legacyText = MODULE.context({ governanceModel: "trio" }).map((section) => section.text).join("\n");

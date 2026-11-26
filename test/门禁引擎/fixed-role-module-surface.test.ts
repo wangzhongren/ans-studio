@@ -7,9 +7,9 @@
 // 口径：接口字段是**纯策略/纯数据**、无 I/O，只在 `matrix:"two-fixed-paths/v1"` 下消费；
 // legacy `card.text`/`cards`/capabilities/`CHIEF_HUB_DISPATCH.targetRoleIds`（五内置）/
 // `CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds`（`["verifier"]`）逐字冻结。
-// 2026-11-17（app-dispatch/v1）：六模块的 fixed 字段均已落地（fixedCards/fixedTargetRoleIds/
-// fixedAllowedBuiltInRoleIds/谓词），本文件不再保留「字段缺失 ⇒ fail-closed 空集」的表面绿分支：
-// 字段被移除必须让测试变红；目标集按设计清零 []（应用建内置任务；运营只派项目 worker）。
+// fixed 字段缺失（六角色 B2 并行实现尚未落地）⇒ fail-closed 空集/undefined，**不回退 legacy**；
+// 本文件以「提供则逐字断言冻结值、缺失则断言 fail-closed」两种状态同时成立的方式编码契约，
+// 六角色实现落地后自动强化为全量值断言，不产生 skip。
 //
 // 本文件只读断言；不改产品代码/legacy 数据；不新增依赖。
 
@@ -123,14 +123,20 @@ test("MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻�
 
 // —————————————————————— fixed 卡种：只读 fixedCards / 缺失 fail-closed ——————————————————————
 
-test("MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；六模块必须提供该字段（缺失即失败，无静默分支）", () => {
+test("MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`）", () => {
   for (const id of ROLE_IDS) {
     const module = builtInRoleModules[id];
-    // 2026-11-17：六模块均已提供 fixedCards（B2 收口）。此处不得保留「字段缺失 ⇒ 空集」的表面绿分支——
-    // 字段被移除必须让本测试变红，而不是静默通过。
-    assert.ok(module.fixedCards !== undefined, `${id} 必须提供 fixedCards（缺失不是 fail-closed 通过条件）`);
     const fixed = cardKindsOf(id, FIXED);
-    // 逐字冻结值 + 卡种闭集 + 无重复 + 不含应用自有卡种（fixed 无 acceptance/appointment-write/merge-main/stable-write）。
+    if (module.fixedCards === undefined) {
+      // 六角色 B2 尚未提供字段：fixed 矩阵必须 fail-closed 空集，**不得**静默回退 legacy cards。
+      assert.deepEqual([...fixed], [], `${id} 缺 fixedCards ⇒ fixed 空集`);
+      assert.notEqual(fixed, module.cards, `${id} fixed 结果不得是 legacy cards 引用`);
+      if (module.cards.length > 0) {
+        assert.equal(fixed.length, 0, `${id} 有 legacy 卡种但 fixed 缺失时仍为空集（不回退）`);
+      }
+      continue;
+    }
+    // 已提供：逐字冻结值 + 卡种闭集 + 无重复 + 不含应用自有卡种（fixed 无 acceptance/appointment-write/merge-main/stable-write）。
     assert.deepEqual([...fixed], [...FIXED_CARDS[id]], `${id} fixedCards 逐字冻结`);
     assert.equal(fixed, module.fixedCards, `${id} fixed 直接读模块字段（零复制）`);
     assert.equal(new Set(fixed).size, fixed.length, `${id} fixedCards 不得重复`);
@@ -164,30 +170,29 @@ test("MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；六模块必须
   assert.equal(FIXED_CARDS.rapporteur.includes("decision"), true);
 });
 
-// —————————————————————— chief/convener fixed 目标（app-dispatch/v1 清零）——————————————————————
+// —————————————————————— chief/convener fixed 目标 ——————————————————————
 
-test("MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 清零 []（字段必须存在）；legacy 常量逐字不变", () => {
+test("MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变", () => {
   const chief = builtInRoleModules.chief;
   const convener = builtInRoleModules.convener;
-  // 2026-11-17（app-dispatch/v1，设计 §2.1/§6.1）：内置任务由应用按流程定义创建，幕僚/运营均无内置
-  // 派发目标。字段**必须存在且为空冻结数组**——「移除字段」不得让本测试保持绿色（表面绿洞）。
-  assert.ok(chief.fixedTargetRoleIds !== undefined, "chief 必须提供 fixedTargetRoleIds（清零为 []，不是移除字段）");
-  assert.deepEqual([...chief.fixedTargetRoleIds!], [], "chief fixed 目标按设计清零（旧值 [convener, verifier] 仅 v2.1 历史）");
-  assert.equal(Object.isFrozen(chief.fixedTargetRoleIds), true, "chief fixed 目标必须是冻结只读数组");
-  assert.equal(
-    chief.fixedTargetRoleIds!.some((target) => ROLE_IDS.includes(target as BuiltInRoleId)),
-    false,
-    "chief fixed 目标不得含任何内置角色",
-  );
-  assert.ok(convener.fixedAllowedBuiltInRoleIds !== undefined, "convener 必须提供 fixedAllowedBuiltInRoleIds（清零为 []，不是移除字段）");
-  assert.deepEqual(
-    [...convener.fixedAllowedBuiltInRoleIds!],
-    [],
-    "convener fixed 内置目标按设计清零（旧值 [product, rapporteur, nominator] 仅 v2.1 历史）",
-  );
-  assert.equal(Object.isFrozen(convener.fixedAllowedBuiltInRoleIds), true, "convener fixed 目标必须是冻结只读数组");
-  assert.equal(convener.fixedAllowedBuiltInRoleIds!.includes("verifier"), false, "fixed 下 convener 不得派 verifier");
-  assert.equal(convener.fixedAllowedBuiltInRoleIds!.length, 0, "fixed 下 convener 不得派任何内置角色");
+  if (chief.fixedTargetRoleIds === undefined) {
+    assert.equal(chief.fixedTargetRoleIds, undefined);
+  } else {
+    assert.deepEqual([...chief.fixedTargetRoleIds], ["convener", "verifier"], "chief fixed 目标冻结为 [convener, verifier]");
+    for (const target of chief.fixedTargetRoleIds) {
+      assert.ok(ROLE_IDS.includes(target as BuiltInRoleId), `chief fixed 目标必须是内置角色：${target}`);
+    }
+  }
+  if (convener.fixedAllowedBuiltInRoleIds === undefined) {
+    assert.equal(convener.fixedAllowedBuiltInRoleIds, undefined);
+  } else {
+    assert.deepEqual(
+      [...convener.fixedAllowedBuiltInRoleIds],
+      ["product", "rapporteur", "nominator"],
+      "convener fixed 内置目标冻结为 [product, rapporteur, nominator]",
+    );
+    assert.equal(convener.fixedAllowedBuiltInRoleIds.includes("verifier"), false, "fixed 下 convener 不得派 verifier");
+  }
   // legacy 常量逐字冻结（五内置 / ["verifier"]；legacy 消费点 apply-journal/trunk-runtime 不改读取源）。
   assert.deepEqual(
     [...CHIEF_HUB_DISPATCH.targetRoleIds],
@@ -201,28 +206,24 @@ test("MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds`
   );
 });
 
-test("MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 恒 false 且与空目标表同源（谓词必须存在）", () => {
+test("MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed）", () => {
   const convener = builtInRoleModules.convener;
   const predicate = convener.isConvenerFixedBuiltInDispatchTarget;
-  // 2026-11-17：谓词字段必须存在；目标集清零后对任何输入（含全部内置角色）恒 false。
-  assert.ok(predicate !== undefined, "convener 必须提供 isConvenerFixedBuiltInDispatchTarget（不是移除字段）");
-  assert.equal(typeof predicate, "function");
-  const allowed = convener.fixedAllowedBuiltInRoleIds;
-  assert.ok(allowed !== undefined, "convener fixedAllowedBuiltInRoleIds 必须存在");
-  for (const target of ROLE_IDS) {
-    assert.equal(predicate(target), false, `convener fixed 谓词须拒绝内置角色 ${target}（应用建内置任务）`);
+  if (predicate === undefined) {
+    assert.equal(predicate, undefined);
+    return;
   }
-  for (const denied of ["verifier", "chief", "convener", "su", "", "worker-x", "Product", "product "]) {
+  const allowed = convener.fixedAllowedBuiltInRoleIds ?? [];
+  for (const target of allowed) {
+    assert.equal(predicate(target), true, `convener fixed 谓词须允许 ${target}`);
+  }
+  for (const denied of ["verifier", "chief", "convener", "su", "", "worker-x", "Product"]) {
     assert.equal(predicate(denied), false, `convener fixed 谓词须拒绝 ${denied}`);
   }
-  // 同源：成员判定恰与 fixedAllowedBuiltInRoleIds 一致（不复制第二张表）。
-  for (const target of [...ROLE_IDS, "su", "worker-x", ""]) {
-    assert.equal(predicate(target), allowed.includes(target), target);
-  }
   // 纯函数：重复调用同值、不写表。
-  const before = JSON.stringify(allowed);
+  const before = JSON.stringify(convener.fixedAllowedBuiltInRoleIds ?? null);
   assert.equal(predicate("product"), predicate("product"));
-  assert.equal(JSON.stringify(convener.fixedAllowedBuiltInRoleIds), before);
+  assert.equal(JSON.stringify(convener.fixedAllowedBuiltInRoleIds ?? null), before);
 });
 
 // —————————————————————— fixed 矩阵视图/文案 ——————————————————————
@@ -252,48 +253,19 @@ test("fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独�
     assert.equal(builtInRoleMatrixSummaryOf(unknownId), undefined, `${unknownId} legacy 无摘要`);
     assert.equal(builtInRoleMatrixSummaryOf(unknownId, FIXED), undefined, `${unknownId} fixed 无摘要`);
   }
-  // fixed 只读视图的关键口径出现在文案中（app-dispatch/v1：幕僚只选流程+按 prompt 呈卡；运营只派项目
-  // worker；内置任务由应用创建；merge-main 客户本人）。
+  // fixed 只读视图的关键口径出现在文案中（两条路径/派发分裂/3 卡/merge-main 客户本人）。
   const chiefFixed = builtInRoleMatrixSummaryOf("chief", FIXED);
   assert.ok(chiefFixed !== undefined);
   assert.match(chiefFixed.duty, /固定路径/);
-  assert.match(chiefFixed.duty, /select_workflow/);
-  assert.ok(
-    chiefFixed.mainChain.some((line) => line.includes("chief-dispatch-removed")),
-    "chief fixed 摘要须明示幕僚不再派发（chief-dispatch-removed）",
-  );
-  assert.ok(
-    chiefFixed.mainChain.some((line) => line.includes("card-prompt")),
-    "chief fixed 摘要须明示按应用 card-prompt 呈卡",
-  );
-  assert.equal(
-    chiefFixed.mainChain.some((line) => line.includes("stage-request")),
-    false,
-    "chief fixed 摘要不得保留旧 stage-request 驱动口径",
-  );
+  assert.ok(chiefFixed.mainChain.some((line) => line.includes("stage-request")));
   const convenerFixed = builtInRoleMatrixSummaryOf("convener", FIXED);
   assert.ok(convenerFixed !== undefined);
-  assert.match(convenerFixed.duty, /只派项目 worker/);
-  const convenerText = `${convenerFixed.duty}${convenerFixed.mainChain.join("")}${convenerFixed.dispatchScope ?? ""}`;
-  assert.match(convenerText, /worker-dispatch/, "convener fixed 摘要须出现 worker-dispatch 绑定口径");
-  assert.match(convenerText, /convener-builtin-dispatch-forbidden/, "convener fixed 摘要须明示不得派内置");
-  assert.equal(convenerText.includes("生产线唯一派发者"), false, "convener fixed 摘要不得保留旧「生产线唯一派发者」");
-  // 内置执行者摘要：任务来源=应用（from:application）/A12 应用直派。
-  for (const id of ["product", "rapporteur", "nominator"] as const) {
-    const summary = builtInRoleMatrixSummaryOf(id, FIXED);
-    assert.ok(summary !== undefined);
-    const text = `${summary.duty}${summary.mainChain.join("")}${summary.dispatchScope ?? ""}`;
-    assert.match(text, /应用/, `${id} fixed 摘要须注明任务由应用创建/直派`);
-    assert.match(text, /from:application|由应用/, `${id} fixed 摘要须注明应用任务来源`);
-  }
-  const verifierFixed = builtInRoleMatrixSummaryOf("verifier", FIXED);
-  assert.ok(verifierFixed !== undefined);
-  assert.match(verifierFixed.duty, /应用直派/);
+  assert.match(`${convenerFixed.duty}${convenerFixed.mainChain.join("")}`, /verifier|质检/);
 });
 
 // —————————————————————— 接口评审拒绝项 / 工具闭集 ——————————————————————
 
-test("G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 为 15 项（14 legacy + selectWorkflow）", () => {
+test("G-IR 拒绝发布工具，幕僚启动 v1.1 仅增加一项", () => {
   const sources = [
     join(REPO_ROOT, "src", "model", "role.ts"),
     join(REPO_ROOT, "src", "common", "门禁引擎", "governance-roles.ts"),
@@ -304,12 +276,9 @@ test("G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配
     const source = readFileSync(file, "utf8");
     assert.doesNotMatch(source, /requestReleaseMerge|request_release_merge/, `${file} 不得出现 requestReleaseMerge`);
   }
-  // 2026-11-17（app-dispatch/v1）：第 15 项 selectWorkflow 追加；前 14 项逐字保留、仍无 release 类工具。
-  assert.equal(ROLE_TOOL_CATALOG.length, 15, "RoleToolId 装配表 = 14 legacy + 1 app-dispatch/v1（selectWorkflow）");
+  assert.equal(ROLE_TOOL_CATALOG.length, 15);
+  assert.equal(ROLE_TOOL_CATALOG[14]?.id, "requestWorkflowStart");
   assert.equal(ROLE_TOOL_CATALOG.some((entry) => /release/i.test(entry.id) || /release/i.test(entry.name)), false);
-  const added = ROLE_TOOL_CATALOG[14];
-  assert.equal(added?.id, "selectWorkflow");
-  assert.equal(added?.name, "select_workflow");
 });
 
 // —————————————————————— 注册表只读视图不被 fixed 污染 ——————————————————————

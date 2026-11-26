@@ -60,6 +60,16 @@ contextBridge.exposeInMainWorld("desktop", {
 
   /** B/2: only opaque current-project refs; no renderer filesystem paths. */
   readProjectDocument: (input) => ipcRenderer.invoke("project:document-read", input),
+  listDurableWorkflows: input => ipcRenderer.invoke("durable-workflow:list", input),
+  validateDurableWorkflow: input => ipcRenderer.invoke("durable-workflow:validate", input),
+  copyDurableWorkflowPreset: input => ipcRenderer.invoke("durable-workflow:preset-copy", input),
+  importDurableWorkflow: input => ipcRenderer.invoke("durable-workflow:import", input),
+  startDurableWorkflow: input => ipcRenderer.invoke("durable-workflow:start", input),
+  listWorkflowStartProposals: input => ipcRenderer.invoke("durable-workflow:start-proposals", input),
+  revokeWorkflowStartProposal: input => ipcRenderer.invoke("durable-workflow:start-proposal-revoke", input),
+  getDurableWorkflowProjection: input => ipcRenderer.invoke("durable-workflow:projection", input),
+  readDurableWorkflowDelivery: input => ipcRenderer.invoke("durable-workflow:delivery-read", input),
+  acknowledgeDurableWorkflowDelivery: input => ipcRenderer.invoke("durable-workflow:delivery-acknowledge", input),
   retryReportSave: input => ipcRenderer.invoke('report:retry-save', input),
   getReportSaveState: input => ipcRenderer.invoke('report:get-save-state', input),
   retryDeliveryHistorySave: input => ipcRenderer.invoke('delivery:retry-history-save', input),

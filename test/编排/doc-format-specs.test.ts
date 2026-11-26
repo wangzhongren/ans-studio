@@ -1314,16 +1314,6 @@ const SCHEMA_WHITELIST: ReadonlyArray<{ literal: string; reason: string }> = [
   { literal: "ans-workflow/v1", reason: "fixed 路径账本 schema（model/runtime.ts；common/编排/workflow-service.ts 写入）；应用内部状态，非项目文档格式" },
   { literal: "ans-task-git-shell/v1", reason: "任务级 Git shell 分类器 kind（pipeline/orchestration/run-role.ts）；运行期匹配标识，非文档格式" },
   { literal: "chief-workflow/v2", reason: "应用内置 Chief workflow 资源版本（run-role.ts fixed 资源校验）；资源元数据，非项目文档格式" },
-  // 2026-11-17（app-dispatch/v1，设计 §4.4/§6.2）：应用侧流程定义注册表与协议标识。
-  // 均为应用内部契约/协议字面量（schema id、workflow.started.protocol 与资源版本），不是目标项目文档格式；
-  // 扫描覆盖面不变，只登记并写明理由。chief-workflow/v3 与 v2 同口径（app-dispatch/v1 注入的资源版本）。
-  { literal: "chief-workflow/v3", reason: "应用内置 Chief workflow v3 资源版本（run-role.ts app-dispatch/v1 资源校验）；资源元数据，非项目文档格式" },
-  { literal: "ans-workflow-definition/v1", reason: "应用内流程定义 JSON Schema 标识（common/编排/workflow-definitions.ts 导出）；应用内部契约，非目标项目文档格式" },
-  { literal: "ans-workflow-definitions/v1", reason: "应用内流程定义注册表 JSON Schema 标识（workflow-definitions.ts 注册表导出）；应用内部契约，非目标项目文档格式" },
-  { literal: "app-dispatch/v1", reason: "工作流协议标识（workflow.started.protocol；model/runtime.ts + common/编排/workflow-service.ts）；应用内部协议，非目标项目文档格式" },
-  // 2026-11-20（block resolver 地基）：blocks.jsonl 独立 append-only 账本 schema。
-  // 应用内部状态账本（common/编排/block-ledger.ts），不是目标项目文档格式；扫描覆盖面不变，只登记并写明理由。
-  { literal: "block/v1", reason: "block 生命周期账本 schema（.ans/state/blocks.jsonl；common/编排/block-ledger.ts 写入/校验）；应用内部状态账本，非目标项目文档格式" },
   { literal: "legacy/v1", reason: "派发/工作流矩阵 schema 枚举（model/role.ts 与角色模块 context）；运行期矩阵标识，非项目文档格式" },
   { literal: "two-fixed-paths/v1", reason: "fixed 两路径派发/工作流矩阵枚举（model/role.ts、run-role.ts、角色模块 context）；运行期矩阵标识，非文档格式" },
 ];
@@ -1355,13 +1345,6 @@ test("TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiter
 
 const CODE_WHITELIST: ReadonlyArray<{ code: string; reason: string }> = [
   { code: "boundary-condition-missing", reason: "边界运行时解析拒绝码；非 boundary-md/yaml 文档格式码" },
-  // 2026-11-20（block resolver 地基）：block 分类表新增的边界/方案升级/名单事实码。
-  // 均为应用内部错误码/事实码（block-resolution.ts 码表；workflow-service.ts 事实出口），
-  // 不是 boundary-md/yaml、plan 文档或 roster 文档的格式解析码；扫描逻辑不变，只登记并写明理由。
-  { code: "boundary-denied", reason: "block resolver 事实分类码（边界运行期拒绝语义；block-resolution.ts）；非文档格式解析码" },
-  { code: "boundary-violation", reason: "block resolver 事实分类码（越界行为；block-resolution.ts）；非文档格式解析码" },
-  { code: "plan-escalation", reason: "block resolver 事实分类码（方案升级/取舍；block-resolution.ts）；非 A8 团队计划文档解析码" },
-  { code: "roster-unreadable", reason: "block resolver 详情码（名单不可读 ⇒ B1 属主修复；workflow-service.ts/block-resolution.ts）；非 roster 文档解析码" },
   { code: "boundary-missing", reason: "边界运行时/治理矩阵诊断码" },
   { code: "boundary-parse-error", reason: "边界运行时解析失败码" },
   { code: "boundary-parse-failed", reason: "边界运行时解析失败码" },

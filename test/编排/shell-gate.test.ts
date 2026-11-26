@@ -20,7 +20,7 @@ import path from "node:path";
 import type { BoundarySection1 } from "../../src/model/boundary.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type { ShellGate } from "../../src/provider/pi/session.ts";
-import type { ShellApprovalContext, ShellGrant } from "../../src/model/runtime.ts";
+import type { AcceptanceEnvironmentReviewScope, AcceptanceWorkspaceReviewScope, OperatorPrompt, ShellApprovalContext, ShellGrant, ShellReviewRequest } from "../../src/model/runtime.ts";
 import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
 import { classifyShell as classifyShellBare, defaultShellRules } from "../../src/service/gate/shell-rules.ts";
 import { selectAdapterFactory, type AdapterFactoryBuilder } from "../../src/pipeline/orchestration/run-role.ts";
@@ -67,6 +67,33 @@ function gateWith(classifyShell: ClassifyShellFn | undefined, rules: ShellRules 
   const gate = createShellGate({ classifyShell, rules, rulesId: RULES_ID, audit });
   return { gate, audit };
 }
+
+test("A11 严格 Shell 在原批准和原登记之后才能准备执行", async () => {
+  const request = { ...REQ, argv: ["node", "--test", "test/module.test.mjs"], turnId: "new-retest" };
+  const audit = createMemoryAuditSink();
+  let checked = 0;
+  let current = true;
+  const prepare = () => ({ mode: "strict" as const, prepare: async () => { checked++; return () => current; } });
+  const allow = createShellGate({ rules: RULES, audit, classifyShell: () => "allow", prepareImplementationSelfTest: async () => prepare() });
+  const decision = await allow(request);
+  assert.equal(decision.allow, true);
+  if (decision.allow) {
+    assert.equal(decision.implementationSelfTest?.strictAuditReady, true);
+    current = false;
+    assert.equal(decision.implementationSelfTest?.isCurrent(), false);
+  }
+  assert.equal(checked, 1);
+  const deny = createShellGate({ rules: RULES, audit, classifyShell: () => "deny", prepareImplementationSelfTest: async () => prepare() });
+  assert.equal((await deny(request)).implementationSelfTest?.strictAuditReady, false);
+  assert.equal(checked, 1);
+  const unavailable = createShellGate({ rules: RULES, audit, classifyShell: () => "allow",
+    prepareImplementationSelfTest: async () => ({ mode: "strict", prepare: async () => { throw Error("pre-snapshot failed"); } }) });
+  const blocked = await unavailable(request);
+  assert.equal(blocked.allow, false);
+  assert.equal(blocked.implementationSelfTest?.strictAuditReady, false);
+  if (!blocked.allow) assert.match(blocked.reason, /pre-snapshot failed/);
+  assert.equal((await gateWith(() => "allow").gate(request)).implementationSelfTest, undefined);
+});
 
 // —————————————————————— 1. allow ——————————————————————
 
@@ -816,6 +843,130 @@ test("onReviewed：script 分支以带 approvalContext 的请求回调；非 scr
   });
   await plain(REQ);
   assert.deepEqual(seen2, [{ command: REQ.command, hasContext: false }]);
+});
+
+const RECOVERY_STAGING = "/proj/.ans/acceptance-npm-current";
+const RECOVERY_SCOPE: AcceptanceEnvironmentReviewScope = {
+  kind: "application-isolated-npm-restore",
+  projectRoot: "/proj",
+  stagingDirectory: RECOVERY_STAGING,
+  stagingIdentity: { dev: "5", ino: "8" },
+  publishDirectory: "/proj/node_modules",
+  instanceId: "instance-1",
+  flowId: "flow-1",
+  stepId: "restore-environment",
+  attempt: 2,
+  taskId: "recovery-child",
+  roleId: "env-bootstrap",
+  turnId: "recovery-turn",
+  toolCallId: "recovery-call",
+  effectKey: "environment-install:recovery-child",
+  candidateOid: "1".repeat(40),
+  manifestSha256: "2".repeat(64),
+  lockSha256: "3".repeat(64),
+  criteriaSha256: "4".repeat(64),
+};
+const RECOVERY_REVIEW: ShellReviewRequest = {
+  command: `npm ci --prefix "${RECOVERY_STAGING}" --ignore-scripts`,
+  argv: ["npm", "ci", "--prefix", RECOVERY_STAGING, "--ignore-scripts"],
+  cwd: RECOVERY_STAGING,
+  toolCallId: RECOVERY_SCOPE.toolCallId,
+  roleId: RECOVERY_SCOPE.roleId,
+  manualOnly: true,
+  acceptanceEnvironmentScope: RECOVERY_SCOPE,
+};
+
+test("the existing operator paths receive host restore scope separately from script evidence", async () => {
+  for (const mode of ["script", "advisory", "operator-only", "regular"] as const) {
+    const prompts: OperatorPrompt[] = [];
+    const gate = createShellGate({
+      classifyShell: () => "risky",
+      rules: RULES,
+      audit: createMemoryAuditSink(),
+      operatorChannel: prompt => {
+        prompts.push(prompt);
+        return { outcome: "deny", operatorId: "original-approver", reason: "The approved source is unavailable." };
+      },
+      ...(mode === "script" ? {
+        writeGuard: () => ({ kind: "script", reason: "角色写区无法静态判断" }),
+        approvalContextLoader: async () => ({ ok: true, context: SCRIPT_CONTEXT }),
+      } : {}),
+      ...(mode === "advisory" ? { advisoryRuleset: true } : {}),
+      ...(mode === "operator-only" ? { operatorOnly: true } : {}),
+    });
+    const result = await gate(RECOVERY_REVIEW);
+    assert.equal(result.allow, false, mode);
+    assert.equal(!result.allow && result.reason, "The approved source is unavailable.");
+    assert.equal(prompts.length, 1);
+    const scoped = prompts[0]!;
+    assert.equal(scoped.acceptanceEnvironmentScope, RECOVERY_SCOPE);
+    assert.equal(scoped.command, RECOVERY_REVIEW.command);
+    assert.deepEqual(scoped.argv, RECOVERY_REVIEW.argv);
+    assert.equal(scoped.cwd, RECOVERY_REVIEW.cwd);
+    assert.equal(scoped.manualOnly, true);
+    if (mode === "script") {
+      assert.equal(scoped.approvalContext, SCRIPT_CONTEXT);
+      assert.match(scoped.reason ?? "", /宿主核验范围/);
+      assert.doesNotMatch(scoped.reason ?? "", /角色写区/);
+    }
+    const { acceptanceEnvironmentScope, ...ordinary } = RECOVERY_REVIEW;
+    await gate(ordinary);
+    assert.equal(prompts[1]?.acceptanceEnvironmentScope, undefined);
+    if (mode === "script") assert.match(prompts[1]?.reason ?? "", /角色写区/);
+  }
+});
+
+test("host restore details leave hard deny, stale grant and unavailable operator decisions intact", async () => {
+  const deny = escalationGate({ classify: () => "deny", operator: allowOperator,
+    writeGuard: () => ({ kind: "script", reason: "Opaque script" }) });
+  assert.equal((await deny.gate(RECOVERY_REVIEW)).allow, false);
+  assert.equal(deny.audit.records[0]?.branch, BRANCH_C_DENY);
+  const stale = escalationGate({ classify: () => "risky", grant: "stale", operator: allowOperator });
+  assert.equal((await stale.gate(RECOVERY_REVIEW)).allow, false);
+  assert.equal(stale.audit.records[0]?.branch, BRANCH_CUSTOMER_ESCALATION_STALE);
+  const absent = escalationGate({ classify: () => "risky", writeGuard: () => ({ kind: "script", reason: "Opaque script" }) });
+  assert.equal((await absent.gate(RECOVERY_REVIEW)).allow, false);
+});
+
+test("workspace facts reach the original operator with the fixed builder and a distinct preview", async () => {
+  const workspace = "/proj/.ans/acceptance-runs/review-task";
+  const scope: AcceptanceWorkspaceReviewScope = {
+    kind: "application-isolated-acceptance-workspace", projectRoot: "/proj", workspaceDirectory: workspace,
+    workspaceIdentity: { dev: "1", ino: "2" }, inputDirectory: workspace + "/input", outputDirectory: workspace + "/output",
+    evidenceDirectory: workspace + "/evidence", launcherPath: workspace + "/build.mjs", launcherSha256: "1".repeat(64),
+    previewLoopback: true, previewTtlMs: 60_000, instanceId: "instance", flowId: "flow", stepId: "assessment",
+    taskId: "review-task", attempt: 1, roleId: "verifier", turnId: "turn", toolCallId: "call", effectKey: "acceptance-workspace-run:review-task",
+    candidateOid: "2".repeat(40), criteriaSha256: "3".repeat(64),
+  };
+  const prompts: OperatorPrompt[] = [];
+  const gate = createShellGate({
+    classifyShell: () => "review", rules: RULES, audit: createMemoryAuditSink(),
+    writeGuard: () => ({ kind: "script", reason: "原脚本审查" }),
+    approvalContextLoader: async () => ({ ok: true, context: SCRIPT_CONTEXT }),
+    operatorChannel(prompt) {
+      prompts.push(prompt);
+      return { outcome: "deny", reason: "Fixture retains the operator decision." };
+    },
+  });
+  const argv = ["node", scope.launcherPath];
+  const ordinary = { command: argv.join(" "), argv, cwd: scope.inputDirectory, roleId: scope.roleId, toolCallId: scope.toolCallId };
+  const out = await gate({ ...ordinary, acceptanceWorkspaceScope: scope, manualOnly: true });
+  assert.equal(out.allow, false);
+  assert.equal(!out.allow && out.reason, "Fixture retains the operator decision.");
+  assert.equal(prompts[0]?.acceptanceWorkspaceScope, scope);
+  assert.equal(prompts[0]?.approvalContext, SCRIPT_CONTEXT);
+  assert.deepEqual(prompts[0]?.argv, argv);
+  assert.equal(prompts[0]?.manualOnly, true);
+  assert.match(prompts[0]?.reason ?? "", /由应用建立的有时限回环预览/);
+  await gate(ordinary);
+  assert.equal(prompts[1]?.acceptanceWorkspaceScope, undefined);
+  assert.match(prompts[1]?.reason ?? "", /原脚本审查/);
+  const staticScope = { ...scope, operation: "static" as const };
+  assert.equal((await gate({ ...ordinary, acceptanceWorkspaceScope: staticScope })).allow, false);
+  assert.equal(prompts[2]?.acceptanceWorkspaceScope, staticScope);
+  assert.deepEqual(prompts[2]?.argv, argv);
+  assert.match(prompts[2]?.reason ?? "", /静态文件复制及回环预览/);
+  assert.doesNotMatch(prompts[2]?.reason ?? "", /验收构建/);
 });
 
 test("onReviewed 抛错不影响判定（只做记录/清理，判定已完成且确定）", async () => {

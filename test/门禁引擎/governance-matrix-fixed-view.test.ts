@@ -180,7 +180,7 @@ test("fixed 卡种路由：只读模块 `fixedCards`（缺失 ⇒ 空集 fail-cl
   }
 });
 
-test("fixed 派发视图：应用建内置任务/运营只派项目 worker/幕僚只选流程+呈卡（无旧 stage-request/生产线派发行）", () => {
+test("fixed 派发视图：幕僚/运营分裂（stage-request + verifier；convener 生产线）不出现 legacy 派发/模型/发起路由", () => {
   const fixed = buildGovernanceMatrix(makeInput(), FIXED);
   const works = ruleWorks(fixed);
   const chief = builtInRoleModules.chief;
@@ -201,44 +201,38 @@ test("fixed 派发视图：应用建内置任务/运营只派项目 worker/幕�
   assert.ok(ruleWorks(legacy).includes("派发任务（dispatch_task）"));
   assert.ok(legacy.routing.some((rule) => rule.basis === "model"));
 
-  // 2026-11-17（app-dispatch/v1）：目标集按设计清零，且字段必须存在（不是靠移除字段/缺失分支取绿）。
-  assert.ok(convener.fixedAllowedBuiltInRoleIds !== undefined, "convener fixedAllowedBuiltInRoleIds 必须存在");
-  assert.ok(chief.fixedTargetRoleIds !== undefined, "chief fixedTargetRoleIds 必须存在");
-  assert.deepEqual([...convener.fixedAllowedBuiltInRoleIds!], [], "convener 无内置派发目标（应用建内置任务）");
-  assert.deepEqual([...chief.fixedTargetRoleIds!], [], "chief 无任何派发目标（只选流程+按 prompt 呈卡）");
-  // 旧 fixed 派发行全部消失（无「生产线派发」/「产线调度请求（stage-request）」/「独立验收派发」）。
-  for (const oldWork of [
-    "生产线派发（dispatch_task）",
-    "产线调度请求（stage-request）",
-    "独立验收派发（review/preparation）",
-  ]) {
-    assert.equal(works.includes(oldWork), false, `fixed 视图不得出现旧派发行：${oldWork}`);
+  // convener 生产线派发行：仅当模块提供 fixedAllowedBuiltInRoleIds（缺失 ⇒ fail-closed 无行）。
+  const convenerTargets = convener.fixedAllowedBuiltInRoleIds ?? [];
+  const convenerRow = fixed.routing.find((rule) => rule.work === "生产线派发（dispatch_task）");
+  if (convenerTargets.length === 0) {
+    assert.equal(convenerRow, undefined, "convener fixed 目标缺失 ⇒ 无生产线派发视图（fail-closed）");
+  } else {
+    assert.ok(convenerRow !== undefined, "convener fixed 目标存在 ⇒ 生产线派发视图");
+    assert.equal(convenerRow.target, "convener");
+    assert.equal(convenerRow.basis, "capability");
+    assert.equal(convenerRow.source, "builtin-registry");
+    for (const target of convenerTargets) assert.ok((convenerRow.note ?? "").includes(target), `派发视图注明 ${target}`);
+    assert.match(convenerRow.note ?? "", /verifier/, "派发视图注明不得派 verifier");
   }
 
-  // 正向断言（不得只靠 targets.length===0 分支）：fixed 角色摘要展示新分工。
-  const roleText = (roleId: string): string => {
-    const role = findRole(fixed, roleId);
-    return `${role.duty.state === "known" ? role.duty.value : ""}\n${
-      role.mainChain.state === "known" ? role.mainChain.value.join("\n") : ""
-    }`;
-  };
-  const chiefText = roleText("chief");
-  assert.match(chiefText, /select_workflow/, "chief fixed 视图须展示「幕僚只选流程」");
-  assert.match(chiefText, /card-prompt/, "chief fixed 视图须展示「按应用 prompt 呈卡」");
-  assert.match(chiefText, /chief-dispatch-removed/, "chief fixed 视图须展示幕僚不再派发");
-  assert.equal(chiefText.includes("stage-request"), false, "chief fixed 视图不得保留旧 stage-request 驱动口径");
-  const convenerText = roleText("convener");
-  assert.match(convenerText, /只派项目 worker/, "convener fixed 视图须展示「运营只派项目 worker」");
-  assert.match(convenerText, /worker-dispatch-required/, "convener fixed 视图须展示 worker-dispatch 绑定");
-  assert.match(convenerText, /convener-builtin-dispatch-forbidden/, "convener fixed 视图须展示不得派内置");
-  for (const builtIn of ["product", "rapporteur", "nominator"] as const) {
-    assert.match(roleText(builtIn), /应用|from:application/, `${builtIn} fixed 视图须展示任务由应用创建`);
+  // chief→convener stage-request / chief→verifier 验收：仅当模块提供 fixedTargetRoleIds。
+  const chiefTargets = chief.fixedTargetRoleIds ?? [];
+  const stageRequestRow = fixed.routing.find((rule) => rule.work === "产线调度请求（stage-request）");
+  const reviewRow = fixed.routing.find((rule) => rule.work === "独立验收派发（review/preparation）");
+  if (chiefTargets.includes("convener")) {
+    assert.ok(stageRequestRow !== undefined, "chief fixedTargetRoleIds 含 convener ⇒ stage-request 视图");
+    assert.equal(stageRequestRow.target, "chief");
+    assert.match(stageRequestRow.note ?? "", /read-only/);
+  } else {
+    assert.equal(stageRequestRow, undefined);
   }
-  assert.match(roleText("verifier"), /应用直派/, "verifier fixed 视图须展示 A12 应用直派");
-  // 渲染文本同样展示新口径（矩阵只读展示，不是判定/授权）。
-  const fixedText = renderGovernanceMatrix(fixed, { maxChars: GOVERNANCE_MATRIX_PROMPT_MAX_CHARS });
-  assert.ok(fixedText.includes("select_workflow"), "fixed 渲染须展示 select_workflow 口径");
-  assert.ok(fixedText.includes("只派项目 worker"), "fixed 渲染须展示运营只派项目 worker");
+  if (chiefTargets.includes("verifier")) {
+    assert.ok(reviewRow !== undefined, "chief fixedTargetRoleIds 含 verifier ⇒ 独立验收视图");
+    assert.equal(reviewRow.target, "chief");
+    assert.match(reviewRow.note ?? "", /reviewRoleId/, "验收视图注明项目验收角色仅 reviewRoleId");
+  } else {
+    assert.equal(reviewRow, undefined);
+  }
 });
 
 test("fixed 应用规则：客户决定三卡/产品意图/策划/下载可见；不新增客户门（只读展示）", () => {

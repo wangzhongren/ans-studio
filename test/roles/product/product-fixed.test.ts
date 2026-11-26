@@ -92,7 +92,7 @@ test("context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（i
   );
 });
 
-test("context(fixed)：只在 matrix=fixed 返回新段；内容覆盖应用建任务/意图撰写/报告回应用/边界；legacy 不混入", () => {
+test("context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入", () => {
   const fixedSections = productRoleModule.context({ governanceModel: "trio", matrix: FIXED });
   assert.notEqual(fixedSections, productRoleModule.context({ governanceModel: "trio" }));
   assert.deepEqual(
@@ -106,20 +106,14 @@ test("context(fixed)：只在 matrix=fixed 返回新段；内容覆盖应用建�
     assert.equal(section.resources, undefined);
   }
   const text = fixedSections.map((section) => section.text).join("\n");
-  // 任务来源冻结口径（app-dispatch/v1）：任务由应用按流程定义创建（stage-execution），报告回应用。
+  // 任务派发冻结口径：按运营派发写意图；不派发/不实现/不自行改方案；意图确认卡由幕僚呈。
   assert.match(text, /docs\/product\/<flowId>-intent-vN\.md/u);
-  assert.match(text, /任务由应用按流程定义创建/u);
-  assert.match(text, /stage-execution/u);
-  assert.match(text, /from:"application"/u);
+  assert.match(text, /运营（convener）派发/u);
   assert.match(text, /不派发任务、不实现、不招人/u);
   assert.match(text, /不自行改方案\/名单\/架构\/角色卡/u);
-  assert.match(text, /意图确认卡由应用开卡、幕僚呈交/u);
+  assert.match(text, /意图确认卡由幕僚呈/u);
   assert.match(text, /submit_report/u);
-  assert.match(text, /task\.reported/u);
-  // 负例防「旧句删除后子串假绿」：旧运营派发/幕僚开卡口径必须整体消失。
-  for (const oldProtocol of ["运营（convener）派发", "收到幕僚派发", "意图确认卡由幕僚呈", "报告回运营"]) {
-    assert.equal(text.includes(oldProtocol), false, `fixed context 不得保留旧口径：${oldProtocol}`);
-  }
+  assert.match(text, /运营（convener）/u);
   // legacy 专属内容不混入 fixed（VCA/版本升级直接提交是 legacy 语义）。
   assert.equal(text.includes("submit_version_change"), false);
   // 确定性/纯函数：同输入同引用，不读 facts。

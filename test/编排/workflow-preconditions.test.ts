@@ -825,6 +825,53 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
   if (!bad.ok) assert.ok(["roster-module-owner-invalid", "roster-env-bootstrap-invalid"].includes(bad.code));
 });
 
+test("env-bootstrap 只可增设单一规范写域的专属自测模块", () => {
+  const flowId = "preview";
+  const architecture = "docs/contracts/preview-architecture-v1.md";
+  type DraftModule = { id: string; name: string; purpose: string; category: string; publicContract: string;
+    architectureSource: string; path?: string; paths?: string[] };
+  const make = (id: string, category: string, paths: string[]): DraftModule => ({ id, name: id, purpose: "实现及基础验证",
+    category, publicContract: "按批准写域使用", architectureSource: architecture,
+    ...(paths.length === 1 ? { path: paths[0]! } : { paths }) });
+  const regular = [make("env-resources", "env", ["style.css"]), make("entry-index", "entry", ["index.html"]), make("content", "core", ["src/"])];
+  function roster(extras: DraftModule[], issue?: "missing-fixed" | "wrong-owner" | "second-owner" | "wrong-topology") {
+    const modules = [...regular.filter(module => issue !== "missing-fixed" || module.id !== "entry-index"), ...extras];
+    const extraIds = extras.map(module => module.id);
+    const roles = [
+      { id: "env-bootstrap", displayName: "环境", purpose: "静态入口", capability: "开发自测", modules: ["env-resources",
+        ...(issue === "missing-fixed" ? [] : ["entry-index"]), ...(issue === "wrong-owner" ? [] : extraIds)] },
+      { id: "developer", displayName: "实现", purpose: "功能", capability: "开发", modules: ["content",
+        ...(issue === "wrong-owner" || issue === "second-owner" ? extraIds : [])] },
+    ];
+    const top = { schema: PROJECT_TOPOLOGY_SCHEMA, modules: modules.map(module => ({ id: module.id,
+      ...(module.path ? { path: module.path } : { paths: module.paths }),
+      roleId: issue === "wrong-topology" && extraIds.includes(module.id) ? "developer" : roles.find(role => role.modules.includes(module.id))!.id })),
+    roles: roles.map(({ id, modules }) => ({ id, modules })), management: ["convener", ...roles.map(role => role.id)] };
+    return `---\n${JSON.stringify({ schema: PROJECT_ROSTER_SCHEMA, flowId, version: 1, intent: "docs/product/preview-intent-v1.md",
+      proposal: "docs/proposals/preview-proposal-v1.md", architecture, roles, modules })}\n---\n## 人员+模块拓扑图\n\`\`\`topology\n${JSON.stringify(top)}\n\`\`\`\n`;
+  }
+  for (const path of ["test/env-bootstrap/", "test/env-bootstrap/unit/", "test/env-bootstrap/entry.test.mjs"]) {
+    const result = parseProjectRoster(roster([make("env-tests", "test", [path])]), flowId);
+    assert.ok(result.ok, result.ok ? "" : result.reason);
+    assert.deepEqual(rosterDirectoriesFor(result.roster, "env-bootstrap"), ["style.css", "index.html", path]);
+  }
+  const tests = make("env-tests", "test", ["test/env-bootstrap/"]);
+  for (const path of ["test/env-bootstrap-extra/", "test/other/", "test/env-bootstrap", "Test/env-bootstrap/",
+    "test\\env-bootstrap/", "test/env-bootstrap/../other/", "test/env-bootstrap/.. /other/", "test/env-bootstrap/check:alias"]) {
+    assert.equal(parseProjectRoster(roster([make("env-tests", "test", [path])]), flowId).ok, false, path);
+  }
+  for (const invalid of [roster([make("env-tests", "core", ["test/env-bootstrap/"])]),
+    roster([make("env-tests", "test", ["test/env-bootstrap/a/", "test/env-bootstrap/b/"])]),
+    roster([tests, make("env-extra-tests", "test", ["test/env-bootstrap/nested/"])]),
+    ...(["missing-fixed", "wrong-owner", "second-owner", "wrong-topology"] as const).map(issue => roster([tests], issue)),
+  ]) assert.equal(parseProjectRoster(invalid, flowId).ok, false, invalid);
+
+  const modulesText = (module: DraftModule) => `---\n${JSON.stringify({ schema: PROJECT_MODULES_SCHEMA, flowId, version: 1,
+    modules: [...regular, module] })}\n---\n`;
+  assert.equal(parseProjectModules(modulesText(tests), flowId).ok, true);
+  assert.equal(parseProjectModules(modulesText(make("env-tests", "test", ["test\\env-bootstrap/"])), flowId).ok, false);
+});
+
 test("设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）", async () => {
   const designPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../docs/planning/2026-10-29_design-workflow-maintainers-hiring.md");
   const design = await fs.readFile(designPath, "utf8");

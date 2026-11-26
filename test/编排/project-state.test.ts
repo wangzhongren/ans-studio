@@ -24,6 +24,7 @@ import {
   scanRunManifestsForState,
 } from "../../src/common/编排/project-state.ts";
 import { writeRunManifest, type RunManifest } from "../../src/common/编排/run-manifest.ts";
+import { PROJECT_MODULES_SCHEMA_EXAMPLE, PROJECT_ROSTER_SCHEMA_EXAMPLE } from "../../src/common/编排/workflow-preconditions.ts";
 import type { ProjectStateTask } from "../../src/model/project-state.ts";
 
 type TaskMirror = TaskCardView & {
@@ -116,6 +117,68 @@ async function addTask(root: string, input: TaskInput): Promise<void> {
 async function hashFile(file: string): Promise<string> {
   return createHash("sha256").update(await fs.readFile(file)).digest("hex");
 }
+
+test("evidence roster reference checks use the exact frozen flow, matching owner and paired documents", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-project-state-evidence-roster-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const flows = { "flow-a": "collector-alpha", "flow-b": "collector-bravo", "flow-pinned": "collector-pinned" };
+  for (const [flowId, roleId] of Object.entries(flows)) {
+    const actual = (text: string) => text.replaceAll("demo", flowId).replaceAll("core", "acceptance-evidence")
+      .replace("category: acceptance-evidence", "category: evidence").replaceAll("src/", `docs/verification/${flowId}/`)
+      .replaceAll("implementer", roleId).replace("<小项目省略理由；默认项目不要照抄>", "Small fixture with one role.");
+    const intent = `docs/product/${flowId}-intent-v1.md`;
+    const proposal = `docs/proposals/${flowId}-proposal-v1.md`;
+    await writeDoc(root, intent, `# Intent for ${flowId}`);
+    await writeDoc(root, proposal, `---\nschema: project-proposal/v2\n---\nSee ${intent}.`);
+    await writeDoc(root, `docs/contracts/${flowId}-architecture-v1.md`, `See ${proposal}.`);
+    await writeDoc(root, `docs/proposals/${flowId}-modules-v1.md`, actual(PROJECT_MODULES_SCHEMA_EXAMPLE));
+    await writeDoc(root, `docs/proposals/${flowId}-roster-v1.md`, actual(PROJECT_ROSTER_SCHEMA_EXAMPLE));
+  }
+  await writeManifest(root, manifest("flow-pinned", "run-20261102-flow-pinned-aaaaaaaa", "pinned"));
+  const consulted: string[] = [];
+  const evidenceCollectorRoleIdForFlow = async (flow: string) => {
+    consulted.push(flow);
+    return flows[flow as keyof typeof flows];
+  };
+  const active = await buildProjectStateView(root, { evidenceCollectorRoleIdForFlow });
+  assert.deepEqual(consulted.sort(), ["flow-a", "flow-b"]);
+  const references = (view: typeof active, flowId: string) => view.versions.filter(entry => entry.flowId === flowId
+    && (entry.docKind === "modules" || entry.docKind === "roster"));
+  for (const flowId of ["flow-a", "flow-b"]) {
+    const docs = references(active, flowId);
+    assert.equal(docs.length, 2);
+    assert.ok(docs.every(entry => !entry.referenceIssue && entry.latest?.sha256));
+  }
+  assert.ok(references(active, "flow-pinned").every(entry => entry.referenceIssue));
+  const scoped = await buildProjectStateView(root, { flowId: "flow-b", limits: { flows: 1 }, evidenceCollectorRoleIdForFlow });
+  assert.equal(references(scoped, "flow-b").length, 2);
+  for (const provider of [undefined, () => "collector-alpha", () => { throw new Error("optional host lookup unavailable"); }]) {
+    const scoped = await buildProjectStateView(root, { flowId: "flow-b", evidenceCollectorRoleIdForFlow: provider });
+    assert.ok(references(scoped, "flow-b").every(entry => entry.referenceIssue));
+  }
+  const selected = { flowId: "flow-b", evidenceCollectorRoleIdForFlow };
+  const rosterPath = "docs/proposals/flow-b-roster-v1.md";
+  const modulesPath = "docs/proposals/flow-b-modules-v1.md";
+  const [roster, modules] = await Promise.all([
+    fs.readFile(path.join(root, rosterPath), "utf8"), fs.readFile(path.join(root, modulesPath), "utf8"),
+  ]);
+  for (const mutate of [
+    (text: string) => text.replaceAll("docs/verification/flow-b/", "docs/verification/flow-a/"),
+    (text: string) => text.replaceAll("docs/verification/flow-b/", "docs/verification/"),
+    (text: string) => text.replace("category: evidence", "category: ordinary"),
+  ]) {
+    await writeDoc(root, rosterPath, mutate(roster));
+    await writeDoc(root, modulesPath, mutate(modules));
+    assert.ok(references(await buildProjectStateView(root, selected), "flow-b").every(entry => entry.referenceIssue));
+  }
+  await writeDoc(root, modulesPath, modules);
+  await writeDoc(root, rosterPath, roster.replace("\n---\n", "\n  - id: collector-other\n    displayName: Other\n"
+    + "    purpose: Second owner\n    capability: collect\n    modules: [acceptance-evidence]\n---\n"));
+  assert.ok(references(await buildProjectStateView(root, selected), "flow-b").every(entry => entry.referenceIssue));
+  await fs.rm(path.join(root, rosterPath));
+  const unpaired = await buildProjectStateView(root, { flowId: "flow-b", evidenceCollectorRoleIdForFlow });
+  assert.equal(references(unpaired, "flow-b").find(entry => entry.docKind === "modules")?.referenceIssue?.includes("治理"), true);
+});
 
 test("flow 合并/focus：多候选不猜 -c；唯一候选 derived；chief 事件与 cleared 正反例", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-project-state-focus-"));
@@ -473,73 +536,6 @@ test("AC-8：轮转丢失 focus 事件后回退 derived/none（不伪造 focus�
   } finally {
     if (oldMax === undefined) delete process.env.ANS_TASKS_MAX_BYTES; else process.env.ANS_TASKS_MAX_BYTES = oldMax;
     if (oldRot === undefined) delete process.env.ANS_TASKS_ROTATIONS; else process.env.ANS_TASKS_ROTATIONS = oldRot;
-    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
-  }
-});
-
-test("S3 地基：request 生命周期按最后一条为准——orphaned→presented 恢复等待；presented→orphaned 终态；resolved 最终态", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-project-state-request-lifecycle-"));
-  const flow = "lifecycle";
-  const createRequest = (requestId: string, at: string, extra: Record<string, unknown> = {}) => taskEvent("request.created", {
-    requestId,
-    flowId: flow,
-    cardKind: "decision",
-    sourceRoleId: "convener",
-    title: `请求 ${requestId}`,
-    options: [{ id: "a", label: "A" }],
-    ...extra,
-  }, () => new Date(at));
-  try {
-    await writeManifest(root, manifest(flow, "run-20261120-lifecycle-aaaaaaaa"));
-
-    // A) created → orphaned → presented ⇒ 恢复等待（request-pending 可见，pendingRequests=1）。
-    await appendTaskEvent(root, createRequest("req-reopen", "2026-11-20T00:00:00.000Z"));
-    await appendTaskEvent(root, taskEvent("request.orphaned", { requestId: "req-reopen", reason: "restart" },
-      () => new Date("2026-11-20T00:00:01.000Z")));
-    let view = await buildProjectStateView(root);
-    assert.equal(view.counts.pendingRequests, 0, "orphaned 当时不显示待决");
-    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-reopen"), false);
-    await appendTaskEvent(root, taskEvent("request.presented", { requestId: "req-reopen", to: "customer" },
-      () => new Date("2026-11-20T00:00:02.000Z")));
-    view = await buildProjectStateView(root);
-    assert.equal(view.counts.pendingRequests, 1, "presented 晚于 orphaned ⇒ 恢复等待");
-    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-reopen"), true,
-      "恢复后 request-pending 可见（客户可答）");
-
-    // B) created → orphaned → created（回归：新 created 清除旧 orphaned；携带 supersedesOrphanAt 同样等待）。
-    await appendTaskEvent(root, createRequest("req-recreated", "2026-11-20T00:00:03.000Z"));
-    await appendTaskEvent(root, taskEvent("request.orphaned", { requestId: "req-recreated", reason: "restart" },
-      () => new Date("2026-11-20T00:00:04.000Z")));
-    await appendTaskEvent(root, createRequest("req-recreated", "2026-11-20T00:00:05.000Z",
-      { supersedesOrphanAt: "2026-11-20T00:00:04.000Z" }));
-    view = await buildProjectStateView(root);
-    assert.equal(view.counts.pendingRequests, 2, "同 requestId 新 created 清除旧 orphaned（含 supersedesOrphanAt）");
-    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-recreated"), true);
-
-    // C) created → presented → orphaned ⇒ orphan 终态（0；presented 之后的 orphaned 重新生效）。
-    await appendTaskEvent(root, createRequest("req-orphan-final", "2026-11-20T00:00:06.000Z"));
-    await appendTaskEvent(root, taskEvent("request.presented", { requestId: "req-orphan-final", to: "customer" },
-      () => new Date("2026-11-20T00:00:07.000Z")));
-    await appendTaskEvent(root, taskEvent("request.orphaned", { requestId: "req-orphan-final", reason: "superseded" },
-      () => new Date("2026-11-20T00:00:08.000Z")));
-    view = await buildProjectStateView(root);
-    assert.equal(view.counts.pendingRequests, 2, "presented 之后的 orphaned 生效（终态，不计待决）");
-    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-orphan-final"), false);
-
-    // D) resolved 最终态：created → orphaned → presented → resolved ⇒ 不再等待。
-    await appendTaskEvent(root, createRequest("req-resolved", "2026-11-20T00:00:09.000Z"));
-    await appendTaskEvent(root, taskEvent("request.orphaned", { requestId: "req-resolved", reason: "restart" },
-      () => new Date("2026-11-20T00:00:10.000Z")));
-    await appendTaskEvent(root, taskEvent("request.presented", { requestId: "req-resolved", to: "customer" },
-      () => new Date("2026-11-20T00:00:11.000Z")));
-    await appendTaskEvent(root, taskEvent("request.resolved", {
-      requestId: "req-resolved", by: "customer", choice: "a", selectedOptionIds: ["a"],
-    }, () => new Date("2026-11-20T00:00:12.000Z")));
-    view = await buildProjectStateView(root);
-    assert.equal(view.counts.pendingRequests, 2, "resolved 是最终态（不再等待；其余两个仍在等待）");
-    assert.equal(view.blockers.some((blocker) => blocker.id === "request-pending:req-resolved"), false);
-    assert.equal(view.errors.length, 0, JSON.stringify(view.errors));
-  } finally {
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });

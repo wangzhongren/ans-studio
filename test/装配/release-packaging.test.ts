@@ -7,9 +7,8 @@ test('release overlay preserves Chinese build paths and excludes private data an
     'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
   assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  // v2.1.0 pointer（随 release-policy 指针更新同步；冻结源 tag v2.1.0 打在 prepare 合并提交上）
-  assert.equal(SOURCE_REF, 'v2.1.0');
-  assert.equal(SOURCE_SHA, 'c289309883c7fd2529312519de16d86ccc69d7bb');
+  assert.equal(SOURCE_REF, 'v2.0.0');
+  assert.equal(SOURCE_SHA, '752953cf229ef9771fb574d0972b80e73ec7c27a');
 });
 
 test('release overlay selects the v2.0.0 packaging surface', () => {
@@ -353,27 +352,20 @@ test('release overlay returns v1.5.0 fix entries to fail-closed or excluded', ()
 // v1.7.0 发布阻断修复（tag v1.7.0 不可移动，当时经评审走显式 overlay）已随 v1.9.0 冻结源吸收、
 // 整批移出白名单：生产修复回到 src/ fail-closed，3 个测试修复与同目录未列名 test/ 文件落 excluded；
 // 断言不放宽。
-// v2.1.0 发布阻断诊断：test/桌面应用/project-document.test.ts 以精确路径**重新入列**（测试侧只加
-// FS_DIAGNOSTIC、断言未放宽）；其单文件边界由本用例末尾的精确路径断言覆盖，本用例不再把该文件算作
-// excluded，其余 v1.7.0 条目边界保持 fail-closed/excluded。
 test('release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded', () => {
   assert.throws(() => selectOverlay(['src/common/shared/diagnostics.ts']), /Unreviewed production overlay/);
   const result = selectOverlay(['test/桌面应用/interface.test.ts',
+    'test/桌面应用/project-document.test.ts',
     'test/桌面应用/acceptance-dispatch.test.ts',
     'test/桌面应用/runtime-resolution.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);
   assert.deepEqual(result.selected, []);
   assert.deepEqual(result.excluded, ['test/桌面应用/interface.test.ts',
+    'test/桌面应用/project-document.test.ts',
     'test/桌面应用/acceptance-dispatch.test.ts',
     'test/桌面应用/runtime-resolution.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);
   assert.throws(() => selectOverlay(['src/common/编排/flow-service.ts']), /Unreviewed production overlay/);
-  // v2.1.0 诊断条目：仅精确路径入选；相似名/同目录其它未列名测试仍 excluded。
-  const diagnostic = selectOverlay(['test/桌面应用/project-document.test.ts',
-    'test/桌面应用/project-document-extra.test.ts', 'test/桌面应用/decision-service.test.ts']);
-  assert.deepEqual(diagnostic.selected, ['test/桌面应用/project-document.test.ts']);
-  assert.deepEqual(diagnostic.excluded, ['test/桌面应用/project-document-extra.test.ts',
-    'test/桌面应用/decision-service.test.ts']);
 });
 
 // v1.8.0 发布阻断修复（tag v1.8.0 不可移动，当时经评审走显式 overlay）已随 v1.9.0 冻结源吸收、

@@ -158,7 +158,7 @@ export function projectRuntimeLiveHandback(draft:RuntimeLiveReportDraftV1,contex
   return projectLiveReport(draft,createToolDisplayContext({credentialEnvNames:context?.credentialEnvNames}).protectText);
 }
 
-async function defaultFactory(runtime: RuntimeKind): Promise<RuntimeProviderFactory> {
+async function defaultFactory(runtime: RuntimeKind, evidenceScoped: boolean): Promise<RuntimeProviderFactory> {
   if (runtime === "demo") return (options) => createDemoRuntimeAdapter(options);
   // Variable imports keep absent SDK adapters lazy during staged assembly.
   const modulePath = `../../provider/${runtime}/session.ts`;
@@ -166,6 +166,10 @@ async function defaultFactory(runtime: RuntimeKind): Promise<RuntimeProviderFact
   const name = runtime === "pi" ? "createPiRuntimeAdapter" : runtime === "codex" ? "createCodexRuntimeAdapter" : "createClaudeRuntimeAdapter";
   const factory = module[name];
   if (typeof factory !== "function") throw new Error(`${runtime} 提供方缺少公开工厂 ${name}`);
+  if (evidenceScoped && runtime === "claude") {
+    const claude = factory as (options: RuntimeProviderOptions, deps: { env: NodeJS.ProcessEnv }) => ReturnType<RuntimeProviderFactory>;
+    return options => claude(options, { env: { ...process.env, ANS_CLAUDE_WEB_SEARCH: "0" } });
+  }
   return factory as RuntimeProviderFactory;
 }
 
@@ -423,6 +427,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
   if (chiefDecision !== undefined && (!isChiefDecisionExecutionContext(chiefDecision)
     || options.decidePendingRequest === undefined || options.shellJudge !== undefined || options.governanceJudge !== undefined))
     throw new Error("Invalid or conflicting real-chief decision context");
+  const evidenceScoped = options.evidenceAuditAccess !== undefined;
+  if (evidenceScoped && (chiefDecision !== undefined || options.shellJudge !== undefined || options.governanceJudge !== undefined))
+    throw new Error("Evidence task authority cannot be combined with a decision or judge session");
   let chiefTurns = 0;
   if (!(RUNTIME_KINDS as readonly string[]).includes(options.runtime)) throw new Error(`未知运行时：${options.runtime}`);
   // 2026-10-18 双开关评审 §6.2：`shellJudge` 与 `governanceJudge` **恰一**——同时给出是配置错误，
@@ -476,7 +483,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       // 后台任务管理器（2026-10-22 B1/B3）：只在**普通受治理会话**（走 buildGovernedTools）且注入了
       // `ShellGate` 时创建——与四工具注册同判据；判断会话不创建管理器（结构性看不到四工具）。
       // `RuntimeSessionOptions` 已 Omit `backgroundTasks`，外部调用方不能自行注入。
-      const backgroundTasks = chiefDecision === undefined && judgeTools === undefined && options.shellGate !== undefined
+      const backgroundTasks = !evidenceScoped && chiefDecision === undefined && judgeTools === undefined && options.shellGate !== undefined
         ? createBackgroundTaskManager({ diagnostics: options.diagnostics })
         : undefined;
       // 2026-10-27 同轮看图设计：按运行时策略决定 `view_image` 的交付方式（唯一开关＝
@@ -490,7 +497,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           ? async () => ({ ok: true, mode: "tool-result" as const })
           : options.viewImage;
       try {
-        const chiefWorkflow = role.id === "chief" && role.kind === "built-in-governance" && chiefDecision === undefined && judgeTools === undefined
+        const chiefWorkflow = options.durableFixedWorkflow !== true && role.id === "chief" && role.kind === "built-in-governance"
+          && chiefDecision === undefined && judgeTools === undefined
           ? await loadBuiltinChiefWorkflow() : undefined;
         const contextSections = chiefWorkflow ? Object.freeze([...(options.contextSections ?? []),
           `## 应用内置 Chief workflow（非授权流程指导）\n${JSON.stringify({ sourceUrl: chiefWorkflow.sourceUrl, moduleUrl: chiefWorkflow.moduleUrl,
@@ -573,6 +581,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           // Claude 适配器据此强制关闭 WebSearch/外来 MCP）。
           ...(judgeTools !== undefined || chiefDecision !== undefined
             ? { judgeMode: true as const, installedMcpServers: [] as const }
+            : evidenceScoped ? { installedMcpServers: [] as const, webSearch: false as const }
             : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),
           // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持字段缺席，交各平台默认策略。
           ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
@@ -604,7 +613,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         const initialMcpServers = providerOptions.installedMcpServers?.map(server => server.name) ?? [];
         const factory = factoryOverride ?? (options.runtime === "demo"
           ? ((input: RuntimeProviderOptions) => createDemoRuntimeAdapter(input, options.script ?? [{ name: "write_file", args: { path: "src/evil.ts", content: "// 越界写入示例\n" } }]))
-          : await defaultFactory(options.runtime));
+          : await defaultFactory(options.runtime, evidenceScoped));
         if (typeof providerOptions.projectToolEvent !== "function" || typeof providerOptions.registerToolDisplayProfile !== "function") throw new Error("Core tool display capability missing");
         let actual: Promise<RuntimeAdapter> | undefined, nativePreparation: RuntimeNativeFactoryPreparation | undefined;
         let admittedScope: Awaited<ReturnType<typeof readCoreProtectionScope>> | undefined;

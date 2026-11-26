@@ -31,13 +31,11 @@ import type {
   WorkflowStage,
 } from "../../model/runtime.ts";
 import {
-  FIXED_TASK_KINDS,
   GOVERNANCE_CARD_KINDS,
   STABLE_WRITE_APPLICATION_EVENT_KINDS,
   STABLE_WRITE_CUSTOMER_EVENT_KINDS,
   STABLE_WRITE_EVENT_KINDS,
   VCA_SUBMISSION_TARGETS_MAX,
-  isFixedTaskKind,
   isTaskWorkSourceRef,
   isTaskParentRef,
   isTaskHubRouting,
@@ -159,46 +157,6 @@ function isTaskSlug(value: unknown): boolean {
  */
 function isGovernanceCardKind(value: unknown): boolean {
   return typeof value === "string" && (GOVERNANCE_CARD_KINDS as readonly string[]).includes(value);
-}
-
-/**
- * 2026-11-17（app-dispatch/v1）：card-prompt 任务的卡文档引用形状
- * （应用计算 path+字节 SHA-256；kind/version 可选；旧任务无此字段）。
- */
-function isCardDocumentRefs(value: unknown): boolean {
-  return Array.isArray(value) && value.length <= 32 && value.every((item) => {
-    if (!isPlainRecord(item)) return false;
-    const path = item["path"];
-    const sha = item["sha256"];
-    const kind = item["kind"];
-    const version = item["version"];
-    return typeof path === "string" && isProjectRelativePath(path)
-      && typeof sha === "string" && isSha256Hex(sha)
-      && (kind === undefined || isNonEmptyTrimmedString(kind))
-      && (version === undefined || isPositiveInteger(version));
-  });
-}
-
-/** card-prompt 任务/申请卡的选项形状（id 唯一、label 非空、recommended 可选布尔）。 */
-function isCardOptions(value: unknown): boolean {
-  if (!Array.isArray(value) || value.length > 32) return false;
-  const ids = new Set<string>();
-  return value.every((item) => {
-    if (!isPlainRecord(item)) return false;
-    const id = item["id"];
-    const label = item["label"];
-    const recommended = item["recommended"];
-    if (!isNonEmptyTrimmedString(id) || !isNonEmptyTrimmedString(label)) return false;
-    if (recommended !== undefined && typeof recommended !== "boolean") return false;
-    if (ids.has(id)) return false;
-    ids.add(id);
-    return true;
-  });
-}
-
-/** card-prompt 推荐项集（非空字符串数组；与选项 id 的交叉一致性由应用/服务层校验）。 */
-function isCardRecommended(value: unknown): boolean {
-  return Array.isArray(value) && value.length <= 32 && value.every((item) => isNonEmptyTrimmedString(item));
 }
 
 /** 2026-11-02：`project.note.refs`/版本决策 refs 的项目相对引用（路径或任务/申请 id）。 */
@@ -401,118 +359,12 @@ export function redispatchTaskId(retryOf: string, attempt: number): string {
 
 // —————————————— 追加（轮转 + 原子行；A2 共享辅助） ——————————————
 
-type AppendResult =
-  | { ok: true; path: string; replay?: boolean; taskId?: string; created?: TaskCreatedEvent }
-  | { ok: false; message: string; code?: string };
-
-// —————————————— 应用任务/修复任务的账本唯一 guard（2026-11-20 SMOKE-1 seams） ——————————————
-//
-// 客户第一不变量：**应用任务必须由工作流/应用侧唯一派发，taskId 必须一致且确定**。
-// 本 guard 只覆盖「应用按流程定义创建」的三类任务（stage-execution/worker-dispatch/card-prompt）
-// 与 block 属主修复任务（taskKind=repair / 携带 blockId）；legacy 派遣与重派（无 workflowId/taskKind，
-// 重派沿用原键）**逐字保持原行为**（不受本 guard 影响）。
-//
-// 语义（串行/并发、进程内）：
-//  · 同 taskId 已存在：payload 一致 ⇒ 返回既有任务（replay，不追加）；不一致 ⇒ invalid-task-binding（不重绑）。
-//  · 同 idempotencyKey 但 taskId 不同：repair 任务返回既有（同键只允许一条修复任务）；
-//    应用任务 ⇒ invalid-task-binding（taskId 必须由键确定性派生，禁止第二创建者）。
-//  · 无冲突 ⇒ 追加一行。读-判-写在同一进程内串行链中完成（跨进程并发不在本批范围）。
-
-const IDEMPOTENT_TASK_CREATED_KINDS: ReadonlySet<string> = new Set([
-  "stage-execution", "worker-dispatch", "card-prompt", "repair",
-]);
-
-function isAppOwnedTaskCreated(event: TaskStateEvent): event is TaskCreatedEvent {
-  if (event.kind !== "task.created") return false;
-  if (event.blockId !== undefined) return true;
-  if (event.taskKind === undefined || event.taskKind === "") return false;
-  if (!IDEMPOTENT_TASK_CREATED_KINDS.has(event.taskKind)) return false;
-  return event.taskKind === "repair" || event.workflowId !== undefined;
-}
-
-/** 同 taskId 的 replay payload 校验字段（固定事实；模型不可自报）。 */
-const TASK_CREATED_STABLE_FIELDS: readonly (keyof TaskCreatedEvent)[] = [
-  "from", "to", "text", "sideEffect", "flowId", "workflowId", "stage", "taskKind", "promptId",
-  "cardKind", "blockId", "moduleId", "moduleDirectory", "expectedOutput",
-];
-
-/** 同 taskId 的 replay payload 校验（返回首个冲突字段；undefined = 一致）。 */
-function taskCreatedPayloadConflict(existing: TaskCreatedEvent, incoming: TaskCreatedEvent): string | undefined {
-  for (const field of TASK_CREATED_STABLE_FIELDS) {
-    if (existing[field] !== incoming[field]) return `${String(field)} 不一致`;
-  }
-  // 数组事实：既有记录缺少后加字段 ⇒ 不据此判冲突（在飞旧任务兼容）；既有有值则逐项一致。
-  const arrayFields: readonly (keyof TaskCreatedEvent)[] = [
-    "modulePaths", "requestedEvidence", "cardDocumentRefs", "cardOptions", "cardRecommended",
-  ];
-  for (const field of arrayFields) {
-    const prior = existing[field];
-    if (prior === undefined) continue;
-    if (JSON.stringify(prior) !== JSON.stringify(incoming[field])) return `${String(field)} 不一致`;
-  }
-  return undefined;
-}
-
-/** 同 tasks 文件的 task.created 幂等追加串行链（read-then-append 原子化）。 */
-const taskCreatedChains = new Map<string, Promise<unknown>>();
-
-function appendTaskCreatedIdempotent(projectRoot: string, event: TaskCreatedEvent): Promise<AppendResult> {
-  const file = tasksStatePath(projectRoot);
-  const canonical = path.resolve(file);
-  const previous = taskCreatedChains.get(canonical) ?? Promise.resolve();
-  const next = previous.then(async (): Promise<AppendResult> => {
-    const state = await readTaskState(projectRoot);
-    const sameId = state.records.get(event.taskId)?.created;
-    if (sameId !== undefined) {
-      const conflict = taskCreatedPayloadConflict(sameId, event);
-      if (conflict !== undefined) {
-        return {
-          ok: false,
-          code: "invalid-task-binding",
-          message: `task.created replay 冲突：任务 ${event.taskId} 已存在且 ${conflict}（不重绑、不追加）`,
-        };
-      }
-      return { ok: true, path: file, replay: true, taskId: sameId.taskId, created: sameId };
-    }
-    const sameKey = findTaskByIdempotencyKey(state, event.idempotencyKey);
-    if (sameKey?.created !== undefined) {
-      if (event.taskKind === "repair" && sameKey.created.taskKind === "repair") {
-        // 属主修复任务同键只允许一条（并发/重入的第二个创建者返回既有）。
-        return { ok: true, path: file, replay: true, taskId: sameKey.taskId, created: sameKey.created };
-      }
-      return {
-        ok: false,
-        code: "invalid-task-binding",
-        message: `task.created 幂等键冲突：${event.idempotencyKey} 已属于任务 ${sameKey.taskId}；新 taskId ${event.taskId} 被拒绝（应用任务 taskId 必须由键确定性派生，任何路径不得重复建任务）`,
-      };
-    }
-    const { maxBytes, rotations } = limits();
-    const appended = await appendJsonlLine(file, JSON.stringify(event), { maxBytes, rotations });
-    if (appended.ok) return { ok: true, path: file, replay: false, taskId: event.taskId, created: event };
-    createDiagnosticLogger({ component: "orchestration.task-state", projectRoot }).error(
-      "tasks.append.failed",
-      appended.cause ?? new Error(appended.message),
-      { taskId: event.taskId },
-    );
-    return {
-      ok: false,
-      message: appended.message,
-      ...(appended.code !== undefined ? { code: appended.code } : {}),
-    };
-  });
-  const settled = next.then(() => undefined, () => undefined);
-  taskCreatedChains.set(canonical, settled);
-  void settled.finally(() => {
-    if (taskCreatedChains.get(canonical) === settled) taskCreatedChains.delete(canonical);
-  });
-  return next;
-}
+type AppendResult = { ok: true; path: string } | { ok: false; message: string; code?: string };
 
 /**
  * T3（2026-11-10 两条固定工作流路径，v1.3 §7.1 / B1 AC-17 / MF-3）：fixed `task.created` 绑定字段的
  * 形状/自洽校验（**写侧**）。`workflowId` 存在即以 fixed 记账：`flowId` 必填、`stage ∈ WorkflowStage`、
- * `taskKind ∈ FIXED_TASK_KINDS`（普通生产任务可缺省；2026-11-17 app-dispatch/v1 扩至
- * stage-request/stage-execution/worker-dispatch/card-prompt）、`workflowPath` 只允许 A/B，
+ * `taskKind` 只允许 `"stage-request"`（普通生产任务可缺省）、`workflowPath` 只允许 A/B，
  * `runId`/`runState` 由调用方另行断言（出现即拒绝）。
  */
 function validateFixedTaskCreatedBinding(
@@ -530,8 +382,8 @@ function validateFixedTaskCreatedBinding(
   if (event.stage === undefined || !isWorkflowStage(event.stage)) {
     return fail("task.created.stage 非法：fixed 任务必须给出合法 WorkflowStage");
   }
-  if (event.taskKind !== undefined && !isFixedTaskKind(event.taskKind)) {
-    return fail(`task.created.taskKind 非法：只允许 ${FIXED_TASK_KINDS.join("/")}（普通生产任务可缺省）`);
+  if (event.taskKind !== undefined && event.taskKind !== "stage-request") {
+    return fail('task.created.taskKind 非法：只允许 "stage-request"（普通生产任务可缺省）');
   }
   if (event.workflowPath !== undefined && !isWorkflowPath(event.workflowPath)) {
     return fail("task.created.workflowPath 非法：只允许 A/B");
@@ -546,70 +398,6 @@ function validateFixedTaskCreatedBinding(
     }
     if (event.moduleId !== undefined || event.modulePaths !== undefined || event.moduleDirectory !== undefined) {
       return fail("task.created stage-request 不得携带 moduleId/modulePaths/moduleDirectory（无写集）");
-    }
-  }
-  // 2026-11-17（app-dispatch/v1）：三种新任务种类的形状 fail-closed（写侧）。
-  // 应用任务一律 from="application"；幂等键前缀固定（设计 §4.3），防止与旧派遣/重派混用。
-  if (event.taskKind === "stage-execution") {
-    if (event.from !== "application") {
-      return fail("task.created stage-execution 只允许 from=application（应用按流程定义创建内置任务）");
-    }
-    if (typeof event.to !== "string" || event.to.trim() === "") {
-      return fail("task.created stage-execution 必须给出非空执行者（to）");
-    }
-    if (event.sideEffect !== "read-only" && event.sideEffect !== "docs") {
-      return fail("task.created stage-execution 只允许 sideEffect=read-only/docs");
-    }
-    if (!event.idempotencyKey.startsWith("stage-exec:")) {
-      return fail("task.created stage-execution 幂等键必须为 stage-exec:<workflowId>:<stage>:<role>:<attempt>");
-    }
-    if (event.promptId !== undefined || event.cardKind !== undefined || event.cardDocumentRefs !== undefined
-      || event.cardOptions !== undefined || event.cardRecommended !== undefined) {
-      return fail("task.created stage-execution 不得携带 card-prompt 字段");
-    }
-  }
-  if (event.taskKind === "worker-dispatch") {
-    if (event.from !== "application" || event.to !== "convener") {
-      return fail("task.created worker-dispatch 只允许 application→convener（应用请运营派 worker）");
-    }
-    if (event.sideEffect !== "read-only") {
-      return fail("task.created worker-dispatch 必须为 sideEffect=read-only（请求任务不产生写副作用）");
-    }
-    if (!event.idempotencyKey.startsWith("worker-dispatch:")) {
-      return fail("task.created worker-dispatch 幂等键必须为 worker-dispatch:<workflowId>:<stage>:<attempt>");
-    }
-    if (event.promptId !== undefined || event.cardKind !== undefined || event.cardDocumentRefs !== undefined
-      || event.cardOptions !== undefined || event.cardRecommended !== undefined) {
-      return fail("task.created worker-dispatch 不得携带 card-prompt 字段");
-    }
-  }
-  if (event.taskKind === "card-prompt") {
-    if (event.from !== "application" || event.to !== "chief") {
-      return fail("task.created card-prompt 只允许 application→chief（应用请幕僚呈客户卡）");
-    }
-    if (event.sideEffect !== "read-only") {
-      return fail("task.created card-prompt 必须为 sideEffect=read-only（呈卡不写盘）");
-    }
-    if (!event.idempotencyKey.startsWith("card-prompt:")) {
-      return fail("task.created card-prompt 幂等键必须为 card-prompt:<workflowId>:<stage>:<requestId>");
-    }
-    if (!isNonEmptyTrimmedString(event.promptId)) {
-      return fail("task.created card-prompt 必须携带非空 promptId（应用发放）");
-    }
-    if (!isGovernanceCardKind(event.cardKind)) {
-      return fail("task.created card-prompt.cardKind 非法（必须在治理卡种白名单内）");
-    }
-    if (event.moduleId !== undefined || event.modulePaths !== undefined || event.moduleDirectory !== undefined) {
-      return fail("task.created card-prompt 不得携带 module/写集");
-    }
-    if (event.cardDocumentRefs !== undefined && !isCardDocumentRefs(event.cardDocumentRefs)) {
-      return fail("task.created card-prompt.cardDocumentRefs 非法");
-    }
-    if (event.cardOptions !== undefined && !isCardOptions(event.cardOptions)) {
-      return fail("task.created card-prompt.cardOptions 非法");
-    }
-    if (event.cardRecommended !== undefined && !isCardRecommended(event.cardRecommended)) {
-      return fail("task.created card-prompt.cardRecommended 非法");
     }
   }
   return { ok: true };
@@ -630,29 +418,7 @@ export async function appendTaskEvent(
   event: TaskStateEvent,
   options: { allowLegacyRun?: boolean } = {},
 ): Promise<AppendResult> {
-  // 2026-11-20（block resolver 桌面批）：repair 任务形状/blockId 引用（写侧 fail-closed）。
-  if (event.kind === "task.created" && (event.taskKind === "repair" || event.blockId !== undefined)) {
-    if (event.blockId !== undefined && !/^[a-f0-9]{24}$/.test(event.blockId)) {
-      return { ok: false, code: "invalid-task-binding", message: "task.created.blockId 非法：必须是 24 位小写 hex" };
-    }
-    if (event.taskKind === "repair") {
-      if (event.from !== "application") {
-        return { ok: false, code: "invalid-task-binding", message: "task.created repair 只允许 from=application（应用创建/收口的属主修复任务）" };
-      }
-      if (event.blockId === undefined) {
-        return { ok: false, code: "invalid-task-binding", message: "task.created repair 必须携带 blockId（block 反向引用）" };
-      }
-      if (!event.idempotencyKey.startsWith("block-repair:")) {
-        return { ok: false, code: "invalid-task-binding", message: "task.created repair 幂等键必须为 block-repair:<blockId>:<attempt>" };
-      }
-      if (event.promptId !== undefined || event.cardKind !== undefined || event.cardDocumentRefs !== undefined
-        || event.cardOptions !== undefined || event.cardRecommended !== undefined) {
-        return { ok: false, code: "invalid-task-binding", message: "task.created repair 不得携带 card-prompt 字段" };
-      }
-    }
-  }
   if ((event.kind === "request.presented" && event.to === "chief")
-    || (event.kind === "request.created" && event.supersedesOrphanAt !== undefined)
     || (event.kind === "request.resolved" && event.by === "chief-delegated")
     || ("actionSource" in event && event.actionSource !== undefined)) {
     const checked = validateEvent(event);
@@ -697,11 +463,6 @@ export async function appendTaskEvent(
     if (event.runId === undefined || event.runId === "" || event.runState === undefined) {
       return { ok: false, code: "run-required", message: "task.created.run-required：新建项目任务必须带 runId 与 runState（legacy 仅历史重放允许）" };
     }
-  }
-  // 2026-11-20（SMOKE-1 seams）：应用任务/修复任务走账本唯一 guard（同键/同 taskId replay；
-  // 冲突 fail-closed）。legacy 派遣/重派保持原追加路径（行为逐字不变）。
-  if (isAppOwnedTaskCreated(event)) {
-    return appendTaskCreatedIdempotent(projectRoot, event);
   }
   const { maxBytes, rotations } = limits();
   const file = tasksStatePath(projectRoot);
@@ -748,17 +509,6 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
       // 2026-10-31（D3 卡种收口）：可选卡种；给出时必须在治理卡种白名单内（缺失 = 旧记录，兼容）。
       if (rec["cardKind"] !== undefined && !isGovernanceCardKind(rec["cardKind"])) {
         return { ok: false, message: "request.created.cardKind 非法" };
-      }
-      // 2026-11-17（app-dispatch/v1）：可选 promptId（应用发放；旧卡缺失 = 旧行为）。
-      if (rec["promptId"] !== undefined && !isNonEmptyTrimmedString(rec["promptId"])) {
-        return { ok: false, message: "request.created.promptId 非法" };
-      }
-      // 2026-11-20（SMOKE-3 S3 地基）：可选的「取代 orphan」显式事实（同 requestId 重新呈现时
-      // 携带被取代 `request.orphaned.at` 原文）。给出时必须是非空、可解析时间戳；缺失 = 首次
-      // 创建/旧记录（兼容）。不改变既有必填/可选字段语义。
-      if (rec["supersedesOrphanAt"] !== undefined
-        && (!isNonEmptyTrimmedString(rec["supersedesOrphanAt"]) || Number.isNaN(Date.parse(rec["supersedesOrphanAt"])))) {
-        return { ok: false, message: "request.created.supersedesOrphanAt 非法" };
       }
     }
     if (kind === "request.presented" && rec["to"] !== "customer" && rec["to"] !== "judge" && rec["to"] !== "chief")
@@ -1301,30 +1051,14 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     if (rec["hubRouting"] !== undefined && !isTaskHubRouting(rec["hubRouting"])) return { ok: false, message: "task.created hubRouting invalid" };
     if (rec["reviewControllerRef"] !== undefined && !isTaskReviewControllerRef(rec["reviewControllerRef"])) return { ok: false, message: "task.created reviewControllerRef invalid" };
     // 2026-10-29（方案 v2.1 §5.4，F2）：创建者受控放宽到 chief / convener（运营派发实现任务）。
-    // 2026-11-17（app-dispatch/v1）：新增 application（应用按流程定义创建内置任务）。
-    if (rec["from"] !== "chief" && rec["from"] !== "convener" && rec["from"] !== "application") {
-      return { ok: false, message: "task.created.from 必须为 chief/convener/application" };
+    if (rec["from"] !== "chief" && rec["from"] !== "convener") {
+      return { ok: false, message: "task.created.from 必须为 chief 或 convener" };
     }
     if (typeof rec["to"] !== "string" || rec["to"] === "") return { ok: false, message: "task.created 缺 to" };
     if (typeof rec["text"] !== "string" || rec["text"].trim() === "") return { ok: false, message: "task.created 缺 text" };
     const sideEffect = rec["sideEffect"];
     if (typeof sideEffect !== "string" || !(SIDE_EFFECTS as readonly string[]).includes(sideEffect)) return { ok: false, message: "sideEffect 非法" };
     if (typeof rec["idempotencyKey"] !== "string" || rec["idempotencyKey"] === "") return { ok: false, message: "缺 idempotencyKey" };
-    // 2026-11-20（block resolver 桌面批）：repair 任务/blockId 读侧同 fail-closed（坏行计数跳过，不猜）。
-    if (rec["blockId"] !== undefined && (typeof rec["blockId"] !== "string" || !/^[a-f0-9]{24}$/.test(rec["blockId"]))) {
-      return { ok: false, message: "task.created.blockId 非法" };
-    }
-    if (rec["taskKind"] === "repair") {
-      if (rec["from"] !== "application") return { ok: false, message: "task.created repair 只允许 from=application" };
-      if (rec["blockId"] === undefined) return { ok: false, message: "task.created repair 缺 blockId" };
-      if (!(rec["idempotencyKey"] as string).startsWith("block-repair:")) {
-        return { ok: false, message: "task.created repair 幂等键前缀非法" };
-      }
-      if (rec["promptId"] !== undefined || rec["cardKind"] !== undefined || rec["cardDocumentRefs"] !== undefined
-        || rec["cardOptions"] !== undefined || rec["cardRecommended"] !== undefined) {
-        return { ok: false, message: "task.created repair 不得携带 card-prompt 字段" };
-      }
-    }
     // 2026-10-29（F3）：可选治理字段——flowId/stepId 给出时必须是合法 slug（缺失 = 旧记录，兼容）。
     if (rec["flowId"] !== undefined && !isTaskSlug(rec["flowId"])) return { ok: false, message: "task.created.flowId 非法" };
     if (rec["stepId"] !== undefined && !isTaskSlug(rec["stepId"])) return { ok: false, message: "task.created.stepId 非法" };
@@ -1387,7 +1121,8 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
       if (rec["runId"] !== undefined || rec["runState"] !== undefined) {
         return { ok: false, message: "task.created fixed 不得携带 runId/runState" };
       }
-      if (rec["taskKind"] !== undefined && !isFixedTaskKind(rec["taskKind"])) {
+      if (rec["taskKind"] !== undefined
+        && (typeof rec["taskKind"] !== "string" || rec["taskKind"].trim() === "" || rec["taskKind"] !== "stage-request")) {
         return { ok: false, message: "task.created.taskKind 非法" };
       }
       if (rec["taskKind"] === "stage-request") {
@@ -1400,46 +1135,6 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
         }
         if (rec["moduleId"] !== undefined || rec["modulePaths"] !== undefined || rec["moduleDirectory"] !== undefined) {
           return { ok: false, message: "task.created stage-request 不得携带 module/写集" };
-        }
-      }
-      // 2026-11-17（app-dispatch/v1）：新任务种类读侧同 fail-closed（坏行计数跳过，不猜）。
-      const idempotencyKey = rec["idempotencyKey"] as string;
-      const cardFieldPresent = rec["promptId"] !== undefined || rec["cardKind"] !== undefined
-        || rec["cardDocumentRefs"] !== undefined || rec["cardOptions"] !== undefined || rec["cardRecommended"] !== undefined;
-      if (rec["taskKind"] === "stage-execution") {
-        if (rec["from"] !== "application") return { ok: false, message: "task.created stage-execution 只允许 from=application" };
-        if (typeof rec["to"] !== "string" || rec["to"].trim() === "") return { ok: false, message: "task.created stage-execution 缺 to" };
-        if (sideEffect !== "read-only" && sideEffect !== "docs") return { ok: false, message: "task.created stage-execution sideEffect 非法" };
-        if (!idempotencyKey.startsWith("stage-exec:")) return { ok: false, message: "task.created stage-execution 幂等键前缀非法" };
-        if (cardFieldPresent) return { ok: false, message: "task.created stage-execution 不得携带 card-prompt 字段" };
-      }
-      if (rec["taskKind"] === "worker-dispatch") {
-        if (rec["from"] !== "application" || rec["to"] !== "convener") {
-          return { ok: false, message: "task.created worker-dispatch 只允许 application→convener" };
-        }
-        if (sideEffect !== "read-only") return { ok: false, message: "task.created worker-dispatch 必须为 sideEffect=read-only" };
-        if (!idempotencyKey.startsWith("worker-dispatch:")) return { ok: false, message: "task.created worker-dispatch 幂等键前缀非法" };
-        if (cardFieldPresent) return { ok: false, message: "task.created worker-dispatch 不得携带 card-prompt 字段" };
-      }
-      if (rec["taskKind"] === "card-prompt") {
-        if (rec["from"] !== "application" || rec["to"] !== "chief") {
-          return { ok: false, message: "task.created card-prompt 只允许 application→chief" };
-        }
-        if (sideEffect !== "read-only") return { ok: false, message: "task.created card-prompt 必须为 sideEffect=read-only" };
-        if (!idempotencyKey.startsWith("card-prompt:")) return { ok: false, message: "task.created card-prompt 幂等键前缀非法" };
-        if (!isNonEmptyTrimmedString(rec["promptId"])) return { ok: false, message: "task.created card-prompt 缺 promptId" };
-        if (!isGovernanceCardKind(rec["cardKind"])) return { ok: false, message: "task.created card-prompt.cardKind 非法" };
-        if (rec["moduleId"] !== undefined || rec["modulePaths"] !== undefined || rec["moduleDirectory"] !== undefined) {
-          return { ok: false, message: "task.created card-prompt 不得携带 module/写集" };
-        }
-        if (rec["cardDocumentRefs"] !== undefined && !isCardDocumentRefs(rec["cardDocumentRefs"])) {
-          return { ok: false, message: "task.created card-prompt.cardDocumentRefs 非法" };
-        }
-        if (rec["cardOptions"] !== undefined && !isCardOptions(rec["cardOptions"])) {
-          return { ok: false, message: "task.created card-prompt.cardOptions 非法" };
-        }
-        if (rec["cardRecommended"] !== undefined && !isCardRecommended(rec["cardRecommended"])) {
-          return { ok: false, message: "task.created card-prompt.cardRecommended 非法" };
         }
       }
       if (rec["workflowPath"] !== undefined && !isWorkflowPath(rec["workflowPath"])) {
@@ -1460,10 +1155,7 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
   }
   if (kind === "task.closed") {
     // 2026-10-29（方案 v2.1 §5.4，F2）：任务创建者收口自己的任务（chief / convener）。
-    // 2026-11-17（app-dispatch/v1）：新增 application（应用收口自己创建的 stage-execution/card-prompt）。
-    if (rec["by"] !== "chief" && rec["by"] !== "convener" && rec["by"] !== "application") {
-      return { ok: false, message: "task.closed.by 必须为 chief/convener/application" };
-    }
+    if (rec["by"] !== "chief" && rec["by"] !== "convener") return { ok: false, message: "task.closed.by 必须为 chief 或 convener" };
     if (typeof rec["outcome"] !== "string" || !(CLOSED_OUTCOMES as readonly string[]).includes(rec["outcome"])) return { ok: false, message: "task.closed.outcome 非法" };
     if (rec["actionSource"] !== undefined || rec["operationId"] !== undefined || rec["eventId"] !== undefined) {
       const source = rec["actionSource"];

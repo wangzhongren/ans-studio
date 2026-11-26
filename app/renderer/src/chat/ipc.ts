@@ -85,6 +85,152 @@ export function directiveBridgeOf(value: unknown): DirectiveBridge | null {
   return record as unknown as DirectiveBridge;
 }
 
+type DurableProjectRequest = { projectRoot: string };
+type DurableDefinitionRequest = DurableProjectRequest & { definitionId: string };
+type DurableDefinitionSelection = { source?: DesktopDurableDefinition["source"]; expectedDigest?: string };
+
+// Wire DTOs exposed by preload. Keep renderer compilation independent of Node and Dapr.
+export interface DurableProblem {
+  code: string;
+  message: string;
+  path?: string;
+}
+
+export type DurableResult<T> = { ok: true; value: T } | ({ ok: false } & DurableProblem);
+
+type DurableEvidenceRef = { path: string; sha256: string };
+
+export interface DurableScopeDecision {
+  kind: "change.scope-decided";
+  id: string;
+  b3Request: { key: string; sourceTaskId: string; digest: string };
+  b1Report: DurableEvidenceRef & { key: string; attempt: number };
+  baseline: { oid: string; branch: string };
+  candidateSource: "requestedEvidence" | "modulePaths";
+  candidates: readonly string[];
+  writeSets: readonly { roleId: string; paths: readonly string[] }[];
+  reason: string;
+  recordedAt: string;
+}
+
+export interface DesktopDurableDefinition {
+  id: string;
+  name?: string;
+  source: "project" | "preset";
+  file: string;
+  version?: number;
+  digest?: string;
+  error?: DurableProblem;
+}
+
+export interface DesktopDurableInstance {
+  owner: "dapr";
+  instanceId: string;
+  definitionId: string;
+  definitionName: string;
+  definitionSource?: DesktopDurableDefinition["source"];
+  schema?: 1 | 2;
+  flowId?: string;
+  pendingTasks?: readonly {
+    taskId: string; roleId: string; stepId: string; attempt: number; state: string;
+  }[];
+  definitionVersion: number;
+  definitionDigest: string;
+  action?: string;
+  engine: "pending" | "healthy" | "offline" | "incompatible" | "history-missing";
+  runtime?: string;
+  status: string;
+  stepId: string;
+  stepName: string;
+  attempt: number;
+  waiting?: string;
+  blockedReason?: string;
+  approval?: { requestId: string; status: string };
+  evidence?: { kind: "analysis" | "scope" | "operator" | "approval"; sha256: string }[];
+  scopeDecision?: DurableScopeDecision;
+  delivery?: DurableDeliverySummary;
+}
+
+type DurableDeliveryRequest = DurableProjectRequest & { instanceId: string; deliveryId: string };
+export interface DurableDeliverySummary {
+  id: string;
+  state: "pending" | "delivered";
+  releaseRequestId: string;
+  createdAt: string;
+  deliveredAt?: string;
+}
+
+type DurableDelivery = DurableDeliverySummary & {
+  mergeOid: string;
+  files: readonly string[];
+  diffDigest: string;
+  operatorReport: DurableEvidenceRef;
+  operatorReportArtifacts?: readonly DurableEvidenceRef[];
+  runtimeVerification: "not-independently-verified";
+};
+
+export type DurableDeliveryView = { delivery: DurableDelivery; viewToken: string };
+
+export interface DesktopDurableView {
+  controlPlane: { state: "stopped" | "starting" | "ready" | "failed"; code?: string; message?: string };
+  instance?: DesktopDurableInstance;
+}
+
+export interface DesktopWorkflowStartProposal {
+  activationId: string;
+  requestId: string;
+  generation: number;
+  state: "pending" | "approved" | "rejected" | "revoked" | "stale" | "started";
+  definition: Required<Pick<DesktopDurableDefinition, "id" | "name" | "version" | "digest" | "source">>;
+  requirement: { text: string };
+  reason: string;
+  createdAt: string;
+  decision?: { action: "approve" | "reject" | "revoke"; source: "customer"; at: string };
+  instanceId?: string;
+  startup?: { state: "waiting" | "blocked" | "created" | "scheduled"; code?: string; message?: string };
+}
+
+export interface DurableWorkflowBridge {
+  listDurableWorkflows(input: DurableProjectRequest): Promise<DurableResult<{
+    definitions: DesktopDurableDefinition[];
+    controlPlane: DesktopDurableView["controlPlane"];
+  }>>;
+  validateDurableWorkflow(input: DurableDefinitionRequest & DurableDefinitionSelection): Promise<DurableResult<DesktopDurableDefinition>>;
+  copyDurableWorkflowPreset(input: DurableDefinitionRequest): Promise<DurableResult<DesktopDurableDefinition>>;
+  importDurableWorkflow(input: DurableProjectRequest): Promise<DurableResult<DesktopDurableDefinition>>;
+  listWorkflowStartProposals(input: DurableProjectRequest): Promise<DurableResult<DesktopWorkflowStartProposal[]>>;
+  revokeWorkflowStartProposal(input: DurableProjectRequest & {
+    activationId: string;
+    requestId: string;
+  }): Promise<DurableResult<DesktopWorkflowStartProposal>>;
+  getDurableWorkflowProjection(input: DurableProjectRequest & {
+    instanceId?: string;
+  }): Promise<DurableResult<DesktopDurableView>>;
+  readDurableWorkflowDelivery(input: DurableDeliveryRequest): Promise<DurableResult<DurableDeliveryView>>;
+  acknowledgeDurableWorkflowDelivery(input: DurableDeliveryRequest & {
+    viewToken: string;
+  }): Promise<DurableResult<DurableDeliverySummary>>;
+}
+
+const DURABLE_METHODS = [
+  "listDurableWorkflows",
+  "validateDurableWorkflow",
+  "copyDurableWorkflowPreset",
+  "importDurableWorkflow",
+  "listWorkflowStartProposals",
+  "revokeWorkflowStartProposal",
+  "getDurableWorkflowProjection",
+  "readDurableWorkflowDelivery",
+  "acknowledgeDurableWorkflowDelivery",
+] as const;
+
+export function getDurableWorkflowBridge(): DurableWorkflowBridge | null {
+  const bridge = getDesktopBridge();
+  const record = asRecord(bridge);
+  if (!DURABLE_METHODS.every((method) => typeof record[method] === "function")) return null;
+  return bridge as unknown as DurableWorkflowBridge;
+}
+
 function viewIdentity(): { projectRoot: string | null; runtime: string } {
   return {
     projectRoot: useChatStore.getState().projectRoot,

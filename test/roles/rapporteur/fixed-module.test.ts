@@ -68,7 +68,7 @@ test("fixed：legacy cards / card.text / capabilities 逐字冻结（fixed 字�
   assert.equal(rapporteurRoleModule.capabilities.dispatchTask, false, "rapporteur 不派发（legacy/fixed 同）");
 });
 
-test("fixed context：显式矩阵返回 fixed 段（职责/decision 卡/报告），覆盖应用建任务与固定路径职责", () => {
+test("fixed context：显式矩阵返回 fixed 段（职责/decision 卡/报告），覆盖固定路径职责", () => {
   const sections = rapporteurRoleModule.context(TRIO_FIXED);
   assert.deepEqual(sections.map((section) => section.id), [
     "rapporteur-fixed-role",
@@ -77,19 +77,14 @@ test("fixed context：显式矩阵返回 fixed 段（职责/decision 卡/报告�
   ]);
   const all = sections.map((section) => section.text).join("\n");
   for (const required of [
-    "任务由应用按流程定义创建",
-    "stage-execution",
-    'from:"application"',
-    "A4/A5",
-    "B1",
+    "运营（convener）",
     "docs/proposals/",
     "docs/contracts/",
     "人员名单",
     "项目模块",
     "项目架构",
     "契约",
-    "方案确认卡由应用开卡",
-    "幕僚（chief）按应用 prompt",
+    "方案确认卡由幕僚",
     "不发起 proposal 卡",
     "不派发任务",
     "不实现代码",
@@ -100,10 +95,6 @@ test("fixed context：显式矩阵返回 fixed 段（职责/decision 卡/报告�
     "`decision`",
   ]) {
     assert.ok(all.includes(required), `fixed context 必须覆盖：${required}`);
-  }
-  // 负例防「旧句删除后子串假绿」：旧运营派发/幕僚自行呈方案卡口径必须整体消失。
-  for (const oldProtocol of ["运营（convener）", "方案确认卡由幕僚", "运营只派"]) {
-    assert.equal(all.includes(oldProtocol), false, `fixed 段不得保留旧口径：${oldProtocol}`);
   }
   // fixed 段删除 legacy 专属内容（run 择时 / 结构化 Git 工具的默认适用）。
   for (const legacyOnly of ["continue-frozen", "stop-and-restart", "`proposal`、`decision`", "绑定 runId/pinDigest"]) {

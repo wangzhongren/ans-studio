@@ -1,0 +1,55 @@
+schema: 2
+id: external-existing-change
+version: 1
+name: Existing threshold review
+start: survey-checkout
+steps:
+  survey-checkout:
+    action: observe-existing
+    next: inspect-threshold
+  inspect-threshold:
+    action: b1-impact-readonly
+    role: module-owner
+    on:
+      usable: prepare-change-worktree
+      needsFollowup: stop-for-research
+      blocked: publish-readonly-findings
+  publish-readonly-findings:
+    action: finish-readonly
+    next: inspections-delivered
+  inspections-delivered:
+    terminal: completed
+  prepare-change-worktree:
+    action: prepare-existing-branch
+    next: freeze-change-range
+  freeze-change-range:
+    action: accept-b3-advance-with-b2-scope
+    next: define-independent-check
+  define-independent-check:
+    action: independent-standard
+    role: independent-reviewer
+    next: implement-threshold-fix
+  implement-threshold-fix:
+    action: b3-implement-and-accept
+    next: assess-current-change
+  assess-current-change:
+    action: independent-assessment
+    role: independent-reviewer
+    on:
+      accepted: archive-current-review
+      rework: stop-for-research
+      blocked: stop-for-research
+  archive-current-review:
+    action: archive-acceptance
+    next: decide-local-delivery
+  decide-local-delivery:
+    action: customer-publish
+    on:
+      merged: applied-threshold-fix
+      rejected: decline-local-delivery
+  applied-threshold-fix:
+    terminal: delivered
+  decline-local-delivery:
+    terminal: stopped
+  stop-for-research:
+    terminal: blocked

@@ -6,8 +6,7 @@
 //
 // 冻结契约：`docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md`
 // （E0.3；685 行 / SHA-256 `067e3d2e…`）§3.1/§3.2/§3.3/§3.4/§3.5、§10.2 D1/D5/D8/D10。
-//  - D1：`tools()` 只返回本角色允许的 `RoleToolId`（15 项闭集 = 14 legacy + app-dispatch/v1 新增
-//    `selectWorkflow`（仅 chief，本角色不可声明）；越界由引擎 fail-closed）。
+//  - D1：`tools()` 只返回本角色允许的 `RoleToolId`（14 项闭集；越界由引擎 fail-closed）。
 //  - R-2：`dispatch()` 只做硬身份/存在性；hub/legacy/review 路由、run/module/D3/交付属主
 //    与报告时点**留在引擎**（`run-role.ts` / `apply-journal.ts` / `workflow-preconditions.ts` /
 //    桌面路由）。`reportToRoleId` 只作差分期望，不驱动实际报告路由。
@@ -23,11 +22,6 @@
 // fixed 矩阵数据（`fixedCards` / `fixedAllowedBuiltInRoleIds` / `isConvenerFixedBuiltInDispatchTarget`）
 // 与 `context({matrix:"two-fixed-paths/v1"})` fixed 段；fixed 字段只在显式 fixed 矩阵下被消费，
 // legacy 数据与 legacy 消费点（apply-journal / trunk-runtime）不改读取源。
-//
-// 2026-11-17（app-dispatch/v1，设计 §2.1/§2.3/§6.1）：`fixedAllowedBuiltInRoleIds` **按设计清零**
-// （内置角色任务全部由应用按流程定义创建；运营只派项目 worker 且必须绑定应用 open 的
-// `worker-dispatch` 任务；越权 ⇒ `convener-builtin-dispatch-forbidden` / `worker-dispatch-required`）；
-// fixed context 段只改「谁建任务/谁派发」来源措辞，B9.1/B23/B27/B28/B32/B13.2/B14 安全段逐字保留。
 //
 // T3 B9.1（RR4 `1bcdaf69…` 失败事实）：fixed 段新增「任务证据与哈希」与「卡预算」两段——
 // 派发 worker 任务时证据只要求 path / 内容/frontmatter / 结论，**不得要求 worker 用
@@ -236,29 +230,24 @@ export const CONVENER_WORKER_DISPATCH_TARGETS = Object.freeze({
 // 编排 legacy 谓词）不改读取源。
 
 /**
- * fixed 矩阵下 convener 可派发的内置生产线目标（2026-11-17 app-dispatch/v1，设计 §2.1/§6.1）。
+ * fixed 矩阵下 convener 可派发的内置生产线目标（T3 B2；MF-IR-4 / v1.3 §3.2/§3.4）。
  *
- * **按设计清零为空数组**：新协议下内置角色任务（product / rapporteur / nominator / convener /
- * verifier）全部由应用按流程定义创建并投递，运营不再派任何内置角色（越权 ⇒
- * `convener-builtin-dispatch-forbidden`）；运营只派项目 worker，且必须绑定自身当前 open 的
- * `worker-dispatch` 任务（`worker-dispatch-required`）。空数组 = 消费方（`governance-matrix`
- * fixed 视图、`isConvenerFixedBuiltInDispatchTarget`）fail-closed 不出任何内置派发路由，
- * **不落回** legacy `CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds`（`["verifier"]`，
- * legacy 消费点 apply-journal / trunk-runtime **逐字冻结**、不改读取源）。纯数据、无 I/O。
- *
- * 历史（v2.1，fixed-v2.1 在飞协议）：冻结值曾为 `["product","rapporteur","nominator"]`；该协议
- * 的在飞 workflow 继续按 v2 资源与旧码运行直至关闭（Q10 不迁移），本字段只为新协议使用。
+ * 冻结值恰 `["product","rapporteur","nominator"]`：运营是生产线唯一派发者；verifier 由幕僚创建
+ * （fixed 谓词对 convener→verifier 拒绝 `convener-to-verifier-forbidden`），不在此表。项目生产
+ * 角色另按 `targetKind:"project"` 允许（目标存在性由宿主核验）。纯数据、无 I/O。
  */
-const CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS: readonly string[] = Object.freeze([]);
+const CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS: readonly string[] = Object.freeze([
+  "product",
+  "rapporteur",
+  "nominator",
+]);
 
 /**
  * fixed 矩阵下「该内置角色是否可作为 convener 的生产线派发目标」纯函数（MF-IR-4）。
  *
  * 与 `CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS` **同源**（直接 `includes` 同一冻结数组，不复制
- * 第二张表）；大小写敏感（角色 id 逐字），空串/未知 id 恒 false。2026-11-17（app-dispatch/v1）：
- * 目标集清零后**任何内置 id 恒 false**（内置任务由应用创建；运营只派项目 worker）。纯函数、无
- * I/O、不修改任何数据。legacy `isConvenerBuiltInDispatchTarget`（`["verifier"]`）在编排侧
- * **逐字冻结**，本谓词不得替换它。
+ * 第二张表）；大小写敏感（角色 id 逐字），空串/未知 id 恒 false。纯函数、无 I/O、不修改任何数据。
+ * legacy `isConvenerBuiltInDispatchTarget`（`["verifier"]`）在编排侧**逐字冻结**，本谓词不得替换它。
  */
 function isConvenerFixedBuiltInDispatchTarget(roleId: string): boolean {
   return CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS.includes(roleId);
@@ -733,12 +722,15 @@ const CONVENER_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
   Object.freeze({ id: "report-expectation", text: REPORT_EXPECTATION_SECTION_TEXT }),
 ]);
 
-// —————————————————————— fixed context 段（T3 B2 + B9.1 + app-dispatch/v1；仅显式 fixed 矩阵返回）——————————————————————
+// —————————————————————— fixed context 段（T3 B2 + B9.1；仅显式 fixed 矩阵返回）——————————————————————
 //
-// v1.3 §3.4 convener 行起、2026-11-17（app-dispatch/v1，设计 §2.3/§4.2）改：fixed 段说明新职责
-// （**只派项目 worker 且绑定应用 open worker-dispatch 任务**；内置角色任务由应用创建；团队计划与
-// 基线 3 件小事 / 集成汇总与报告期望 / 不派质检）。B9.1 的任务证据与哈希段、卡预算段、B13.2/B23/
-// B27/B28/B32/B14 安全段**逐字保留**；只改「谁建任务/谁派发」的来源措辞。
+// v1.3 §3.4 convener 行：fixed 段说明新职责（生产线唯一派发者 / 团队计划与基线 3 件小事 /
+// 集成汇总与报告期望 / 不派质检）。B9.1 按 RR4 失败事实补两段：任务证据与哈希（应用算哈希、
+// 禁止 worker shell 算 hash）与卡预算（3 确认卡 + merge-main；不诱导额外审批卡）。
+// B13.2（2026-11-11，RR8 修复）：证据段补一条任务文本要求——worker `submit_report.evidence[]`
+// 每项为纯项目相对文件路径（描述文本不计为证据；RR8 因此 close-report-missing 并触发返工循环）。
+// B14（2026-11-11，RR9 修复）：生产线段补环境探测禁令——不得为探测环境运行 shell
+// （`node -v`/`python --version` 等会触发 shell 审批/拒绝面，超出 fixed 卡预算；环境事实从应用读）。
 // 只在 `context({matrix:"two-fixed-paths/v1"})` 下返回；`context({})`（无 matrix）与
 // `matrix:"legacy-v1"` 逐字返回上面的 legacy 三段（同一冻结引用）。
 // run-role fixed 会话把本段追加在旧卡文本之后；与旧卡文本冲突时以本段为准（仅 fixed 会话）。
@@ -747,14 +739,14 @@ const CONVENER_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
 const FIXED_PRODUCTION_LINE_SECTION: RoleContextSection = Object.freeze({
   id: "convener-fixed-production-line",
   text: [
-    "## 固定路径运营：只派项目 worker（two-fixed-paths/v1；与旧卡文本冲突时以本段为准）",
-    "- 内置角色任务（product / rapporteur / nominator / convener / verifier，A1/A2/A4/A5/A7/A8/A9/A12a/A12b）**全部由应用按流程定义创建并投递**；你不再派发任何内置角色（convener-builtin-dispatch-forbidden），验收任务（A12a/A12b）由应用直派（默认 verifier；roster roles[].review 项目验收角色优先），你不派新质检、不发 acceptance 卡、不代客户验收。",
-    "- 你只派**项目 worker**：收到应用发放的 `worker-dispatch` 任务（A11/B1/B3；携阶段、模块清单、写集来源、验收要求）后，在真实回合内为各模块派项目生产角色（模块属主 / 实现 / 分析）；派发必须绑定该自身当前 open 的 `worker-dispatch` 任务（worker-dispatch-required），实现任务须写明 moduleId、写集与验收/证据要求（证据只写路径、内容/frontmatter 与结论，见「任务证据与哈希」段），做属主校验并保持同工作区写任务串行；**一模块一任务**：moduleId 权威，modulePaths 只写该模块路径（应用从模块表派生/校验，跨模块派发 ⇒ `module-paths-mismatch` 拒绝）；生产任务报告回你（你创建的 worker 任务由你收口，Q6）。",
-    "- 幕僚不再派发任何 agent（只选流程、按应用 prompt 呈客户卡）；应用建任务不走角色派发谓词，但仍受阶段/定义/幂等/边界校验。",
+    "## 固定路径运营：生产线唯一派发者（two-fixed-paths/v1；与旧卡文本冲突时以本段为准）",
+    "- 收到幕僚 `stage-request` 后，由你在真实回合内派发生产线：内置 product / rapporteur / nominator 与项目生产角色（模块属主 / 实现 / 分析）；实现任务须写明 moduleId、写集与验收/证据要求（证据只写路径、内容/frontmatter 与结论，见「任务证据与哈希」段），做属主校验并保持同工作区写任务串行；**一模块一任务**：moduleId 权威，modulePaths 只写该模块路径（应用从模块表派生/校验，跨模块派发 ⇒ `module-paths-mismatch` 拒绝）；生产任务报告回你。",
+    "- 幕僚不直接派生产线角色（chief-production-dispatch-forbidden）；`stage-request` 是只读、无 module/写集的产线调度请求，不是生产线派发。",
+    "- 不派 verifier：独立验收由幕僚创建（默认 verifier；roster `roles[].review` 项目验收角色优先）；`convener→verifier` 拒绝（`convener-to-verifier-forbidden`）；你不派新质检、不发 acceptance 卡、不代客户验收。",
     "- 环境/工具链事实以应用只读事实（`project_state`/项目配置）为准；**不得为探测环境运行 shell**（`node -v`、`python --version`、`which`、`where` 等会触发 shell 审批/拒绝面，属 fixed 卡预算之外的额外门，RR9 实测）。任务文本要求环境探测时，按应用事实报告并如实说明，不运行 shell。",
     "- A11/B3 实现任务文本：**不得建议或要求 worker 添加后运行自测脚本**，不得以「如何自测」「测试结论」作为报告项；报告只要求**静态自检结论（读码核对，不运行 shell/node/npm、不执行测试脚本）**；执行/验证归 A12 验收角色承担，worker 只写本模块文件 + 字面 `git add`/`git commit`，任何 `run_shell`（含 `node`/`npm`/自测脚本）都会触发 shell 审批卡（RR24 实测：`node src/core/self-test.js` ⇒ shell 门早停）。",
     "- **所有 fixed 生产/评审任务文本：不得要求或建议 worker 运行任何 shell 命令（含 `mkdir`/`cp`/`mv` 等目录/文件操作）**；`write_file`/`edit_file` 会自动创建目录；`docs/acceptance/` 归档由应用完成。任何 `run_shell` 都会触发 shell 审批卡（RR25 实测：review 角色 `cmd /c mkdir docs\\acceptance` ⇒ shell 门早停）。",
-    "- A11/B3 实现与返工任务文本的提交语法（RR27 实测）：worker 提交只写 `git add <paths>` 与 `git commit -m \"<message>\"`——**含空格的提交消息必须整体加引号**，`-m` 后必须恰一个带引号的单消息参数（未加引号会被拆成多 argv 并被 shell 写门拒绝；RR27 实测 `git commit -m feat(game-core): implement …` ⇒ `[\"git\",\"commit\",\"-m\",\"feat(game-core):\",\"implement\",…]`）；返工任务只纠正提交语法（复述正确的 `git commit -m \"<message>\"` 写法），**不得重写已完成的实现**；**你不得代 worker 执行 `git commit`/`git add`（不得代提交）**——你按应用发放的 worker-dispatch 任务派 worker，按设计无实现任务 taskGitScope，代提交必被拒（RR27 实测）；worker 提交被拒时按真实回执（code 与 argv 形状）rework/re-dispatch，并在任务文本复述正确提交语法，不得把「缺少 taskGitScope」当唯一解释。",
+    "- A11/B3 实现与返工任务文本的提交语法（RR27 实测）：worker 提交只写 `git add <paths>` 与 `git commit -m \"<message>\"`——**含空格的提交消息必须整体加引号**，`-m` 后必须恰一个带引号的单消息参数（未加引号会被拆成多 argv 并被 shell 写门拒绝；RR27 实测 `git commit -m feat(game-core): implement …` ⇒ `[\"git\",\"commit\",\"-m\",\"feat(game-core):\",\"implement\",…]`）；返工任务只纠正提交语法（复述正确的 `git commit -m \"<message>\"` 写法），**不得重写已完成的实现**；**你不得代 worker 执行 `git commit`/`git add`（不得代提交）**——convener 为 stage-request 会话，按设计无实现任务 taskGitScope，代提交必被拒（RR27 实测）；worker 提交被拒时按真实回执（code 与 argv 形状）rework/re-dispatch，并在任务文本复述正确提交语法，不得把「缺少 taskGitScope」当唯一解释。",
   ].join("\n"),
 });
 
@@ -792,10 +784,9 @@ const FIXED_REPORT_SECTION: RoleContextSection = Object.freeze({
   id: "convener-fixed-report",
   text: [
     "## 固定路径集成汇总与报告期望（fixed）",
-    "- 集成汇总：汇总各 worker 任务与实现任务的进度/阻塞/真实提交（任务分支 `ans/task/<workflowId>` 的普通 Git add/commit）；冲突或返工交回原 owner 责任链，不代写实现、不伪造完成。A13/B4 的集成汇总由应用按流程定义创建为 `stage-execution` 任务（from:\"application\"），你在该任务内执行内容工作。",
-    "- 报告期望：任务完成或阻塞必须用 `submit_report` 回交（创建者为应用；应用观察 `task.reported` 后按完成条件收口并写 `stage.completed`——报告 ≠ 收口 ≠ 阶段完成，不得只在正文里说）；你创建的 worker 任务仍由你按真实报告收口。不转发客户、不批准、不验收、不代客户选择。",
-    "- **block 路由与修复任务（fixed）**：block 不是终点——blocked 报告必须写缺失项与可核验证据路径，如实报告即路由输入，应用按类路由（引擎修复/属主修复/决策卡/升级），你不空转、不代客户选择、不越权 shell；旧卡文本中的停住/等待类默认出路在固定路径不适用（以本段为准）。收到应用修复简报/修复任务时按简报执行（携 `repairId`、缺失路径、证据口径与截止 `T_repair`；fixed-v2.1 由你用既有 `dispatch_task` 建任务，app-dispatch 由应用建任务），完成后按 `repairId` 回交；环境/授权阻塞主动上报，不自行同文重试；同一 `blockId` 不重弹卡。终止仅由客户在决策卡中显式选择（decided 结果），你无停止动作。",
-    "- 发布合并：由应用构造并呈 merge-main 卡、仅客户本人确认；你不代批、不冒充客户、不自行合并 main。",
+    "- 集成汇总：汇总各生产线任务与实现任务的进度/阻塞/真实提交（任务分支 `ans/task/<workflowId>` 的普通 Git add/commit）；冲突或返工交回原 owner 责任链，不代写实现、不伪造完成。",
+    "- 报告期望：汇总后向幕僚 `submit_report`（完成/未完成/证据/遗留）；收到幕僚派发的任务必须用 `submit_report` 回短报，不要只结束回合；不转发客户、不批准、不验收、不代客户选择。",
+    "- 发布合并：由应用呈 merge-main 卡、仅客户本人确认；你不代批、不冒充客户、不自行合并 main。",
   ].join("\n"),
 });
 

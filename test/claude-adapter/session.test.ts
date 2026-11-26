@@ -13,7 +13,7 @@ import * as z from "zod";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createClaudeRuntimeAdapter, claudeToolInputWithCallContext } from "../../src/provider/claude/session.ts";
-import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
+import { buildChiefDecisionTools, buildGovernedTools } from "../../src/provider/runtime/tools.ts";
 import { describeTool } from "../../src/provider/runtime/schema.ts";
 import { createRuntimeSessionStore } from "../../src/provider/runtime/session-store.ts";
 import { createRuntimeAdapter, projectRuntimeLiveHandback } from "../../src/service/runtime/session.ts";
@@ -21,7 +21,7 @@ import { toClaudeSchema } from "../../src/common/claude-adapter/schema.ts";
 import { buildShellJudgeTools, SHELL_JUDGE_TOOL_NAMES } from "../../src/common/runtime-core/shell-judge/tools.ts";
 import { ALL_JUDGE_TOOL_NAMES, GOVERNANCE_JUDGE_TOOL_NAMES, buildGovernanceJudgeTools } from "../../src/common/runtime-core/governance-judge/tools.ts";
 import type { ResolvedRole } from "../../src/model/role.ts";
-import type { RuntimeProviderOptions, InteractionGate, ToolDefinition, SessionEvent, WriteGate, ShellJudgeReadStats, RuntimeToolEventSource } from "../../src/model/runtime.ts";
+import type { ChiefDecisionExecutionContext, DecidePendingRequestInput, RuntimeProviderOptions, InteractionGate, ToolDefinition, SessionEvent, WriteGate, ShellJudgeReadStats, RuntimeToolEventSource } from "../../src/model/runtime.ts";
 
 const role: ResolvedRole = { id: "claude-fixture", kind: "project", cardText: "# Claude fixture", boundary: { entries: [], boundarySource: "fixture", acceptance: { accepted: true, source: "fixture" } }, boundarySource: "fixture", location: { card: "fixture", boundary: "fixture" } };
 const allow: WriteGate = (path) => ({ allowed: true, matchedEntry: { kind: "file", root: "project", path, purpose: "fixture" } });
@@ -2008,6 +2008,116 @@ test("governance judge mode registers exactly the three governance tools, force-
   await session.dispose();
   await assert.rejects(access(join(root, ".ans")));
   await assert.rejects(access(configDirectory));
+}));
+
+const boundedChief: ResolvedRole = { ...role, id: "chief", kind: "built-in-governance", governanceFunction: "chief" };
+
+function boundedChiefContext(): ChiefDecisionExecutionContext {
+  return {
+    roleId: "chief", executionId: "claude-r10-fixture", mode: "bounded-decision",
+    productionWriteAuthority: false, tools: ["decide_pending_request"],
+    limits: { maxTurns: 1, timeoutMs: 5000, maxAttempts: 1 },
+    request: {
+      requestId: "claude-merge-card", baseDigest: "a".repeat(64), delegationRevision: 3, originRoleId: "application",
+      cardKind: "merge-main", durableWorkflow: { generation: 2, multiple: false },
+      question: "Choose the current merge card option", options: [{ id: "approve", label: "Approve" }],
+      evidenceRefs: [{ snapshotId: "verified-merge", path: "docs/release.md", version: 1, sha256: "b".repeat(64) }],
+    },
+  };
+}
+
+test("bounded Chief reaches the actual SDK MCP handler with only its isolated decision tool", async () => fixture(async (root) => {
+  const chiefDecisionContext = boundedChiefContext();
+  const { requestId, baseDigest, delegationRevision, originRoleId } = chiefDecisionContext.request;
+  const decision: DecidePendingRequestInput = { requestId, baseDigest, delegationRevision, disposition: "select", selected: ["approve"], reason: "Reviewed the current merge card." };
+  const received: DecidePendingRequestInput[] = [];
+  const tools = buildChiefDecisionTools(async input => {
+    received.push(input);
+    return { ok: true, requestId, status: "settled", source: { ...input, kind: "chief-delegated", actorRoleId: "chief", originRoleId, at: "2026-11-18T00:00:00.000Z" } };
+  }, chiefDecisionContext);
+  const engine = fake(async (client, config, user, _index, rawCall) => {
+    assert.deepEqual(config.tools, []);
+    assert.deepEqual(config.allowedTools, ["mcp__ans__decide_pending_request"]);
+    assert.deepEqual(Object.keys(config.mcpServers!), ["ans"]);
+    assert.deepEqual(config.skills, []);
+    assert.equal(config.strictMcpConfig, true);
+    assert.equal(config.persistSession, false);
+    for (const name of ["Read", "Bash", "WebSearch", "WebFetch", "Skill"]) assert.ok(config.disallowedTools?.includes(name), name);
+    assert.match(config.systemPrompt as string, /claude-merge-card.*approve/);
+    assert.match(config.systemPrompt as string, /mcp__ans__decide_pending_request/);
+    assert.doesNotMatch(config.systemPrompt as string, /judge_read_file|report_shell_judgement|unsafe context fixture/);
+    assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ["decide_pending_request"]);
+
+    const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+    const checkHook = async (tool_name: string, mcp_server?: { name: string; source: "sdk" | "dynamic" }, prompt_id = user.uuid) => {
+      const result = await hook(
+        { hook_event_name: "PreToolUse", prompt_id, tool_name, tool_input: decision, tool_use_id: "r10-test", session_id: "fixture", transcript_path: "fixture", cwd: root, ...(mcp_server && { mcp_server }) },
+        "r10-test", { signal: new AbortController().signal },
+      );
+      return "hookSpecificOutput" in result && result.hookSpecificOutput?.hookEventName === "PreToolUse"
+        ? result.hookSpecificOutput.permissionDecision : undefined;
+    };
+    for (const [name, provenance] of [
+      ["mcp__ans__judge_read_file", { name: "ans", source: "sdk" }],
+      ["mcp__ans__report_governance_judgement", { name: "ans", source: "sdk" }],
+      ["mcp__ans__decide_pending_request", { name: "ans", source: "dynamic" }],
+      ["mcp__ext__decide_pending_request", { name: "ext", source: "dynamic" }],
+      ["WebSearch", undefined], ["Bash", undefined],
+    ] as const) assert.equal(await checkHook(name, provenance), "deny", name);
+    assert.equal(await checkHook("mcp__ans__decide_pending_request", { name: "ans", source: "sdk" }, randomUUID()), "deny");
+    const unbound = await rawCall({ name: "decide_pending_request", arguments: { ...decision, __ans_call_context: randomUUID() } });
+    assert.equal(unbound.isError, true);
+    const stale = await client.callTool({ name: "decide_pending_request", arguments: { ...decision, delegationRevision: 2 } });
+    assert.equal(stale.isError, true);
+    assert.match(JSON.stringify(stale.content), /stale request/);
+    assert.deepEqual(received, []);
+    const approved = await client.callTool({ name: "decide_pending_request", arguments: { ...decision } });
+    assert.equal(approved.isError, false);
+  });
+  const storage = createRuntimeSessionStore({ projectRoot: root, roleId: boundedChief.id, runtime: "claude" });
+  const adapter = createClaudeRuntimeAdapter({
+    ...options(root, tools), judgeMode: true, chiefDecisionContext, storage,
+    installedMcpServers: [{ name: "ext", command: "/bin/echo", args: [] }], contextSections: ["unsafe context fixture"],
+  }, { ...engine.dependencies, env: { ...environment, ANS_CLAUDE_WEB_SEARCH: "1" } });
+  const session = await adapter.bindRole(boundedChief);
+  try {
+    await session.prompt("Decision fixture");
+    assert.deepEqual(received, [decision]);
+    assert.notEqual(engine.configurations[0]!.env!.CLAUDE_CONFIG_DIR, storage.nativeDirectory);
+  } finally { await session.dispose(); }
+  await assert.rejects(access(join(root, ".ans")));
+  await assert.rejects(access(engine.configurations[0]!.env!.CLAUDE_CONFIG_DIR!));
+}));
+
+test("bounded Chief rejects invalid isolation, incorrect roles and configuration drift", async () => fixture(async (root) => {
+  const chiefDecisionContext = boundedChiefContext();
+  const tools = buildChiefDecisionTools(async () => assert.fail("No decision handler may run"), chiefDecisionContext);
+  const ordinary = { ...options(root, tools), judgeMode: true as const };
+  const config = { ...ordinary, chiefDecisionContext };
+  const engine = fake(async () => assert.fail("No native query may run"));
+  assert.throws(() => createClaudeRuntimeAdapter(ordinary, engine.dependencies), /判断会话只接受/);
+  for (const invalid of [
+    { ...config, judgeMode: undefined },
+    { ...config, chiefDecisionContext: { ...chiefDecisionContext, request: { ...chiefDecisionContext.request, baseDigest: "invalid" } } },
+    { ...config, tools: [] }, { ...config, tools: [probeTool()] }, { ...config, tools: [...tools, probeTool()] },
+  ]) assert.throws(() => createClaudeRuntimeAdapter(invalid, engine.dependencies), /有效的决策上下文且只接受/);
+  const adapter = createClaudeRuntimeAdapter(config, engine.dependencies);
+  for (const identity of [role, { ...boundedChief, kind: "project" }, { ...boundedChief, governanceFunction: "product" }] as const) {
+    await assert.rejects(adapter.composeContext(identity), /真实内置 Chief/);
+    await assert.rejects(adapter.bindRole(identity), /真实内置 Chief/);
+  }
+  const driftedConfig = { ...config, chiefDecisionContext: structuredClone(chiefDecisionContext) };
+  const driftedAdapter = createClaudeRuntimeAdapter(driftedConfig, engine.dependencies);
+  driftedConfig.chiefDecisionContext.request.delegationRevision++;
+  await assert.rejects(driftedAdapter.bindRole(boundedChief), /决策上下文已变更/);
+
+  const lateConfig = { ...config };
+  const session = await createClaudeRuntimeAdapter(lateConfig, engine.dependencies).bindRole(boundedChief);
+  try {
+    lateConfig.tools = [...tools, probeTool()];
+    await assert.rejects(session.prompt("late tool injection"), /有效的决策上下文且只接受/);
+  } finally { await session.dispose(); }
+  assert.equal(engine.loadCount, 0);
 }));
 
 test("judge mode accepts either frozen triple but rejects mixed, partial, or extended judge tool sets", async () => fixture(async (root) => {

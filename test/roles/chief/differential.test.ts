@@ -142,7 +142,9 @@ test("差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结
 test("差分：6 个工具 id 全部通过旧 D1 装配校验，映射名/顺序与冻结结果一致（含 closeCreatedTask）", () => {
   const policy = MODULE.tools({ governanceModel: "trio" });
   const declared = [...policy.tools];
-  assert.deepEqual(declared, [...ORACLE_CHIEF_TOOL_DECLARATION.tools], "模块声明必须与金样一致");
+  const legacyCount = ORACLE_CHIEF_TOOL_DECLARATION.tools.length;
+  assert.deepEqual(declared.slice(0, legacyCount), [...ORACLE_CHIEF_TOOL_DECLARATION.tools], "旧模块声明必须与金样一致");
+  assert.deepEqual(declared.slice(legacyCount), ["requestWorkflowStart"], "唯一新增声明为工作流启用提议工具");
   assert.deepEqual([...policy.reasons], [], "trio 不应有结构化原因");
   assert.deepEqual(declared, [...CHIEF_TOOL_IDS], "CHIEF_TOOL_IDS 必须与 tools() 声明同一来源");
 
