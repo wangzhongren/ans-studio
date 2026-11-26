@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
@@ -468,16 +468,37 @@ test("disallowed lock source, staged drift and reparse output are rejected befor
   assert.equal(!changed.ok && changed.code, "workflow-environment-candidate-drift");
   git(root, "restore", "--staged", "--worktree", "--", "package.json");
   const elsewhere = path.join(root, ".ans", "preserved");
+  const output = path.join(root, "node_modules");
+  const marker = "Existing dependency output";
   await mkdir(elsewhere, { recursive: true });
+  await writeFile(path.join(elsewhere, "original.txt"), marker);
+  let linked = true;
   try {
-    await symlink(elsewhere, path.join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+    await symlink(elsewhere, output, process.platform === "win32" ? "junction" : "dir");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
-    t.diagnostic("This container denies junction creation; checking a non-directory destination.");
-    await writeFile(path.join(root, "node_modules"), "preserved");
+    if (process.platform !== "win32" || (error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+    linked = false;
+    t.diagnostic("This Windows container denies junction creation. The ordinary-file target is checked independently.");
   }
-  const redirect = await verifyAcceptanceEnvironment(root, basis);
-  assert.equal(!redirect.ok && redirect.code, "workflow-environment-install-target");
+  if (linked) {
+    const redirect = await verifyAcceptanceEnvironment(root, basis);
+    // POSIX Git rejects the directory pathspec before installation target verification.
+    assert.equal(!redirect.ok && redirect.code, process.platform === "win32"
+      ? "workflow-environment-install-target" : "workflow-environment-candidate-drift");
+    assert.equal((await lstat(output)).isSymbolicLink(), true);
+    assert.equal(path.relative(elsewhere, await realpath(output)), "");
+    assert.deepEqual(await readdir(elsewhere), ["original.txt"]);
+    assert.equal(await readFile(path.join(elsewhere, "original.txt"), "utf8"), marker);
+    assert.deepEqual(await readFile(path.join(root, "package.json")), manifest);
+  }
+  const occupied = await candidate(t);
+  const occupiedOutput = path.join(occupied.root, "node_modules");
+  await writeFile(occupiedOutput, marker);
+  const ordinaryFile = await verifyAcceptanceEnvironment(occupied.root, occupied.basis);
+  assert.equal(!ordinaryFile.ok && ordinaryFile.code, "workflow-environment-install-target");
+  assert.equal((await lstat(occupiedOutput)).isFile(), true);
+  assert.equal(await readFile(occupiedOutput, "utf8"), marker);
+  assert.deepEqual(await readFile(path.join(occupied.root, "package.json")), manifest);
   const hostile = await candidate(t, Buffer.from(JSON.stringify({ name: "example-project", version: "1.0.0", lockfileVersion: 3, packages: {
     "": { name: "example-project", version: "1.0.0", devDependencies: { esbuild: "0.25.0" } },
     "node_modules/esbuild": { resolved: "https://unapproved.invalid/esbuild.tgz", integrity: "sha512-YWJj" },

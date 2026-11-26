@@ -357,7 +357,7 @@ test("v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；�
 });
 
 test("A11 严格审计关联前后完整观察、同一工具调用与可靠落账", async t => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-retest-post-audit-"));
+  const root = await fs.mkdtemp(path.join(await fs.realpath(os.tmpdir()), "ans-retest-post-audit-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, ".git", "refs", "heads"), { recursive: true });
   await fs.mkdir(path.join(root, "coverage"), { recursive: true });

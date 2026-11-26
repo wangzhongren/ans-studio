@@ -166,7 +166,15 @@ for (const linked of [false, true]) test(`task Git settles failed add with uncha
   }
   const indexPath = git(root, "rev-parse", "--path-format=absolute", "--git-path", "index");
   const baseline = git(root, "rev-parse", "HEAD");
-  await fs.writeFile(path.join(root, "source.ts"), "export const source = 2;\n");
+  const source = path.join(root, "source.ts");
+  await fs.writeFile(source, "export const source = 2;\n");
+  // Keep the working file outside Git's racy-stat window before recording its staged state.
+  const stableTime = new Date("2025-01-01T00:00:00Z");
+  await fs.utimes(source, stableTime, stableTime);
+  const readIndex = async () => {
+    const shared = git(root, "rev-parse", "--path-format=absolute", "--shared-index-path");
+    return { primary: await fs.readFile(indexPath), shared, sharedBytes: shared ? await fs.readFile(shared) : undefined };
+  };
 
   type Intent = Parameters<ClaimDurableTaskGit>[0];
   const settled: { intent: Intent; outcome: string; result: Readonly<Record<string, unknown>> | undefined }[] = [];
@@ -185,12 +193,12 @@ for (const linked of [false, true]) test(`task Git settles failed add with uncha
   };
   const open = () => createDesktopTaskGitShellPort(root, claim);
   const port = open();
-  const original = await fs.readFile(indexPath);
+  const original = await readIndex();
   const missing = ["source.ts", "package-lock.json"];
   const failed = await port.add(missing);
   assert.equal(failed.exitCode, 128);
   assert.match(failed.stderr, /pathspec.*package-lock\.json/);
-  assert.deepEqual(await fs.readFile(indexPath), original);
+  assert.deepEqual(await readIndex(), original);
   assert.equal(settled[0]?.outcome, "not-started");
   assert.match(settled[0]!.intent.key, /^git-add:v2:/);
   assert.equal(settled[0]!.result?.beforeIndex, settled[0]!.result?.afterIndex);
@@ -199,11 +207,14 @@ for (const linked of [false, true]) test(`task Git settles failed add with uncha
 
   const reopened = open();
   assert.equal((await reopened.add(missing)).exitCode, 128);
+  assert.deepEqual(await readIndex(), original);
   assert.equal(settled[1]!.intent.key, settled[0]!.intent.key);
   assert.equal((await reopened.add(["source.ts"])).exitCode, 0);
   assert.equal(settled[2]!.outcome, "succeeded");
   assert.equal(git(root, "diff", "--cached", "--name-only"), "source.ts");
+  const staged = await readIndex();
   assert.equal((await reopened.add(missing)).exitCode, 128);
+  assert.deepEqual(await readIndex(), staged);
   assert.equal(settled[3]!.outcome, "not-started");
   assert.notEqual(settled[3]!.intent.key, settled[0]!.intent.key);
   assert.equal(settled[3]!.result?.beforeIndex, settled[3]!.result?.afterIndex);
@@ -226,13 +237,26 @@ for (const linked of [false, true]) test(`task Git settles failed add with uncha
   assert.equal(settled[5]!.outcome, "succeeded");
   assert.equal(git(root, "rev-parse", "HEAD^"), baseline);
 
+  // Refresh stat records before the no-op. Commit and Git can leave valid cache metadata to refresh.
+  git(root, "update-index", "--refresh");
+  const recordedHead = git(root, "rev-parse", "HEAD");
+  const recordedEntries = git(root, "--no-optional-locks", "ls-files", "--stage", "-z");
+  const recordedSource = await fs.readFile(source);
+  git(root, "--no-optional-locks", "diff", "--cached", "--quiet");
+  git(root, "--no-optional-locks", "diff", "--quiet");
+  const recordedIndex = await readIndex();
   assert.equal((await reopened.add(["source.ts"])).exitCode, 0);
   const completed = settled.at(-1)!;
   assert.equal(completed.outcome, "succeeded");
   assert.equal(completed.result?.beforeIndex, completed.result?.afterIndex);
+  assert.deepEqual(await readIndex(), recordedIndex);
+  assert.equal(git(root, "rev-parse", "HEAD"), recordedHead);
+  assert.equal(git(root, "--no-optional-locks", "ls-files", "--stage", "-z"), recordedEntries);
+  assert.deepEqual(await fs.readFile(source), recordedSource);
   const beforeReplay = settled.length;
   assert.match((await open().add(["source.ts"])).stdout, /already recorded/);
   assert.equal(settled.length, beforeReplay);
+  assert.deepEqual(await readIndex(), recordedIndex);
 });
 
 test("the same Git operation resumes after init and branch creation without repeating either effect", async t => {
