@@ -14,7 +14,10 @@ test("对话框 ARIA/模态：role=dialog、aria-modal、标题/来源/风险描
   assert.match(DIALOG, /role="dialog"/);
   assert.match(DIALOG, /aria-modal="true"/);
   assert.match(DIALOG, /aria-labelledby="dd-title"/);
-  assert.match(DIALOG, /aria-describedby="dd-source dd-risk"/);
+  assert.match(DIALOG, /const workflowStart = isWorkflowStartCard\(decisionRequestOf\(payload\)\);/);
+  assert.match(DIALOG, /aria-describedby=\{workflowStart \? "dd-source" : "dd-source dd-risk"\}/);
+  assert.match(DIALOG, /<\/div>\s*<p id="dd-source"[^>]*>\s*\{t\("ui\.decisionDialog\.sourceRole", \{ role: roleName \}\)\}\s*<\/p>\s*\{!workflowStart/);
+  assert.match(DIALOG, /\{!workflowStart \? <p id="dd-risk"[^\n]*>[\s\S]*?t\("ui\.decisionDialog\.highRisk"\)[\s\S]*?<\/p> : null\}/);
   assert.match(DIALOG, /data-priority=\{view\.priority\}/);
 });
 

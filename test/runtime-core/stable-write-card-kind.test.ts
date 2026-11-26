@@ -78,6 +78,21 @@ test("document-revision 由应用呈现，保留账本身份并排除通用工�
   assert.equal(governanceCardGroup(kind), undefined);
 });
 
+test("workflow-blocked-scope 由应用呈现并保留账本卡种", () => {
+  const kind: AppOwnedGovernanceCardKind = "workflow-blocked-scope";
+  const created: Pick<RequestCreatedEvent, "cardKind"> = { cardKind: kind };
+  const resolved: Pick<RequestResolvedEvent, "cardKind"> = { cardKind: kind };
+  assert.equal(created.cardKind, "workflow-blocked-scope");
+  assert.equal(resolved.cardKind, "workflow-blocked-scope");
+  // @ts-expect-error 工作流卡点选择仅由应用呈现
+  const choice: GovernanceChoiceCardKind = "workflow-blocked-scope";
+  // @ts-expect-error 工作流卡点选择仅由应用呈现
+  const confirm: GovernanceConfirmCardKind = "workflow-blocked-scope";
+  assert.equal(choice, kind);
+  assert.equal(confirm, kind);
+  assert.equal(governanceCardGroup(kind), undefined);
+});
+
 test("判断分组不变：GROUP 精确键集不变；stable-write 永不判断/代选", () => {
   assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "stable-write"), false);
   assert.equal(governanceCardGroup("stable-write"), undefined);
@@ -99,14 +114,13 @@ test("判断分组不变：GROUP 精确键集不变；stable-write 永不判断/
 });
 
 test("白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏", () => {
-  // 2026-11-10 T3（v1.3 §8.4/AC-14）：app-owned 增 `merge-main`（客户本人合并 main 确认卡）；
-  // GROUP 键集仍逐字不变，`merge-main` 不进判断分组（下方断言）。
-  const appOwned = ["stable-write", "merge-main", "workflow-start", "document-revision"] as const;
+  const appOwned = ["stable-write", "merge-main", "workflow-start", "document-revision", "workflow-blocked-scope"] as const;
   assert.deepEqual([...GOVERNANCE_APP_OWNED_CARD_KINDS], appOwned);
   assert.equal(Object.isFrozen(GOVERNANCE_APP_OWNED_CARD_KINDS), true);
   assert.equal(Object.isFrozen(GOVERNANCE_CARD_KINDS), true);
+  assert.equal(Object.isFrozen(GOVERNANCE_CARD_GROUP), true);
   assert.deepEqual([...GOVERNANCE_CARD_KINDS].sort(), [...OLD_GROUP_KEYS, ...appOwned].sort());
-  assert.equal(GOVERNANCE_CARD_KINDS.length, 11, "GROUP 7 键 + app-owned 4 键");
+  assert.equal(GOVERNANCE_CARD_KINDS.length, 12, "GROUP 7 键 + app-owned 5 键");
   assert.equal(new Set(GOVERNANCE_CARD_KINDS).size, GOVERNANCE_CARD_KINDS.length, "白名单不得重复");
   assert.equal(GOVERNANCE_CARD_KINDS.includes("stable-write"), true);
   assert.equal(GOVERNANCE_CARD_KINDS.includes("merge-main"), true);
@@ -114,8 +128,8 @@ test("白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned
   for (const key of Object.keys(GOVERNANCE_CARD_GROUP) as GovernanceCardKind[]) {
     assert.equal(GOVERNANCE_CARD_KINDS.includes(key), true, `GROUP 键 ${key} 必须在白名单内`);
   }
-  // 白名单只用于账本卡种校验，不表达判断分组：stable-write/merge-main 仍在 GROUP 外
-  assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "stable-write"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "merge-main"), false);
-  assert.equal(governanceCardGroup("workflow-start"), undefined);
+  for (const kind of appOwned) {
+    assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, kind), false, `${kind} 必须在 GROUP 外`);
+    assert.equal(governanceCardGroup(kind), undefined);
+  }
 });

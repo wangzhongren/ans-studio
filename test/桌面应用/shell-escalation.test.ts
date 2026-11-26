@@ -445,7 +445,7 @@ test("暂停状态机：只接受 {paused:boolean}；非法输入不改状态；
   assert.equal(state.isPaused(), false, "reset 显式复位（测试/显式重置）");
 });
 
-test("暂停 IPC 接线：main.ts 模块级单例、shell-only 生效、不影响治理 approval 组、推送含 paused", () => {
+test("暂停 IPC 接线：main.ts 模块级单例、仅命令审批暂停、治理走业务决定开关、读取和推送含 paused", () => {
   const mainSrc = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
   // 状态本体：模块级单例（在 createWindow/registerIpc 之外声明——跨窗口重开保留；重启由模块初始化清零）。
   const declaration = mainSrc.indexOf("const shellSessionPaused = createShellSessionPauseState();");
@@ -457,10 +457,11 @@ test("暂停 IPC 接线：main.ts 模块级单例、shell-only 生效、不影�
     mainSrc.includes("isEnabled: () => shellJudgeSwitch.isEnabled() && !shellSessionPaused.isPaused()"),
     "shell 操作者通道的有效开关叠加暂停（不改持久化开关）",
   );
-  // 治理 approval 组仍只看全局开关（暂停不波及）。
-  assert.ok(
-    mainSrc.includes('group === "approval" ? shellJudgeSwitch.isEnabled() : decisionJudgeSwitch.isEnabled()'),
-    "customer-input 的 approval 判断组未读取暂停状态",
+  // 通用治理卡只允许 decision 组，使用独立的业务决定开关。
+  assert.match(
+    mainSrc,
+    /judge: \{\s*isGroupEnabled: \(group\) => group === "decision" && decisionJudgeSwitch\.isEnabled\(\),\s*\},/,
+    "治理 decision 组只读取业务决定开关",
   );
   // shell:judge-pause IPC + sender 校验 + 推送 paused。
   assert.ok(mainSrc.includes('registerHandler("shell:judge-pause"'), "新增 shell:judge-pause 通道");
@@ -468,7 +469,16 @@ test("暂停 IPC 接线：main.ts 模块级单例、shell-only 生效、不影�
     /registerHandler\("shell:judge-pause", \(event, input\) => \{\s*if \(!isShellJudgeIpcSender\(event\.sender, win\.webContents\)\)/.test(mainSrc),
     "暂停通道沿用 shell:judge-* 的 sender 校验",
   );
-  assert.ok(mainSrc.includes("paused: shellSessionPaused.isPaused()"), "shell:judge-state 推送与 shell:judge-get 读取均含 paused");
+  assert.match(
+    mainSrc,
+    /win\.webContents\.send\("shell:judge-state", \{[^}]*paused: shellSessionPaused\.isPaused\(\),\s*\}\);/,
+    "shell:judge-state 推送读取当前 paused 状态",
+  );
+  assert.match(
+    mainSrc,
+    /registerHandler\("shell:judge-get", \(event\) => \{\s*if \(!isShellJudgeIpcSender\(event\.sender, win\.webContents\)\)[^\n]*\n\s*(?:\/\/[^\n]*\n\s*)?return \{ \.\.\.desktop\.getShellJudgeState\(\), paused: shellSessionPaused\.isPaused\(\) \};/,
+    "shell:judge-get 校验发送方并返回当前 paused 状态",
+  );
   // shell:judge-set 的字段校验路径不变（仍只经 shellJudgeSwitch.set）。
   assert.ok(mainSrc.includes("const result = await desktop.setShellJudgeEnabled(input);"), "shell:judge-set 校验/持久化路径不变");
 });

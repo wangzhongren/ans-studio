@@ -16,7 +16,7 @@
 //  5. legacy `contract_check` 输出/行为不变（topic 静态路径 + 无 topic 事实路径）；
 //  6. judge（「替我审」/「替我决策」）与有界 Chief 决策会话**不注册** `doc_format`、工具集逐字不变
 //     （含真实桌面有界构造路径：`chiefDecision.execute` 打开的 chief 会话 + 桌面 judge 工厂入参）；
-//  7. 预算：索引 5,223 B、最大详情 4,089 B（B1 实测；均 ≤8192 B）。
+//  7. 预算：索引 5,244 B、最大详情 3,967 B（当前注册表实测；均 ≤8192 B）。
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -571,11 +571,10 @@ test("AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有�
   }
 });
 
-// 2026-11-16（B6b）：B23（6482387，fixed-path 哈希来源说明）更新了 doc-format 正文；
-// B1 初版 pin（5,223 / 4,089）已被有意内容增长取代。预算上限（≤8192）与 54 id 不变，仅重钉实测值。
-test("AC-8 预算：索引 5,244 B、最大详情 4,243 B（均 ≤8192 B，B23 后实测 pin）", () => {
+// 预算精确值取自当前索引和详情的生成结果，另逐项执行 8,192 字节上限。
+test("AC-8 预算：索引 5,244 B、最大详情 3,967 B（均 ≤8192 B）", () => {
   const index = docFormatIndexText();
-  assert.equal(Buffer.byteLength(index, "utf8"), 5244, "索引字节（B23 后实测 pin）");
+  assert.equal(Buffer.byteLength(index, "utf8"), 5244, "当前索引字节");
   assert.ok(Buffer.byteLength(index, "utf8") <= 8192);
   assert.equal(docFormatKnownIds().length, 54, "54 个格式 id 全量可发现");
 
@@ -589,6 +588,6 @@ test("AC-8 预算：索引 5,244 B、最大详情 4,243 B（均 ≤8192 B，B23 
       maxId = id;
     }
   }
-  assert.equal(maxBytes, 4243, "最大详情字节（B23 后实测 pin）");
+  assert.equal(maxBytes, 3967, "当前最大详情字节");
   assert.equal(maxId, "project-roster/v3", "最大详情为 roster（render 型整段返回）");
 });

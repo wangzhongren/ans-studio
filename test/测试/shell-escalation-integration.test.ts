@@ -17,8 +17,7 @@
 //   G. 白名单形态在项目角色/内置审批档 judge 调用计数=0；npm install 仍走既有判断；
 //   H. 审计四类可区分（judge 放行 / 客户手批 / 客户升级授权 / escalation-decision；deny 档 tier+hardDenyOverride）；
 //   I. c=allow 不消费一次性授权、c=deny 不消费/不放行；
-//   J. 暂停语义（createShellSessionPauseState shell-only、非法输入不改状态；治理 approval 组不被暂停影响，
-//      按 app/main.ts 现有代码事实断言）。
+//   J. 暂停仅影响命令审批，非法输入保留状态；治理决定使用独立开关，并核对主进程 IPC 的发送方和状态回传。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -68,7 +67,7 @@ import {
 import { classifyShell, defaultShellRules } from "../../src/service/gate/shell-rules.ts";
 import { evaluateShellWriteTargets } from "../../src/common/门禁引擎/shell-write-guard.ts";
 import { buildGovernedTools, REQUEST_SHELL_ESCALATION_TOOL_NAME } from "../../src/provider/runtime/tools.ts";
-import { createShellJudgeSwitch, createShellSessionPauseState } from "../../app/desktop/interface.ts";
+import { createDecisionDelegationSwitch, createShellJudgeSwitch, createShellSessionPauseState } from "../../app/desktop/interface.ts";
 import { shellJudgeResultView } from "../../app/renderer/src/chat/judge.ts";
 import { DEFAULT_LOCALE, translate } from "../../src/common/shared/i18n/index.ts";
 
@@ -1052,7 +1051,7 @@ test("I/AC-07：c=allow 不消费一次性授权；c=deny 分类不消费、不�
 
 // —————————————————————— J. 暂停语义 ——————————————————————
 
-test("J/AC-20：暂停状态机 shell-only、非法输入不改状态；治理 approval 组不被暂停影响（按 main.ts 现有代码事实）", () => {
+test("J/AC-20：暂停只影响命令审批，治理决定使用独立开关，IPC 校验发送方并回传实际状态", () => {
   const pause = createShellSessionPauseState();
   assert.equal(pause.isPaused(), false, "初始未暂停");
   assert.deepEqual(pause.set({ paused: true }), { version: 1, ok: true, paused: true });
@@ -1067,32 +1066,47 @@ test("J/AC-20：暂停状态机 shell-only、非法输入不改状态；治理 a
   }
   assert.deepEqual(pause.set({ paused: false }), { version: 1, ok: true, paused: false });
   assert.equal(pause.isPaused(), false);
-  pause.reset();
-  assert.equal(pause.isPaused(), false);
-
-  // 有效值组合（与 app/main.ts 代码事实一致）：shell 操作者通道 = 持久化开关 && !paused；
-  // 治理 approval 组只看 shellJudgeSwitch（不受暂停影响）。
-  const switchState = createShellJudgeSwitch(true);
-  const shellOperatorEnabled = (): boolean => switchState.isEnabled() && !pause.isPaused();
-  const governanceApprovalEnabled = (): boolean => (switchState.isEnabled() ? true : false);
+  const shellJudgeSwitch = createShellJudgeSwitch(true);
+  const decisionJudgeSwitch = createDecisionDelegationSwitch(true);
+  const shellOperatorEnabled = () => shellJudgeSwitch.isEnabled() && !pause.isPaused();
+  const governanceEnabled = (group: "approval" | "decision") => group === "decision" && decisionJudgeSwitch.isEnabled();
   pause.set({ paused: true });
   assert.equal(shellOperatorEnabled(), false, "暂停后 shell 操作者通道降级为逐条客户确认");
-  assert.equal(governanceApprovalEnabled(), true, "治理 approval 组不被暂停影响");
-  assert.equal(switchState.isEnabled(), true, "暂停不改持久化开关值");
+  assert.equal(shellJudgeSwitch.isEnabled(), true, "暂停保留命令审批开关值");
+  assert.equal(governanceEnabled("decision"), true, "暂停保留业务决定开关值");
+  assert.equal(governanceEnabled("approval"), false, "命令开关开启时，通用治理通道仍不自动审批");
+  decisionJudgeSwitch.set({ enabled: false });
+  assert.equal(governanceEnabled("decision"), false, "业务决定可在暂停期间独立关闭");
   pause.set({ paused: false });
-  assert.equal(shellOperatorEnabled(), true, "恢复即回到持久化开关值");
+  assert.equal(shellOperatorEnabled(), true, "恢复后读回命令审批开关值");
+  assert.equal(governanceEnabled("decision"), false, "恢复命令审批保留业务决定的独立设置");
+  shellJudgeSwitch.set({ enabled: false });
+  decisionJudgeSwitch.set({ enabled: true });
+  assert.equal(shellOperatorEnabled(), false, "关闭命令审批后保持逐条确认");
+  assert.equal(governanceEnabled("decision"), true, "命令审批关闭时仍可单独开启业务决定");
+  pause.set({ paused: true });
+  pause.reset();
+  assert.equal(pause.isPaused(), false, "重置清除本次运行的暂停状态");
 
-  // 代码事实钉死（main.ts 的两处表达式）：暂停只作用于 shell 操作者通道，治理组仍只读全局开关。
   const mainSrc = fs.readFileSync(new URL("../../app/main.ts", import.meta.url), "utf8");
   assert.ok(
     mainSrc.includes("isEnabled: () => shellJudgeSwitch.isEnabled() && !shellSessionPaused.isPaused()"),
     "shell 操作者通道有效值必须叠加暂停",
   );
-  assert.ok(
-    mainSrc.includes('isGroupEnabled: (group) => (group === "approval" ? shellJudgeSwitch.isEnabled() : decisionJudgeSwitch.isEnabled())'),
-    "治理 approval 组只读全局开关（不读暂停）",
+  assert.match(mainSrc, /judge: \{\s*isGroupEnabled: \(group\) => group === "decision" && decisionJudgeSwitch\.isEnabled\(\),\s*\},/,
+    "主进程的通用治理通道只为 decision 组读取业务决定开关");
+  const declaration = mainSrc.indexOf("const shellSessionPaused = createShellSessionPauseState();");
+  assert.ok(declaration >= 0 && declaration < mainSrc.indexOf("function createWindow"), "暂停状态在模块级创建");
+  assert.equal(mainSrc.includes("shellSessionPaused.reset("), false, "窗口重开保留本次运行的暂停状态");
+  assert.match(mainSrc, /registerHandler\("shell:judge-pause", \(event, input\) => \{\s*if \(!isShellJudgeIpcSender\(event\.sender, win\.webContents\)\)/,
+    "暂停请求在写入状态前校验实际 IPC 发送方");
+  assert.match(
+    mainSrc,
+    /registerHandler\("shell:judge-get", \(event\) => \{\s*if \(!isShellJudgeIpcSender\(event\.sender, win\.webContents\)\)[^\n]*\n\s*(?:\/\/[^\n]*\n\s*)?return \{ \.\.\.desktop\.getShellJudgeState\(\), paused: shellSessionPaused\.isPaused\(\) \};/,
+    "读取接口校验发送方并回传主进程的真实暂停状态",
   );
-  assert.ok(mainSrc.includes("const shellSessionPaused = createShellSessionPauseState();"), "暂停状态为模块级单例（跨窗口重开保留、重启清零）");
+  assert.match(mainSrc, /win\.webContents\.send\("shell:judge-state", \{[^}]*paused: shellSessionPaused\.isPaused\(\),\s*\}\);/,
+    "状态推送向渲染端回传主进程的真实暂停状态");
 });
 
 // —————————————————————— K. presenter pending（E2 返工 R2） ——————————————————————
