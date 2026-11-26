@@ -319,6 +319,9 @@ export function resolveWatchdogConfig(env: Record<string, string | undefined> = 
   };
 }
 
+export type WatchdogDeliveryDisposition = "queued" | "informational";
+type WatchdogDeliveryMessage = WatchdogOutboundMessage & { dedupKey: string; uiOnlyWhenBusy?: boolean };
+
 export interface WatchdogServiceDeps {
   /** 当前需要看护的项目根集合（导入过的项目 ∪ 有过会话/队列的项目；由 Interface 组装）。 */
   projects: () => string[];
@@ -327,7 +330,8 @@ export interface WatchdogServiceDeps {
   /** 投递端：把系统消息交给**既有投递机**（SessionManager.watchdogDeliver——kind:"system" → su）。
    *  `uiOnlyWhenBusy`：**看护服务发出**的消息为 true——目标忙时走 UI-only 旁路（P0 2026-10-30），
    *  不进入忙目标模型队列；直接调用（如 MCP 安装系统行）不带此标记，保持既有排队语义。 */
-  deliver: (projectRoot: string, message: WatchdogOutboundMessage & { dedupKey: string; uiOnlyWhenBusy?: boolean }) => void;
+  deliver: ((projectRoot: string, message: WatchdogDeliveryMessage) => WatchdogDeliveryDisposition | Promise<WatchdogDeliveryDisposition>)
+    | ((projectRoot: string, message: WatchdogDeliveryMessage) => void);
   /**
    * **自动中止回调**（2026-10-20 真机：Convener 卡 1h、队列 24）：回合超过中止时限且该角色自动开关开启时，
    * 恰对**同一 role+turnId** 调用一次（去重由看护自持）。缺省 ⇒ 不中止（旧行为零变化）。
@@ -459,10 +463,13 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
   };
 
   /** 投递一条系统消息（统一入口；失败（本层回调抛错）如实记诊断并视为未投出——绝不向上抛）。 */
-  const outbound = (projectRoot: string, message: WatchdogOutboundMessage, label: string): boolean => {
+  const outbound = (projectRoot: string, message: WatchdogOutboundMessage, label: string,
+    onDisposition?: (result: WatchdogDeliveryDisposition) => void): boolean => {
     try {
-      // 看护服务发出的消息：目标忙时 UI-only 旁路（P0 2026-10-30）——看护不再被自己的队列楔死。
-      deps.deliver(projectRoot, { ...message, dedupKey: nextSystemKey(projectRoot, label), uiOnlyWhenBusy: true });
+      const result = deps.deliver(projectRoot, { ...message, dedupKey: nextSystemKey(projectRoot, label), uiOnlyWhenBusy: true });
+      const report = (value: WatchdogDeliveryDisposition | void) => onDisposition?.(value === "informational" ? value : "queued");
+      if (result instanceof Promise) void result.then(report, err => loggerFor(projectRoot).error("watchdog.deliver.failed", err));
+      else report(result);
       return true;
     } catch (err) {
       loggerFor(projectRoot).error("watchdog.deliver.failed", err);
@@ -853,14 +860,14 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
         }
         roleLines.sort((a, b) => a.roleId.localeCompare(b.roleId));
         if (roleLines.length > 0) {
-          const delivered = outbound(projectRoot, {
+          outbound(projectRoot, {
             text: renderPatrolPrompt({ at: new Date(at).toISOString(), roles: roleLines, ...(patrol.skipped > 0 ? { skipped: patrol.skipped } : {}) }),
             summary: mainT("main.watchdog.patrolSummary", { count: roleLines.length }),
-          }, "patrol");
-          if (delivered) {
-            patrol.pending = true;
+          }, "patrol", disposition => {
+            if (patrol.lastRunAt !== at) return;
+            patrol.pending = disposition === "queued";
             patrol.skipped = 0;
-          }
+          });
         }
       }
     }

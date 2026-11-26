@@ -63,6 +63,8 @@ import { ROLE_CARD_REQUIRED_SECTIONS, cardKindsOf as governanceCardKindsOf } fro
 import { CHIEF_INTENT_CONFIRM_CARD } from "../../common/roles/chief/index.ts";
 import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
 import { loadLatestRoster, nominationD3CardFacts, parseProjectModules, parseProjectRoster, parseTeamPlan, rosterContainsBuiltInRoleIds, rosterDirectoriesFor, rosterRoleIds, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+import { yamlContractCheck, yamlSessionRole, yamlTaskAssignmentContextText } from "../../common/编排/durable-role-context.ts";
+import { docFormatEvidenceScopeText } from "../../common/编排/doc-format-specs.ts";
 // T3 B3.1（2026-11-10，AC-08/AC-13）：fixed A10 卡在办标记（stage.requested A10）经 fixed 账本公共原语写入。
 import { stageRequestIdempotencyKey } from "../../common/编排/workflow-dispatch.ts";
 import { canRequestStage, deriveWorkflowView, WORKFLOW_CORRUPT_CODE } from "../../common/编排/workflow-state.ts";
@@ -126,7 +128,7 @@ import { readGitProtectionFacts, checkGitProtectionFactsCurrent, readGitHostProt
 // 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git matcher 经 Service 公共出口**同一函数引用**
 // （门禁引擎单一实现；不复制白名单/解析逻辑）。
 // 2026-11-10（B4.1）：任务级 Git 写 matcher 同经 Service 出口消费（同一函数引用；生产不导入私有 common/）。
-import { classifyShellDetailed, defaultShellRules, matchReadonlyGit, matchTaskGit } from "../../service/gate/shell-rules.ts";
+import { matchReadonlyGit, matchTaskGit } from "../../service/gate/shell-rules.ts";
 import type { TaskGitMatch, TaskGitScope } from "../../service/gate/shell-rules.ts";
 import {
   GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
@@ -145,7 +147,9 @@ import type {
   WorkerRoleInput,
 } from "../../model/governance-matrix.ts";
 import { isChiefDecisionExecutionContext, isRuntimeSessionDrained } from "../../model/runtime.ts";
-import type { DurableDomainOperation, DurableRequestWorkflowStartFn } from "../../model/durable-workflow.ts";
+import type { DurableA11GitObservation, DurableDomainOperation, DurableEvidenceRef, DurableRequestWorkflowStartFn } from "../../model/durable-workflow.ts";
+import { implementationTestCommand, verifyImplementationRetestInputs } from "../../service/durable-workflow/public.ts";
+import type { PrepareImplementationSelfTest } from "../../common/编排/shell-gate.ts";
 import type {
   RuntimeReplayEntry,
   RuntimeSessionRecord,
@@ -154,6 +158,9 @@ import type {
   FileGateFacts,
   FileGateProtectionFacts,
   ClaimFileWriteFn,
+  GovernedPackageLockGenerator,
+  RequestDocumentRevisionFn,
+  SubmitDocumentRevisionFn,
   WriteGateContext,
   RoleSession,
   RuntimeAdapter,
@@ -349,11 +356,25 @@ export interface AdapterCapabilities {
   fileGateProtocol?: "host-facts-v1";
   fileGateProtection?: FileGateProtectionFacts;
   claimFileWrite?: ClaimFileWriteFn;
+  governedPackageLock?: GovernedPackageLockGenerator;
+  restoreAcceptanceEnvironment?: RuntimeSessionOptions["restoreAcceptanceEnvironment"];
+  evidenceCollectorRoleId?: string;
+  evidenceAuditAccess?: RuntimeSessionOptions["evidenceAuditAccess"];
+  evidenceAuditIsCurrent?: RuntimeSessionOptions["evidenceAuditIsCurrent"];
+  evidenceAuditReadPaths?: RuntimeSessionOptions["evidenceAuditReadPaths"];
+  evidenceAuditReportPath?: RuntimeSessionOptions["evidenceAuditReportPath"];
+  evidenceCollectionWritePaths?: RuntimeSessionOptions["evidenceCollectionWritePaths"];
+  observeAcceptanceEnvironmentShell?: RuntimeSessionOptions["observeAcceptanceEnvironmentShell"];
+  observeImplementationSelfTest?: RuntimeSessionOptions["observeImplementationSelfTest"];
+  requestDocumentRevision?: RequestDocumentRevisionFn;
+  submitDocumentRevision?: SubmitDocumentRevisionFn;
+  taskGitAvailable?: boolean;
   customerInput?: CustomerInputFn;
   reportHandback?: ReportHandbackFn;
   sessionDir?: string;
   runtime?: RuntimeKind;
   persistSession?: boolean;
+  durableFixedWorkflow?: boolean;
   /**
    * 图片查看能力（`view_image`「注入才注册」，2026-10-26 客户要求；两轮附件设计）——**通用只读能力**：
    * 项目角色与内置治理角色在调用方提供时**都注入**（不按角色收窄；与只给 su 的安装/看护类能力不同）。
@@ -498,6 +519,12 @@ export interface AdapterCapabilities {
    */
   governanceJudge?: GovernanceJudgeToolOptions;
 }
+
+export type ImplementationRetestGuard = (context: { turnId: string; toolCallId: string }) => Promise<
+  { mode: "ordinary" } | { mode: "denied" } | { mode: "retest"; key: string; candidateOid: string; branch: string;
+    workOrderDigest: string; standard: DurableEvidenceRef; modulePaths: readonly string[]; approvedCommands: readonly (readonly string[] | undefined)[];
+    isCurrent(): boolean; observeGit(): Promise<DurableA11GitObservation> }
+>;
 
 export interface RunRoleInput {
   roleId: string;
@@ -1322,6 +1349,10 @@ export async function openRoleSession(
      */
     projectState?: ProjectStateFn;
     requestWorkflowStart?: DurableRequestWorkflowStartFn;
+    durableFixedWorkflow?: boolean;
+    durableImplementationController?: boolean;
+    durableAcceptanceEnvironmentController?: boolean;
+    durableB3EvidenceController?: boolean;
     /** 2026-11-02：`project_note` 受控备注能力；**只对 trio chief 转交**。 */
     projectNote?: ProjectNoteFn;
     /** 2026-11-02：`request_version_decision` 能力；**只对 trio chief 转交**。 */
@@ -1467,6 +1498,20 @@ export async function openRoleSession(
     taskGit?: TaskGitShellRuntimeInput;
     /** Actual guarded-write claim for a task assigned by the durable workflow host. */
     claimFileWrite?: ClaimFileWriteFn;
+    /** Host runtime for the currently assigned A11 implementation child. */
+    governedPackageLock?: GovernedPackageLockGenerator;
+    restoreAcceptanceEnvironment?: RuntimeSessionOptions["restoreAcceptanceEnvironment"];
+    evidenceCollectorRoleId?: string;
+    evidenceAuditAccess?: RuntimeSessionOptions["evidenceAuditAccess"];
+    evidenceAuditIsCurrent?: RuntimeSessionOptions["evidenceAuditIsCurrent"];
+    evidenceAuditReadPaths?: RuntimeSessionOptions["evidenceAuditReadPaths"];
+    evidenceAuditReportPath?: RuntimeSessionOptions["evidenceAuditReportPath"];
+    evidenceCollectionWritePaths?: RuntimeSessionOptions["evidenceCollectionWritePaths"];
+    observeAcceptanceEnvironmentShell?: RuntimeSessionOptions["observeAcceptanceEnvironmentShell"];
+    observeImplementationSelfTest?: RuntimeSessionOptions["observeImplementationSelfTest"];
+    implementationRetest?: ImplementationRetestGuard;
+    requestDocumentRevision?: RequestDocumentRevisionFn;
+    submitDocumentRevision?: SubmitDocumentRevisionFn;
     workflowDomain?: <T>(operation: DurableDomainOperation, run: () => Promise<T>) => Promise<T>;
     /**
      * **R-1：审读结论工具的能力**（`report_shell_verdict`「注入才注册」）——审读会话专用，由
@@ -1665,7 +1710,7 @@ export async function openRoleSession(
     // `activate_role_documents` v2 仍复核 A6 proposalDecisionId + roster/三文档 hash。
     const fixedA8 = await fixedRoleDraftTaskOf(input.project.projectRoot, input.taskId);
     if (fixedA8 !== undefined) {
-      const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: fixedA8.flowId });
+      const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: fixedA8.flowId, evidenceCollectorRoleId: input.durableFixedWorkflow ? input.evidenceCollectorRoleId : undefined });
       if (roster.ok && !rosterContainsBuiltInRoleIds(roster.roster)) {
         for (const role of roster.roster.roles) {
           if (!/^[a-z0-9][a-z0-9-]{0,62}$/i.test(role.id)) continue;
@@ -1703,6 +1748,20 @@ export async function openRoleSession(
     const createdForScope = taskStateForScope.records.get(input.taskId)?.created;
     if (createdForScope?.workflowId !== undefined) {
       if (createdForScope.to !== setup.role.id) return;
+      if (input.durableFixedWorkflow && input.evidenceAuditAccess && input.evidenceAuditIsCurrent) {
+        const flowId = createdForScope.flowId;
+        if (!flowId || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(flowId)) return;
+        if (input.evidenceAuditAccess === "collect" && (createdForScope.stage === "A11" || createdForScope.stage === "B3")) {
+          const root = `docs/verification/${flowId}/${input.taskId}/`;
+          if (input.evidenceCollectionWritePaths?.length === 1 && input.evidenceCollectionWritePaths[0] === root) assignedTaskWritePaths.push(root);
+        } else if (input.evidenceAuditAccess === "audit" && createdForScope.stage === "A12b" && input.evidenceAuditReportPath) {
+          const prefix = `docs/quality/${flowId}-report-v`;
+          if (input.evidenceAuditReportPath.startsWith(prefix) && /^[1-9][0-9]*\.md$/.test(input.evidenceAuditReportPath.slice(prefix.length))) {
+            assignedTaskWritePaths.push(input.evidenceAuditReportPath);
+          }
+        }
+        return;
+      }
       const modulePaths = createdForScope.modulePaths;
       if (modulePaths === undefined || modulePaths.length === 0) return;
       const gitScope = await resolveTaskGitScope({ projectRoot: input.project.projectRoot, taskId: input.taskId, roleId: setup.role.id });
@@ -1732,7 +1791,7 @@ export async function openRoleSession(
   // product 等 fixed 任务目标会话）；legacy 任务（无 workflowId）仍走原路径逐字不变；无 taskId 的
   // chat 不触达本块。
   let fixedTaskAssignment: AssignedTaskFacts | undefined;
-  if (input.taskId && setup.role.kind === "built-in-governance") {
+  if (input.taskId && (setup.role.kind === "built-in-governance" || input.durableFixedWorkflow)) {
     const taskStateForAssignment = await readTaskState(input.project.projectRoot);
     const createdForAssignment = taskStateForAssignment.records.get(input.taskId)?.created;
     if (createdForAssignment?.workflowId !== undefined) {
@@ -1754,6 +1813,39 @@ export async function openRoleSession(
       });
     }
   }
+  const durablePersonnelActivation = input.durableFixedWorkflow === true && setup.role.id === "nominator"
+    && fixedTaskAssignment?.stage === "A8" && fixedTaskAssignment.taskKind !== "stage-request" && !fixedTaskAssignment.stopped;
+  const durableImplementationController = input.durableFixedWorkflow === true && input.durableImplementationController === true
+    && setup.role.id === "convener" && fixedTaskAssignment?.stage === "A11"
+    && fixedTaskAssignment.taskKind !== "stage-request" && !fixedTaskAssignment.stopped;
+  const durableAcceptanceAssignment = input.durableFixedWorkflow === true && fixedTaskAssignment?.stage === "A12b"
+    && fixedTaskAssignment.taskKind !== "stage-request" && !fixedTaskAssignment.stopped;
+  const durableAcceptanceEnvironmentController = durableAcceptanceAssignment && input.durableAcceptanceEnvironmentController === true
+    && setup.role.id === "convener" && fixedTaskAssignment?.sideEffect === "read-only";
+  const restoreAcceptanceEnvironment = durableAcceptanceAssignment && setup.role.kind === "project"
+    ? input.restoreAcceptanceEnvironment : undefined;
+  const evidenceAuditAccess = input.durableFixedWorkflow && input.evidenceAuditAccess === "collect"
+    && setup.role.kind === "project" && fixedTaskAssignment
+    && ["A11", "B3"].includes(fixedTaskAssignment.stage ?? "") ? "collect"
+    : durableAcceptanceAssignment && setup.role.id !== "convener" && !restoreAcceptanceEnvironment ? "audit" : undefined;
+  const observeAcceptanceEnvironmentShell = durableAcceptanceAssignment && setup.role.id !== "convener" && !evidenceAuditAccess
+    ? input.observeAcceptanceEnvironmentShell : undefined;
+  const observeImplementationSelfTest = evidenceAuditAccess === "collect" || input.durableFixedWorkflow === true && fixedTaskAssignment?.stage === "A11"
+    && fixedTaskAssignment.taskKind !== "stage-request" && !fixedTaskAssignment.stopped && setup.role.kind === "project"
+    ? input.observeImplementationSelfTest : undefined;
+  const implementationRetest = evidenceAuditAccess === "collect" || input.durableFixedWorkflow === true && fixedTaskAssignment?.stage === "A11"
+    && fixedTaskAssignment.taskKind !== "stage-request" && !fixedTaskAssignment.stopped && setup.role.kind === "project"
+    ? input.implementationRetest : undefined;
+  const requestDocumentRevision = durableImplementationController ? input.requestDocumentRevision : undefined;
+  const submitDocumentRevision = input.durableFixedWorkflow && setup.role.kind === "built-in-governance" && fixedTaskAssignment
+    && fixedTaskAssignment.taskKind !== "stage-request" && !fixedTaskAssignment.stopped ? input.submitDocumentRevision : undefined;
+  const governedPackageLock = input.governedPackageLock && input.durableFixedWorkflow === true
+    && input.claimFileWrite !== undefined && input.taskGit?.durableScope !== undefined
+    && setup.role.kind === "project" && fixedTaskAssignment?.stage === "A11" && fixedTaskAssignment.sideEffect === "code"
+    && fixedTaskAssignment.taskKind !== "stage-request" && !fixedTaskAssignment.stopped
+    && assignedTaskWritePaths?.includes("package-lock.json") && managedBoundary.acceptance.accepted
+    && managedBoundary.entries.some(entry => section1EntryCovers(entry, "package-lock.json", staticScope?.conditions ?? []))
+    ? input.governedPackageLock : undefined;
   let assignedReview: Awaited<ReturnType<ReturnType<typeof createTrunkService>["readAssignedReviewContext"]>> | undefined;
   if (input.taskId && setup.role.kind === "built-in-governance" && setup.role.id === "verifier" && fixedTaskAssignment === undefined) {
     const task = await createTrunkService({ projectRoot: input.project.projectRoot }).inspectAssignedTask({ taskId: input.taskId, actorRoleId: setup.role.id });
@@ -1813,7 +1905,7 @@ export async function openRoleSession(
     // One immutable boundary/task intersection is used at all three genuine Provider stages.
     // Read preflight authorizes only the next bounded read, never a stable write or permit consumption.
     const stageScope = input.claimFileWrite !== undefined && !(input.workflowDomain && setup.role.kind === "built-in-governance")
-      ? { writeSet: assignedTaskWritePaths ?? [], conditions: staticScope?.conditions ?? [] }
+      ? { writeSet: assignedTaskWritePaths && rel !== undefined ? [rel] : [], conditions: staticScope?.conditions ?? [] }
       : confirmationMode
       ? scopeWithPreauthorizedWrites({ writeSet: [...confinedWriteSet, ...issued], conditions }, p, input.project.projectRoot, preauthorization)
       : staticScope !== undefined ? (hasPreauthorization ? scopeWithPreauthorizedWrites(staticScope, p, input.project.projectRoot, preauthorization) : staticScope)
@@ -1824,7 +1916,10 @@ export async function openRoleSession(
     if (stagedDecision && !stagedDecision.allowed) return stagedDecision;
     if (rel !== undefined) {
       if (isTrio && setup.role.id === "nominator" && /^角色卡\/[^/]+\/(?:role-card\.md|boundary\.md|boundary\.yaml)$/.test(rel)) {
-        if (!roleDraftWritePaths.includes(rel)) return { allowed: false, reason: "Role drafts require the actual completed plan and current D3 selection; no old appointment-write card can substitute", allowedByRoot: { skill: [], project: [] } };
+        if (!roleDraftWritePaths.includes(rel)) return { allowed: false,
+          reason: input.durableFixedWorkflow ? "角色草稿须属于当前 A8 任务和已批准角色名单。"
+            : "Role drafts require the actual completed plan and current D3 selection; no old appointment-write card can substitute",
+          allowedByRoot: { skill: [], project: [] } };
         return stagedDecision ?? baseGate(p);
       }
       if (fileFacts && fileFacts.stage !== "final-write") return stagedDecision!;
@@ -1984,7 +2079,7 @@ export async function openRoleSession(
             if (effectiveReq.kind !== "choice") {
               return rejectAppointment("招人决定卡必须是 choice 卡（多选名单角色）；本次未向客户发卡。");
             }
-            const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: appointmentFlowId });
+            const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: appointmentFlowId, evidenceCollectorRoleId: input.durableFixedWorkflow ? input.evidenceCollectorRoleId : undefined });
             if (!roster.ok) {
               return rejectAppointment(`招人决定卡前置不满足：${roster.reason} 请先让策划产出合法名单。`);
             }
@@ -2228,7 +2323,7 @@ export async function openRoleSession(
             const previewFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             const previewTarget = typeof effectiveMetadata?.targetRoleId === "string" ? effectiveMetadata.targetRoleId.trim() : "";
             if (typeof previewFlowId === "string" && previewFlowId !== "" && previewTarget !== "") {
-              const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: previewFlowId });
+              const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: previewFlowId, evidenceCollectorRoleId: input.durableFixedWorkflow ? input.evidenceCollectorRoleId : undefined });
               if (roster.ok) {
                 appointmentAllowedDirectories = rosterDirectoriesFor(roster.roster, previewTarget) ?? [];
               }
@@ -2480,12 +2575,18 @@ export async function openRoleSession(
   // 守卫不另写第二份真实路径判定。显式写目标越界即拒；不透明执行交客户本人（manualOnly）。
   const shellCheckWrite = (relPath: string): { allowed: boolean; reason?: string } => {
     if (isTrio && setup.role.id === "nominator" && /^角色卡\/[^/]+\/(?:role-card\.md|boundary\.md|boundary\.yaml)$/.test(relPath))
-      return { allowed: false, reason: "D3 role drafts use the guarded write_file/edit_file path; opaque shell cannot write or activate role documents" };
+      return { allowed: false, reason: input.durableFixedWorkflow ? "请使用受治理文件工具写入当前 A8 角色草稿，激活使用 activate_role_documents。"
+        : "D3 role drafts use the guarded write_file/edit_file path; opaque shell cannot write or activate role documents" };
     const decision = gate(relPath);
     return decision.allowed === true ? { allowed: true } : { allowed: false, reason: decision.reason };
   };
+  // The foreground uses the registered application gate. Background processes have no foreground post-execution audit.
+  const backgroundShellDenial = (req: ShellReviewRequest) =>
+    input.claimFileWrite && req.entry === "start_background_task"
+      ? { kind: "deny" as const, reason: "当前任务的应用执行能力只允许前台命令。", targets: [] }
+      : undefined;
   const shellWriteGuard = (req: ShellReviewRequest) =>
-    evaluateShellWriteTargets({
+    backgroundShellDenial(req) ?? evaluateShellWriteTargets({
       argv: req.argv,
       cwd: req.cwd,
       // 2026-11-08（W3-G / AC-22）：真实入口——只读 Git 放行仅前台 `run_shell`；后台入口维持 Git 硬拒。
@@ -2533,6 +2634,39 @@ export async function openRoleSession(
         ? [input.project.skillRoot]
         : [],
   });
+  const prepareImplementationSelfTest: PrepareImplementationSelfTest | undefined = implementationRetest && (async req => {
+    const context = await implementationRetest({ toolCallId: req.toolCallId, turnId: req.turnId ?? "" });
+    if (context.mode === "ordinary") return context;
+    const deny = (reason: string) => ({ mode: "denied" as const, reason });
+    if (context.mode !== "retest" || !req.turnId || req.roleId !== setup.role.id || !context.isCurrent()
+      || evidenceAuditAccess === "collect" && !await input.evidenceAuditIsCurrent?.())
+      return deny("当前请求未绑定有效的同候选补测回合。");
+    if (req.entry !== "run_shell" || path.relative(input.project.projectRoot, req.cwd))
+      return deny("同候选补测仅允许在原项目根使用前台命令。");
+    if (matchReadonlyGit(req.argv)) return { mode: "ordinary" };
+    if (!observeImplementationSelfTest) return deny("当前补测的应用回执或严格审计未装配。");
+    if (!implementationTestCommand(req.argv) || !context.approvedCommands.some(argv => argv === undefined
+      ? evidenceAuditAccess !== "collect" : argv.length === req.argv.length && argv.every((arg, index) => arg === req.argv[index]))) {
+      return deny("补测命令须匹配当前缺项的正式命令和字面 argv；可用独立只读工具核对候选。");
+    }
+    const verifyInputs = () => verifyImplementationRetestInputs(input.project.projectRoot, context.candidateOid, context.modulePaths, req.argv, context.standard);
+    const checked = await verifyInputs();
+    if (!checked.ok) return deny(checked.message);
+    return { mode: "strict", prepare: async () => {
+      if (!context.isCurrent() || evidenceAuditAccess === "collect" && !await input.evidenceAuditIsCurrent?.())
+        throw new Error("已批准命令的取证或补测回合已经换代。");
+      const ready = await verifyInputs();
+      if (!ready.ok) throw new Error(ready.message);
+      await shellPostAudit.snapshotRetest(req, context);
+      return context.isCurrent;
+    } };
+  });
+  const requestDownload: RequestDownloadFn | undefined = input.requestDownload && (implementationRetest
+    ? async (request, metadata) => {
+      const guard = await implementationRetest({ turnId: metadata?.turnId ?? "", toolCallId: metadata?.toolCallId ?? "" });
+      return guard.mode === "ordinary" ? input.requestDownload!(request, metadata)
+        : { ok: false, code: "download-unavailable", message: "当前同候选补测不允许下载或使用备用写入工具。" };
+    } : input.requestDownload);
 
   // 回交（设计 §10.8）：角色会话 settle → 编排发 `handback` 事件，交回治理角色。
   // **星形最小系统（2026-10-29 客户实测）**：内置 worker（产品/策划/人事/运营/质检）也是幕僚的 worker，
@@ -2574,8 +2708,11 @@ export async function openRoleSession(
   // B 批（2026-10-28）：**幕僚（trio chief）的星形派发不套旧 flow 派发门**——任务/汇报主链走
   // `tasks.jsonl`，目标由桌面星形路由校验（任意内置/项目 worker、自身除外）。convener 的旧 dispatch
   // 仍逐字走原派发范围门（保留至 D）；single/su 旧行为不变。
+  const b3EvidenceController = input.durableFixedWorkflow === true && input.durableB3EvidenceController === true
+    && fixedTaskAssignment?.stage === "B3" && setup.role.id === "convener";
   const dispatchTask: DispatchTaskFn | undefined =
-    cap?.dispatchTask === true && input.dispatchTask !== undefined ? input.dispatchTask : undefined;
+    cap?.dispatchTask === true && (!input.durableFixedWorkflow || durableImplementationController || durableAcceptanceEnvironmentController || b3EvidenceController)
+      ? input.dispatchTask : undefined;
 
   // G-2 看护三能力（R1/R2）：能力矩阵驱动——仅 `capabilities.roleStatus/sessionTail/proposeRecovery`
   // （trio=Convener；su 旧行为）。未注入 ⇒ 不注入（能力缺席 = 最强 fail-closed）。
@@ -2693,7 +2830,11 @@ export async function openRoleSession(
     } else {
       try {
         // **只读档不注入升级注入点**（尤其 `takeGrant`）：陈旧授权不得越过 `readonly-deny`。
-        shellGate = await assembleReadonlyShellGate({ project: input.project, ...input.shellReadonly });
+        const readonly = input.shellReadonly;
+        shellGate = await assembleReadonlyShellGate({ project: input.project, ...readonly,
+          ...(input.claimFileWrite ? { writeGuard: (req: ShellReviewRequest) =>
+            backgroundShellDenial(req) ?? readonly.writeGuard?.(req) ?? { kind: "pass" } } : {}),
+        });
       } catch (err) {
         log.error("shell.arming.failed", err);
         shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
@@ -2712,6 +2853,7 @@ export async function openRoleSession(
         ...(input.routineShellPolicy !== undefined ? { routineShellPolicy: input.routineShellPolicy } : {}),
         writeGuard: shellWriteGuard,
         snapshotBefore: (req) => shellPostAudit.snapshotBefore(req),
+        ...(prepareImplementationSelfTest ? { prepareImplementationSelfTest } : {}),
         approvalContextLoader: shellApprovalContextLoader,
         // 2026-11-08（I0-6）：受保护范围启用审批类放行 + 审计失败 ⇒ 拒绝（fail-closed）。
         auditFailurePolicy: roleCapabilityProtection.state === "required" ? "deny-non-readonly" : "observe",
@@ -2720,20 +2862,6 @@ export async function openRoleSession(
       log.error("shell.arming.failed", err);
       shellGate = undefined;
     }
-  }
-
-  if (input.claimFileWrite && shellGate) {
-    const originalGate = shellGate;
-    const rules = defaultShellRules();
-    shellGate = async request => {
-      const classification = classifyShellDetailed(request.argv, rules, { taskGitScope: taskGitRuntime?.scope });
-      const approvedShape = classification.decision === "allow"
-        && (classification.ruleId.startsWith("allow:readonly:") || classification.ruleId.startsWith("allow:task-git:"));
-      if (request.entry === "start_background_task" || !approvedShape) {
-        return { allow: false, by: "durable-workflow", reason: "持久任务的实际写入必须经过工作流认领。" };
-      }
-      return originalGate(request);
-    };
   }
 
   // 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git 固定传输能力（注入才生效）——
@@ -2808,7 +2936,8 @@ export async function openRoleSession(
   };
   const effectiveRoleActivityLog = moduleToolValue("roleActivityLog", roleActivityLog, input.roleActivityLog);
   const effectiveTerminateRoleRun = moduleToolValue("terminateRoleRun", terminateRoleRun, input.terminateRoleRun);
-  const effectiveRedispatchTask = moduleToolValue("redispatchTask", redispatchTask, input.redispatchTask);
+  const effectiveRedispatchTask = input.durableFixedWorkflow
+    ? undefined : moduleToolValue("redispatchTask", redispatchTask, input.redispatchTask);
   const effectiveProjectNote = moduleToolValue("projectNote", projectNote, input.projectNote);
   const requestWorkflowStart = directGovernance && setup.role.id === "chief" && !input.taskId && !input.workflowDomain
     && moduleDeclaresTool("requestWorkflowStart") === true ? input.requestWorkflowStart : undefined;
@@ -2897,6 +3026,7 @@ export async function openRoleSession(
   // `{operationId,taskId,outcome,note?}`；legacy 会话字段缺席（legacy 实现逐字保留在上方）。
   const fixedCloseCreatedTask: FixedCloseCreatedTaskFn | undefined = fixedSessionTools
     && directGovernance && (setup.role.id === "chief" || setup.role.id === "convener")
+    && (!input.durableFixedWorkflow || setup.role.id === "convener" && input.closeCreatedTaskFixed !== undefined)
     && moduleCloseCreatedTask !== false
     ? async (toolInput: FixedCloseCreatedTaskToolInput, signal) => {
         if (signal?.aborted) {
@@ -2962,7 +3092,8 @@ export async function openRoleSession(
 
   // —————— 治理权力矩阵（C3）：幕僚启动快照 + 六角色工具能力（注入才注册） ——————
   // 仅 trio + 内置治理 + 六个内置角色之一；worker/su/single 不启用。
-  const governanceMatrixEnabled = chiefDecisionContext === undefined && governanceModel === "trio" && builtInGovernance && isTrio;
+  const governanceMatrixEnabled = chiefDecisionContext === undefined && !input.durableFixedWorkflow
+    && governanceModel === "trio" && builtInGovernance && isTrio;
   const governanceMatrixSessionFlags: GovernanceMatrixSessionFlags = {
     customerInput: governedInput !== undefined,
     download: input.requestDownload !== undefined,
@@ -3017,14 +3148,29 @@ export async function openRoleSession(
     : undefined;
 
   // T3 B10.2：fixed 任务会话的 assignment 上下文（应用账本事实；与 legacy assignedReview 互斥）。
+  const frozenFlowId = input.durableFixedWorkflow ? fixedTaskAssignment?.flowId : undefined;
+  const frozenCollectorRoleId = frozenFlowId ? input.evidenceCollectorRoleId : undefined;
+  const docFormat = input.docFormat && frozenFlowId && frozenCollectorRoleId
+    ? (async (query, metadata) => {
+      const result = await input.docFormat!(query, metadata);
+      const scope = docFormatEvidenceScopeText(query.format, frozenFlowId, frozenCollectorRoleId);
+      return typeof result === "string" && result && scope ? scope + "\n\n" + result : result;
+    }) satisfies DocFormatFn : input.docFormat;
+  const taskGitAvailable = input.durableFixedWorkflow === true && fixedTaskAssignment?.stage === "A11"
+    && shellGate !== undefined && taskGitRuntime !== undefined;
   if (fixedTaskAssignment !== undefined) {
-    contextSections = [...(contextSections ?? []), fixedTaskAssignmentContextText(fixedTaskAssignment)];
+    contextSections = [...(contextSections ?? []), input.durableFixedWorkflow
+      ? await yamlTaskAssignmentContextText(fixedTaskAssignment, assignedTaskWritePaths, input.project.projectRoot,
+        governedPackageLock !== undefined, taskGitAvailable, frozenCollectorRoleId)
+      : fixedTaskAssignmentContextText(fixedTaskAssignment)];
   }
+  if (requestDocumentRevision) contextSections = [...(contextSections ?? []),
+    "发现当前治理文件错误或已批准依据使实施无法继续时，使用 request_document_revision 提交精确文件路径和原因。应用按固定归属派发，确认及恢复节点由工作流处理。工具受理后结束当前回合。"];
   if (assignedReview?.ok) contextSections = [...(contextSections ?? []), assignedReview.value.contextText];
   // T3 B1（AC-12/§3.4）：fixed 会话注入模块 `context({matrix:"two-fixed-paths/v1"})` 段（纯文本；
   // legacy 数据/context 返回值逐字不变——只在 fixed 模式追加）。
-  if (sessionWorkflowMode === "fixed") {
-    const fixedContextModule = builtInRoleModuleOf(setup.role.id);
+  if (sessionWorkflowMode === "fixed" || input.durableFixedWorkflow) {
+    const fixedContextModule = input.durableFixedWorkflow ? undefined : builtInRoleModuleOf(setup.role.id);
     if (fixedContextModule !== undefined) {
       const fixedSections = fixedContextModule.context({ governanceModel, matrix: "two-fixed-paths/v1" })
         .map((section) => section.text)
@@ -3037,15 +3183,21 @@ export async function openRoleSession(
     // ⇒ 抛错 fail-closed（与 legacy loader 同口径；不猜正文、不静默降级）。
     if (builtInGovernance && setup.role.id === "chief" && chiefDecisionContext === undefined) {
       const fixedChiefWorkflow = await loadFixedChiefWorkflowResource();
+      const durableSection = /<!-- durable-chief:start -->\r?\n([\s\S]*?)\r?\n<!-- durable-chief:end -->/g;
+      const sections = [...fixedChiefWorkflow.text.matchAll(durableSection)];
+      if (input.durableFixedWorkflow && (sections.length !== 1 || !sections[0]?.[1]?.trim())) {
+        throw new Error("chief-workflow-v2-resource-unavailable: invalid YAML workflow section");
+      }
+      const workflowText = input.durableFixedWorkflow ? sections[0]![1]! : fixedChiefWorkflow.text.replace(durableSection, "");
       contextSections = [...(contextSections ?? []),
-        `## 应用内置 Chief workflow v2（fixed 固定路径；本段优先于任何 legacy chief-workflow v1 段）\n${JSON.stringify({
+        `## 应用内置 Chief workflow v2（${input.durableFixedWorkflow ? "YAML 固定派发" : "fixed 固定路径；本段优先于任何 legacy chief-workflow v1 段"}）\n${JSON.stringify({
           sourceUrl: fixedChiefWorkflow.sourceUrl,
           moduleUrl: fixedChiefWorkflow.moduleUrl,
           resourceVersion: fixedChiefWorkflow.version,
           sha256: fixedChiefWorkflow.sha256,
           bytes: fixedChiefWorkflow.bytes,
           applicationVersion: fixedChiefWorkflow.applicationVersion,
-        })}\n\n${fixedChiefWorkflow.text}`];
+        })}\n\n${workflowText}`];
       log.record("chief.workflow.v2.loaded", {
         version: fixedChiefWorkflow.version,
         sha256: fixedChiefWorkflow.sha256,
@@ -3053,7 +3205,7 @@ export async function openRoleSession(
       });
     }
   }
-  if (requestWorkflowStart) {
+  if (requestWorkflowStart && !input.durableFixedWorkflow) {
     contextSections = [...(contextSections ?? []),
       "## 客户需求与工作流启用\n收到普通客户的新需求时，先用 project_state 查当前项目有效工作流目录，"
       + "按需提供 definitionId 查看定义。根据实际需求和项目条件选择定义，使用 request_workflow_start 提交目录的 ID、来源、摘要和选择理由。"
@@ -3065,8 +3217,15 @@ export async function openRoleSession(
   const capabilities: AdapterCapabilities = chiefDecisionContext !== undefined ? {
     chiefDecisionContext: structuredClone(chiefDecisionContext), decidePendingRequest: input.decidePendingRequest,
     persistSession: false, ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
+  } : submitDocumentRevision ? {
+    durableFixedWorkflow: true, submitDocumentRevision,
+    roleId: setup.role.id, runtime: input.runtime, persistSession: input.persistSession, sessionDir,
+    contractCheck: yamlContractCheck(setup.role, fixedTaskAssignment, undefined, input.project.projectRoot, frozenCollectorRoleId),
+    contextSections: ["当前是应用定向派发的治理文件修订任务。读取实际文件和问题，使用 submit_document_revision 提交该文件的完整候选内容。应用隔离候选并处理审批、发布与恢复。"],
   } : {
-    ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
+    ...(input.durableFixedWorkflow ? { durableFixedWorkflow: true } : {}),
+    ...(governedInput !== undefined && !durablePersonnelActivation && !durableImplementationController && !durableAcceptanceEnvironmentController
+      ? { customerInput: governedInput } : {}),
     ...(reportHandback !== undefined ? { reportHandback } : {}),
     // 2026-10-26 图片查看（view_image）：**通用只读能力**——项目角色与内置治理角色都注入（只要调用方
     // 提供；不按角色收窄）；未提供 ⇒ 字段缺席、工具不注册（同 dispatch_task 的「注入才注册」先例）。
@@ -3076,12 +3235,22 @@ export async function openRoleSession(
     protectedGitRoots: gitProtection.protectedGitRoots,
     ...(managedFileProtocol ? { fileGateProtocol: "host-facts-v1" as const, fileGateProtection: gitProtection } : {}),
     ...(input.claimFileWrite ? { claimFileWrite: input.claimFileWrite } : {}),
+    ...(governedPackageLock ? { governedPackageLock } : {}),
+    ...(restoreAcceptanceEnvironment ? { restoreAcceptanceEnvironment } : {}),
+    ...(evidenceAuditAccess ? { evidenceAuditAccess, evidenceAuditIsCurrent: input.evidenceAuditIsCurrent,
+      evidenceAuditReadPaths: input.evidenceAuditReadPaths, ...(evidenceAuditAccess === "audit"
+        ? { evidenceAuditReportPath: input.evidenceAuditReportPath } : { evidenceCollectionWritePaths: input.evidenceCollectionWritePaths }) } : {}),
+    ...(observeAcceptanceEnvironmentShell ? { observeAcceptanceEnvironmentShell } : {}),
+    ...(observeImplementationSelfTest ? { observeImplementationSelfTest } : {}),
+    ...(requestDocumentRevision ? { requestDocumentRevision } : {}),
+    ...(taskGitAvailable ? { taskGitAvailable: true } : {}),
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
-    ...(requestRequirementChange !== undefined ? { requestRequirementChange } : {}),
+    ...(requestRequirementChange !== undefined && !durableImplementationController && !durableAcceptanceEnvironmentController
+      ? { requestRequirementChange } : {}),
     // 2026-11-04 下载申请：纯透传；未注入 ⇒ 字段缺席、工具不注册。
-    ...(input.requestDownload !== undefined ? { requestDownload: input.requestDownload } : {}),
+    ...(requestDownload !== undefined ? { requestDownload } : {}),
     ...(projectState !== undefined ? { projectState } : {}),
     ...(effectiveProjectNote !== undefined ? { projectNote: effectiveProjectNote } : {}),
     ...(requestWorkflowStart ? { requestWorkflowStart } : {}),
@@ -3090,10 +3259,12 @@ export async function openRoleSession(
     // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层只透传同一引用，不包装、
     // 不调用、不写盘/flow、不伪造接受或决定。
     ...(roleStatus !== undefined ? { roleStatus } : {}),
-    ...(input.contractCheck !== undefined ? { contractCheck: input.contractCheck } : {}),
+    ...(input.contractCheck !== undefined ? { contractCheck: input.durableFixedWorkflow
+      ? yamlContractCheck(setup.role, fixedTaskAssignment, assignedTaskWritePaths, input.project.projectRoot, frozenCollectorRoleId)
+      : input.contractCheck } : {}),
     // 2026-11-09（文档格式权威说明，P1.2 §14 G1）：只读 `doc_format` 数据源，与 contractCheck 同条件透传；
     // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层纯透传同一引用。
-    ...(input.docFormat !== undefined ? { docFormat: input.docFormat } : {}),
+    ...(docFormat !== undefined ? { docFormat } : {}),
     ...(input.evidenceCheck !== undefined ? { evidenceCheck: input.evidenceCheck } : {}),
     ...(sessionTail !== undefined ? { sessionTail } : {}),
     ...(effectiveRoleActivityLog !== undefined ? { roleActivityLog: effectiveRoleActivityLog } : {}),
@@ -3112,7 +3283,7 @@ export async function openRoleSession(
     // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 经模块声明 + 既有 directGovernance 会话模式门控
     // 决定是否注入；single/su 回退旧合并字面量（`effectiveCloseCreatedTask`）。fixed 会话不注入 legacy
     // 实现（B1 注入面兼容别名见下：同名能力位保留但值为 fixed 实现，供既有断言/旧 handler 路径复用）。
-    ...(effectiveCloseCreatedTask !== undefined && !fixedSessionTools ? { closeCreatedTask: effectiveCloseCreatedTask } : {}),
+    ...(effectiveCloseCreatedTask !== undefined && !fixedSessionTools && !input.durableFixedWorkflow ? { closeCreatedTask: effectiveCloseCreatedTask } : {}),
     ...(fixedCloseCreatedTask !== undefined ? { closeCreatedTask: fixedCloseCreatedTask as unknown as CloseCreatedTaskFn } : {}),
     ...(fixedCloseCreatedTask !== undefined ? { closeCreatedTaskFixed: fixedCloseCreatedTask } : {}),
     ...(legacyOnlyToolsAllowed && input.gitQuery !== undefined ? { gitQuery: input.gitQuery } : {}),
@@ -3139,12 +3310,16 @@ export async function openRoleSession(
   const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions);
   if (deps.createAdapter && !officialCoreAdapterFactories.has(deps.createAdapter)) unmanagedFactoryAttempts.push({ projectRoot: input.project.projectRoot, roleId: setup.role.id, runtime: input.runtime ?? "pi", reason: "unverified-role-session-adapter-factory" });
   const adapter = createAdapter(
-    gate,
+    submitDocumentRevision ? () => ({ allowed: false, reason: "修订候选必须由本次专用工具保存。",
+      allowedByRoot: { skill: [], project: [] } }) : gate,
     Object.keys(capabilities).length > 0 ? capabilities : undefined,
   );
   let session: RoleSession;
   try {
-    session = await bindPreparedRuntimeRole(adapter, setup.role, input.project.projectRoot);
+    const runtimeRole = input.durableFixedWorkflow && chiefDecisionContext === undefined
+      ? yamlSessionRole(setup.role, fixedTaskAssignment?.stage, durableImplementationController, submitDocumentRevision !== undefined,
+        durableAcceptanceEnvironmentController ? "parent" : restoreAcceptanceEnvironment ? "child" : undefined) : setup.role;
+    session = await bindPreparedRuntimeRole(adapter, runtimeRole, input.project.projectRoot);
   } catch (err) {
     captureRoleSessionOpenFailure(err, { projectRoot: input.project.projectRoot, roleId: setup.role.id, runtime: input.runtime ?? "pi" },
       !deps.createAdapter || officialCoreAdapterFactories.has(deps.createAdapter));
@@ -3163,7 +3338,7 @@ export async function openRoleSession(
 
   // 自动收尾 + 自动重 pin（A-4 / §13.3）：缺省仅**内置治理角色（su）会话**开启。
   // `repinIfBootstrapped`：创世态 = **首次收尾**（无可 pin 之物 → 零副作用）；非创世态 = 重扫更新 pin。
-  const autoRepinEnabled = chiefDecisionContext === undefined && (input.autoRepin ?? setup.role.kind === "built-in-governance");
+  const autoRepinEnabled = !submitDocumentRevision && chiefDecisionContext === undefined && (input.autoRepin ?? setup.role.kind === "built-in-governance");
 
   let disposed = false;
   // F-5-opt1：排入的模型可见注记（下一次 send 的输入前缀；送达一次即消费——见 queueModelNotice 文档）。
@@ -4359,6 +4534,8 @@ const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> &
   "merge-main": "merge-main 为应用合并通道发起的高风险确认卡，必须客户本人确认、judge 不可代批；不得用 request_choice/request_confirmation 发该卡",
   "stable-write": "stable 写入确认卡由应用自有通道（stable-write-runtime）发起；不得用 request_choice/request_confirmation 发 stable 写入确认卡",
   "workflow-start": "工作流启用卡由应用在幕僚提交提议后呈现，须客户本人确认",
+  "document-revision": "治理文件修订须由应用按候选摘要呈现本人确认卡",
+  "workflow-blocked-scope": "此卡只能由应用绑定当前工作流实际阻塞和已批准材料生成",
 };
 
 /**
@@ -4594,6 +4771,65 @@ function fixedTaskAssignmentContextText(task: AssignedTaskFacts): string {
 }
 
 /** Fresh host-derived ordinary scope facts. This is not a permission or an effect capability. */
+export async function preflightDurableReviewWrite(input: {
+  project: ProjectConfig; roleId: string; path: string;
+}): Promise<import("../../model/durable-workflow.ts").DurableResult<true>> {
+  if (!/^docs\/quality\/[a-z0-9][a-z0-9-]*-(?:criteria|report)-v[1-9][0-9]*\.md$/.test(input.path)) {
+    return { ok: false, code: "workflow-review-path-invalid", message: "本次验收的规范文件路径无效。" };
+  }
+  const setup = await setupRole(input.roleId, input.project, { allowBuiltInRoles: true });
+  if (!setup.ok) return { ok: false, code: "workflow-review-role-unavailable", message: setup.reason };
+  const trio = governanceRoleOf(setup.role.id);
+  const forbidden = trio && forbiddenWriteDecision(trio, input.path);
+  const checked = forbidden ?? await buildGate(setup.role, input.project, { writeSet: [input.path], conditions: [] })(input.path);
+  return checked.allowed ? { ok: true, value: true }
+    : { ok: false, code: "workflow-review-write-denied", message: checked.reason ?? "当前角色无法写入规范验收文件。" };
+}
+
+/** Inspect the worker's existing manifest authority without issuing a write or a task grant. */
+export async function preflightDurableEnvironmentOwner(input: {
+  project: ProjectConfig; roleId: string;
+}): Promise<import("../../model/durable-workflow.ts").DurableResult<true>> {
+  const setup = await setupRole(input.roleId, input.project, { allowBuiltInRoles: false });
+  if (!setup.ok || setup.role.kind !== "project") {
+    return { ok: false, code: "environment-owner-unavailable", message: setup.ok ? "恢复须由当前项目属主办理。" : setup.reason };
+  }
+  const path = "package.json";
+  const checked = await buildGate(setup.role, input.project, { writeSet: [path], conditions: [] })(path);
+  return checked.allowed ? { ok: true, value: true }
+    : { ok: false, code: "environment-owner-denied", message: checked.reason ?? "当前角色没有获批清单写域。" };
+}
+
+/** Inspect approved module locations against the active role's real write gate without creating files or grants. */
+export async function preflightDurableImplementationOwner(input: {
+  project: ProjectConfig; roleId: string; paths: readonly string[];
+}): Promise<import("../../model/durable-workflow.ts").DurableResult<true>> {
+  const setup = await setupRole(input.roleId, input.project, { allowBuiltInRoles: false });
+  if (!setup.ok || setup.role.kind !== "project" || !input.paths.length) {
+    return { ok: false, code: "workflow-implementation-owner-unavailable", message: setup.ok ? "工作项缺实际项目属主。" : setup.reason };
+  }
+  const gate = buildGate(setup.role, input.project, { writeSet: [...input.paths], conditions: [] });
+  for (const path of input.paths) {
+    let checked;
+    if (path.endsWith("/")) {
+      const directory = path.slice(0, -1);
+      if (isAbsoluteAny(directory) || /[\\:\x00-\x1f]/.test(directory) || normalizeLexical(directory) !== directory
+        || directory.split("/").some(part => !part || part === "." || part === "..")) {
+        return { ok: false, code: "workflow-implementation-owner-denied", message: "工作项目录须是规范的项目内相对路径。" };
+      }
+      if (!setup.role.boundary.entries.some(entry => entry.kind !== "file" && section1EntryCovers(entry, directory, []))) {
+        return { ok: false, code: "workflow-implementation-owner-denied", message: "当前角色没有覆盖工作项目录的已声明目录写域。" };
+      }
+      const probe = path + "__ans_write_preflight__";
+      checked = await buildGate(setup.role, input.project, { writeSet: [probe], conditions: [] })(probe);
+    } else {
+      checked = await gate(path);
+    }
+    if (!checked.allowed) return { ok: false, code: "workflow-implementation-owner-denied", message: checked.reason ?? "当前实际角色没有该模块写域。" };
+  }
+  return { ok: true, value: true };
+}
+
 export async function readRoleCapabilityProtectionScope(input: { projectRoot: string }): Promise<{ state: "required" | "unmanaged" | "unknown"; revision: number }> {
   const { state, revision } = await readGitHostProtectionRequirement(input);
   return { state, revision };
@@ -4692,6 +4928,7 @@ export function createRuntimeAdapterFactory(
   const factory: RuntimeAdapterFactory = (gate, capabilities) => createRuntimeAdapter({
     ...options,
     runtime, gate, projectRoot: project.projectRoot, skillRoot: project.skillRoot,
+    durableFixedWorkflow: capabilities?.durableFixedWorkflow,
     readRoot: project.projectRoot,
     writeRoot: runtime === "demo" ? options.writeRoot : project.projectRoot,
     shellCwd: project.projectRoot,
@@ -4731,6 +4968,18 @@ export function createRuntimeAdapterFactory(
     fileGateProtocol: capabilities?.fileGateProtocol,
     fileGateProtection: capabilities?.fileGateProtection,
     claimFileWrite: capabilities?.claimFileWrite,
+    governedPackageLock: capabilities?.governedPackageLock,
+    restoreAcceptanceEnvironment: capabilities?.restoreAcceptanceEnvironment,
+    evidenceAuditAccess: capabilities?.evidenceAuditAccess,
+    evidenceAuditIsCurrent: capabilities?.evidenceAuditIsCurrent,
+    evidenceAuditReadPaths: capabilities?.evidenceAuditReadPaths,
+    evidenceAuditReportPath: capabilities?.evidenceAuditReportPath,
+    evidenceCollectionWritePaths: capabilities?.evidenceCollectionWritePaths,
+    observeAcceptanceEnvironmentShell: capabilities?.observeAcceptanceEnvironmentShell,
+    observeImplementationSelfTest: capabilities?.observeImplementationSelfTest,
+    requestDocumentRevision: capabilities?.requestDocumentRevision,
+    submitDocumentRevision: capabilities?.submitDocumentRevision,
+    taskGitAvailable: capabilities?.taskGitAvailable,
     submitRefactor: capabilities?.submitRefactor,
     requestStableWrite: capabilities?.requestStableWrite,
     // 治理权力矩阵（C3）：纯展示提示段（C2 `RuntimeProviderOptions.contextSections`）与只读工具

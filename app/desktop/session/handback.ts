@@ -22,6 +22,7 @@
 import { createHash } from "node:crypto";
 import { createDiagnosticLogger } from "../../../src/common/shared/diagnostics.ts";
 import { handbackKey, renderHandbackPrompt, renderWorkReportPrompt, type HandbackEvent, type TaskHandback } from "../../../src/common/编排/handback.ts";
+import { appendRoleLog, readRoleLog } from "../../../src/common/编排/role-log.ts";
 import { reportTargetForTaskCreator } from "../../../src/common/编排/workflow-preconditions.ts";
 import { shortenSummary, taskEvent, taskReportStatusOf, type TaskReplay } from "../../../src/common/编排/task-state.ts";
 import { isBuiltInGovernanceRoleId } from "../../../src/service/boundary/resolve-boundary.ts";
@@ -30,9 +31,13 @@ import type { RuntimeKind } from "../../../src/common/shared/runtime-shared.ts";
 import type { RuntimeLiveReportViewV1, RuntimeReportSnapshotV1, TaskStateEvent } from "../../../src/model/runtime.ts";
 import type { GovernanceModel } from "../../../src/model/role.ts";
 import { mainT } from "../i18n.ts";
+import { a11ResumeKey, evidenceOperatorBinding, isOperationsParentEffect, operationsTasks, operationsWakeKey, parkDesktopA11Disposition, workflowTaskEffectMatches, workflowWrittenReviewEvidence } from "../durable-workflow-a.ts";
+import { recordAcceptanceEnvironmentReport, recoveryWakeKey } from "../durable-acceptance-environment.ts";
+import { readCollectionEvidence } from "../durable-acceptance-workspace.ts";
+import { verifyDurableTaskCommit } from "../workflow-git.ts";
 import type { SessionManagerDeps } from "./contracts/deps.ts";
 import type { DurableEvidenceRef, DurableFact, DurablePendingTask, DurableProjection } from "../../../src/model/durable-workflow.ts";
-import { durableTaskId } from "../durable-workflow.ts";
+import { durableTaskId, isDirectProductCapability, recordWorkflowNotice } from "../durable-workflow.ts";
 import { isRuntimeKind } from "../runtime-config.ts";
 import type { DeliveryItem, DesktopOrchestrationEvent, LiveSession } from "./contracts/session-types.ts";
 import { now } from "./shared/clock.ts";
@@ -41,6 +46,25 @@ import { emitDeliveryNote } from "./shared/notifier.ts";
 import { chiefTaskRoleIdOf, findListingForFeedback, handbackOwnerRoleId } from "./shared/roles.ts";
 import { appendTaskStateResult, readTasks, taskCreators } from "./shared/tasks-store.ts";
 import { shouldSuppressStarTaskReport } from "./shared/text.ts";
+
+function proposalEvidencePaths(flowId: string, evidence: RuntimeReportSnapshotV1["evidence"]): string[] {
+  const version = "-v[1-9][0-9]{0,8}\\.md";
+  const namedMaterial = new RegExp(`^(docs/proposals/${flowId}-(?:proposal|modules|roster)${version}|docs/contracts/${flowId}-architecture${version})(.*)$`, "u");
+  const paths = new Set<string>();
+  for (const item of evidence) {
+    if (item.truncated || item.redacted || item.text.length > 512 || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(item.text)) continue;
+    const match = namedMaterial.exec(item.text);
+    if (!match) continue;
+    const ending = match[2]!.trimStart();
+    if (ending) {
+      const parentheses = ending.startsWith("(") && ending.endsWith(")") || ending.startsWith("（") && ending.endsWith("）");
+      const note = ending.slice(1, -1);
+      if (!parentheses || !note.trim() || /[.\/\\()（）\[\]【】<>`]/u.test(note)) continue;
+    }
+    paths.add(match[1]!);
+  }
+  return [...paths].sort();
+}
 
 /** handback 模块单 owner 的状态（方案 §3.6 handback 的 2 个字段；本模块创建）。 */
 export interface HandbackState {
@@ -202,7 +226,7 @@ export class Handback {
       if (report) report = structuredClone(report);
       if (liveReport) liveReport = structuredClone(liveReport);
       if (hb.taskId?.startsWith("dw-") && this.deps.durableWorkflow) {
-        return this.commitDurableHandback(projectRoot, runtime, hb, report);
+        return await this.commitDurableHandback(projectRoot, runtime, hb, report);
       }
       const ownerRoleId = this.handbackOwnerRoleId(projectRoot);
       // 2026-10-29（方案 v2.1 §5.1/M9，F1）：任务绑定报告**按 `task.created.from` 回创建者**——
@@ -401,38 +425,109 @@ export class Handback {
   private async commitDurableHandback(
     projectRoot: string, runtime: RuntimeKind, handback: TaskHandback, report: RuntimeReportSnapshotV1 | undefined,
   ): Promise<boolean> {
-    if (!report || report.origin !== "submitted-report" || report.taskId !== handback.taskId
+    if (!report || report.taskId !== handback.taskId
       || report.source.roleId !== handback.roleId || report.source.runtime !== runtime
       || report.source.turnId !== handback.turnId || report.status !== handback.status) return false;
+    const key = `durable-report:${projectRoot}:${report.reportId}`;
+    if (this.pendingHandbackKeys.has(key)) return false;
+    this.pendingHandbackKeys.add(key);
+    try {
+      return await this.persistDurableHandback(projectRoot, runtime, handback, report);
+    } finally {
+      this.pendingHandbackKeys.delete(key);
+    }
+  }
+
+  private async persistDurableHandback(projectRoot: string, runtime: RuntimeKind, handback: TaskHandback, report: RuntimeReportSnapshotV1): Promise<boolean> {
     const durable = this.deps.durableWorkflow!;
     const store = await durable.store();
     const convener = this.handbackOwnerRoleId(projectRoot);
     const views = (await store.listProjections(projectRoot)).filter(view => view.status === "waiting");
+    const revisionView = views.find(({ documentRevision }) => documentRevision?.task.taskId === report.taskId
+      && documentRevision.roleId === report.source.roleId);
+    const revision = revisionView?.documentRevision;
+    if (revisionView && revision) {
+      if (revision.status === "pending") {
+        await store.failDocumentRevision(revisionView.ref, { revisionId: revision.id, turnId: report.source.turnId,
+          reason: "修订回合已经结束，尚未通过专用入口提交候选。" });
+        durable.activate();
+      }
+      return true;
+    }
+    if (views.some(({ documentRevision }) => documentRevision && documentRevision.status !== "resumed"
+      && documentRevision.origin.taskId === report.taskId && report.source.roleId === "convener")) return true;
     const pendingFor = (view: DurableProjection) => view.pendingTasks?.find(task => task.taskId === report.taskId
       && task.roleId === report.source.roleId && (task.state === "pending" || task.state === "reported"));
     const graph = views.find(view => view.schema === 2 && (pendingFor(view) || this.graphOperatorBinding(view, report)));
-    if (graph) return this.commitGraphReport(graph, pendingFor(graph), report);
+    if (graph) {
+      const pending = pendingFor(graph);
+      if (report.origin !== "submitted-report" &&
+        (!graph.workflowOwnedDispatch && !isDirectProductCapability(pending?.capability) || report.status === "completed")) return false;
+      return this.commitGraphReport(graph, pending, report);
+    }
     const projection = views.find(view =>
       (view.task?.taskId === report.taskId || view.task?.parentTaskId === report.taskId || (convener && [
         durableTaskId(view.ref, convener, "B1", view.attempt), durableTaskId(view.ref, convener, "B3", view.attempt),
       ].includes(report.taskId ?? ""))));
     if (!projection || projection.status !== "waiting") return false;
+    if (report.origin !== "submitted-report" && (!projection.workflowOwnedDispatch || report.status === "completed")) return false;
     const { ref, attempt, stepId, action } = projection;
     const facts = store.listFacts(ref);
     const assigned = facts.find(({ fact }) => fact.kind === "task-bound" && fact.task.taskId === report.taskId)?.fact;
     const operatorStage = action === "b3-implement-and-accept" ? "B3" : "B1";
     const operatorAttempt = operatorStage === "B1" ? projection.analysisReport?.attempt ?? attempt : attempt;
-    const operatorTaskId = convener && durableTaskId(ref, convener, operatorStage, operatorAttempt);
+    const operatorTaskId = projection.workflowOwnedDispatch ? projection.task?.parentTaskId : convener && durableTaskId(ref, convener, operatorStage, operatorAttempt);
     const parent = operatorStage === "B1"
       ? facts.find(({ fact }) => fact.kind === "stage-request" && fact.attempt === operatorAttempt)?.fact
       : projection.scope;
     const production = assigned?.kind === "task-bound" && assigned.task.roleId === handback.roleId;
     const operator = !!parent && handback.roleId === convener && report.taskId === operatorTaskId;
     if (!production && !operator) return false;
+    const evidenceParent = operatorStage === "B3" && operator ? evidenceOperatorBinding(projection) : undefined;
+    const audit = evidenceParent && projection.evidenceAudit;
+    if (audit && evidenceParent && report.origin === "submitted-report" && report.status === "blocked") {
+      const current = () => {
+        const live = store.lookup(ref);
+        return live?.status === "waiting" && live.stepId === stepId && live.attempt === attempt
+          && live.evidenceAudit?.basis.generation === audit.basis.generation
+          && store.listEffects(ref, "model-send").some(row => row.state === "succeeded" && row.intent.task?.taskId === report.taskId
+            && row.intent.task?.roleId === report.source.roleId && row.intent.expected?.runtime === runtime
+            && row.intent.expected?.evidenceAuditParentGeneration === String(audit.basis.generation)
+            && row.result?.result?.turnId === report.source.turnId);
+      };
+      if (!current()) return false;
+      const saved = await store.recordEvidenceBlocker(ref, { parentTask: evidenceParent, originId: report.source.turnId,
+        generation: audit.basis.generation, reason: shortenSummary(report.summary.text, 300) }, current);
+      if (saved.ok) durable.activate();
+      return saved.ok && saved.value.state !== "ignored";
+    }
     const workStep = production ? assigned.stepId : operatorStage === "B1" ? parent?.stepId : stepId;
     const workAttempt = production ? assigned.attempt : operatorAttempt;
     if (!workStep) return false;
     const cleanHandback = this.durableHandbackOf(report);
+    if (projection.workflowOwnedDispatch && report.taskId) {
+      const effect = store.listEffects(ref, "model-send").find(row => row.intent.stepId === workStep && row.intent.attempt === workAttempt
+        && row.intent.task?.taskId === report.taskId && row.intent.task.roleId === report.source.roleId
+        && row.intent.expected?.runtime === runtime);
+      if (!effect || effect.state === "not-started" || effect.result?.result?.turnId !== report.source.turnId) return false;
+      const journal = await this.readTasks(projectRoot);
+      if (!journal.records.get(report.taskId)?.reports.some(row => row.turnId === report.source.turnId)) {
+        const mirrored = await this.appendTaskStateResult(projectRoot, taskEvent("task.reported", {
+          taskId: report.taskId, from: report.source.roleId, status: taskReportStatusOf(report.status),
+          summary: shortenSummary(cleanHandback.summary), evidence: cleanHandback.evidence, turnId: report.source.turnId,
+        }));
+        if (!mirrored.ok) return false;
+      }
+    }
+    if (projection.workflowOwnedDispatch && report.status !== "completed") {
+      const chief = this.chiefTaskRoleIdOf(projectRoot);
+      const summary = `${operatorStage} 工作流回交需要幕僚处理（${ref.instanceId}，#${report.taskId}）。${cleanHandback.summary}`;
+      if (chief) {
+        const notice = await recordWorkflowNotice(projectRoot, chief, { ref: report.reportId, summary, taskId: report.taskId ?? undefined });
+        if (notice === "recorded") this.emitDeliveryNote(projectRoot, runtime, chief, report.source.roleId, summary);
+        else if (notice === "failed") store.block(ref, "workflow-notice-unavailable", summary);
+      }
+    }
     const artifacts: DurableEvidenceRef[] = [];
     for (const reference of [...new Set(cleanHandback.evidence)].sort()) {
       const artifact = await store.readEvidence(projectRoot, reference);
@@ -455,6 +550,18 @@ export class Handback {
   }
 
   private async commitGraphReport(view: DurableProjection, pending: DurablePendingTask | undefined, report: RuntimeReportSnapshotV1): Promise<boolean> {
+    if (!view.workflowOwnedDispatch && !isDirectProductCapability(pending?.capability)) return this.persistGraphReport(view, pending, report);
+    const key = `product:${view.ref.instanceId}:${report.reportId}`;
+    if (this.pendingHandbackKeys.has(key)) return false;
+    this.pendingHandbackKeys.add(key);
+    try {
+      return await this.persistGraphReport(view, pending, report);
+    } finally {
+      this.pendingHandbackKeys.delete(key);
+    }
+  }
+
+  private async persistGraphReport(view: DurableProjection, pending: DurablePendingTask | undefined, report: RuntimeReportSnapshotV1): Promise<boolean> {
     const durable = this.deps.durableWorkflow!;
     const store = await durable.store();
     const { ref, projectRoot } = view;
@@ -462,35 +569,219 @@ export class Handback {
     const bound = pending ?? operator;
     const taskId = report.taskId;
     if (!bound || !taskId) return false;
+    const operations = view.workflowOwnedDispatch && pending?.capability === "operations-implementation" ? pending : undefined;
+    const operationsParent = operations && !operations.workItemId && !operations.evidenceWorkOrder ? operations : undefined;
+    const a11 = view.a11Disposition;
+    if (a11?.retest && a11.state === "parked" && (taskId === a11.childTask.taskId || taskId === a11.parentTask.taskId)) return false;
+    const resumedOwner = a11?.state === "resumed" && operations?.workItemId && operations.taskId === a11.childTask.taskId ? a11 : undefined;
+    const retiredParent = a11?.state === "resumed" && operationsParent
+      ? a11.parentReport && (store.getEvidence(ref, a11.parentReport.evidence) as { report?: RuntimeReportSnapshotV1 } | undefined)?.report : undefined;
+    if (resumedOwner && report.origin !== "submitted-report") return false;
+    if (retiredParent?.source.turnId === report.source.turnId) return false;
+    const recovery = view.workflowOwnedDispatch && pending?.environmentRecovery ? pending : undefined;
+    if (recovery?.environmentRecovery === "parent" && (report.origin !== "submitted-report" || report.status !== "blocked")) return false;
+    if (operationsParent) {
+      if (report.origin !== "submitted-report") return false;
+      const { children } = operationsTasks(view);
+      if (report.status === "completed" && !view.implementationItems?.every(item => children.some(child =>
+        child.workItemId === item.id && child.state === "accepted"))) return false;
+    }
     const effects = store.listEffects(ref, "model-send").filter(effect =>
       effect.intent.task?.taskId === taskId && effect.intent.task.roleId === report.source.roleId
       && effect.intent.expected?.runtime === report.source.runtime && effect.state !== "not-started");
-    const effect = pending ? effects.find(row => row.intent.key === `model:${taskId}`)
+    const effect = recovery?.environmentRecovery === "parent" ? effects.find(row => workflowTaskEffectMatches(row, recovery)
+      && (row.intent.key === `model:${taskId}` || row.intent.key.startsWith("model:environment-recovery-wake:"))
+      && row.result?.result?.turnId === report.source.turnId)
+      : operationsParent ? effects.find(row => isOperationsParentEffect(row, operationsParent) && row.result?.result?.turnId === report.source.turnId)
+      : pending ? effects.find(row => row.intent.key === `model:${resumedOwner ? a11ResumeKey(resumedOwner.key) : taskId}`)
       : effects.find(row => row.intent.key.startsWith(`model:graph-report:${bound.taskId}:`));
+    const directProduct = pending && isDirectProductCapability(pending.capability) ? pending : undefined;
+    const review = view.workflowOwnedDispatch && pending && (pending.capability === "independent-standard"
+      || pending.capability === "independent-assessment" && pending.reviewWritePath) ? pending : undefined;
     if (!effect || (typeof effect.result?.result?.turnId === "string" && effect.result.result.turnId !== report.source.turnId)) return false;
+    if (a11?.state === "resumed" && operationsParent
+      && (effect.intent.key === `model:${operationsParent.taskId}` || effect.intent.key === `model:${operationsWakeKey(a11.childTask.taskId, a11.childReport.key)}`)) return false;
+    const exact = review ?? operations ?? recovery ?? (pending?.evidenceWorkOrder ? pending : undefined);
+    if (exact && (!workflowTaskEffectMatches(effect, exact) || effect.result?.result?.turnId !== report.source.turnId)) return false;
+    if (directProduct) {
+      if (effect.intent.stepId !== directProduct.stepId || effect.intent.attempt !== directProduct.attempt
+        || effect.intent.task?.parentTaskId !== ref.instanceId
+        || effect.result?.result?.turnId !== report.source.turnId) return false;
+      if (effect.state !== "succeeded") {
+        const recovered = await store.settleEffect(ref, { key: effect.intent.key, token: effect.token, outcome: "succeeded",
+          evidence: "The exact product turn has a durable runtime report.", result: { turnId: report.source.turnId } });
+        if (!recovered.ok) return false;
+      }
+    }
+    const order = pending?.evidenceWorkOrder;
+    const auditGeneration = view.evidenceAuditEnabled && pending?.capability === "independent-assessment"
+      ? view.evidenceAudit?.basis.generation : undefined;
+    const currentEvidenceTurn = () => {
+      const now = store.lookup(ref);
+      return now?.status === "waiting" && now.engine === "healthy" && now.stepId === view.stepId && now.attempt === view.attempt
+        && now.evidenceAudit?.basis.generation === (order?.basis.generation ?? auditGeneration ?? view.evidenceAudit?.basis.generation)
+        && store.listEffects(ref, "model-send").some(row => row.intent.key === effect.intent.key && row.state === "succeeded"
+          && row.result?.result?.turnId === report.source.turnId);
+    };
+    if ((order || auditGeneration !== undefined) && (report.origin !== "submitted-report" || !currentEvidenceTurn())) return false;
+    const collection = order && readCollectionEvidence(report.evidence.map(item => item.text));
+    if (order && !collection) return false;
+    if (operationsParent && view.evidenceAuditEnabled && view.evidenceAudit && report.status === "blocked") {
+      if (effect.intent.expected?.evidenceAuditParentGeneration !== String(view.evidenceAudit.basis.generation)) return false;
+      const saved = await store.recordEvidenceBlocker(ref, { parentTask: operationsParent.task, originId: report.source.turnId,
+        generation: view.evidenceAudit.basis.generation, reason: shortenSummary(report.summary.text, 300) }, currentEvidenceTurn);
+      if (saved.ok) durable.activate();
+      return saved.ok;
+    }
     const handback = this.durableHandbackOf(report);
-    const artifacts: DurableEvidenceRef[] = [];
-    for (const file of [...new Set(handback.evidence)].sort()) {
+    const proposal = view.workflowOwnedDispatch && view.action === "author-proposal" && pending?.capability === "author-proposal"
+      && report.origin === "submitted-report" && report.status === "completed" ? pending : undefined;
+    if (proposal && (view.status !== "waiting" || proposal.stepId !== view.stepId || proposal.attempt !== view.attempt
+      || proposal.task.stage !== "A5" || proposal.task.stageAttempt !== view.attempt || proposal.task.parentTaskId !== ref.instanceId
+      || proposal.roleId !== "rapporteur" || report.source.roleId !== proposal.roleId || proposal.flowId !== view.flowId
+      || proposal.dispatch.actor !== "application" || proposal.dispatch.flowId !== proposal.flowId
+      || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(proposal.flowId) || !isRuntimeKind(report.source.runtime)
+      || !workflowTaskEffectMatches(effect, proposal) || effect.intent.kind !== "model-send" || effect.intent.expected?.roleId !== proposal.roleId
+      || effect.state !== "succeeded" || effect.result?.outcome !== "succeeded" || effect.result.key !== effect.intent.key
+      || effect.result.token !== effect.token || effect.result.result?.turnId !== report.source.turnId)) return false;
+    const artifacts = review && report.origin === "submitted-report"
+      ? await workflowWrittenReviewEvidence(store, view, review) : [];
+    const directIntent = directProduct?.capability === "author-intent-direct";
+    const artifactPaths = directIntent || review || order ? [] : proposal ? proposalEvidencePaths(proposal.flowId, report.evidence)
+      : [...new Set(handback.evidence)].sort();
+    for (const file of artifactPaths) {
       const artifact = await store.readEvidence(projectRoot, file);
       if (artifact.ok) artifacts.push(artifact.value);
     }
     const evidence = store.storeEvidence(ref, { report, handback, artifacts });
     if (!evidence.ok) return false;
+    if (review?.capability === "independent-assessment" && report.origin === "submitted-report" && report.status === "blocked" && artifacts[0]
+      && view.acceptanceEnvironment?.enabled) {
+      const journal = await this.readTasks(projectRoot);
+      if (!journal.records.get(taskId)?.reports.some(item => item.turnId === report.source.turnId)) {
+        const mirrored = await this.appendTaskStateResult(projectRoot, taskEvent("task.reported", {
+          taskId, from: report.source.roleId, status: "blocked", summary: shortenSummary(handback.summary),
+          evidence: handback.evidence, turnId: report.source.turnId,
+        }));
+        if (!mirrored.ok) return false;
+      }
+      const missing = await recordAcceptanceEnvironmentReport({ store, view, pending: review, reportKey: `report:${report.reportId}`,
+        originId: report.source.turnId, report: evidence.value, artifact: artifacts[0] });
+      if (missing.ok && missing.value === "recorded") {
+        durable.activate();
+        return true;
+      }
+      if (!missing.ok) {
+        const chief = this.chiefTaskRoleIdOf(projectRoot);
+        if (chief) {
+          const summary = `A12b 验收环境无法核验（工作流 ${ref.instanceId}，#${taskId}）。${missing.message}`;
+          if (await recordWorkflowNotice(projectRoot, chief, { ref: report.reportId, summary, taskId }) === "recorded") {
+            this.emitDeliveryNote(projectRoot, report.source.runtime, chief, report.source.roleId, summary);
+          }
+        }
+      }
+    }
+    const task = pending?.task ?? { ...bound.task, taskId, roleId: report.source.roleId, parentTaskId: bound.taskId };
+    const resumedOwnerCurrent = resumedOwner && (() => {
+      const current = store.lookup(ref);
+      return current?.status === "waiting" && current.engine === "healthy" && current.stepId === view.stepId
+        && current.attempt === view.attempt && current.a11Disposition?.key === resumedOwner.key
+        && current.a11Disposition.state === "resumed" && current.a11Disposition.generation === resumedOwner.generation
+        && store.listEffects(ref, "model-send").some(row => row.intent.key === effect.intent.key && row.state === "succeeded"
+          && row.result?.result?.turnId === report.source.turnId && !!operations && workflowTaskEffectMatches(row, operations));
+    });
+    const submit = () => store.submitCapability(ref, {
+      key: `report:${report.reportId}`, stepId: bound.stepId, attempt: bound.attempt, flowId: bound.flowId,
+      source: { roleId: report.source.roleId, originId: report.source.turnId, parentTaskId: taskId },
+      input: pending ? { kind: "task-report", task, evidence: evidence.value, ...(resumedOwner ? { recoveryKey: resumedOwner.key } : {}),
+        ...(auditGeneration !== undefined ? { evidenceAuditGeneration: auditGeneration } : {}) }
+        : { kind: "operator-report", parentTaskId: taskId, evidence: evidence.value },
+    }, resumedOwnerCurrent || (order || auditGeneration !== undefined ? currentEvidenceTurn : undefined));
+    if (operationsParent && report.status === "blocked" && view.blockedRoutingEnabled) {
+      const reported = operationsTasks(view).children.filter(child => child.state === "reported");
+      if (reported.length === 1) {
+        await parkDesktopA11Disposition(durable, view, reported[0]!, () => {
+          const actual = store.lookup(ref);
+          return actual?.status === "waiting" && actual.engine === "healthy" && actual.stepId === view.stepId
+            && actual.attempt === view.attempt && operationsTasks(actual).parent?.taskId === operationsParent.taskId;
+        });
+      }
+    }
+    const parentResult = operationsParent ? await submit() : undefined;
+    if (parentResult && !parentResult.ok) {
+      const chief = this.chiefTaskRoleIdOf(projectRoot);
+      const summary = `A11 运营汇总未收口（工作流 ${ref.instanceId}，#${taskId}）。${parentResult.message}`;
+      store.block(ref, parentResult.code, summary);
+      if (chief && await recordWorkflowNotice(projectRoot, chief, { ref: `workflow-a11-summary:${report.reportId}`, summary, taskId }) === "recorded") {
+        this.emitDeliveryNote(projectRoot, report.source.runtime, chief, report.source.roleId, summary);
+      }
+      return false;
+    }
+    if (parentResult?.ok && parentResult.value.state === "ignored") return false;
     const state = await this.readTasks(projectRoot);
+    if (view.workflowOwnedDispatch && !directProduct && !operations?.workItemId && !recovery && report.status !== "completed") {
+      const chief = this.chiefTaskRoleIdOf(projectRoot);
+      if (chief) {
+        const summary = `${bound.task.stage} 工作流回交需要幕僚处理（工作流 ${ref.instanceId}，#${taskId}）。${handback.summary}`;
+        const notice = await recordWorkflowNotice(projectRoot, chief, { ref: report.reportId, summary, taskId });
+        if (notice === "failed") {
+          store.block(ref, "workflow-notice-unavailable", summary);
+          return false;
+        }
+        if (notice === "recorded") this.emitDeliveryNote(projectRoot, report.source.runtime, chief, report.source.roleId, summary);
+      }
+    }
+    if (directIntent && report.status !== "completed") {
+      const chief = this.chiefTaskRoleIdOf(projectRoot);
+      if (!chief) return false;
+      const clarification = report.origin === "submitted-report" && report.status === "blocked";
+      const issue = clarification ? "A2 产品意图待澄清，请幕僚协调" : "A2 产品意图受阻，请幕僚核对运行状态";
+      const summary = `${issue}（工作流 ${ref.instanceId}，#${taskId}）。${handback.summary}`;
+      const notice = await recordWorkflowNotice(projectRoot, chief, { ref: report.reportId, summary, taskId });
+      if (notice === "failed") {
+        store.block(ref, "workflow-notice-unavailable", summary);
+        return false;
+      }
+      if (notice === "recorded") this.emitDeliveryNote(projectRoot, report.source.runtime, chief, report.source.roleId, summary);
+    }
     if (!state.records.get(taskId)?.reports.some(item => item.turnId === report.source.turnId)) {
+      if (directProduct?.capability === "product-prepare-direct" && report.status !== "completed") {
+        const chief = this.chiefTaskRoleIdOf(projectRoot);
+        if (chief) {
+          const summary = shortenSummary(`A1 产品受理受阻（#${taskId}） · ${handback.summary}`);
+          const prior = await readRoleLog(projectRoot, { roleId: chief, since: report.at });
+          if (!prior.entries.some(entry => entry.kind === "task.reported" && entry.taskId === taskId && entry.ref === report.reportId)) {
+            await appendRoleLog(projectRoot, chief, { kind: "task.reported", summary, taskId,
+              status: taskReportStatusOf(report.status), turnId: report.source.turnId, ref: report.reportId });
+            this.emitDeliveryNote(projectRoot, report.source.runtime, chief, report.source.roleId, summary);
+          }
+        }
+      }
       const mirrored = await this.appendTaskStateResult(projectRoot, taskEvent("task.reported", {
         taskId, from: report.source.roleId, status: taskReportStatusOf(report.status), summary: shortenSummary(handback.summary),
         evidence: handback.evidence, turnId: report.source.turnId,
       }));
       if (!mirrored.ok) return false;
     }
-    const task = pending?.task ?? { ...bound.task, taskId, roleId: report.source.roleId, parentTaskId: bound.taskId };
-    const saved = await store.submitCapability(ref, {
-      key: `report:${report.reportId}`, stepId: bound.stepId, attempt: bound.attempt, flowId: bound.flowId,
-      source: { roleId: report.source.roleId, originId: report.source.turnId, parentTaskId: taskId },
-      input: pending ? { kind: "task-report", task, evidence: evidence.value }
-        : { kind: "operator-report", parentTaskId: taskId, evidence: evidence.value },
-    });
+    const saved = parentResult ?? await submit();
+    if (order && collection && saved.ok && saved.value.state !== "ignored") {
+      const collected = await store.recordEvidenceCollection(ref, { task: order.task, generation: order.basis.generation,
+        reportKey: saved.value.key, ...collection }, currentEvidenceTurn);
+      if (collected.ok) durable.activate();
+      return collected.ok && collected.value.state !== "ignored";
+    }
+    if (resumedOwner?.retest && (!saved.ok || saved.value.state === "ignored") && resumedOwnerCurrent?.()) {
+      const failed = await store.failA11Retest(ref, resumedOwner.key, saved.ok ? "原属主的补测回交未能完成核验。" : saved.message, resumedOwnerCurrent);
+      if (failed.ok) durable.activate();
+    }
+    if (saved.ok && recovery?.environmentRecovery === "parent" && saved.value.state !== "ignored" && view.acceptanceEnvironment?.parentTask) {
+      const state = view.acceptanceEnvironment;
+      const stopped = await store.settleAcceptanceEnvironment(ref, { parentTask: state.parentTask!, childTask: state.childTask,
+        originId: report.source.turnId, outcome: { kind: "blocked", reason: `运营报告本次恢复受阻。${shortenSummary(handback.summary, 300)}` } },
+      () => store.lookup(ref)?.acceptanceEnvironment?.parentTask?.taskId === taskId);
+      if (!stopped.ok) return false;
+      durable.activate();
+    }
     return saved.ok && saved.value.state !== "ignored";
   }
 
@@ -500,6 +791,46 @@ export class Handback {
       turnId: report.source.turnId, runtime: report.source.runtime, origin: report.origin };
   }
 
+  private async resumeBlockedProductTask(
+    view: DurableProjection, roleBusy: (roleId: string, runtime: RuntimeKind) => boolean,
+  ): Promise<void> {
+    const { ref, projectRoot, stepId, attempt, flowId } = view;
+    const stage = view.action === "product-prepare" ? "A1" : view.action === "author-intent" ? "A2" : undefined;
+    if (!stage || !flowId || view.pendingTasks?.some(task => task.stepId === stepId
+      && task.attempt === attempt)) return;
+    const read = this.deps.readDurableReports!;
+    const store = await this.deps.durableWorkflow!.store();
+    const stageRequest = store.listCapabilityEvents(ref).find(({ event, receipt }) => receipt.state === "consumed"
+      && event.stepId === stepId && event.attempt === attempt && event.flowId === flowId
+      && event.input.kind === "stage-request" && event.input.stage === stage && event.source.roleId === "chief")?.event;
+    if (!stageRequest) return;
+    const taskId = durableTaskId(ref, "convener", stepId, attempt);
+    const effect = store.listEffects(ref, "model-send").find(item => item.intent.key === `model:${taskId}`);
+    const runtime = effect?.intent.expected?.runtime;
+    const turnId = effect?.result?.result?.turnId;
+    if (effect?.state !== "succeeded" || typeof turnId !== "string" || !isRuntimeKind(runtime)
+      || roleBusy("convener", runtime)) return;
+    const journal = await this.readTasks(projectRoot);
+    const parent = journal.records.get(taskId);
+    if (journal.errors.length || parent?.closed || parent?.created?.workflowId !== ref.instanceId || parent.created.flowId !== flowId
+      || parent.created.taskKind !== "stage-request" || parent.created.to !== "convener" || parent.created.stage !== stage
+      || [...journal.records.values()].some(row => row.created?.workflowId === ref.instanceId
+        && row.created.to === "product" && row.created.stage === stage)) return;
+    const reports = (await read({ projectRoot, roleId: "convener", runtime })).filter(item => item.taskId === taskId
+      && item.source.roleId === "convener" && item.source.runtime === runtime && item.source.turnId === turnId
+      && item.origin === "submitted-report" && item.status === "blocked");
+    if (reports.length !== 1) return;
+    const report = reports[0]!;
+    const evidence = store.storeEvidence(ref, { report, handback: this.durableHandbackOf(report) });
+    if (!evidence.ok) return;
+    const saved = await store.submitCapability(ref, {
+      key: `${stage === "A1" ? "intake" : "intent"}-recovery:${stepId}:${attempt}`, stepId, attempt, flowId,
+      source: { roleId: "convener", originId: turnId, parentTaskId: taskId },
+      input: { kind: stage === "A1" ? "product-intake-recovery" : "product-intent-recovery", evidence: evidence.value },
+    }, () => !roleBusy("convener", runtime));
+    if (!saved.ok) store.block(ref, saved.code, saved.message);
+  }
+
   async resumeDurableReports(projection: DurableProjection, roleBusy: (roleId: string, runtime: RuntimeKind) => boolean): Promise<void> {
     const durable = this.deps.durableWorkflow;
     const read = this.deps.readDurableReports;
@@ -507,6 +838,20 @@ export class Handback {
     if (!durable || !read || status !== "waiting") return;
     const store = await durable.store();
     if (projection.schema === 2) {
+      const revision = projection.documentRevision;
+      if (revision && revision.status !== "resumed") {
+        if (revision.status !== "pending") return;
+        const effect = store.listEffects(ref, "model-send").find(item => item.intent.key === `model:${revision.task.taskId}`);
+        const runtime = effect?.intent.expected?.runtime;
+        const turnId = effect?.result?.result?.turnId;
+        if (effect?.state !== "succeeded" || !isRuntimeKind(runtime) || typeof turnId !== "string" || roleBusy(revision.roleId, runtime)) return;
+        const hasReport = (await read({ projectRoot, roleId: revision.roleId, runtime })).some(report => report.taskId === revision.task.taskId
+          && report.source.turnId === turnId && report.source.roleId === revision.roleId && report.source.runtime === runtime);
+        if (hasReport) await store.failDocumentRevision(ref, { revisionId: revision.id, turnId,
+          reason: "原修订回合已经结束，尚未通过专用入口提交候选。" });
+        return;
+      }
+      await this.resumeBlockedProductTask(projection, roleBusy);
       if (projection.action === "verify-stop" && projection.flowId) {
         const effect = store.listEffects(ref, "model-send").find(item => item.intent.key === `model:stop:${projection.stepId}:${projection.attempt}`);
         const runtime = effect?.intent.expected?.runtime;
@@ -526,16 +871,80 @@ export class Handback {
           }
         }
       }
-      const pending = projection.pendingTasks?.filter(item => item.state === "pending") ?? [];
+      const pending = projection.pendingTasks?.filter(item => item.state === "pending" ||
+        item.state === "reported" && item.evidenceWorkOrder && !store.listCapabilityEvents(ref).some(row =>
+          row.receipt.state !== "ignored" && row.event.input.kind === "evidence-collection-recorded"
+            && row.event.input.task.taskId === item.taskId && row.event.input.reportKey === item.report?.key)) ?? [];
       for (const item of pending) {
-        const effect = store.listEffects(ref, "model-send").find(row => row.intent.key === `model:${item.taskId}` && row.state !== "not-started");
+        const operationsParent = item.capability === "operations-implementation" && !item.workItemId && !item.evidenceWorkOrder;
+        const a11 = projection.a11Disposition;
+        const resumedOwner = a11?.state === "resumed" && a11.childTask.taskId === item.taskId ? a11 : undefined;
+        const recoveryParent = item.environmentRecovery === "parent";
+        const child = recoveryParent && projection.pendingTasks?.find(task => task.taskId === projection.acceptanceEnvironment?.childTask?.taskId);
+        const effect = store.listEffects(ref, "model-send").findLast(row => row.state !== "not-started"
+          && (operationsParent ? isOperationsParentEffect(row, item) : row.intent.key === `model:${resumedOwner ? a11ResumeKey(resumedOwner.key) : item.taskId}`
+            || child && row.intent.key === `model:${recoveryWakeKey(child)}`));
         const runtime = effect?.intent.expected?.runtime;
         if (!effect || !isRuntimeKind(runtime) || roleBusy(item.roleId, runtime)) continue;
         const turnId = effect.result?.result?.turnId;
-        const matches = (await read({ projectRoot, runtime, roleId: item.roleId })).filter(report => report.taskId === item.taskId
-          && report.origin === "submitted-report" && (typeof turnId !== "string" || turnId === report.source.turnId));
-        if (matches.length !== 1 || !await this.commitGraphReport(projection, item, matches[0]!)) continue;
-        if (effect.state === "unknown" || effect.state === "claimed") {
+        const currentRetest = () => {
+          const active = store.lookup(ref)?.a11Disposition;
+          return !!resumedOwner?.retest && active?.key === resumedOwner.key && active.state === "resumed"
+            && active.generation === resumedOwner.generation && !roleBusy(item.roleId, runtime);
+        };
+        const directProduct = isDirectProductCapability(item.capability);
+        const matches = (directProduct || resumedOwner?.retest) && typeof turnId !== "string" ? [] : (await read({ projectRoot, runtime, roleId: item.roleId })).filter(report => report.taskId === item.taskId
+          && (report.origin === "submitted-report" || !operationsParent && !recoveryParent && !resumedOwner && (directProduct || projection.workflowOwnedDispatch) && report.status !== "completed")
+          && (!resumedOwner?.retest || report.source.roleId === item.roleId && report.source.runtime === runtime)
+          && (typeof turnId !== "string" || turnId === report.source.turnId));
+        if (matches.length !== 1) {
+          if (resumedOwner?.retest) {
+            if (effect.state === "claimed" && currentRetest()) await store.settleEffect(ref, { key: effect.intent.key, token: effect.token,
+              outcome: "unknown", evidence: "The recorded A11 retest send claim has no live runtime or uniquely matching durable report." });
+            const reason = typeof turnId === "string" ? "同候选补测回合已结束，缺少唯一可核验的正式回交。"
+              : "同候选补测送达已进入执行边界，无法核对实际回合。";
+            const failed = await store.failA11Retest(ref, resumedOwner.key, reason, currentRetest);
+            if (failed.ok) durable.activate();
+            continue;
+          }
+          if (operationsParent || recoveryParent) continue;
+          if (item.environmentRecovery === "child" && projection.acceptanceEnvironment?.parentTask) {
+            const parentTask = projection.acceptanceEnvironment.parentTask;
+            await store.settleAcceptanceEnvironment(ref, { parentTask, childTask: item.task,
+              outcome: { kind: "blocked", reason: "原依赖恢复回合缺少可核验的正式报告，请核对实际应用回执和本地输出。" } },
+            () => store.lookup(ref)?.acceptanceEnvironment?.childTask?.taskId === item.taskId && !roleBusy(item.roleId, runtime));
+            this.deps.durableWorkflow?.activate();
+            continue;
+          }
+          if (item.capability === "author-intent-direct" || projection.workflowOwnedDispatch) {
+            const chief = this.chiefTaskRoleIdOf(projectRoot);
+            const summary = `${item.task.stage} 工作流任务回执待核对（工作流 ${ref.instanceId}，#${item.taskId}）。没有唯一匹配的回交，请幕僚核对原回合。`;
+            if (!projection.blockedReason) store.block(ref, "product-receipt-unverified", summary);
+            if (chief) {
+              const notice = await recordWorkflowNotice(projectRoot, chief, {
+                ref: `product-send-uncertain:${item.taskId}`, summary, taskId: item.taskId,
+              });
+              if (notice === "recorded") this.emitDeliveryNote(projectRoot, runtime, chief, chief, summary);
+            }
+          }
+          continue;
+        }
+        if (item.capability === "operations-implementation" && (effect.state === "unknown" || effect.state === "claimed")) {
+          if (typeof turnId !== "string" || !workflowTaskEffectMatches(effect, item)) continue;
+          const exact = await store.settleEffect(ref, { key: effect.intent.key, token: effect.token, outcome: "succeeded",
+            evidence: "The original A11 model turn has its matching durable report.", result: { turnId } });
+          if (!exact.ok) continue;
+        }
+        if (item.capability === "operations-implementation" && item.workItemId) {
+          for (const effect of store.listEffects(ref, "task-commit")) {
+            if ((effect.state !== "claimed" && effect.state !== "unknown") || !effect.intent.expected || !workflowTaskEffectMatches(effect, item)) continue;
+            const proven = await verifyDurableTaskCommit(projectRoot, effect.intent.expected);
+            if (proven) await store.settleEffect(ref, { key: effect.intent.key, token: effect.token, outcome: "succeeded",
+              evidence: "Recovered the original A11 commit by its branch, parent, diff and marker.", result: proven });
+          }
+        }
+        if (!await this.commitGraphReport(projection, item, matches[0]!)) continue;
+        if (!directProduct && item.capability !== "operations-implementation" && (effect.state === "unknown" || effect.state === "claimed")) {
           await store.settleEffect(ref, { key: effect.intent.key, token: effect.token, outcome: "succeeded",
             evidence: "Recovered the bound runtime turn and submitted report.", result: { turnId: matches[0]!.source.turnId } });
         }
@@ -545,13 +954,15 @@ export class Handback {
           && row.event.input.kind === "operator-report" && row.receipt.state !== "ignored")) {
         const effects = store.listEffects(ref, "model-send");
         for (const item of projection.pendingTasks ?? []) {
-          if (item.stepId !== projection.stepId || item.attempt !== projection.attempt || item.state !== "accepted" || !item.report) continue;
+          if (item.stepId !== projection.stepId || item.attempt !== projection.attempt || !item.report ||
+            item.state !== "accepted" && (!projection.workflowOwnedDispatch || item.state !== "reported")) continue;
           const effect = effects.find(row => row.intent.key === `model:graph-report:${item.taskId}:${item.report!.key}`);
           const turnId = effect?.result?.result?.turnId;
           const runtime = effect?.intent.expected?.runtime;
           if (!effect || !isRuntimeKind(runtime) || typeof turnId !== "string" || roleBusy("convener", runtime)) continue;
           const report = (await read({ projectRoot, roleId: "convener", runtime })).find(saved =>
-            saved.taskId === item.task.parentTaskId && saved.source.turnId === turnId && saved.origin === "submitted-report");
+            saved.taskId === item.task.parentTaskId && saved.source.turnId === turnId &&
+            (saved.origin === "submitted-report" || projection.workflowOwnedDispatch && saved.status !== "completed"));
           if (report) await this.commitGraphReport(projection, undefined, report);
         }
       }
@@ -573,7 +984,8 @@ export class Handback {
       if (!effect || !roleId || !isRuntimeKind(runtime) || roleBusy(roleId, runtime)) continue;
       const storedTurnId = effect.result?.result?.turnId;
       const matches = (await read({ projectRoot, roleId, runtime })).filter(report => report.taskId === taskId
-        && report.origin === "submitted-report" && (typeof storedTurnId !== "string" || storedTurnId === report.source.turnId));
+        && (report.origin === "submitted-report" || projection.workflowOwnedDispatch && report.status !== "completed")
+        && (typeof storedTurnId !== "string" || storedTurnId === report.source.turnId));
       if (matches.length !== 1) continue;
       const report = matches[0]!;
       if (!await this.commitDurableHandback(projectRoot, runtime, this.durableHandbackOf(report), report)) continue;

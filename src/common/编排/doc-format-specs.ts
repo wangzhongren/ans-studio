@@ -28,6 +28,8 @@ import {
   PROJECT_TOPOLOGY_SCHEMA_EXAMPLE,
   TEAM_PLAN_SCHEMA,
   contractSchemaText,
+  EVIDENCE_TEAM_WRITESET_GUIDANCE,
+  evidenceRosterScopeText,
 } from "./workflow-preconditions.ts";
 import {
   RUN_ARCHITECTURE_SCHEMA,
@@ -821,7 +823,7 @@ export const DOC_FORMAT_SPECS: readonly DocFormatSpec[] = Object.freeze([
       vf("roleRows", "对象[]", "required", "数组长度 = roster 角色数；每角色恰一次"),
       vf("roleRows[].roleId", "string", "required", "唯一且在 roster 内"),
       vf("roleRows[].modules", "string[]", "required", "非空；与 roster 属主一致"),
-      vf("roleRows[].writesets", "string[]", "required", "非空；在属主模块根内、无治理目录、互不重叠；每模块需具体写集"),
+      vf("roleRows[].writesets", "string[]", "required", "非空；在属主模块根内、互不重叠；每模块需具体写集。治理写区仅适用下述取证声明。", EVIDENCE_TEAM_WRITESET_GUIDANCE),
       vf("roleRows[].dependsOn", "string[]", "required", "可空数组；引用已定义角色且无环"),
       cf("正文", "任意", "计划说明为写作约定（不解析）"),
     ],
@@ -2294,4 +2296,10 @@ export function docFormatSpecText(id: string, part: DocFormatPart = "all"): stri
 /** 已知格式 id（注册表顺序；供工具描述与未知 id 提示）。 */
 export function docFormatKnownIds(): readonly string[] {
   return DOC_FORMAT_SPECS.map((spec) => spec.id);
+}
+
+/** Assignment context is supplied by the host, outside the static format registry. */
+export function docFormatEvidenceScopeText(id: string | undefined, flowId: string, roleId: string): string | undefined {
+  return id === PROJECT_MODULES_SCHEMA || id === PROJECT_ROSTER_SCHEMA || id === "team-plan/v3"
+    ? evidenceRosterScopeText(flowId, roleId) : undefined;
 }

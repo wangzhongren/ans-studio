@@ -5,7 +5,7 @@ import type {
   DurableActionIntent, DurableDefinitionSnapshot, DurableDelivery, DurableEffectClaim, DurableEffectIntent, DurableEffectOutcome,
   DurableEvidenceRef, DurableFact, DurableFactReceipt, DurableInstanceRef, DurableOwner, DurableProjection, DurableReleaseRequest,
   DurableGraphCard, DurablePendingTask, DurableScopeDecision, DurableTaskBinding, DurableTerminal, DurableWriteSet,
-  DurableStartInput, DurableStartProposal,
+  DurableStartInput, DurableStartProposal, DurableDocumentRevision, DurableCapabilityEvent,
 } from '../../model/durable-workflow.ts';
 import type { RepositoryIdentity } from './files.ts';
 
@@ -53,7 +53,18 @@ export interface StoredInstance {
     proposalRoster?: DurableEvidenceRef;
     approvedProposalRequestId?: string;
     acceptanceArchive?: DurableEvidenceRef;
+    documentRevisions?: StoredDocumentRevision[];
   };
+}
+
+export interface StoredDocumentRevision extends DurableDocumentRevision {
+  requestedBy: DurableCapabilityEvent['source'];
+  submittedBy?: DurableCapabilityEvent['source'];
+  candidateInputDigest?: string;
+  basis: readonly DurableEvidenceRef[];
+  updates?: readonly { original: DurableEvidenceRef; candidate: DurableEvidenceRef }[];
+  missingOriginal?: boolean;
+  decision?: { authority: 'customer'; decision: 'approve' | 'reject'; digest: string; at: string };
 }
 
 export interface StoredFact { fact: DurableFact; receipt: DurableFactReceipt; fingerprint: string }

@@ -7,21 +7,25 @@ import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCustomerInputChannel, MERGE_MAIN_OPTION_IDS, type OperatorRequestPayload } from "../../../app/desktop/customer-input.ts";
-import { createDesktopInterface } from "../../../app/desktop/interface.ts";
+import { createDecisionDelegationSwitch, createDesktopInterface, createShellJudgeSwitch } from "../../../app/desktop/interface.ts";
 import { DesktopDurableWorkflow, type DesktopDurableView } from "../../../app/desktop/durable-workflow.ts";
-import { buildDesktopShellArming } from "../../../app/desktop/operator-channel.ts";
+import { buildDesktopShellArming, createDesktopOperatorChannel, type OperatorDecision, type OperatorPresenter,
+  type ShellJudgeResultPayload } from "../../../app/desktop/operator-channel.ts";
 import { createDesktopBaselineGitPort } from "../../../app/desktop/workflow-git.ts";
 import { WORKFLOW_START_OPTION_IDS, type DesktopWorkflowStartProposal } from "../../../app/desktop/workflow-chief-start.ts";
 import { createEventQueue } from "../../../src/common/runtime-core/event-queue.ts";
 import { createNetworkGate } from "../../../src/common/runtime-core/network-gate.ts";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
-import type { DurableResult } from "../../../src/model/durable-workflow.ts";
-import type { RuntimeProviderFactory, SessionEvent, ToolResult } from "../../../src/model/runtime.ts";
+import { DEFAULT_EVIDENCE_COLLECTOR, type DurableInstanceRef, type DurableProjection, type DurableResult } from "../../../src/model/durable-workflow.ts";
+import type { ChiefDecisionExecutionContext, RuntimeProviderFactory, SessionEvent, ToolResult } from "../../../src/model/runtime.ts";
+import { isChiefDecisionExecutionContext } from "../../../src/model/runtime.ts";
 import { legacyPathB } from "../../编排/durable-workflow/fixture.ts";
 import { writeRealPinnedAns } from "../existing-project-compat-verify/fixture.ts";
 
 export const resourceRoot = process.env.ANS_W5_DAPR_ROOT;
 const sourceAppRoot = fileURLToPath(new URL("../../../", import.meta.url));
+export const historicalR19Resources = path.join(sourceAppRoot,
+  "release-output/yaml-owned-fixed-flow-candidate/windows-x64-r19-a12b-preview-diagnostic-handoff/resources");
 export const target = "src/core/snake.ts";
 export const analysis = "docs/governance/w5-analysis.md";
 export const operatorReport = "docs/quality/w5-operator.md";
@@ -42,15 +46,24 @@ export async function write(root: string, relative: string, bytes: string) {
   await fs.writeFile(name, bytes, "utf8");
 }
 
-export async function emptyFixture() {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w5-dapr-"));
+export async function emptyFixture(scratchRoot = os.tmpdir()) {
+  const directory = await fs.mkdtemp(path.join(scratchRoot, "ans-w5-dapr-"));
   const root = path.join(directory, "project");
   const userDataRoot = path.join(directory, "data");
   await fs.mkdir(root);
   return { directory, root, userDataRoot };
 }
 
-export async function fixture(options: { installLegacyPathB?: boolean; existingIndependentRoster?: boolean } = {}) {
+export function evidenceCollectorRoleFiles(writeDomain: string) {
+  const location = `角色卡/${DEFAULT_EVIDENCE_COLLECTOR}/`;
+  return {
+    card: { path: location + "role-card.md", content: `---\nroleId: ${DEFAULT_EVIDENCE_COLLECTOR}\ndisplayName: Evidence collector\n---\n# Collection\n` },
+    boundaryMd: { path: location + "boundary.md", content: `# 边界\n\n## Section 1: 可修改文件与目录\n\n| 类型 | 路径 | 用途 |\n| --- | --- | --- |\n| 目录 | ${writeDomain} | Evidence |\n` },
+    boundaryYaml: { path: location + "boundary.yaml", content: `role: ${DEFAULT_EVIDENCE_COLLECTOR}\nentries:\n  - root: project\n    path: ${writeDomain}\n    kind: directory\n    purpose: Evidence\n` },
+  };
+}
+
+export async function fixture(options: { installLegacyPathB?: boolean; existingIndependentRoster?: boolean; evidenceCollector?: boolean } = {}) {
   const { directory, root, userDataRoot } = await emptyFixture();
   // frozen fixed-path test shape: main, core module and worker. This fixture uses its boundary fallback.
   await write(root, target, "export const SNAKE = 1;\n");
@@ -59,7 +72,10 @@ export async function fixture(options: { installLegacyPathB?: boolean; existingI
   await write(root, "角色卡/worker/boundary.yaml", "role: worker\nentries:\n  - root: project\n    path: src/core/\n    kind: directory\n    purpose: Core\n");
   // Model an already governed project. Use the established fixture with hashes of the actual
   // role files, then select the existing trio mode. The product loader and write gate check it.
-  writeRealPinnedAns(root, ["worker"]);
+  if (options.evidenceCollector) {
+    for (const doc of Object.values(evidenceCollectorRoleFiles("docs/verification/"))) await write(root, doc.path, doc.content);
+  }
+  writeRealPinnedAns(root, options.evidenceCollector ? ["worker", DEFAULT_EVIDENCE_COLLECTOR] : ["worker"]);
   const config = JSON.parse(await fs.readFile(path.join(root, ".ans/project.json"), "utf8"));
   await write(root, ".ans/project.json", JSON.stringify({ ...config, governanceModel: "trio", workflowSchema: "two-fixed-paths/v1" }));
   if (options.installLegacyPathB !== false) await write(root, "docs/workflows/path-b.yaml", legacyPathB);
@@ -97,8 +113,26 @@ async function installExistingRoster(root: string) {
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 type WorkspaceFixture = Awaited<ReturnType<typeof emptyFixture>>;
-export type ModelTurn = { roleId: string; text: string; turnId?: string; signal: AbortSignal; toolNames: readonly string[]; call(name: string, args: Record<string, unknown>): Promise<ToolResult> };
+export type ModelTurn = { roleId: string; text: string; turnId?: string; signal: AbortSignal; toolNames: readonly string[];
+  chiefDecisionContext?: ChiefDecisionExecutionContext;
+  shellJudgeSystemText?: string;
+  call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolResult> };
 export type Log = (event: string, value: unknown) => void;
+
+export async function decideBounded(turn: ModelTurn, selected: readonly string[], log: Log) {
+  const context = turn.chiefDecisionContext;
+  assert.ok(context?.request.durableWorkflow && isChiefDecisionExecutionContext(context));
+  assert.equal(turn.roleId, "chief");
+  assert.deepEqual(turn.toolNames, ["decide_pending_request"]);
+  assert.equal(context.productionWriteAuthority, false);
+  const { requestId, baseDigest, delegationRevision } = context.request;
+  const prompt = JSON.parse(turn.text) as { request: typeof context.request; evidence: string };
+  assert.deepEqual(prompt.request, context.request);
+  assert.ok(prompt.evidence.trim());
+  log("controlled-chief-boundary", { context, evidence: prompt.evidence });
+  return turn.call("decide_pending_request", { requestId, baseDigest, delegationRevision, disposition: "select", selected,
+    reason: "The application supplied the current approved evidence for this isolated fixture." });
+}
 
 export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Log) {
   let sequence = 0;
@@ -121,11 +155,30 @@ export function modelFixture(script: (turn: ModelTurn) => Promise<void>, log: Lo
           try {
             const originalRequest = text.startsWith("【系统通知·会话重建】") ? text.slice(text.indexOf("\n\n") + 2) : text;
             const next = roleId === "chief" ? ordinaryChiefTurns.get(originalRequest) ?? script : script;
-            await next({ roleId, text, turnId, signal: abort.signal, toolNames, async call(name, args) {
+            await next({ roleId, text, turnId, signal: abort.signal, toolNames, chiefDecisionContext: options.chiefDecisionContext,
+              ...(roleId === "shell-judge" ? { shellJudgeSystemText: role.cardText } : {}), async call(name, args, signal) {
               const tool = options.tools.find(candidate => candidate.name === name);
               assert.ok(tool, `${roleId} missing actual ${name} capability`);
+              if (process.env.ANS_F6_ANNOTATED_CRITERIA === "1" && name === "submit_report" && Array.isArray(args.evidence)) {
+                const criteria = args.evidence.filter((entry): entry is string => typeof entry === "string"
+                  && /^docs\/quality\/[^/]+-criteria-v[1-9]\d*\.md$/.test(entry));
+                if (criteria.length) {
+                  const reader = options.tools.find(candidate => candidate.name === "read_file");
+                  assert.ok(reader, `${roleId} must read back its actual standard before the annotated report`);
+                  for (const file of criteria) {
+                    const readArgs = { path: file };
+                    const readResult: ToolResult = await reader.handler({ name: "read_file", args: readArgs,
+                      toolCallId: `w5-${++sequence}`, signal: abort.signal });
+                    log("tool-result", { roleId, turnId, name: "read_file", args: readArgs, result: readResult });
+                    assert.equal(readResult.ok, true, readResult.message);
+                  }
+                  args = { ...args, summary: "独立验收标准已完成，本次实际标准文件已写入并回读。", evidence: ["已完成验收标准编制，文件已由本次任务实际写入。",
+                    ...criteria.map(file => `标准文件：${file}（已落盘并回读；以本次受信写入的原始摘要核对）`)] };
+                  log("f6-annotated-criteria-model-output", { roleId, turnId, evidence: args.evidence });
+                }
+              }
               const toolCallId = `w5-${++sequence}`;
-              const result = await tool.handler({ name, args, toolCallId, signal: abort.signal });
+              const result = await tool.handler({ name, args, toolCallId, signal: signal ? AbortSignal.any([abort.signal, signal]) : abort.signal });
               log("tool-result", { roleId, turnId, name, args, result });
               return result;
             } });
@@ -209,6 +262,14 @@ type AppFixtureOptions = {
   pickWorkflowDefinition?: () => Promise<string | null>;
   bundleResources?: string;
   chooseProjectRoot?: () => Promise<string>;
+  shellOperatorPresenter?: OperatorPresenter;
+  emitShellJudgeResult?: (payload: ShellJudgeResultPayload) => void;
+  initialJudgeSwitches?: { decision: boolean; approval: boolean };
+  watchdogOptions?: Parameters<typeof createDesktopInterface>[0]["watchdogOptions"];
+  nativeAcceptanceBrowser?: boolean;
+  pauseA11ParentReduction?: () => boolean;
+  modelRuntime?: "pi" | "claude";
+  assessmentReplayRef?: DurableInstanceRef;
 };
 type ChiefStartInput = {
   projectRoot?: string;
@@ -220,32 +281,95 @@ type ChiefStartInput = {
   enabled?: boolean;
 };
 
+type HistoricalBrowserFactory = (options: { url: string; allowedPaths: readonly string[]; signal: AbortSignal }) => Promise<{
+  focus(): boolean;
+  onBlur(callback: () => void): () => void;
+  input(input: { kind: "keydown" | "keyup"; key: string } | { kind: "click"; x: number; y: number }): void;
+  png(): Promise<Buffer>;
+  visibleText(): Promise<string>;
+  close(): void;
+}>;
+
 export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFixture>, log: Log, options: AppFixtureOptions = {}) {
-  const { bundleResources, pickWorkflowDefinition, chooseProjectRoot } = options;
+  const { bundleResources = process.env.ANS_W5_APP_RESOURCES ?? (options.nativeAcceptanceBrowser ? historicalR19Resources : undefined),
+    pickWorkflowDefinition, chooseProjectRoot, shellOperatorPresenter, emitShellJudgeResult,
+    initialJudgeSwitches = { decision: false, approval: false }, watchdogOptions, nativeAcceptanceBrowser,
+    pauseA11ParentReduction, modelRuntime = "pi", assessmentReplayRef } = options;
   const presetRoot = bundleResources ? path.join(bundleResources, "app") : sourceAppRoot;
   const moduleUrl = (file: string) => pathToFileURL(path.join(presetRoot, file)).href;
   const { DesktopDurableWorkflow: Controller } = bundleResources
     ? await import(moduleUrl("app/desktop/durable-workflow.ts")) as typeof import("../../../app/desktop/durable-workflow.ts")
     : { DesktopDurableWorkflow };
-  const { createDesktopInterface: desktopInterface } = bundleResources
+  const { createDesktopInterface: desktopInterface, createDecisionDelegationSwitch: decisionSwitch,
+    createShellJudgeSwitch: shellSwitch } = bundleResources
     ? await import(moduleUrl("app/desktop/interface.ts")) as typeof import("../../../app/desktop/interface.ts")
-    : { createDesktopInterface };
+    : { createDesktopInterface, createDecisionDelegationSwitch, createShellJudgeSwitch };
   const { createCustomerInputChannel: customerChannel } = bundleResources
     ? await import(moduleUrl("app/desktop/customer-input.ts")) as typeof import("../../../app/desktop/customer-input.ts")
     : { createCustomerInputChannel };
   const { createNetworkGate: network } = bundleResources
     ? await import(moduleUrl("src/common/runtime-core/network-gate.ts")) as typeof import("../../../src/common/runtime-core/network-gate.ts")
     : { createNetworkGate };
-  const { buildDesktopShellArming: shellArming } = bundleResources
+  const { buildDesktopShellArming: shellArming, createDesktopOperatorChannel: operatorChannel } = bundleResources
     ? await import(moduleUrl("app/desktop/operator-channel.ts")) as typeof import("../../../app/desktop/operator-channel.ts")
-    : { buildDesktopShellArming };
+    : { buildDesktopShellArming, createDesktopOperatorChannel };
+  const acceptanceBrowser = nativeAcceptanceBrowser ? await (async () => {
+    const { BrowserWindow } = await import("electron");
+    const { electronAcceptanceBrowser } = await import(moduleUrl("app/desktop/durable-acceptance-browser.ts")) as {
+      electronAcceptanceBrowser(window: typeof BrowserWindow): HistoricalBrowserFactory;
+    };
+    const open = electronAcceptanceBrowser(BrowserWindow);
+    return (async options => {
+      const page = await open(options);
+      return { ...page, onBlur(callback) {
+        return page.onBlur(() => {
+          log("native-acceptance-window-blurred", { preview: options.url, previewClosed: options.signal.aborted });
+          callback();
+        });
+      } };
+    }) satisfies typeof open;
+  })() : undefined;
   const durable = new Controller({
     userDataRoot: f.userDataRoot, resourceRoot: bundleResources ?? resourceRoot!, presetRoot,
+    ...(acceptanceBrowser ? { acceptanceBrowser } : {}),
   });
+  if (assessmentReplayRef) {
+    const find = durable.find.bind(durable);
+    // The signed A6 digest includes the original logical project ID. Bridge only the
+    // isolated physical root lookup; the production ledger still verifies every effect.
+    durable.find = (root, instanceId) => root === f.root && (instanceId === undefined || instanceId === assessmentReplayRef.instanceId)
+      ? durable.lookup(assessmentReplayRef) : find(root, instanceId);
+  }
+  if (pauseA11ParentReduction) {
+    const store = await durable.store();
+    const reconcile = store.reconcile.bind(store);
+    let reported = false;
+    store.reconcile = async (...args) => {
+      if (!pauseA11ParentReduction()) return reconcile(...args);
+      if (!reported) {
+        reported = true;
+        log("r16-r15-dapr-publication-held-after-original-close-refusal", f);
+      }
+    };
+  }
+  let observer: ((projection: DurableProjection) => Promise<void>) | undefined;
+  const registerObserver = durable.observeProject.bind(durable);
+  durable.observeProject = (root, update) => {
+    observer = update;
+    return registerObserver(root, update);
+  };
+  const roleStates: Parameters<NonNullable<Parameters<typeof createDesktopInterface>[0]["emitRoleState"]>>[0][] = [];
+  const watchdogDeliveryNotes: string[] = [];
   const networkGate = network();
+  const decisionJudgeSwitch = decisionSwitch(initialJudgeSwitches.decision);
+  const shellJudgeSwitch = shellSwitch(initialJudgeSwitches.approval);
   const cards = new Map<string, OperatorRequestPayload>();
+  const applicationRequests = new Map<string, Pick<OperatorRequestPayload, "id" | "request">>();
   const channel = customerChannel({
     operatorId: "w5-isolated-customer",
+    delegation: decisionJudgeSwitch,
+    judge: { isGroupEnabled: group => group === "decision" && decisionJudgeSwitch.isEnabled() },
+    emitJudgeResult: result => log("desktop-judge-result", result),
     presenter: card => { cards.set(card.id, card); log("customer-card", card); },
     onExpired: card => { cards.delete(card.id); log("customer-card-closed", card); },
   });
@@ -255,18 +379,36 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
     pickWorkflowDefinition,
     emitEvent: envelope => {
       if (["settled", "handback", "denied"].includes(envelope.event.kind)) log("desktop-event", envelope);
+      if (watchdogOptions && envelope.event.kind === "message" && (envelope.event.detail as { source?: string })?.source === "delivery-note"
+        && envelope.event.summary) watchdogDeliveryNotes.push(envelope.event.summary);
     },
+    ...(watchdogOptions ? { watchdogOptions } : {}),
     envFilePath: path.join(f.directory, "empty.env"),
     piConfigEnv: {},
     runtimeStatePath: path.join(f.directory, "runtime-selection.json"),
-    runtimeOptions: { providerFactories: { pi: model.factory }, persistSession: true, networkGate },
-    resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "selected", skipped: [] }),
-    customerInput: channel.customerInput,
+    runtimeOptions: { providerFactories: { [modelRuntime]: model.factory }, persistSession: true, networkGate },
+    resolveRuntimeFn: async () => ({ ok: true, runtime: modelRuntime, source: "selected", skipped: [] }),
+    customerInput(request, context, ...args) {
+      if (context.requestId && context.durableDecision) {
+        applicationRequests.set(context.requestId, { id: context.requestId, request });
+      }
+      return channel.customerInput(request, context, ...args);
+    },
     hasPendingProjectCard: root => channel.hasPendingProjectCard(root),
+    emitRoleState: state => { roleStates.push(structuredClone(state)); },
+    decisionJudgeSwitch,
+    shellJudgeSwitch,
+    initialJudgeSwitches,
+    preferencesPath: path.join(f.userDataRoot, "ans", "preferences.json"),
     shellArming: shellArming(),
-    shellOperatorChannel: () => ({ outcome: "unavailable", reason: "W5 disables arbitrary shell escalation" }),
+    shellOperatorChannel: shellOperatorPresenter ? operatorChannel({ operatorId: "r9-isolated-test-operator", presenter: shellOperatorPresenter,
+      judge: { isEnabled: () => shellJudgeSwitch.isEnabled() }, emitJudgeResult: payload => {
+        log("desktop-shell-judge-result", payload);
+        emitShellJudgeResult?.(payload);
+      } })
+      : () => ({ outcome: "unavailable", reason: "W5 disables arbitrary shell escalation" }),
   });
-  await durable.resume();
+  if (!assessmentReplayRef) await durable.resume();
   assert.equal(await desktop.pickProject(), f.root);
   const listing = await desktop.listProject({ projectRoot: f.root });
   if ("baselineOid" in f) assert.ok(listing.roles.some(role => role.roleId === "worker"), JSON.stringify(listing.roles));
@@ -331,7 +473,11 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
     if (!activated.instanceId) return { ok: false, code: activated.startup?.code ?? "workflow-start-blocked", message: activated.startup?.message ?? "The approved start is blocked." };
     return desktop.getDurableWorkflowProjection({ ...project, instanceId: activated.instanceId });
   }
-  return { desktop, durable, cards, listing, proposeViaChief, startViaChief,
+  return { desktop, durable, cards, applicationRequests, listing, proposeViaChief, startViaChief, roleStates, watchdogDeliveryNotes,
+    async observeNow(instanceId: string) {
+      const current = await durable.find(f.root, instanceId);
+      if (current && observer) await observer(current);
+    },
     simulateNetwork(online: boolean) {
       const state = { online, source: "main-net", reason: online ? "resume" : "interface-down", at: Date.now(), stableForMs: 0 } as const;
       networkGate.apply(state);
@@ -345,6 +491,7 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
       return result;
     },
     async close() {
+      if (watchdogOptions) desktop.stopWatchdog();
       desktop.disposeProjectDocuments();
       channel.rejectAllPending("isolated W5 window closed");
       await desktop.stopSession({ roleId: null });
@@ -353,9 +500,9 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
   };
 }
 
-export async function until<T>(phase: string, probe: () => Promise<T | undefined>, errors: unknown[]) {
+export async function until<T>(phase: string, probe: () => Promise<T | undefined>, errors: unknown[], timeoutMs = 60_000) {
   const start = Date.now();
-  while (Date.now() - start < 60_000) {
+  while (Date.now() - start < timeoutMs) {
     if (errors.length) throw errors[0];
     const value = await probe();
     if (value !== undefined) return value;
@@ -386,6 +533,170 @@ export function sqliteSnapshot(f: WorkspaceFixture, instanceId: string): Record<
 export async function successful(turn: ModelTurn, name: string, args: Record<string, unknown>) {
   const result = await turn.call(name, args);
   assert.equal(result.ok, true, `${turn.roleId}/${name}: ${result.message}`);
+}
+
+export const workflowShellScript = "src/core/check-threshold.mjs";
+export const workflowShellManifest = {
+  name: "ans-local-threshold",
+  version: "1.0.0",
+  private: true,
+  scripts: {
+    typecheck: `node ${workflowShellScript} verify`,
+    "review-evidence": `node ${workflowShellScript} failure`,
+    "verify-denied": `node ${workflowShellScript} verify-denied`,
+    "verify-cancelled": `node ${workflowShellScript} verify-cancelled`,
+  },
+};
+export const workflowShellSource = `import { writeFileSync } from "node:fs";
+const mode = process.argv[2];
+if (mode.endsWith("denied") || mode.endsWith("cancelled")) {
+  writeFileSync(mode + "-shell.marker", "unexpected child execution");
+}
+console.log("R9 process stdout", mode);
+console.error("R9 process stderr", mode);
+if (mode === "failure") process.exitCode = 17;
+if (mode === "running") {
+  writeFileSync("running-shell.marker", String(process.pid));
+  setInterval(() => {}, 1000);
+}
+`;
+
+/** The same operator channel as the Desktop app, with only the human presentation endpoint controlled. */
+export function workflowShellFixture(projectRoot: string, log: Log) {
+  const seen: string[] = [];
+  const node = (mode: string) => `node ${workflowShellScript} ${mode}`;
+  const npm = (script: string) => `npm run ${script}`;
+  const forbiddenTarget = "src/outside-shell-scope";
+  const expected = new Map([
+    [node("worker"), { role: "worker", argv: ["node", workflowShellScript, "worker"], allow: true }],
+    [node("denied"), { role: "worker", argv: ["node", workflowShellScript, "denied"], allow: false }],
+    [node("cancelled"), { role: "worker", argv: ["node", workflowShellScript, "cancelled"], allow: true }],
+    [node("running"), { role: "worker", argv: ["node", workflowShellScript, "running"], allow: true }],
+    [npm("review-evidence"), { role: "verifier", argv: ["npm", "run", "review-evidence"], allow: true }],
+    [npm("verify-denied"), { role: "verifier", argv: ["npm", "run", "verify-denied"], allow: false }],
+    [npm("verify-cancelled"), { role: "verifier", argv: ["npm", "run", "verify-cancelled"], allow: true }],
+  ]);
+  const cancellations = new Map([node("cancelled"), npm("verify-cancelled")].map(command => [command, {
+    started: Promise.withResolvers<void>(), decision: Promise.withResolvers<OperatorDecision>(),
+  }]));
+  const marker = (name: string) => path.join(projectRoot, `${name}-shell.marker`);
+  const noMarker = (name: string) => assert.rejects(fs.access(marker(name)), { code: "ENOENT" });
+  const noDeniedChild = () => Promise.all(["denied", "cancelled", "verify-denied", "verify-cancelled"].map(noMarker));
+  const assertProcess = (result: ToolResult, mode: string, exitCode: number) => {
+    assert.equal(result.ok, exitCode === 0, result.message);
+    assert.equal(result.execution?.exitCode, exitCode, result.message);
+    assert.match(result.execution?.stdout ?? "", new RegExp(`R9 process stdout ${mode}`));
+    assert.match(result.execution?.stderr ?? "", new RegExp(`R9 process stderr ${mode}`));
+  };
+  const presenter: OperatorPresenter = { async present(prompt, display, metadata) {
+    const command = display.command;
+    assert.equal(prompt.acceptanceEnvironmentScope, undefined);
+    assert.equal(display.acceptanceEnvironmentScope, undefined);
+    const binding = expected.get(command);
+    assert.ok(binding, `Unexpected application approval: ${command}`);
+    assert.equal(seen.includes(command), false);
+    seen.push(command);
+    assert.equal(metadata?.roleId, binding.role);
+    assert.equal(metadata.runtime, "pi");
+    assert.equal(path.resolve(display.cwd), path.resolve(projectRoot));
+    assert.deepEqual(prompt.argv, binding.argv);
+    assert.deepEqual(display.argv, binding.argv);
+    await noDeniedChild();
+    await noMarker("running");
+    log("r9-actual-application-command-approval", { command, argv: display.argv, cwd: display.cwd, roleId: metadata.roleId });
+    const cancellation = cancellations.get(command);
+    if (cancellation) {
+      cancellation.started.resolve();
+      return cancellation.decision.promise;
+    }
+    return { allow: binding.allow };
+  } };
+  const tool = (turn: ModelTurn, command: string, signal?: AbortSignal) => turn.call("run_shell", { command }, signal);
+  const deny = async (turn: ModelTurn, command: string, mode: string) => {
+    const denied = await tool(turn, command);
+    assert.equal(denied.ok, false, denied.message);
+    assert.equal(denied.execution, undefined);
+    await noMarker(mode);
+  };
+  const cancelApproval = async (turn: ModelTurn, command: string, mode: string) => {
+    const cancellation = cancellations.get(command);
+    assert.ok(cancellation);
+    const abort = new AbortController();
+    const pending = tool(turn, command, abort.signal);
+    // A missing application request fails immediately instead of leaving the suite waiting for approval.
+    await Promise.race([cancellation.started.promise, pending.then(result => assert.fail(result.message))]);
+    await noMarker(mode);
+    abort.abort();
+    const cancelled = await pending;
+    assert.equal(cancelled.ok, false, cancelled.message);
+    assert.equal(cancelled.execution, undefined);
+    cancellation.decision.resolve({ allow: true });
+    await noMarker(mode);
+    log("r9-command-cancelled-before-spawn", { command, roleId: turn.roleId, message: cancelled.message });
+  };
+  const cancelRunningChild = async (turn: ModelTurn) => {
+    const abort = new AbortController();
+    const command = node("running");
+    const pending = tool(turn, command, abort.signal);
+    try {
+      const pid = await Promise.race([
+        until("R9 approved foreground command started", async () =>
+          Number(await fs.readFile(marker("running"), "utf8").catch(() => "")) || undefined, []),
+        pending.then(result => assert.fail(result.message)),
+      ]);
+      process.kill(pid, 0);
+      abort.abort();
+      const cancelled = await pending;
+      assert.equal(cancelled.ok, false, cancelled.message);
+      await until("R9 cancelled foreground command stopped", async () => {
+        try { process.kill(pid, 0); return undefined; }
+        catch (error) { assert.equal((error as NodeJS.ErrnoException).code, "ESRCH"); return true; }
+      }, []);
+      log("r9-command-cancelled-after-spawn", { command, pid, roleId: turn.roleId, message: cancelled.message });
+    } finally {
+      abort.abort();
+      await fs.rm(marker("running"), { force: true });
+    }
+  };
+  return {
+    presenter,
+    async worker(turn: ModelTurn) {
+      assertProcess(await tool(turn, node("worker")), "worker", 0);
+      await deny(turn, node("denied"), "denied");
+      await cancelApproval(turn, node("cancelled"), "cancelled");
+      await cancelRunningChild(turn);
+      const outside = await tool(turn, `mkdir ${forbiddenTarget}`);
+      assert.equal(outside.ok, false, outside.message);
+      assert.match(outside.message, /write-guard/);
+      assert.equal(outside.execution, undefined);
+      await assert.rejects(fs.access(path.join(projectRoot, forbiddenTarget)), { code: "ENOENT" });
+      const gitDenied = await tool(turn, `git add ${forbiddenTarget}`);
+      assert.equal(gitDenied.ok, false, gitDenied.message);
+      assert.equal(gitDenied.execution, undefined);
+      const background = await turn.call("start_background_task", { command: node("denied") });
+      assert.equal(background.ok, false, background.message);
+      assert.equal(background.backgroundTask, undefined);
+      await noMarker("denied");
+    },
+    async verifier(turn: ModelTurn) {
+      assertProcess(await tool(turn, npm("typecheck")), "verify", 0);
+      assertProcess(await tool(turn, npm("review-evidence")), "failure", 17);
+      await deny(turn, npm("verify-denied"), "verify-denied");
+      await cancelApproval(turn, npm("verify-cancelled"), "verify-cancelled");
+    },
+    async verifyDelivery() {
+      assert.deepEqual(seen, [...expected.keys()]);
+      await noDeniedChild();
+      const audit = (await fs.readFile(path.join(projectRoot, "docs/audit/shell-gate.jsonl"), "utf8"))
+        .trim().split(/\r?\n/).map(row => JSON.parse(row));
+      for (const [command, executable] of [[node("worker"), true], [node("denied"), false],
+        [npm("typecheck"), true], [npm("review-evidence"), true], [npm("verify-denied"), false]] as const) {
+        assert.ok(audit.some(entry => entry.command === command && entry.conclusion === (executable ? "allow" : "deny")),
+          `Missing actual shell review for ${command}`);
+      }
+      log("r9-shell-audit-and-delivery", { seen, audit: audit.filter(row => expected.has(row.command) || row.command === "npm run typecheck") });
+    },
+  };
 }
 
 export async function daprdListener(f: WorkspaceFixture) {

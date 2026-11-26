@@ -1,15 +1,20 @@
 schema: 2
 id: path-a
-version: 1
+version: 9
+evidenceAudit:
+  version: 1
+  collectorRoleId: acceptance-evidence-collector
 name: 路径 A
 start: prepare-product
 steps:
   prepare-product:
-    action: product-prepare
-    next: write-intent
+    action: product-prepare-direct
+    role: product
+    on: { ready: write-intent, blocked: blocked }
   write-intent:
-    action: author-intent
-    next: confirm-intent
+    action: author-intent-direct
+    role: product
+    on: { ready: confirm-intent, clarify: needs-clarification, blocked: blocked }
   confirm-intent:
     action: confirm-intent
     on: { approved: prepare-planning, revise: revise-intent, rejected: verify-stop }
@@ -20,10 +25,14 @@ steps:
     onLimit: stopped
   prepare-planning:
     action: planning-prepare
+    role: rapporteur
     next: write-proposal
+    onFailure: blocked
   write-proposal:
     action: author-proposal
+    role: rapporteur
     next: confirm-proposal
+    onFailure: blocked
   confirm-proposal:
     action: confirm-proposal
     on: { approved: prepare-personnel, revise: revise-proposal, rejected: blocked }
@@ -34,28 +43,49 @@ steps:
     onLimit: stopped
   prepare-personnel:
     action: personnel-prepare
+    role: nominator
     next: activate-roles
+    onFailure: blocked
   activate-roles:
     action: activate-roles
+    role: nominator
     next: establish-team-baseline
+    onFailure: blocked
   establish-team-baseline:
     action: team-baseline
+    role: convener
     next: confirm-appointment
+    onFailure: blocked
   confirm-appointment:
     action: confirm-appointment
     on: { approved: open-standard, revise: blocked, rejected: blocked }
   open-standard:
     action: independent-standard
-    role: independent-reviewer
+    role: verifier
+    blockedRouting: true
     next: implement
+    onFailure: blocked
   implement:
-    action: governed-implementation
-    role: module-owner
+    action: operations-implementation
+    role: convener
+    documentRevision: true
+    blockedRouting: true
     next: assess
+    onFailure: blocked
   assess:
     action: independent-assessment
-    role: independent-reviewer
-    on: { accepted: archive, rework: revise-implementation, blocked: blocked }
+    role: verifier
+    blockedRouting: true
+    on: { accepted: archive, rework: revise-implementation, blocked: blocked, environment-missing: open-recovery }
+  open-recovery:
+    action: open-environment-recovery
+    maxVisits: 2
+    next: restore-environment
+    onLimit: blocked
+  restore-environment:
+    action: operations-environment-recovery
+    role: convener
+    on: { restored: assess, retryable: open-recovery, blocked: blocked }
   revise-implementation:
     action: retry-implementation
     maxVisits: 2
@@ -73,3 +103,4 @@ steps:
   delivered: { terminal: delivered }
   stopped: { terminal: stopped }
   blocked: { terminal: blocked }
+  needs-clarification: { terminal: blocked }

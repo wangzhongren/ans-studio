@@ -212,7 +212,8 @@ export class Tasks {
    * 纯读、零写入；裁剪/有界/部分结果全部由 A1 决定，本层不复制派生。
    */
   async projectStateView(projectRoot: string, scope: { roleId?: string; viewerRoleId?: string; full?: boolean; flowId?: string; now?: Date } = {}): Promise<ProjectStateView> {
-    return buildProjectStateView(projectRoot, scope);
+    const evidenceCollectorRoleIdForFlow = this.deps.durableWorkflow?.evidenceCollectorRoleForProject(projectRoot);
+    return buildProjectStateView(projectRoot, { ...scope, evidenceCollectorRoleIdForFlow });
   }
 
   /** `project_state` 工具能力：A1 文本摘要投影（同一 builder；工具层再做 8 KiB 硬截断）。 */
@@ -224,7 +225,7 @@ export class Tasks {
         directory = await start.catalog(projectRoot, query.definitionId).catch(() => "The workflow definition directory could not be read.");
       }
       if (query.definitionId && directory) return { ok: true, text: directory };
-      const view = await buildProjectStateView(projectRoot, {
+      const view = await this.projectStateView(projectRoot, {
         roleId,
         ...(query.flowId !== undefined ? { flowId: query.flowId } : {}),
       });

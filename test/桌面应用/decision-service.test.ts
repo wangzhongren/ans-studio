@@ -10,7 +10,12 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { createCustomerInputChannel, evaluateDecisionCardRequest, type OperatorJudgeResultPayload, type OperatorRequestPayload, type ChiefDecisionHost } from "../../app/desktop/customer-input.ts";
+import { createCustomerInputChannel, evaluateDecisionCardRequest, buildMergeMainCardRequest, BLOCKED_SCOPE_CARD_KIND, DOCUMENT_REVISION_OPTIONS,
+  MERGE_MAIN_OPTION_IDS, type DesktopCustomerInputFn, type OperatorJudgeResultPayload, type OperatorRequestPayload, type ChiefDecisionHost } from "../../app/desktop/customer-input.ts";
+import { presentB2EvidenceScopeCard } from "../../app/desktop/durable-blocked-routing.ts";
+import type { DesktopDurableWorkflow } from "../../app/desktop/durable-workflow.ts";
+import type { DurableB2EvidenceDecision, DurableDecisionBinding, DurableDecisionProvenance, DurableProjection } from "../../src/model/durable-workflow.ts";
+import { WORKFLOW_START_OPTION_IDS } from "../../app/desktop/workflow-chief-start.ts";
 import { mainT } from "../../app/desktop/i18n.ts";
 import { createDecisionDelegationSwitch } from "../../app/desktop/interface.ts";
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
@@ -80,6 +85,187 @@ function channelHarness(
 }
 
 const ctx = { roleId: "application", projectRoot: "/p", runtime: "demo" as const, governanceModel: "trio" as const };
+
+const durableChoices = [
+  ["intent-confirm", ["confirm", "revise", "reject"]],
+  ["proposal", ["accept", "revise", "reject"]],
+  ["appointment", ["builder", "reviewer"]],
+  ["workflow-start", [...WORKFLOW_START_OPTION_IDS]],
+  ["document-revision", [...DOCUMENT_REVISION_OPTIONS]],
+  [BLOCKED_SCOPE_CARD_KIND, ["wait", "revise", "stop"]],
+  ["merge-main", [...MERGE_MAIN_OPTION_IDS]],
+] as const;
+
+for (const [cardKind, options] of durableChoices) test(`durable ${cardKind} delegates through one exact application-bound decision port`, async () => {
+  const h = channelHarness(true);
+  const requestId = `verified-${cardKind}`;
+  const digest = "c".repeat(64);
+  const selected = cardKind === "appointment" ? [...options] : [options[1]!];
+  const reviewGate = Promise.withResolvers<void>();
+  let attempts = 0;
+  const host: ChiefDecisionHost = {
+    prepare: async () => ({ baseDigest: digest, context: "Verified application evidence", isCurrent: async () => true,
+      evidenceRefs: [{ snapshotId: digest, path: "docs/evidence.md", sha256: digest }] }),
+    execute: async (context, _evidence, decide) => {
+      assert.equal(context.request.cardKind, cardKind);
+      assert.deepEqual(context.request.durableWorkflow, { generation: 7, multiple: cardKind === "appointment" });
+      assert.deepEqual(context.tools, ["decide_pending_request"]);
+      assert.equal(context.productionWriteAuthority, false);
+      const binding = { requestId, baseDigest: digest, delegationRevision: h.delegation.get().revision, reason: "Verified evidence supports this choice" };
+      assert.equal((await decide({ ...binding, disposition: "reject" })).ok, false);
+      const valid = decide({ ...binding, disposition: "select", selected });
+      assert.equal((await decide({ ...binding, disposition: "select", selected })).ok, false);
+      reviewGate.resolve();
+      assert.equal((await valid).ok, true);
+    },
+  };
+  const persist: NonNullable<Parameters<DesktopCustomerInputFn>[1]["persistWorkflowDecision"]> = async (answer, delegated) => {
+    assert.equal(delegated?.source.requestId, requestId);
+    assert.equal(delegated?.source.baseDigest, digest);
+    assert.equal(delegated?.isCurrent(), true);
+    assert.deepEqual(answer.kind === "choice" ? answer.selected : [], selected);
+    attempts++;
+    return { ok: true, decisionId: "persisted-decision" };
+  };
+  const request: CustomerInputRequest = cardKind === "merge-main"
+    ? buildMergeMainCardRequest({ workflowId: "fixture", flowId: "test", releaseId: "release", mainBaseOid: "base",
+      branchTipOid: "tip", branchBaseOid: "base", nonMainBaseline: false, fileCount: 1, diffStat: "feature.txt", mergeKind: "merge", highRiskNotes: [] })
+    : { kind: "choice", title: cardKind, cardKind, application: true, sourceRoleId: "application", multiple: cardKind === "appointment",
+      options: options.map(id => ({ id, label: id })) };
+  const bound: Parameters<DesktopCustomerInputFn>[1] = { ...ctx, runtime: "claude", requestId, durableDecision: { cardKind, generation: 7, host },
+    ...(cardKind === "merge-main" ? { persistReleaseDecision: (choice, delegated) => persist({ kind: "choice",
+      selected: [MERGE_MAIN_OPTION_IDS[choice === "approve" ? 0 : 1]] }, delegated) } : { persistWorkflowDecision: persist }) };
+  const outcome = h.channel.customerInput(request, bound);
+  const replay = h.channel.customerInput(request, bound);
+  assert.equal((await h.channel.respondDurable({ id: requestId, decision: { kind: "choice", selected, source: "delegated-chief" } }, () => true))?.ok, false);
+  await reviewGate.promise;
+  assert.deepEqual(await replay, await outcome);
+  assert.equal((await outcome)?.outcome, "answered");
+  assert.equal(attempts, 1);
+  assert.deepEqual(h.pushed, []);
+  assert.equal(h.judgeCalls(), 0);
+  assert.equal(h.results[0]?.actionSource?.kind, "chief-delegated");
+});
+
+test("blocked scope requires an application card and an actual current customer when delegation is off", async () => {
+  const h = channelHarness(true);
+  const request: CustomerInputRequest = { kind: "choice", title: "Decide what to do about the current scope", cardKind: BLOCKED_SCOPE_CARD_KIND,
+    application: true, sourceRoleId: "application", options: [{ id: "wait", label: "Wait" }, { id: "stop", label: "Stop" }] };
+  assert.equal((await h.channel.customerInput(request, ctx))?.outcome, "unavailable");
+  const requestId = "verified-scope-wait";
+  let commits = 0;
+  const outcome = h.channel.customerInput(request, { ...ctx, requestId, durableDecision: { cardKind: BLOCKED_SCOPE_CARD_KIND, generation: 1 },
+    persistWorkflowDecision: async (answer, delegated, current) => {
+      assert.equal(delegated, undefined);
+      assert.equal(current?.(), true);
+      assert.deepEqual(answer, { kind: "choice", selected: ["wait"], acknowledged: undefined });
+      commits++;
+      return { ok: true, decisionId: requestId };
+    } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.pushed.at(-1)?.id, requestId);
+  const answer = (id: string) => ({ id: requestId, decision: { kind: "choice", selected: [id] } });
+  assert.equal((await h.channel.respondDurable(answer("wait"), () => true))?.ok, false);
+  h.delegation.set({ enabled: false });
+  assert.equal((await h.channel.respondDurable(answer("wait"), () => false))?.ok, false);
+  assert.equal((await h.channel.respondDurable(answer("revise"), () => true))?.ok, false);
+  assert.equal((await h.channel.respondDurable(answer("wait"), () => true))?.ok, true);
+  assert.equal((await outcome)?.outcome, "answered");
+  assert.equal(commits, 1);
+  assert.equal(h.judgeCalls(), 0);
+});
+
+test("a customer-opened A11 stop confirmation stays in the main window with delegation enabled", async () => {
+  const h = channelHarness(true);
+  const requestId = "workflow-a11-explicit-stop";
+  const request: CustomerInputRequest = { kind: "choice", title: "Confirm A11 stop", cardKind: BLOCKED_SCOPE_CARD_KIND,
+    application: true, sourceRoleId: "application",
+    options: [{ id: "wait", label: "Keep waiting" }, { id: "stop", label: "Stop" }] };
+  let decisions = 0;
+  const outcome = h.channel.customerInput(request, { ...ctx, requestId,
+    durableDecision: { cardKind: BLOCKED_SCOPE_CARD_KIND, generation: 2, customerOnly: true },
+    persistWorkflowDecision: async (answer, delegated, current) => {
+      assert.equal(delegated, undefined);
+      assert.equal(current?.(), true);
+      assert.deepEqual(answer, { kind: "choice", selected: ["wait"], acknowledged: undefined });
+      decisions++;
+      return { ok: true, decisionId: requestId };
+    } });
+  assert.equal(h.pushed.at(-1)?.id, requestId);
+  const decision = { id: requestId, decision: { kind: "choice", selected: ["wait"] } };
+  assert.equal((await h.channel.respondDurable(decision, () => false))?.ok, false);
+  assert.equal((await h.channel.respondDurable(decision, () => true))?.ok, true);
+  assert.equal((await outcome)?.outcome, "answered");
+  assert.equal(decisions, 1);
+  assert.equal(h.judgeCalls(), 0);
+});
+
+test("B2 evidence approval uses the existing main-window gateway and exact scope binding", async () => {
+  const h = channelHarness(true);
+  const binding: DurableDecisionBinding = { requestId: "b2-evidence-scope-1", generation: 1, digest: "5".repeat(64) };
+  const scope: DurableB2EvidenceDecision = { binding, scopeId: "scope:b3-source", roleId: "acceptance-evidence-collector",
+    writePaths: ["docs/verification/current/"], requirements: [{ requirementId: "AC-1", reason: "核对当前产物",
+      source: "candidate-file", paths: ["src/current.js"] }] };
+  let active = true;
+  let activations = 0;
+  let settled: (DurableDecisionBinding & { action: string; provenance: DurableDecisionProvenance }) | undefined;
+  const view = { projectRoot: ctx.projectRoot, status: "waiting", engine: "healthy", flowId: "current", metadata: { runtime: "pi" },
+    definitionName: "Path B", stepId: "scope", stepName: "B2", attempt: 1, pendingFacts: 0,
+    ref: { instanceId: "current-instance", projectId: "current-project", definitionId: "path-b", definitionVersion: 3,
+      definitionDigest: "a".repeat(64), executor: "ans-durable-definition-v2", activityContract: 2 }, b2EvidenceDecision: scope } satisfies DurableProjection;
+  const store = { lookup: () => view,
+    async decideB2EvidenceScope(_ref: unknown, input: NonNullable<typeof settled>, current: () => boolean) {
+      assert.equal(current(), true);
+      settled = input;
+      return { ok: true };
+    } };
+  const durable = { store: async () => store, activate() { activations++; } } as unknown as DesktopDurableWorkflow;
+  await presentB2EvidenceScopeCard({ durable, view, chief: "chief", customer: h.channel.customerInput, isRegistered: () => active });
+  assert.equal(h.pushed.at(-1)?.id, binding.requestId);
+  const decision = { id: binding.requestId, decision: { kind: "choice", selected: ["route"] } };
+  assert.equal((await h.channel.respondDurable(decision, () => false))?.ok, false);
+  assert.equal(settled, undefined);
+  active = false;
+  assert.equal((await h.channel.respondDurable(decision, () => true))?.ok, false);
+  active = true;
+  assert.equal((await h.channel.respondDurable(decision, () => true))?.ok, true);
+  assert.deepEqual(settled, { ...binding, action: "approve", provenance: { source: "customer" } });
+  assert.equal(activations, 1);
+  assert.equal(h.judgeCalls(), 0);
+});
+
+test("revoking a durable delegation during evidence review drops its late choice and leaves the original card", async () => {
+  const h = channelHarness(true);
+  const digest = "5".repeat(64);
+  const reviewing = Promise.withResolvers<void>();
+  const finishReview = Promise.withResolvers<boolean>();
+  const received = Promise.withResolvers<boolean>();
+  const request: CustomerInputRequest = { kind: "choice", title: "Intent", cardKind: "intent-confirm",
+    options: [{ id: "confirm", label: "Confirm" }, { id: "reject", label: "Reject" }] };
+  const outcome = h.channel.customerInput(request, { ...ctx, requestId: "intent-request", runtime: "claude",
+    durableDecision: { cardKind: "intent-confirm", generation: 4, host: {
+      prepare: async () => ({ baseDigest: digest, context: "Current intent", evidenceRefs: [{ path: "docs/intent.md", snapshotId: digest, sha256: digest }],
+        isCurrent: () => { reviewing.resolve(); return finishReview.promise; } }),
+      execute: async (context, _evidence, decide) => {
+        const { requestId, baseDigest, delegationRevision } = context.request;
+        received.resolve((await decide({ requestId, baseDigest, delegationRevision, disposition: "select", selected: ["confirm"], reason: "Observed" })).ok);
+      },
+    } }, persistWorkflowDecision: async (_answer, delegated, current) => {
+      assert.equal(delegated, undefined);
+      assert.equal(current?.(), true);
+      return { ok: true, decisionId: "saved-manual" };
+    } });
+  await reviewing.promise;
+  h.delegation.set({ enabled: false });
+  finishReview.resolve(true);
+  assert.equal(await received.promise, false);
+  assert.equal(h.pushed[0]?.id, "intent-request");
+  assert.ok(h.pushed[0]?.judgeNotice);
+  assert.equal((await h.channel.respondDurable({ id: "intent-request", decision: { kind: "choice", selected: ["confirm"], source: "delegated-chief" } }, () => true))?.ok, true);
+  const saved = await outcome;
+  assert.equal(saved?.outcome, "answered");
+  assert.equal(saved && "actionSource" in saved ? saved.actionSource : undefined, undefined);
+});
 
 test("decision 开关关闭：应用 decision 卡呈现客户，客户手选；无 judge 审计", async () => {
   const h = channelHarness(false);

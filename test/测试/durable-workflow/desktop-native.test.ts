@@ -4,7 +4,8 @@ import path from "node:path";
 import test from "node:test";
 import { MERGE_MAIN_OPTION_IDS } from "../../../app/desktop/customer-input.ts";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
-import { app, daprdListener, fix, fixture, git, modelFixture, pathBModel, resourceRoot, sqliteSnapshot, target, until, unwrap, write, type Log } from "./fixture.ts";
+import { analysis, app, daprdListener, fix, fixture, git, modelFixture, operatorReport, pathBModel, resourceRoot, sqliteSnapshot,
+  successful, target, until, unwrap, write, type Log } from "./fixture.ts";
 
 const windowsDapr = {
   skip: !resourceRoot && "Set ANS_W5_DAPR_ROOT to the verified bundle resource directory",
@@ -17,6 +18,73 @@ function b3Reports({ fact }: ReturnType<typeof sqliteSnapshot>) {
     return data.fact.kind === "task-report" && data.fact.task.stage === "B3";
   });
 }
+
+test("Native current preset B preserves the trusted manual merge and one Git effect", windowsDapr, async t => {
+  const f = await fixture({ installLegacyPathB: false, existingIndependentRoster: true });
+  const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
+  const project = { projectRoot: f.root };
+  const turns: string[] = [];
+  let instanceId: string | undefined;
+  const model = modelFixture(async turn => {
+    assert.equal(turn.chiefDecisionContext, undefined);
+    const taskId = /任务编号：#([a-z0-9-]+)/.exec(turn.text)?.[1];
+    assert.ok(taskId);
+    const state = await readTaskState(f.root);
+    const task = state.records.get(taskId)?.created;
+    assert.ok(task?.stage && task.workflowId === instanceId);
+    turns.push(`${turn.roleId}:${task.stage}`);
+    if (turn.roleId === "worker" && task.stage === "B1") {
+      await successful(turn, "read_file", { path: target });
+      assert.equal((await turn.call("write_file", { path: target, content: "unauthorized during B1" })).ok, false);
+      await successful(turn, "submit_report", { status: "completed", summary: `Only ${target} requires the scoped threshold fix.`, evidence: [analysis] });
+      return;
+    }
+    if (turn.roleId === "worker" && task.stage === "B3") {
+      await successful(turn, "write_file", { path: target, content: fix });
+      await successful(turn, "run_shell", { command: `git add ${target}` });
+      await successful(turn, "run_shell", { command: 'git commit -m "R10 current preset B bounded fix"' });
+      await successful(turn, "submit_report", { status: "completed", summary: "The scoped fix is committed.", evidence: [target] });
+      return;
+    }
+    assert.equal(turn.roleId, "convener");
+    const worker = [...state.records.values()].find(row => row.created?.to === "worker" && row.created.stage === task.stage);
+    assert.ok(worker && worker.reports.length === 1);
+    await successful(turn, "close_created_task", { operationId: `r10-review-${worker.taskId}`, taskId: worker.taskId, outcome: "accepted" });
+    await successful(turn, "submit_report", { status: "completed", summary: `Original ${task.stage} report verified.`,
+      evidence: [task.stage === "B1" ? analysis : operatorReport] });
+  }, log);
+  const handle = await app(f, model, log);
+  t.after(() => handle.close());
+  const started = unwrap(await handle.startViaChief({ ...project, definitionId: "path-b", source: "preset",
+    summary: `Change the existing threshold in ${target} within its approved work item.` }));
+  assert.ok(started.instance);
+  instanceId = started.instance.instanceId;
+  const selector = { ...project, instanceId };
+  const card = await until("current B4 merge card", async () => [...handle.cards.values()].find(card => card.request.cardKind === "merge-main"), model.errors);
+  const branchTip = git(f.root, "rev-parse", "HEAD");
+  const rejectedFrame = await handle.respond(card.id, MERGE_MAIN_OPTION_IDS[0], () => false);
+  assert.equal(rejectedFrame.ok, false);
+  assert.equal(git(f.root, "rev-parse", "main"), f.baselineOid);
+  const accepted = await handle.respond(card.id, MERGE_MAIN_OPTION_IDS[0], () => true);
+  assert.equal(accepted.ok, true, JSON.stringify(accepted));
+  const done = await until("B4 actual Git result and delivery", async () => {
+    const view = unwrap(await handle.desktop.getDurableWorkflowProjection(selector)).instance;
+    if (view?.delivery?.state === "pending") return view;
+  }, model.errors);
+  assert.deepEqual(turns, ["worker:B1", "convener:B1", "worker:B3", "convener:B3"]);
+  assert.equal(git(f.root, "show", `main:${target}`), fix.trim());
+  const mainParents = git(f.root, "rev-list", "--parents", "-n", "1", "main").split(" ");
+  assert.deepEqual(mainParents.slice(1), [f.baselineOid, branchTip]);
+  const decision = { ...selector, deliveryId: done.delivery!.id };
+  const detail = unwrap(await handle.desktop.readDurableWorkflowDelivery(decision));
+  assert.equal(unwrap(await handle.desktop.acknowledgeDurableWorkflowDelivery({ ...decision, viewToken: detail.viewToken })).state, "delivered");
+  const snapshot = sqliteSnapshot(f, instanceId);
+  const saved = snapshot.fact?.filter(row => row.business_key === `release-decision:${card.id}`);
+  assert.equal(saved?.length, 1);
+  assert.match(String(saved?.[0]?.data), /"source":"customer"/);
+  assert.deepEqual(snapshot.effect?.filter(row => String(row.business_key).startsWith("release-merge:")).map(row => row.state), ["succeeded"]);
+  log("r10-current-b-manual-release", { turns, rejectedFrame, accepted, branchTip, mainParents, done, snapshot });
+});
 
 for (const mode of ["normal", "pending-card-restart", "daprd-loss-during-handback", "simulated-offline-before-dispatch"] as const) test(`Native Windows Desktop Path B ${mode}`, windowsDapr, async t => {
   const f = await fixture();

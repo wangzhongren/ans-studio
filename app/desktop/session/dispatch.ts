@@ -244,6 +244,9 @@ export class Dispatch {
       }
       return this.port.routeDurableDispatch(projection, runtime, fromRoleId, d, targetRoleId, task, source);
     }
+    if (fromRoleId === "chief" && this.deps.workflowChiefStart?.requestForSession(
+      projectRoot, fromRoleId, source?.entry.assignedTaskId, () => source?.entry,
+    )) return fail("workflow-dispatch-owned", "请使用 request_workflow_start 提请确认。固定任务由工作流派发。");
     if (this.deps.workflowChiefStart?.mode(projectRoot) && d.taskKind === "stage-request"
       && (d.stage === "A1" || d.stage === "B1") && (d.workflowAction ?? "advance") === "advance") {
       const existing = await this.existingFirstStageWorkflow(projectRoot, runtime, fromRoleId, d, source);

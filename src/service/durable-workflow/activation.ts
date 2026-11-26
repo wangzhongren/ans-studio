@@ -6,7 +6,7 @@ import { digest, stableJson, workspaceIdentity } from '../../provider/durable-wo
 import type {
   DurableLedger, StoredStartProposal, StoredStartSelection, WorkspaceIdentity,
 } from '../../provider/durable-workflow/public.ts';
-import { equal, fail, hashValid, ok, validKey } from './rules.ts';
+import { decisionProvenanceMatches, equal, fail, hashValid, ok, validKey } from './rules.ts';
 
 type IsCurrent = () => boolean;
 type Select = (root: string, definitionId: string) => Promise<DurableResult<StoredStartSelection>>;
@@ -18,6 +18,14 @@ const notFound = () => fail('workflow-start-proposal-not-found', '这个项目�
 function selectionMatches(first: StoredStartSelection, second: StoredStartSelection): boolean {
   return first.source === second.source && first.file === second.file && first.fileDigest === second.fileDigest
     && first.definition.digest === second.definition.digest;
+}
+
+function decisionBinding(value: StoredStartProposal) {
+  const { proposal, selection, start, fingerprint } = value;
+  return { requestId: proposal.requestId, generation: proposal.generation,
+    digest: digest(stableJson([proposal.projectId, proposal.activationId, proposal.requestId, proposal.generation,
+      start.projectRoot, proposal.requirement.inputId, proposal.requirement.turnId, fingerprint,
+      selection.source, selection.file, selection.fileDigest, selection.definition.version, selection.definition.digest])) };
 }
 
 export class WorkflowStartActivation {
@@ -43,7 +51,8 @@ export class WorkflowStartActivation {
   }
 
   #view(value: StoredStartProposal): DurableStartProposal {
-    const proposal = value.proposal;
+    const proposal = { ...value.proposal, decisionDigest: decisionBinding(value).digest,
+      definition: { ...value.proposal.definition, file: value.selection.file, fileDigest: value.selection.fileDigest } };
     const instance = proposal.instanceRef && this.ledger.instance(proposal.instanceRef.instanceId);
     if (!instance) return proposal;
     return { ...proposal, startup: { state: instance.scheduled ? 'scheduled' : 'created',
@@ -95,6 +104,9 @@ export class WorkflowStartActivation {
       if (selection.source !== source || definition.digest !== expectedDigest) {
         return fail('workflow-start-definition-changed', '定义的有效来源或摘要已变化，请重新查看目录。');
       }
+      if (definition.schema !== 2) {
+        return fail('workflow-definition-upgrade-required', '新启用需要 schema: 2。只读定义可提升 schema 和 version 后重新校验；旧路径 B 可从当前预设复制并调整。');
+      }
       const generation = (latest?.proposal.generation ?? 0) + 1;
       const identity = digest(stableJson([projectId, requirement.inputId, generation]));
       const activationId = 'activate-' + identity;
@@ -102,9 +114,10 @@ export class WorkflowStartActivation {
         generation, state: 'pending', definition: { id: definition.id, name: definition.name, version: definition.version,
           digest: definition.digest, source }, requirement, reason, createdAt: new Date().toISOString() };
       const start: DurableStartInput = { projectRoot: root, definitionId, source, expectedDigest, customerPurpose,
-        requestId: 'workflow-start-' + identity, metadata: { summary: requirement.text, runtime: requirement.runtime, activationId } };
-      this.ledger.saveStartProposal({ proposal, selection, fingerprint, start });
-      return ok(proposal);
+        requestId: 'workflow-start-' + identity, metadata: { summary: requirement.text, runtime: requirement.runtime, activationId, selectionReason: reason } };
+      const value = { proposal, selection, fingerprint, start };
+      this.ledger.saveStartProposal(value);
+      return ok(this.#view(value));
     });
   }
 
@@ -130,17 +143,27 @@ export class WorkflowStartActivation {
     if (!current?.()) return sourceStale();
     if (!['approve', 'reject', 'revoke'].includes(input.action)) return fail('workflow-start-decision-invalid', '启用决定无效。');
     const workspace = await this.#workspace(input.projectRoot);
+    if (!current()) return sourceStale();
     const value = this.#read(workspace, input.activationId);
     if (!value || value.proposal.requestId !== input.requestId) return notFound();
+    const provenance = input.provenance ?? { source: 'customer' };
+    if (!decisionProvenanceMatches(provenance.source, provenance, decisionBinding(value))
+      || provenance.source === 'delegated-chief' && input.action === 'revoke') {
+      return fail('workflow-start-decision-authority', '启用决定未匹配当前申请的有权来源和依据。');
+    }
+    const currentWorkspace = await this.#workspace(input.projectRoot);
+    if (!current()) return sourceStale();
     const selected = value.proposal.state === 'pending' && input.action !== 'revoke'
       ? await this.select(value.start.projectRoot, value.proposal.definition.id) : undefined;
-    const currentWorkspace = await this.#workspace(input.projectRoot);
     return this.#transaction(() => {
       if (!current()) return sourceStale();
       const checked = this.#read(currentWorkspace, input.activationId);
       if (!checked || checked.proposal.requestId !== input.requestId) return notFound();
       const proposal = checked.proposal;
-      if (proposal.decision?.action === input.action) return ok(this.#view(checked));
+      if (!equal(decisionBinding(value), decisionBinding(checked))) return sourceStale();
+      if (proposal.decision?.action === input.action && equal(proposal.decision.provenance ?? { source: proposal.decision.source }, provenance)) {
+        return ok(this.#view(checked));
+      }
       if (proposal.state !== 'pending') {
         return fail(proposal.state === 'stale' ? 'workflow-start-proposal-stale' : 'workflow-start-decision-conflict',
           '该启用提议已失效或已保存其他决定。');
@@ -150,14 +173,15 @@ export class WorkflowStartActivation {
         this.ledger.saveStartProposal(checked);
         return fail('workflow-start-proposal-stale', '定义文件或有效来源已变化，请在新提议中重新核对。');
       }
-      proposal.decision = { action: input.action, source: 'customer', at: new Date().toISOString() };
+      proposal.decision = { action: input.action, source: provenance.source, at: new Date().toISOString(),
+        ...(input.provenance ? { provenance } : {}) };
       proposal.state = input.action === 'approve' ? 'approved' : input.action === 'reject' ? 'rejected' : 'revoked';
       if (input.action === 'approve') {
         proposal.startup = { state: 'waiting' };
         this.ledger.saveApprovedStart({ activationId: input.activationId, start: checked.start, selection: checked.selection });
       }
       this.ledger.saveStartProposal(checked);
-      return ok(proposal);
+      return ok(this.#view(checked));
     });
   }
 
@@ -168,8 +192,8 @@ export class WorkflowStartActivation {
     if (!value) return notFound();
     if (value.proposal.state === 'started') return ok(this.#view(value));
     if (value.proposal.state !== 'approved' || value.proposal.decision?.action !== 'approve'
-      || value.proposal.decision.source !== 'customer') {
-      return fail('workflow-start-confirmation-required', '该提议还没有本人的启用批准。');
+      || !decisionProvenanceMatches(value.proposal.decision.source, value.proposal.decision.provenance, decisionBinding(value))) {
+      return fail('workflow-start-confirmation-required', '该提议还没有当前申请的有效启用批准。');
     }
     const existing = this.#starting.get(activationId);
     if (existing) return existing;

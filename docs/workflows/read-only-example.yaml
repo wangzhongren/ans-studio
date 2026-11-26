@@ -1,3 +1,4 @@
+# 保留作历史 schema 1 示例。新项目导入启用时，使用 schema: 2 并提升版本。
 schema: 1
 id: read-only-example
 version: 1

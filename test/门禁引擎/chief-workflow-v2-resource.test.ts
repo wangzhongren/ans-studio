@@ -83,3 +83,23 @@ test("chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；�
   const nonEmptyLines = v2.toString("utf8").split(/\r?\n/).filter((line) => line.trim() !== "").length;
   assert.ok(nonEmptyLines >= 40 && nonEmptyLines <= 200, `v2 资源规模应有界（实际 ${nonEmptyLines} 非空行）`);
 });
+
+test("YAML 幕僚资源只包含选流、提请确认与异常处置，不包含旧手动派发模板", () => {
+  const text = readFileSync(V2_PATH, "utf8");
+  const start = "<!-- durable-chief:start -->";
+  const end = "<!-- durable-chief:end -->";
+  assert.equal(text.split(start).length, 2);
+  assert.equal(text.split(end).length, 2);
+  const startIndex = text.indexOf(start) + start.length;
+  const endIndex = text.indexOf(end);
+  assert.ok(endIndex > startIndex);
+  const durableText = text.slice(startIndex, endIndex);
+  assert.match(durableText, /冻结的 YAML 创建固定任务、绑定角色并选择分支/);
+  assert.match(durableText, /幕僚不派发、不重派、不提交阶段推进或停止任务/);
+  assert.match(durableText, /`request_workflow_start`[^\n]*`definitionId`[^\n]*`expectedDigest`/);
+  assert.match(durableText, /`request_choice`[^\n]*`cardKind` 和 `flowId`/);
+  assert.match(durableText, /`merge-main` 合并卡由应用构造，需客户本人确认/);
+  assert.match(durableText, /送达未知时等待原回执核对/);
+  assert.doesNotMatch(durableText, /dispatch_task|stage-request|close_created_task/);
+  assert.match(text.slice(endIndex + end.length), /首个动作：A1 精确 stage-request/);
+});

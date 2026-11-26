@@ -966,20 +966,21 @@ export const zhCN = {
   "ui.judge.decisionShort": "决策",
   "ui.judge.bridgeMissing": "当前版本不支持自动判断，保持手动",
   "ui.judge.decisionSingleNote": "旧治理模型（single）不支持代决策",
-  "ui.judge.shellOffTitle": "手动逐条确认 shell 命令与必要写入（默认）",
-  "ui.judge.shellOnTitle": "自动代理先评估 shell 命令与必要写入；可随时关闭",
-  "ui.judge.decisionOffTitle": "手动逐张确认提案接受、任命与验收（默认）",
-  "ui.judge.decisionOnTitle": "自动代理先评估提案接受、任命与验收；可随时关闭",
+  "ui.judge.shellOffTitle": "手动逐条审批 shell 命令请求（默认）",
+  "ui.judge.shellOnTitle": "由自动代理审核 shell 命令请求。可随时关闭。",
+  "ui.judge.decisionOffTitle": "手动处理工作流启用、意图确认、方案确认、角色任命、文件修订和合并卡（默认）",
+  "ui.judge.decisionOnTitle": "由幕僚处理获授权的工作流卡。可随时关闭。",
   "ui.judge.warningClose": "知道了",
   "ui.judge.toggleOn.shell":
-    "替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / removedScheduleWrite）将由自动代理代批。",
-  "ui.judge.toggleOn.decision": "替我决策中：提案接受、任命、验收将由自动代理代批。",
+    "自动代理代你审核 shell 命令请求。",
+  "ui.judge.toggleOn.decision":
+    "幕僚代你处理六类获授权的工作流卡，包括工作流启用、意图确认、方案确认、角色任命、文件修订和合并。",
   "ui.judge.scopeNote":
-    "自动代理只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。",
+    "自动代理以只读方式检查项目内的代码、文档和角色卡。未获有效审批时，本次命令不会执行。关闭开关后，可手动审核后续命令请求。",
   "ui.judge.quickPathNote":
-    "提案快捷路径（accept-quick）默认不代批；旧治理模型的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。",
+    "应用在执行命令前仍会核对路径、上下文和适用授权。",
   "ui.judge.costNote":
-    "每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。",
+    "模型调用会消耗令牌并增加等待时间。结果行与审计会标明代审批来源。判断可能出错，可随时关闭。",
   "ui.judge.toggleFailed": "未能确认自动判断开关（通道异常）；保持原状态。",
   "ui.judge.summaryFallback": "无法概括命令；展开查看原文",
   "ui.judge.alternative": "替代方案：{value}",

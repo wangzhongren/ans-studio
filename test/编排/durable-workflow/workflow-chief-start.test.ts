@@ -96,6 +96,40 @@ test('a pending card fails closed on byte edits, deletion and a same-byte effect
   assert.deepEqual(service.activeProjections(), []);
 });
 
+test('workflow activation persists the bound delegated approval and only resumes the original start', async t => {
+  const { directory, dataDir, cleanup } = await fixture(t);
+  const projectRoot = join(directory, 'delegated');
+  await mkdir(projectRoot);
+  let service = new DurableWorkflowService(dataDir, process.cwd());
+  cleanup.push(() => service.close());
+  const request = unwrap(await service.proposeWorkflowStart(await proposalInput(service, projectRoot), current));
+  assert.match(request.definition.file ?? '', /path-a\.yaml$/);
+  assert.match(request.definition.fileDigest ?? '', /^[a-f0-9]{64}$/);
+  assert.match(request.decisionDigest ?? '', /^[a-f0-9]{64}$/);
+  const provenance = { source: 'delegated-chief', requestId: request.requestId, digest: request.decisionDigest!,
+    generation: request.generation, delegationRevision: 4, reason: 'The verified built-in graph fits the requested work.' } as const;
+  const answer = { ...decision(projectRoot, request, 'approve'), provenance };
+  failure(await service.decideWorkflowStart({ ...answer, action: 'revoke' }, current), 'workflow-start-decision-authority');
+  failure(await service.decideWorkflowStart({ ...answer, provenance: { ...provenance, reason: '   ' } }, current), 'workflow-start-decision-authority');
+  failure(await service.decideWorkflowStart({ ...answer, provenance: { ...provenance, generation: request.generation + 1 } }, current),
+    'workflow-start-decision-authority');
+  let checks = 0;
+  failure(await service.decideWorkflowStart(answer, () => ++checks < 4), 'workflow-start-source-stale');
+  assert.equal((await service.listWorkflowStartProposals(projectRoot))[0]?.state, 'pending');
+  const approved = unwrap(await service.decideWorkflowStart(answer, current));
+  assert.deepEqual(approved.decision?.provenance, provenance);
+  failure(await service.decideWorkflowStart({ ...answer, provenance: { source: 'customer' } }, current), 'workflow-start-decision-conflict');
+  service.close();
+  service = new DurableWorkflowService(dataDir, process.cwd());
+  assert.deepEqual(unwrap(await service.decideWorkflowStart(answer, current)), approved);
+  const results = await Promise.all([service.startApprovedWorkflow(projectRoot, request.activationId, current),
+    service.startApprovedWorkflow(projectRoot, request.activationId, current)]);
+  const first = unwrap(results[0]!);
+  assert.deepEqual(first, unwrap(results[1]!));
+  assert.equal(first.decision?.source, 'delegated-chief');
+  assert.equal((await service.listProjections(projectRoot)).filter(instance => instance.ref.instanceId === first.instanceRef?.instanceId).length, 1);
+});
+
 test('approved original snapshots start once after YAML is edited, deleted or replaced by a different source', async t => {
   for (const edit of ['rewrite', 'delete', 'replace-source'] as const) await t.test(edit, async sub => {
     const { directory, dataDir, cleanup } = await fixture(sub);

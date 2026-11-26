@@ -1,6 +1,7 @@
-import type { DurableAction, DurableCapability, DurableFact, DurableGraphStep, DurableInstanceRef, DurableProjection, DurableResult, DurableStep, DurableTaskBinding, DurableTerminal } from '../../model/durable-workflow.ts';
+import type { DurableCapability, DurableDecisionBinding, DurableDecisionProvenance, DurableFact, DurableGraphStep, DurableInstanceRef, DurableProjection, DurableResult, DurableStep, DurableTaskBinding, DurableTerminal } from '../../model/durable-workflow.ts';
 import type { DurableLedger, StoredFact, StoredInstance } from '../../provider/durable-workflow/public.ts';
 import { digest, stableJson } from '../../provider/durable-workflow/public.ts';
+import { evidenceAuditProjection } from './path-a.ts';
 
 export const ok = <T>(value: T): DurableResult<T> => ({ ok: true, value });
 export const fail = (code: string, message: string): DurableResult<never> => ({ ok: false, code, message });
@@ -13,6 +14,18 @@ export const sameTask = (first: DurableTaskBinding | undefined, second: DurableT
 export const liveEffect = (state: string): boolean => state === 'claimed' || state === 'unknown';
 export const actionOf = (step: DurableStep | DurableGraphStep): DurableCapability | undefined => 'action' in step ? step.action : undefined;
 export const activeAction = (value: StoredInstance): DurableCapability | undefined => actionOf(value.definition.steps[value.stepId]!);
+export const workflowOwnsDispatch = (value: StoredInstance): boolean =>
+  value.definition.schema === 2 && value.metadata.workflowOwnedDispatch === 'true';
+export const evidenceAuditConfiguration = (value: StoredInstance) =>
+  value.definition.schema === 2 && workflowOwnsDispatch(value) ? value.definition.evidenceAudit : undefined;
+
+export function decisionProvenanceMatches(source: unknown, provenance: DurableDecisionProvenance | undefined, binding: DurableDecisionBinding): boolean {
+  if (source === 'customer') return provenance === undefined || equal(provenance, { source });
+  return source === 'delegated-chief' && provenance?.source === source && Object.keys(provenance).length === 6
+    && provenance.requestId === binding.requestId && provenance.digest === binding.digest && provenance.generation === binding.generation
+    && Number.isSafeInteger(provenance.delegationRevision) && provenance.delegationRevision >= 0
+    && typeof provenance.reason === 'string' && provenance.reason.trim().length > 0 && provenance.reason.length <= 4000;
+}
 
 export function safePath(path: string): boolean {
   return typeof path === 'string' && path.length > 0 && path.length <= 4096
@@ -27,6 +40,8 @@ const sources: Readonly<Record<DurableFact['kind'], DurableFact['source']>> = {
   'release-preview': 'host', 'release-decision': 'customer', 'release-merged': 'host', 'readonly-review': 'convener',
   'effect-settled': 'host',
   'capability-event': 'host',
+  'intent-decision-applied': 'host',
+  'document-revision': 'host',
 };
 
 const factsForAction: Readonly<Partial<Record<DurableCapability, readonly DurableFact['kind'][]>>> = {
@@ -40,7 +55,9 @@ const factsForAction: Readonly<Partial<Record<DurableCapability, readonly Durabl
   'wait-for-review': ['readonly-review'],
 };
 
-const waitFor: Readonly<Record<DurableAction, string>> = {
+const waitFor: Readonly<Partial<Record<DurableCapability, string>>> = {
+  'product-prepare-direct': '等待产品受理任务送达和回交',
+  'author-intent-direct': '等待产品意图撰写任务送达和回交',
   'b1-impact-readonly': '等待本次 B1 只读报告和运营处置',
   'b1-open-followup-attempt': '等待上一 B1 尝试完成核对',
   'accept-b3-advance-with-b2-scope': '等待同一 B1 报告关联的幕僚 B3 advance',
@@ -48,20 +65,27 @@ const waitFor: Readonly<Record<DurableAction, string>> = {
   'b4-customer-merge-main': '等待应用生成发布预览',
   'readonly-report': '等待模块属主的只读报告',
   'wait-for-review': '等待运营核对只读报告',
+  'open-environment-recovery': '核对当前验收候选的环境补齐额度',
+  'operations-environment-recovery': '等待运营安排并核对本地验收环境补齐',
 };
 
 export function project(ledger: DurableLedger, value: StoredInstance): DurableProjection {
   const action = value.status === 'waiting' ? activeAction(value) : undefined;
+  const pending = ledger.facts(value.ref.instanceId, true);
   const stageRequest = ledger.facts(value.ref.instanceId).find(item => item.fact.kind === 'stage-request'
     && item.fact.attempt === value.attempt)?.fact;
+  const finishingIntent = action === 'confirm-intent' && pending.some(({ fact }) =>
+    fact.kind === 'capability-event' && fact.stepId === value.stepId && fact.attempt === value.attempt && fact.decisionRecordedAt
+    && fact.event.input.kind === 'card-decided' && fact.event.input.decision === 'approve');
   return {
     ref: value.ref, definitionName: value.definition.name, projectRoot: value.projectRoot,
     stepId: value.stepId, stepName: value.stepId, attempt: value.attempt, status: value.status, engine: value.engine,
-    action, waitingFor: action === undefined ? undefined : value.release
+    action, waitingFor: action === undefined ? undefined : finishingIntent ? '等候应用补齐已批准意图的写回' : value.release
       ? (value.release.decision?.action === 'approve' ? '等待应用核对并执行已批准的本地合并' : '等待客户决定')
-      : waitFor[action as DurableAction] ?? action,
+      : action === 'accept-b3-advance-with-b2-scope' && workflowOwnsDispatch(value)
+        ? '等待应用核对 B1 报告和本次变更范围' : waitFor[action] ?? action,
     blockedReason: value.engineReason ?? value.businessReason,
-    pendingFacts: ledger.facts(value.ref.instanceId, true).length,
+    pendingFacts: pending.length,
     task: value.task, actionIntent: value.actionIntent, baseline: value.baseline,
     stageRequest: stageRequest?.kind === 'stage-request' ? stageRequest : undefined,
     analysisReport: value.analysisReport, scope: value.scope, implementation: value.implementation,
@@ -69,9 +93,14 @@ export function project(ledger: DurableLedger, value: StoredInstance): DurablePr
   };
 }
 
-export function factShape(value: StoredInstance, fact: DurableFact): DurableResult<true> {
+export function factShape(value: StoredInstance, fact: DurableFact, trustedReleaseDecision = false): DurableResult<true> {
   if (!validKey(fact.key) || !Number.isSafeInteger(fact.attempt) || fact.attempt < 1) return fail('fact-invalid', '事实键或尝试号无效。');
-  if (!Object.hasOwn(sources, fact.kind) || sources[fact.kind] !== fact.source) return fail('fact-source-invalid', '事实来源无效。');
+  const workflowRequest = (fact.kind === 'stage-request' || fact.kind === 'b3-advance') && workflowOwnsDispatch(value);
+  const validSource = fact.kind === 'release-decision' && trustedReleaseDecision
+    ? decisionProvenanceMatches(fact.source, fact.provenance, fact)
+    : workflowRequest ? fact.source === 'host' && fact.sourceTaskId === value.ref.instanceId && fact.dispatch?.actor === 'application'
+      : sources[fact.kind] === fact.source && (fact.kind !== 'release-decision' || fact.provenance === undefined);
+  if (!Object.hasOwn(sources, fact.kind) || !validSource) return fail('fact-source-invalid', '事实来源无效。');
   if (!Object.hasOwn(value.definition.steps, fact.stepId)) return fail('fact-step-invalid', '事实步骤不属于固定定义。');
   const action = actionOf(value.definition.steps[fact.stepId]!);
   if (action === undefined || !factsForAction[action]?.includes(fact.kind)) {
@@ -141,6 +170,8 @@ export function applyStep(ledger: DurableLedger, value: StoredInstance, input: A
   for (const item of pending) {
     if (item.fact.attempt < value.attempt) consume(ledger, value, item, 'attempt-retired');
     else if (item.fact.kind === 'effect-settled') consume(ledger, value, item);
+    else if (item.fact.kind === 'capability-event' && item.fact.stepId === stepId && item.fact.attempt === value.attempt
+      && /^(?:b2-evidence-scope-|evidence-(?:collection-|audit-blocked$|execution-recorded$))/.test(item.fact.event.input.kind)) consume(ledger, value, item);
   }
 
   const bound = candidate('task-bound');
@@ -209,6 +240,10 @@ export function applyStep(ledger: DurableLedger, value: StoredInstance, input: A
       break;
     }
     case 'b3-implement-and-accept': {
+      if (value.scope?.evidenceRequirements?.length && evidenceAuditProjection(ledger, value)?.state !== 'ready') {
+        value.businessReason = 'B3 等待 B2 已批准取证范围及真实证据。';
+        break;
+      }
       const accepted = candidate('implementation-accepted');
       const close = candidate('implementation-close');
       const implementation = accepted?.fact ?? (close && operatorReport?.fact.kind === 'operator-report'

@@ -26,7 +26,7 @@ import { createHash } from "node:crypto";
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../../src/common/shared/diagnostics.ts";
 import { resolveRuntimeTimeouts } from "../../../src/common/runtime-core/timeout.ts";
 import { readRoleLog } from "../../../src/common/编排/role-log.ts";
-import { formatDurationMs, type WatchdogProjectSnapshot } from "../watchdog.ts";
+import { formatDurationMs, type WatchdogDeliveryDisposition, type WatchdogProjectSnapshot } from "../watchdog.ts";
 import { getSessionHistory } from "../runtime-history.ts";
 import { pickLatestSessionFile, sessionsDirFor } from "../session-history.ts";
 import { governanceAcceptanceReportPath } from "../governance-advance.ts";
@@ -94,7 +94,7 @@ export interface DiagnosticsPorts {
 }
 
 /** diagnostics 方法读取的 deps 切片（原 `this.deps` 的只读查询）。 */
-type DiagnosticsDeps = Pick<SessionManagerDeps, "getListing" | "networkGate" | "watchdogPendingConfirmations" | "watchdogStats" | "runtimeOptions" | "emitEvent" | "now">;
+type DiagnosticsDeps = Pick<SessionManagerDeps, "durableWorkflow" | "getListing" | "networkGate" | "watchdogPendingConfirmations" | "watchdogStats" | "runtimeOptions" | "emitEvent" | "now">;
 
 /** 看护/状态文本/诊断尾部/治理投影/网络状态（原 `SessionManager` 17 方法的同签名实现）。 */
 export class Diagnostics {
@@ -141,6 +141,15 @@ export class Diagnostics {
   private drainAllQueuesFor(projectRoot: string): Promise<void> { return this.port.drainAllQueuesFor(projectRoot); }
   private drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> { return this.port.drainQueue(projectRoot, targetRoleId, runtime); }
   private enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void { this.port.enqueueDelivery(projectRoot, targetRoleId, item); }
+
+  private async informationOnly(projectRoot: string): Promise<boolean> {
+    const durable = this.deps.durableWorkflow;
+    if (!durable) return false;
+    if (await durable.owns(projectRoot)) return true;
+    const owner = await (await durable.store()).owner(projectRoot);
+    // After a YAML terminal, the reservation may be released before a late role/watchdog event arrives.
+    return owner ? owner.engine === "dapr" : (await durable.find(projectRoot))?.workflowOwnedDispatch === true;
+  }
 
   /** 治理主人（回交/系统行落位；2026-10-19 验收自动派发用）：trio=Convener；single=主入口（su）；未枚举 ⇒ null。 */
   governanceOwnerRoleId(projectRoot: string): string | null {
@@ -345,6 +354,14 @@ export class Diagnostics {
           action: "await-lead-summary",
         };
       }
+      const presentFeedback = () => {
+        const summary = isProof
+          ? `${displayName}${projection.statusText}。报告路径 ${projection.reportPath}。`
+          : `${displayName}本轮反馈已记录。请查看角色记录中的反馈与正式回交。`;
+        this.emitDeliveryNote(projectRoot, runtime, primaryRoleId, roleId, summary);
+        diagnostic.record("governance.feedback.information-only", { targetRoleId: primaryRoleId });
+      };
+      if (await this.informationOnly(projectRoot)) return presentFeedback();
       const opened = await this.openBackground({ projectRoot, roleId: primaryRoleId, runtime });
       if (!opened.ok) {
         diagnostic.error("governance.feedback.open.failed", new Error(opened.error ?? "无法开启主入口会话"), { targetRoleId: primaryRoleId });
@@ -352,6 +369,7 @@ export class Diagnostics {
       }
       // 治理反馈是**轮次状态镜像**而非应用任务：同文可在不同轮次重复出现（既有语义不变）——
       // 不生成稳定任务键，不参与「同一应用任务至多投递一次」的去重。
+      if (await this.informationOnly(projectRoot)) return presentFeedback();
       const sent = await this.sendBackground({ projectRoot, roleId: primaryRoleId, runtime, text: task, stableIdentity: false });
       if (!sent.ok) {
         diagnostic.error("governance.feedback.dispatch.failed", new Error(sent.error ?? "治理反馈投递失败"), { targetRoleId: primaryRoleId });
@@ -487,7 +505,7 @@ export class Diagnostics {
    * 恒空——呈现层按文首 `[系统·<子类>] ` 定格标记归类）。主人未枚举到 ⇒ 入 `""` 目标队列（投递机既有的
    * 一次性提示 + 保留待重试；**绝不静默丢**）。
    */
-  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string; uiOnlyWhenBusy?: boolean }): void {
+  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string; uiOnlyWhenBusy?: boolean }): WatchdogDeliveryDisposition | Promise<WatchdogDeliveryDisposition> {
     // B 批：看护/巡检系统消息回幕僚（trio）；无幕僚（single/旧项目）保持原主人。
     const governanceRoleId = this.chiefTaskRoleIdOf(projectRoot) ?? this.handbackOwnerRoleId(projectRoot);
     let runtime: RuntimeKind | undefined;
@@ -503,30 +521,30 @@ export class Diagnostics {
     // 否则看护自身的提示会被同一队列楔死（现场：`patrol.skipped (pending)` 持续、告警也排不进）。
     // 改为经既有 UI 系统行（`delivery-note`，不触发模型/门禁/自动决策）呈现 + `watchdog.notice.bypass`
     // 诊断；不忙时仍走正常 system 队列投递。直接调用（MCP 安装/申请系统行等，不带该标记）保持既有排队语义。
-    const live = target !== "" ? this.sessions.get(this.sessionKey(projectRoot, target, runtime)) : undefined;
-    if (live?.busy === true && message.uiOnlyWhenBusy === true) {
-      const queueDepth = (this.deliveryQueues.get(this.queueKey(projectRoot, target, runtime)) ?? []).length;
-      const parts = message.dedupKey.split("\u0000");
-      const signal = parts[0] === "watchdog" && parts.length >= 3 && parts[2] !== "" ? parts[2] : "watchdog";
-      createDiagnosticLogger({ component: "desktop.watchdog", projectRoot, roleId: target }).record("watchdog.notice.bypass", {
-        mode: "ui-only",
-        signal,
-        targetRoleId: target,
-        queueDepth,
+    const deliver = (informationOnly: boolean): WatchdogDeliveryDisposition => {
+      const live = target !== "" ? this.sessions.get(this.sessionKey(projectRoot, target, runtime)) : undefined;
+      if (informationOnly || live?.busy === true && message.uiOnlyWhenBusy === true) {
+        const queueDepth = (this.deliveryQueues.get(this.queueKey(projectRoot, target, runtime)) ?? []).length;
+        const parts = message.dedupKey.split("\u0000");
+        const signal = parts[0] === "watchdog" && parts.length >= 3 && parts[2] !== "" ? parts[2] : "watchdog";
+        createDiagnosticLogger({ component: "desktop.watchdog", projectRoot, roleId: target }).record("watchdog.notice.bypass", {
+          mode: "ui-only", signal, targetRoleId: target, queueDepth,
+        });
+        this.emitDeliveryNote(projectRoot, runtime, target, "", message.summary);
+        return "informational";
+      }
+      this.enqueueDelivery(projectRoot, target, {
+        kind: "system", runtime, targetRoleId: target, sourceRoleId: "",
+        text: message.text, summary: message.summary, dedupKey: message.dedupKey,
       });
-      this.emitDeliveryNote(projectRoot, runtime, target, "", message.summary);
-      return;
-    }
-    this.enqueueDelivery(projectRoot, target, {
-      kind: "system",
-      runtime,
-      targetRoleId: target,
-      sourceRoleId: "", // U1 已落树契约：system 来源标注恒空（「系统」非角色）——不得填假角色
-      text: message.text,
-      summary: message.summary,
-      dedupKey: message.dedupKey,
+      void this.drainQueue(projectRoot, governanceRoleId, runtime);
+      return "queued";
+    };
+    if (message.uiOnlyWhenBusy !== true || !this.deps.durableWorkflow) return deliver(false);
+    return this.informationOnly(projectRoot).then(deliver, error => {
+      createDiagnosticLogger({ component: "desktop.watchdog", projectRoot }).error("watchdog.owner.read.failed", error);
+      return deliver(true);
     });
-    void this.drainQueue(projectRoot, governanceRoleId, runtime);
   }
 
   /** `role_status` 结构化文本（设计 §4.1：su 行 + 各角色行 + 队列明细 + 可选诊断节；**纯读**、无副作用；

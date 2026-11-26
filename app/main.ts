@@ -102,7 +102,7 @@ let initialJudgeSwitches: JudgeSwitchesPreference = DEFAULT_JUDGE_SWITCHES;
  * **状态本体在模块级**：同一次应用运行内**跨窗口重开保留**（macOS `activate` 重建窗口时仍是同一实例）；
  * 应用重启时模块重新初始化 ⇒ **清零**并回到持久化开关值。**不写偏好、不持久化**。
  * **只作用于 shell 操作者通道**（有效 `isEnabled = shellJudgeSwitch.isEnabled() && !paused`）：
- * 不改持久化开关值、**不影响治理 approval 组**（客户交互通道的判断组仍只看全局开关）。
+ * 不改持久化开关值，命令暂停随窗口关闭释放。
  */
 const shellSessionPaused = createShellSessionPauseState();
 /**
@@ -350,7 +350,7 @@ function registerIpc(win: BrowserWindow): void {
   // 两个**独立**状态机：启动初值来自应用偏好（2026-10-29 客户缺陷修复）、跨渲染重载保持、互不影响；
   // 变更由 Interface 经偏好服务持久化到 userData（不写项目文件）。只在主进程内存中**当前值**由两处共享。
   // 同一实例交给通道（调用当刻读 `isEnabled()`）与 Interface（`shell:judge-*` / `decision:judge-*`），
-  // 两处永不漂移。代码符号沿用 `shellJudgeSwitch`（approval 组现为「shell + 写盘族」），通道名不改。
+  // 命令审批和业务决策各读自己的开关。
   const shellJudgeSwitch = createShellJudgeSwitch(initialJudgeSwitches.approval);
   const decisionJudgeSwitch = createDecisionDelegationSwitch(initialJudgeSwitches.decision);
   win.webContents.on("did-start-loading", () => { decisionJudgeSwitch.set({ enabled: decisionJudgeSwitch.isEnabled() }); });
@@ -623,10 +623,9 @@ function registerIpc(win: BrowserWindow): void {
         event: { kind: "message", summary: event.summary, detail: { source: "delivery-note" } },
       });
     },
-    // 判断 agent（2026-10-18 双开关评审 §8.1/§8.3）：按卡种所属组读**各自**开关（主进程权威）；
-    // 两开关互不影响；判断闭包由每会话上下文（`ctx.governanceJudge`）提供。
+    // 通用治理卡只接业务决策开关。命令开关由独立的 shell 操作者通道读取。
     judge: {
-      isGroupEnabled: (group) => (group === "approval" ? shellJudgeSwitch.isEnabled() : decisionJudgeSwitch.isEnabled()),
+      isGroupEnabled: (group) => group === "decision" && decisionJudgeSwitch.isEnabled(),
     },
     // 代批结果行：推达失败**必须抛错**（结果行是 approve 的条件，通道据此回落 manual/row-failed）。
     emitJudgeResult: (payload) => {
@@ -719,7 +718,7 @@ function registerIpc(win: BrowserWindow): void {
   });
   // 2026-10-31（判拒升级方案 v1.3 §4.6/§6.5(e)/§7.2）：**「本次运行暂停自动审批」**——
   // 独立状态（模块级 `shellSessionPaused`），**只影响 shell 操作者通道**的 `isEnabled()`：
-  // 不写偏好、不改持久化开关、不影响治理 approval 组；sender 校验沿用既有 `shell:judge-*` 模式。
+  // 暂停应用命令审批，持久开关和 sender 校验沿用 `shell:judge-*` 模式。
   registerHandler("shell:judge-pause", (event, input) => {
     if (!isShellJudgeIpcSender(event.sender, win.webContents)) {
       shellJudgeLog.record("shell-judge.pause.rejected", { reason: "sender-mismatch" });
@@ -797,8 +796,7 @@ function registerIpc(win: BrowserWindow): void {
     shellArming !== undefined
       ? buildDesktopOperatorChannel(shellConfirm.presenter, {
           // 2026-10-31（判拒升级方案 §4.6）：**有效值 = 持久化开关 && !本次运行暂停**。
-          // 暂停是 shell-only 的临时覆盖：不动持久化开关，也不影响治理 approval 组（后者在
-          // `customerChannel` 的 `isGroupEnabled` 里仍只读 `shellJudgeSwitch`）。
+          // 命令暂停是窗口内的临时覆盖，持久开关按原设置读取。
           isEnabled: () => shellJudgeSwitch.isEnabled() && !shellSessionPaused.isPaused(),
           // 推达失败**必须抛错**：allow 的结果行是放行条件（通道据此降级 manual/row-failed）。
           emitJudgeResult: (payload) => {
@@ -975,12 +973,14 @@ function registerIpc(win: BrowserWindow): void {
   // → 解挂为冻结三态；非法回包不受理（pending 保留，界面可重试失败后修正）。
   registerHandler("session:operator-response", async (event, input) => {
     const isMainFrameCurrent = () => !win.isDestroyed() && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;
-    if (!isMainFrameCurrent()) {
-      return { ok: false, error: "Invalid customer decision source." };
-    }
+    const invalid = { ok: false, error: "Invalid customer decision source." };
+    if (!isMainFrameCurrent()) return invalid;
     const response = input && typeof input === "object" ? input : {};
-    return await customerChannel.respondDurable(response, isMainFrameCurrent) ?? await desktop.replayDurableReleaseDecision(response)
-      ?? customerChannel.respond(response);
+    const durable = await customerChannel.respondDurable(response, isMainFrameCurrent);
+    if (durable) return durable;
+    if (!isMainFrameCurrent()) return invalid;
+    const replay = await desktop.replayDurableReleaseDecision(response);
+    return isMainFrameCurrent() ? replay ?? customerChannel.respond(response) : invalid;
   });
 
   registerHandler("app:pick-project", () => desktop.pickProject());

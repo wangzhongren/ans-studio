@@ -5,10 +5,12 @@ import path from "node:path";
 import { setTimeout } from "node:timers/promises";
 import test from "node:test";
 import { createCustomerInputChannel, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
-import { DesktopDurableWorkflow } from "../../app/desktop/durable-workflow.ts";
+import { DesktopDurableWorkflow, durableHash } from "../../app/desktop/durable-workflow.ts";
+import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { WorkflowChiefStart, WORKFLOW_START_OPTION_IDS } from "../../app/desktop/workflow-chief-start.ts";
 import type { LiveSession } from "../../app/desktop/session/contracts/session-types.ts";
 import type { DurableResult } from "../../src/model/durable-workflow.ts";
+import type { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 
 function unwrap<T>(result: DurableResult<T>): T {
   if (!result.ok) assert.fail(`${result.code}: ${result.message}`);
@@ -106,4 +108,72 @@ test("startup proposals bind the acknowledged original customer input and requir
   assert.equal((await channel.respondDurable(approve, () => true))?.ok, false);
   turnIsActive = false;
   start.select();
+});
+
+test("a registered project reopens its pending activation on the recorded engine without opening a production session", async t => {
+  const temporary = path.resolve(os.tmpdir());
+  const directory = await fs.mkdtemp(path.join(temporary, "ans-reopen-activation-"));
+  const projectRoot = path.join(directory, "project");
+  await fs.mkdir(projectRoot);
+  const options = { userDataRoot: path.join(directory, "data"), resourceRoot: directory, presetRoot: path.join(import.meta.dirname, "../..") };
+  const before = new DesktopDurableWorkflow(options);
+  const definition = unwrap(await before.validateDefinition(projectRoot, "path-a", { source: "preset" }));
+  assert.ok(definition.digest);
+  const proposal = unwrap(await (await before.store()).proposeWorkflowStart({ projectRoot, definitionId: definition.id, source: "preset",
+    expectedDigest: definition.digest, reason: "The original proposal", requirement: { inputId: "verified-input", turnId: "verified-turn",
+      text: "Use the saved customer input.", digest: durableHash("Use the saved customer input."), runtime: "claude" } }, () => true));
+  await before.close();
+  const reopened = new DesktopDurableWorkflow(options);
+  const presented: OperatorRequestPayload[] = [];
+  const channel = createCustomerInputChannel({ operatorId: "operator", presenter: card => presented.push(card),
+    delegation: { get: () => ({ enabled: true, revision: 11 }), subscribe: () => () => undefined } });
+  const finished = Promise.withResolvers<void>();
+  let executions = 0;
+  const desktop = createDesktopInterface({ durableWorkflow: reopened, pickDirectory: async () => projectRoot, emitEvent() {},
+    envFilePath: path.join(directory, ".env"), customerInput: channel.customerInput,
+    openRoleSessionFn: async (input: Parameters<typeof openRoleSession>[0]) => {
+      executions++;
+      assert.equal(input.runtime, "claude");
+      assert.equal(input.project.projectRoot, projectRoot);
+      assert.equal(input.roleId, "chief");
+      assert.equal(input.customerInput, undefined);
+      assert.equal(input.dispatchTask, undefined);
+      assert.equal(input.scope, undefined);
+      const context = input.chiefDecisionContext;
+      assert.equal(context?.request.requestId, proposal.requestId);
+      assert.equal(context?.request.cardKind, "workflow-start");
+      assert.equal(context?.request.durableWorkflow?.generation, proposal.generation);
+      assert.ok(context?.request.evidenceRefs[0]?.sha256);
+      assert.ok(context && input.decidePendingRequest);
+      const decide = input.decidePendingRequest;
+      return {
+        async send(text) {
+          assert.match(text, /Use the saved customer input/);
+          const { requestId, baseDigest, delegationRevision } = context.request;
+          assert.equal((await decide({ requestId, baseDigest, delegationRevision, disposition: "select",
+            selected: [WORKFLOW_START_OPTION_IDS[1]], reason: "The saved request does not require this workflow." })).ok, true);
+          finished.resolve();
+        },
+        async *events() {},
+        async dispose() {},
+      };
+    },
+  });
+  t.after(async () => {
+    desktop.disposeProjectDocuments();
+    channel.rejectAllPending("test closed");
+    await reopened.close();
+    assert.equal(path.dirname(directory), temporary);
+    await fs.rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  });
+  assert.equal(await desktop.pickProject(), projectRoot);
+  await desktop.listProject({ projectRoot });
+  await Promise.race([finished.promise, setTimeout(3_000, undefined, { ref: false }).then(() => assert.fail(JSON.stringify(presented)))]);
+  const store = await reopened.store();
+  const [settled] = await store.listWorkflowStartProposals(projectRoot);
+  assert.equal(settled?.state, "rejected");
+  assert.equal(settled?.requestId, proposal.requestId);
+  assert.equal(settled?.decision?.source, "delegated-chief");
+  assert.equal(executions, 1);
+  assert.deepEqual(presented, []);
 });

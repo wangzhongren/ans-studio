@@ -29,6 +29,7 @@ import { createDiagnosticLogger } from "../../../../src/common/shared/diagnostic
 import { shortenSummary, taskEvent, type TaskReplay } from "../../../../src/common/编排/task-state.ts";
 import { renderHandbackBatchPrompt, renderWorkReportBatchPrompt, type TaskHandback } from "../../../../src/common/编排/handback.ts";
 import { isBuiltInGovernanceRoleId } from "../../../../src/service/boundary/resolve-boundary.ts";
+import { desktopQueuedAcceptanceIsCurrent } from "../../durable-acceptance-workspace.ts";
 import { inspectAssignedTask, inspectQueuedControllerResume, classifyClosedTaskNotice, prepareRoleDispatch, resolveDeliveryAssignment } from "../../../../src/pipeline/orchestration/trunk-runtime.ts";
 import { inspectAssignedTask as inspectWorkflowAssignedTask } from "../../../../src/common/编排/workflow-service.ts";
 import { RuntimeDeliveryError } from "../../../../src/model/runtime.ts";
@@ -58,7 +59,7 @@ import { queueKey, sessionKey } from "../shared/keys.ts";
 import { now } from "../shared/clock.ts";
 import { emitDeliveryNote } from "../shared/notifier.ts";
 import { chiefTaskRoleIdOf, handbackOwnerRoleId, roleDisplayName } from "../shared/roles.ts";
-import { appendRoleActivity, appendTaskState, isFixedTask, readTasks } from "../shared/tasks-store.ts";
+import { appendRoleActivity, appendTaskState, isFixedTask, readTasks, recordTaskFailure } from "../shared/tasks-store.ts";
 import { inventoryChanged, publishDeliveryInventory, type SessionInventoryState } from "../shared/inventory.ts";
 import { contextInfo } from "../shared/session-views.ts";
 import { APP_TASK_CLIENT_MESSAGE_ID_PREFIX, isAppTaskClientMessageId } from "../shared/text.ts";
@@ -169,6 +170,7 @@ export class Delivery {
     this.store = new DeliveryStore(this.state, this.refs, {
       enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item),
       drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime),
+      reconcileRecoveredInformation: (projectRoot, roleId, item) => this.reconcileRecoveredInformation(projectRoot, roleId, item),
       managerId: () => this.port.managerId(),
       inventoryState: () => this.port.inventoryState(),
     }, deps);
@@ -254,6 +256,23 @@ export class Delivery {
   deliveryQueuePersistenceFacts(): DeliveryQueuePersistenceFacts { return this.store.deliveryQueuePersistenceFacts(); }
   finishStopPersistence(result: StopResult): Promise<StopResult> { return this.store.finishStopPersistence(result); }
   async restorePersistedDeliveries(): Promise<DeliveryQueueRestoreReport> { return this.store.restorePersistedDeliveries(); }
+
+  private async reconcileRecoveredInformation(projectRoot: string, roleId: string, item: DeliveryItem): Promise<(() => void) | undefined> {
+    const durable = this.deps.durableWorkflow;
+    if (!durable || item.kind !== "system" || item.sourceRoleId !== "" || item.targetRoleId !== roleId
+      || item.clientMessageId || item.taskId || item.flowId || item.systemAssignment || item.notificationSource || item.controllerResume) return;
+    const [producer, root, signal, sequence, ...tail] = item.dedupKey.split("\u0000");
+    if (producer !== "watchdog" || root !== projectRoot || tail.length || !sequence || !/^[1-9][0-9]*$/.test(sequence)
+      || !signal || !/^(?:patrol(?:-skipped)?|storm-notice|auto-abort-[\w-]+|(?:alert|recovery)-(?:turn-deadline|queue-stuck|cmd-timeout|repeat-fail|log-silence):[\w-]+)$/.test(signal)) return;
+    const chief = chiefTaskRoleIdOf(projectRoot, this.deps);
+    if (chief && roleId !== chief) return;
+    const owner = await (await durable.store()).owner(projectRoot);
+    if (owner ? owner.engine !== "dapr" : (await durable.find(projectRoot))?.workflowOwnedDispatch !== true) return;
+    return () => {
+      this.emitDeliveryNote(projectRoot, item.runtime, roleId, "", item.summary);
+      createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId }).record("delivery.notice.information-only", { signal });
+    };
+  }
   persistableDeliveryItem(item: DeliveryItem): PersistedDeliveryItemV1["item"] | undefined { return this.store.persistableDeliveryItem(item); }
   deliveryStoreItems(): PersistedDeliveryItemV1[] { return this.store.deliveryStoreItems(); }
   parsePersistedDeliveryItem(raw: unknown): { projectRoot: string; roleId: string; runtime: RuntimeKind; item: DeliveryItem } | undefined { return this.store.parsePersistedDeliveryItem(raw); }
@@ -703,6 +722,10 @@ export class Delivery {
     if (owned && priorityIndex === -1) return;
     const headIndex = priorityIndex >= 0 ? priorityIndex : 0;
     const item = q[headIndex];
+    const delivery = durable?.delivery(projectRoot, item.clientMessageId);
+    const directIntent = item.kind === "dispatch" && resolvedTarget === "product" && delivery?.intent.task?.stage === "A2" && delivery.intent.task.taskId === item.taskId
+      && delivery.intent.task.parentTaskId === delivery.ref.instanceId && delivery.runtime === runtime ? delivery : undefined;
+    const ownedDispatch = directIntent ?? (item.kind === "dispatch" && delivery?.workflowOwnedDispatch && delivery.intent.task?.taskId === item.taskId && delivery.runtime === runtime ? delivery : undefined);
     // These identities come from the selected transport item, never from the latest role/task.
     const claimTaskId = item.kind === "dispatch" ? item.taskId : item.kind === "system" ? item.systemAssignment?.taskId : undefined;
     claim.taskIds = claimTaskId ? [claimTaskId] : undefined;
@@ -800,6 +823,7 @@ export class Delivery {
       diagnostic.record("delivery.skip.delivered", { state: item.kind, queueDepth: q.length });
       this.notifyRoleState(projectRoot, resolvedTarget, runtime);
       this.persistDeliveryQueues();
+      void this.drainQueue(projectRoot, resolvedTarget, runtime);
       return;
     }
 
@@ -965,6 +989,21 @@ export class Delivery {
     // `input.taskId`，`submit_report` 关联的来源）。已打开但未绑定本次任务（聊天/上一任务）⇒ 安全重绑。
     // 回交条目的 `taskId` 是**子任务**（创建者要收口的对象，不是目标会话自己的受派任务），不用于会话
     // 绑定（误绑会让创建者自己的报告关联到子任务）；B8.2 的 forced fixed 重绑照旧。
+    if (durable?.delivery(projectRoot, item.clientMessageId)?.intent.task?.stage === "A12b") {
+      const current = await desktopQueuedAcceptanceIsCurrent(durable, projectRoot, item.clientMessageId).catch(() => false);
+      if (stopped() || !q.includes(item)) return;
+      if (!current) {
+        q.splice(q.indexOf(item), 1);
+        if (!q.length) this.deliveryQueues.delete(key);
+        this.activeDispatchKeys.delete(item.dedupKey);
+        diagnostic.record("delivery.skip.stale-assessment-evidence", { taskId: item.taskId });
+        this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+        this.persistDeliveryQueues();
+        durable.activate();
+        void this.drainQueue(projectRoot, resolvedTarget, runtime);
+        return;
+      }
+    }
     const fixedOpenTaskId = forcedDeliveryMode === "fixed" && item.kind === "dispatch"
       && typeof item.taskId === "string" && item.taskId !== "" ? item.taskId : undefined;
     const needsFixedRebind = forcedDeliveryMode === "fixed" && entry !== undefined && entry.projectRoot === projectRoot &&
@@ -997,6 +1036,26 @@ export class Delivery {
         ...(forcedDeliveryMode !== undefined ? { forcedWorkflowMode: forcedDeliveryMode } : {}),
         ...(workflowChatInput ? { workflowChatInput } : {}) }, false);
       if (!opened.ok) {
+        const reason = opened.error ?? mainT("shared.common.unknownReason");
+        if (ownedDispatch && !stopped() && !this.isNetworkOffline()
+          && !/fixed-session-rebind-blocked|worker-task-session-busy|run-stop-host-fenced|会话已停止|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|网络离线/.test(reason)) {
+          const chief = chiefTaskRoleIdOf(projectRoot, this.deps);
+          if (chief) {
+            const summary = await durable!.rejectWorkflowDispatch(ownedDispatch.ref, ownedDispatch.intent.task!, reason, chief);
+            if (summary) {
+              const index = q.indexOf(item);
+              if (index !== -1) q.splice(index, 1);
+              if (q.length === 0) this.deliveryQueues.delete(key);
+              this.activeDispatchKeys.delete(item.dedupKey);
+              await recordTaskFailure(projectRoot, item.taskId!, summary, () => this.now());
+              this.emitDeliveryNote(projectRoot, runtime, chief, chief, summary);
+              this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+              this.persistDeliveryQueues();
+              void this.drainQueue(projectRoot, resolvedTarget, runtime);
+              return;
+            }
+          }
+        }
         item.lastAttempt = { state: "blocked", code: "unknown", at: new Date(this.now()).toISOString() };
         this.emitDeliveryNote(projectRoot, runtime,
           item.kind === "handback" ? resolvedTarget : item.sourceRoleId,
@@ -1217,9 +1276,12 @@ export class Delivery {
       // P0：settle 已记 `delivery.end` ⇒ 视为已处理（更不允许重投）。
       const acked = origin.turnId !== undefined || origin.inputAccepted === true || terminalRecorded;
       const retiredDurable = origin.assignmentRejectionCode === "effect-attempt-retired";
+      const durableEffect = !acked && delivery && durable
+        ? (await durable.store()).listEffects(delivery.ref, "model-send").find(effect => effect.intent.key === delivery.intent.key)
+        : undefined;
       const canRetry = terminalRecorded || retiredDurable || sent.controllerResume && origin.assignmentRejectionCode ? false : cAttempt
         ? !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed
-        : !acked;
+        : !acked && (!durableEffect || durableEffect.state === "not-started");
       const mayBeActive = terminalRecorded ? false : cAttempt && (!receipt || receipt.providerMayHaveStarted);
       const ownsRunningDelivery = entry.origins.running === origin;
       if (!mayBeActive) this.failDeliveryOrigin(entry, origin);

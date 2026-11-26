@@ -28,7 +28,9 @@
 
 import { accessSync, constants, mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import type { ResolvedRole } from "../../model/role.ts";
+import { isChiefDecisionExecutionContext } from "../../model/runtime.ts";
 import type {
   WriteGate, RoleSession, RuntimeAdapter, SessionEvent, PromptImage, PromptOptions,
   RuntimeProviderOptions, RuntimeSessionStorage, RuntimeContextSource,
@@ -1574,8 +1576,24 @@ export interface PiAdapterDependencies {
   buildRuntime?: typeof buildExplicitRuntime;
 }
 
+const CHIEF_DECISION_TOOL_NAME = "decide_pending_request";
+
 export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependencies: PiAdapterDependencies = {}): RuntimeAdapter {
   const opts = { ...input };
+  const judgeMode = opts.judgeMode === true;
+  const chiefDecision = isChiefDecisionExecutionContext(opts.chiefDecisionContext)
+    ? structuredClone(opts.chiefDecisionContext) : undefined;
+  const assertChiefDecisionBinding = (role: ResolvedRole, tools: readonly GovernedTool[]): void => {
+    if (!judgeMode || chiefDecision === undefined || tools.length !== 1 || tools[0]?.name !== CHIEF_DECISION_TOOL_NAME) {
+      throw new Error(`Pi 有界幕僚会话需要有效的决策上下文且只接受 ${CHIEF_DECISION_TOOL_NAME}`);
+    }
+    if (role.id !== "chief" || role.kind !== "built-in-governance" || role.governanceFunction !== "chief") {
+      throw new Error("Pi 有界幕僚会话需要真实内置 Chief 角色");
+    }
+    if (!isDeepStrictEqual(opts.chiefDecisionContext, chiefDecision)) {
+      throw new Error("Pi 有界幕僚决策上下文已变更");
+    }
+  };
   return {
     async composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }> {
       let contextSections = opts.contextSections;
@@ -1583,26 +1601,24 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
       return { systemPrompt: renderSystemPrompt(role, opts.projectRoot, contextSections) };
     },
 
-    async bindRole(role: ResolvedRole): Promise<RoleSession> {
+    async bindRole(requestedRole: ResolvedRole): Promise<RoleSession> {
       const governedTools = opts.tools.map((tool) => ({ ...tool,
         inputSchema: structuredClone(tool.inputSchema),
         ...(tool.promptGuidelines ? { promptGuidelines: [...tool.promptGuidelines] } : {}),
       }));
       if (opts.runtime !== "pi") throw new Error("Pi 适配器只能建立 Pi 会话");
-      // 判断 agent（「替我审」/「替我审批」/「替我决策」，PM 评审 2026-10-17 §4.1/§7.1；
-      // 2026-10-18 双开关评审 §6.2）：只消费注入的 judge 只读工具集——结构性拒绝任何其余工具；
-      // force off 原生能力面（server tools / 外来 MCP）并关闭持久化。
-      // allowlist 用运行时核心的**并集** `ALL_JUDGE_TOOL_NAMES`（shell 与治理 judge 会话都能注册各自的
-      // report 工具）；并集只用于放行面、不用于装配——每次会话实际注入的仍恰是某一方三只工具。
-      // 未置 `judgeMode` ⇒ 逐字旧行为（以下各判据均为 false 分支）。
-      const judgeMode = opts.judgeMode === true;
-      if (judgeMode) {
+      // 只读判断与有界幕僚决策各自核对注入集合，共用 judgeMode 的原生能力、MCP 和会话隔离。
+      const boundedChief = opts.chiefDecisionContext !== undefined || governedTools.some(tool => tool.name === CHIEF_DECISION_TOOL_NAME);
+      if (boundedChief) {
+        assertChiefDecisionBinding(requestedRole, governedTools);
+      } else if (judgeMode) {
         const allowedJudgeTools = new Set<string>(ALL_JUDGE_TOOL_NAMES);
         const foreign = governedTools.filter((tool) => !allowedJudgeTools.has(tool.name)).map((tool) => tool.name);
         if (foreign.length > 0) {
           throw new Error(`判断会话只允许 judge 只读工具，拒绝注入：${foreign.join(", ")}`);
         }
       }
+      const role = boundedChief ? { ...requestedRole } : requestedRole;
       if (!judgeMode && opts.storage && opts.storage.roleId !== role.id) throw new Error("Pi 存储与当前角色不匹配");
       const log = opts.logger ?? createStageLogger(process.env);
       const diagnostics = createDiagnosticLogger({ component: "pi-adapter", projectRoot: opts.projectRoot, roleId: role.id });
@@ -1696,8 +1712,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
 
         // —— G-4 V2：按角色安装的外来 MCP（stdio 限定；纯消费注入面——不读任何盘上来源）——
         // 缺省（无声明）⇒ 零装配：MCP 扩展不加载、bindExtensions 不调用、放行面＝原快照集 ⇒ 既有行为逐字不变。
-        // 判断会话**强制置空**（即便调用方误传）：外来 MCP 是任意的第三方工具/网络面，
-        // judge 会话只允许运行时核心的三只只读工具（PM 评审 §4.1/§7.1）。
+        // 隔离会话强制置空外来 MCP，只开放本轮核验过的注入工具。
         const installedMcp = !judgeMode && Array.isArray(opts.installedMcpServers) ? [...opts.installedMcpServers] : [];
         const mcpActive = installedMcp.length > 0;
         // env:NAME 展开（只自 process.env；缺失即抛——先于任何子进程/网络）。值只进内存与子进程环境。
@@ -1816,6 +1831,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           log.trace(`新会话（持久化目录：${opts.sessionDir ?? ""}；首条消息后才落盘）`);
         }
 
+        if (boundedChief) assertChiefDecisionBinding(requestedRole, governedTools);
         diagnostics.record("session.construct.step", { state: "agent_session" });
         log.stage("createAgentSession…");
         const { session } = await withTimeout(

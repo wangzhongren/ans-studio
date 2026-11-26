@@ -1,9 +1,46 @@
-import type { DurableDelivery, DurableEvidenceRef, DurableFact, DurableFactReceipt, DurableReleaseRequest, DurableResult, DurableScopeDecision } from '../../model/durable-workflow.ts';
+import type { DurableDelivery, DurableEvidenceRef, DurableFact, DurableFactReceipt, DurableProposalDecision, DurableReleaseRequest, DurableResult, DurableScopeDecision } from '../../model/durable-workflow.ts';
 import { digest, stableJson } from '../../provider/durable-workflow/public.ts';
 import type { DurableLedger, StoredFact, StoredInstance } from '../../provider/durable-workflow/public.ts';
-import { activeAction, equal, fail, hashValid, liveEffect, oidValid, ok, safePath, sameTask, validKey } from './rules.ts';
+import { activeAction, decisionProvenanceMatches, equal, fail, hashValid, liveEffect, oidValid, ok, safePath, sameTask, validKey, workflowOwnsDispatch } from './rules.ts';
 
 type FactUpdate = DurableFactReceipt & { noWrite?: true };
+
+export function currentProposalDecision(ledger: DurableLedger, instance: StoredInstance): DurableProposalDecision | undefined {
+  const key = instance.graph?.proofs['proposal-approved'];
+  if (!key) return;
+  const approved = ledger.fact(instance.ref.instanceId, key);
+  const event = approved?.fact.kind === 'capability-event' ? approved.fact.event : undefined;
+  const decision = event?.input;
+  if (approved?.receipt.state !== 'consumed' || !event || !decision || decision.kind !== 'card-decided'
+    || decision.decision !== 'approve' || decision.decisionValues === undefined
+    || decision.requestId !== instance.graph?.approvedProposalRequestId) return;
+  const prepared = ledger.fact(instance.ref.instanceId, 'card-prepared:' + decision.requestId);
+  const preparation = prepared?.fact.kind === 'capability-event' ? prepared.fact.event : undefined;
+  const card = preparation?.input.kind === 'card-prepared' ? preparation.input.card : undefined;
+  const proposal = card?.documents.find(item => /^docs\/proposals\/[a-z0-9-]+-proposal-v[1-9][0-9]*\.md$/.test(item.path));
+  if (prepared?.receipt.state !== 'consumed' || !card || !proposal || preparation?.stepId !== event.stepId
+    || preparation.attempt !== event.attempt || preparation.flowId !== event.flowId || !card.decisionFields?.length
+    || card.digest !== decision.digest || card.generation !== decision.generation) return;
+  const { requestId, digest: cardDigest, generation, decisionValues: values, authority, provenance } = decision;
+  const selectionDigest = digest(stableJson([instance.ref, requestId, cardDigest, generation, proposal, values, authority, provenance]));
+  return { requestId, digest: cardDigest, generation, proposal, selectionDigest, values, authority, ...(provenance ? { provenance } : {}) };
+}
+
+export function acceptancePreparationArchitecture(ledger: DurableLedger, instance: StoredInstance) {
+  const approved = currentProposalDecision(ledger, instance);
+  if (!approved) return;
+  const prepared = ledger.fact(instance.ref.instanceId, 'card-prepared:' + approved.requestId)?.fact;
+  const card = prepared?.kind === 'capability-event' && prepared.event.input.kind === 'card-prepared' ? prepared.event.input.card : undefined;
+  return card?.documents.find(document => /^docs\/contracts\/[a-z0-9-]+-architecture-v[1-9][0-9]*\.md$/.test(document.path));
+}
+
+export function proposalDecisionTaskText(approved: DurableProposalDecision, stage: 'A11' | 'A12a' | 'A12b'): string {
+  const selection = '\n本项目已批准的 A6 定案（应用账本）：' + JSON.stringify({
+    requestId: approved.requestId, cardDigest: approved.digest, proposalDecisionDigest: approved.selectionDigest, decisionValues: approved.values,
+  });
+  return stage === 'A11' ? selection + '\n按实际定案实施和核对，发现任务与获批值冲突时按原流程回交。'
+    : selection + '\n在当前验收文档顶部 YAML 前置区逐项写入同一 proposalDecisionDigest 与 decisionValues。按已批值核对，发现冲突时回交实际原因。';
+}
 
 export function admitFact(ledger: DurableLedger, instance: StoredInstance, fact: DurableFact): DurableResult<FactUpdate> {
   const id = instance.ref.instanceId;
@@ -23,6 +60,7 @@ export function admitFact(ledger: DurableLedger, instance: StoredInstance, fact:
         || typeof fact.dispatch?.text !== 'string' || digest(fact.dispatch.text) !== fact.requestDigest || facts(fact.kind).length) {
         return fail('stage-request-invalid', 'B1 阶段请求的来源、摘要、尝试或唯一键不匹配。');
       }
+      if (workflowOwnsDispatch(instance) && instance.graph) instance.graph.flowId ??= fact.dispatch.flowId;
       break;
     case 'task-bound': {
       if (!atCurrentStep) return obsolete('step-not-active');
@@ -75,6 +113,14 @@ export function admitFact(ledger: DurableLedger, instance: StoredInstance, fact:
         || fact.dispatch && digest(fact.dispatch.text) !== fact.requestDigest || !fact.reason.trim()) {
         return fail('b2-evidence-mismatch', 'B3 请求与本次 B1 收口或基线不一致。');
       }
+      if (!equal(fact.evidenceRequirements ?? [], evidenceRequirementsFromB1(ledger, instance))) {
+        return fail('b2-acceptance-evidence-mismatch', '证据要求须来自同次正式 B1 报告，并绑定本次 B2 范围。');
+      }
+      const evidenceDecision = b2EvidenceDecisionProjection(ledger, instance);
+      if (evidenceDecision && !evidenceDecision.decision
+        || !equal(fact.evidenceAuthorization, evidenceDecision?.decision === 'approve' ? evidenceDecision : undefined)) {
+        return fail('b2-acceptance-evidence-approval-mismatch', '独立取证额外写域须引用本次 B2 客户实际批准。');
+      }
       if (fact.candidates.length === 0 || fact.candidates.some(path => !safePath(path))
         || !['requestedEvidence', 'modulePaths'].includes(fact.candidateSource)
         || fact.candidateSource === 'modulePaths' && !equal([...fact.candidates].sort(), [...report.modulePaths].sort())) {
@@ -122,11 +168,15 @@ export function admitFact(ledger: DurableLedger, instance: StoredInstance, fact:
       }
       if (!['approve', 'reject'].includes(fact.action)) return fail('release-decision-invalid', '客户决定必须批准或拒绝。');
       if (release.decision) {
-        if (release.decision.action !== fact.action) return fail('release-decision-conflict', '客户已提交相反的发布决定。');
+        if (release.decision.action !== fact.action || release.decision.source !== fact.source
+          || !equal(release.decision.provenance ?? { source: release.decision.source }, fact.provenance ?? { source: fact.source })) {
+          return fail('release-decision-conflict', '此发布请求已提交其他决定。');
+        }
         const existing = ledger.fact(id, release.decision.id);
         return ok({ ...receipt, ...existing?.receipt, release, noWrite: true });
       }
-      release.decision = { id: fact.key, action: fact.action, at: new Date().toISOString(), source: 'customer' };
+      release.decision = { id: fact.key, action: fact.action, at: new Date().toISOString(), source: fact.source,
+        ...(fact.provenance ? { provenance: fact.provenance } : {}) };
       receipt.release = release;
       break;
     }
@@ -172,7 +222,7 @@ function hasEvidence(ledger: DurableLedger, instanceId: string, evidence: Durabl
 
 export function scopeDecisionFor(ledger: DurableLedger, instance: StoredInstance, source: StoredFact | undefined, recordedAt: string,
   decidedAt?: string): DurableScopeDecision | undefined {
-  if (!accepted(source) || source.fact.kind !== 'b3-advance' || source.fact.source !== 'chief') return undefined;
+  if (!accepted(source) || source.fact.kind !== 'b3-advance' || source.fact.source !== (workflowOwnsDispatch(instance) ? 'host' : 'chief')) return undefined;
   const b3 = source.fact;
   const id = instance.ref.instanceId;
   const report = instance.analysisReport;
@@ -194,8 +244,52 @@ export function scopeDecisionFor(ledger: DurableLedger, instance: StoredInstance
     b3Request: { key: b3.key, sourceTaskId: b3.sourceTaskId, digest: b3.requestDigest },
     b1Report: { ...report.evidence, key: report.key, attempt: report.attempt }, baseline,
     candidateSource: b3.candidateSource, candidates: b3.candidates, writeSets: b3.writeSets, reason: b3.reason,
+    ...(b3.evidenceRequirements?.length ? { evidenceRequirements: b3.evidenceRequirements } : {}),
+    ...(b3.evidenceAuthorization ? { evidenceAuthorization: b3.evidenceAuthorization } : {}),
     recordedAt, ...(decidedAt ? { decidedAt } : {}),
   };
+}
+
+export function evidenceRequirementsFromB1(ledger: DurableLedger, value: StoredInstance): import('../../model/durable-workflow.ts').DurableB2EvidenceRequirement[] {
+  const ref = value.analysisReport?.evidence;
+  const bytes = ref && ledger.evidence(value.ref.instanceId, ref.sha256);
+  if (!bytes || digest(bytes) !== ref?.sha256) return [];
+  try {
+    const envelope = JSON.parse(bytes.toString('utf8')) as { report?: { origin?: string; evidence?: { text?: string }[] } };
+    if (envelope.report?.origin !== 'submitted-report') return [];
+    return (envelope.report.evidence ?? []).flatMap<import('../../model/durable-workflow.ts').DurableB2EvidenceRequirement>(item => {
+      try {
+        const entry = JSON.parse(item.text ?? '') as { kind?: string; requirementId?: string; reason?: string; source?: string; paths?: unknown };
+        return entry.kind === 'b2-evidence-requirement' && typeof entry.requirementId === 'string'
+          && /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(entry.requirementId) && typeof entry.reason === 'string' && validKey(entry.reason)
+          ? [{ requirementId: entry.requirementId, reason: entry.reason,
+            ...(entry.source === 'candidate-file' && Array.isArray(entry.paths) && entry.paths.length > 0 && entry.paths.length <= 12
+              && entry.paths.every(safePath) && new Set(entry.paths).size === entry.paths.length
+              ? { source: 'candidate-file' as const, paths: entry.paths } : {}) }] : [];
+      } catch { return []; }
+    }).filter((entry, index, all) => all.findIndex(row => row.requirementId === entry.requirementId) === index).slice(0, 24);
+  } catch { return []; }
+}
+
+export function b2EvidenceDecisionProjection(ledger: DurableLedger, value: StoredInstance) {
+  if (value.status !== 'waiting' || activeAction(value) !== 'accept-b3-advance-with-b2-scope') return;
+  const row = ledger.facts(value.ref.instanceId).findLast(item => item.receipt.state !== 'ignored'
+    && item.fact.kind === 'capability-event' && item.fact.stepId === value.stepId && item.fact.attempt === value.attempt
+    && (item.fact.event.input.kind === 'b2-evidence-scope-prepared' || item.fact.event.input.kind === 'b2-evidence-scope-decided'));
+  const input = row?.fact.kind === 'capability-event' ? row.fact.event.input : undefined;
+  return input?.kind === 'b2-evidence-scope-prepared' || input?.kind === 'b2-evidence-scope-decided' ? input.request : undefined;
+}
+
+export function approvalForRelease(ledger: DurableLedger, instance: StoredInstance, release: DurableReleaseRequest,
+  address: { stepId: string; attempt: number }): boolean {
+  const decision = release.decision;
+  if (decision?.action !== 'approve' || !decisionProvenanceMatches(decision.source, decision.provenance, release)) return false;
+  const record = ledger.fact(instance.ref.instanceId, decision.id);
+  if (!accepted(record) || record.fact.kind !== 'release-decision') return false;
+  const saved = record.fact;
+  return saved.source === decision.source && saved.action === 'approve' && equal(saved.provenance, decision.provenance)
+    && saved.requestId === release.requestId && saved.digest === release.digest && saved.generation === release.generation
+    && saved.attempt === address.attempt && saved.stepId === address.stepId;
 }
 
 export function deliveryFor(ledger: DurableLedger, instance: StoredInstance, source: StoredFact | undefined,
@@ -205,13 +299,8 @@ export function deliveryFor(ledger: DurableLedger, instance: StoredInstance, sou
   const merge = source.fact;
   const id = instance.ref.instanceId;
   const release = instance.release;
-  if (!release || release.requestId !== merge.requestId || release.decision?.source !== 'customer'
-    || release.decision.action !== 'approve' || !oidValid(merge.mainOid)) return undefined;
-  const savedDecision = ledger.fact(id, release.decision.id);
-  if (!accepted(savedDecision) || savedDecision.fact.kind !== 'release-decision' || savedDecision.fact.source !== 'customer'
-    || savedDecision.fact.action !== 'approve' || savedDecision.fact.requestId !== release.requestId
-    || savedDecision.fact.digest !== release.digest || savedDecision.fact.generation !== release.generation
-    || savedDecision.fact.attempt !== merge.attempt || savedDecision.fact.stepId !== merge.stepId) return undefined;
+  if (!release || release.requestId !== merge.requestId || !oidValid(merge.mainOid)
+    || !approvalForRelease(ledger, instance, release, merge)) return undefined;
 
   const effect = ledger.effect(id, merge.effectKey);
   const outcome = effect?.result;

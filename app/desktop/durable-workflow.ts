@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
+  DurableCapability,
   DurableDelivery as DurableDeliveryNote,
   DurableEffectIntent,
   DurableEffectOutcome,
@@ -10,18 +11,90 @@ import type {
   DurableProblem,
   DurableProjection,
   DurableResult,
-  DurableScopeDecision,
+  DurableScopeDecision, DurableEvidenceAuditProjection,
+  DurableTaskBinding,
 } from "../../src/model/durable-workflow.ts";
-import type { ClaimFileWriteFn } from "../../src/model/runtime.ts";
+import type { ChiefDecisionExecutionContext, ClaimFileWriteFn } from "../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
+import { appendRoleLog, readRoleLog, redactRoleLogSummary } from "../../src/common/编排/role-log.ts";
 import { isRuntimeKind } from "./runtime-config.ts";
 import { createDaprHost } from "../../src/pipeline/orchestration/dapr-host.ts";
 import { openDurableWorkflow } from "../../src/pipeline/orchestration/durable-workflow.ts";
+import { createRuntimeAdapterFactory, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import type { ChiefDecisionExecutor } from "./customer-input.ts";
+import { buildEffectiveProjectConfig } from "./project.ts";
+import type { SessionManagerDeps } from "./session/contracts/deps.ts";
+import type { LifecycleHost } from "./session/lifecycle/host.ts";
 import type { ClaimDurableTaskGit } from "./workflow-git.ts";
 
 type WorkflowStore = Awaited<ReturnType<typeof openDurableWorkflow>>;
 type DaprHost = ReturnType<typeof createDaprHost>;
 type DurableSessionOwner = { projectRoot: string } & ({ ref: DurableInstanceRef } | { foreign: DurableOwner });
+
+type DecisionSessionHost = Pick<LifecycleHost, "openObservedRoleSession" | "disposeObservedHandle" | "loadEffectiveConfig">;
+
+export async function executeChiefDecision(
+  context: ChiefDecisionExecutionContext, evidence: string, signal: AbortSignal,
+  open: (signal: AbortSignal) => Promise<RoleSessionHandle>,
+  dispose: DecisionSessionHost["disposeObservedHandle"],
+): Promise<void> {
+  const bounded = AbortSignal.any([signal, AbortSignal.timeout(context.limits.timeoutMs)]);
+  bounded.throwIfAborted();
+  let handle: RoleSessionHandle | undefined;
+  let cancel!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    cancel = () => {
+      void handle?.abort?.().catch(() => undefined);
+      reject(new Error("幕僚独立决策已取消或达到预算"));
+    };
+    bounded.addEventListener("abort", cancel, { once: true });
+  });
+  const opening = open(bounded);
+  void opening.then(late => {
+    if (bounded.aborted && handle !== late) void dispose(late).catch(() => undefined);
+  }, () => undefined);
+  try {
+    handle = await Promise.race([opening, aborted]);
+    bounded.throwIfAborted();
+    const active = handle;
+    void (async () => { for await (const _event of active.events()) { /* isolated decision stream */ } })().catch(() => undefined);
+    await Promise.race([active.send(JSON.stringify({ request: context.request, evidence })), aborted]);
+  } finally {
+    bounded.removeEventListener("abort", cancel);
+    if (handle) await dispose(handle);
+  }
+}
+
+/** Uses the registered project and the engine recorded on the workflow, including after restart. */
+export function durableChiefDecisionExecutor(
+  deps: SessionManagerDeps, host: DecisionSessionHost, projectRoot: string, runtime: unknown,
+): ChiefDecisionExecutor | undefined {
+  const selection = deps.getRegisteredProjectLifecycle?.(projectRoot);
+  if (!selection || !isRuntimeKind(runtime) || runtime === "demo") return undefined;
+  return async (context, evidence, decidePendingRequest, signal) => {
+    const current = () => deps.getRegisteredProjectLifecycle?.(projectRoot)?.selectionId === selection.selectionId;
+    await executeChiefDecision(context, evidence, signal, async bounded => {
+      await deps.prepareRuntimeProfile?.(runtime);
+      bounded.throwIfAborted();
+      const listing = deps.getListing(projectRoot);
+      if (listing?.governanceModel !== "trio" || !current() || !context.request.durableWorkflow) {
+        throw new Error("当前项目或持久卡的幕僚委托不可用");
+      }
+      const { project } = await buildEffectiveProjectConfig(listing, {
+        buildProjectConfig: deps.buildProjectConfig, loadEffectiveConfig: host.loadEffectiveConfig,
+      });
+      bounded.throwIfAborted();
+      if (!current()) throw new Error("项目窗口已切换");
+      const createAdapter = deps.createRuntimeAdapterFactory
+        ? deps.createRuntimeAdapterFactory(project, runtime, { ...deps.runtimeOptions, shellGate: deps.shellGate })
+        : runtime === "pi" ? deps.createPiAdapterFactory(project, deps.shellGate)
+          : createRuntimeAdapterFactory(project, runtime, deps.runtimeOptions);
+      return host.openObservedRoleSession({ roleId: "chief", project, runtime, chiefDecisionContext: context,
+        decidePendingRequest: (input, toolSignal) => decidePendingRequest(input, current()
+          ? toolSignal ? AbortSignal.any([bounded, toolSignal]) : bounded : AbortSignal.abort()) }, { createAdapter });
+    }, handle => host.disposeObservedHandle(handle));
+  };
+}
 
 export interface DesktopDurableControlPlane {
   state: "stopped" | "starting" | "ready" | "failed";
@@ -61,8 +134,10 @@ export interface DesktopDurableInstance {
   attempt: number;
   waiting?: string;
   blockedReason?: string;
-  approval?: { requestId: string; status: string };
+  acceptanceEnvironment?: DurableProjection["acceptanceEnvironment"];
+  approval?: { requestId: string; status: string; decisionId?: string; source?: "customer" | "delegated-chief" };
   evidence?: { kind: "analysis" | "scope" | "operator" | "approval"; sha256: string }[];
+  evidenceAudit?: Pick<DurableEvidenceAuditProjection, "state" | "basis" | "missing">;
   scopeDecision?: DurableScopeDecision;
   delivery?: DesktopDurableDeliverySummary;
 }
@@ -94,9 +169,59 @@ export function durableFailure(code: string, message: string): DurableResult<nev
   return { ok: false, code, message };
 }
 
+export function isDirectProductCapability(capability: DurableCapability | undefined): boolean {
+  return capability === "product-prepare-direct" || capability === "author-intent-direct";
+}
+
+export async function recordWorkflowNotice(
+  projectRoot: string, chief: string, notice: { ref: string; summary: string; taskId?: string },
+): Promise<"recorded" | "existing" | "failed"> {
+  const prior = await readRoleLog(projectRoot, { roleId: chief });
+  if (prior.entries.some(entry => entry.kind === "workflow.notice" && entry.ref === notice.ref)) return "existing";
+  const result = await appendRoleLog(projectRoot, chief, { kind: "workflow.notice", status: "blocked", ...notice });
+  return result.ok ? "recorded" : "failed";
+}
+
 function deliverySummary(delivery: DurableDeliveryNote): DesktopDurableDeliverySummary {
   const { id, state, releaseRequestId, createdAt, deliveredAt } = delivery;
   return { id, state, releaseRequestId, createdAt, ...(deliveredAt ? { deliveredAt } : {}) };
+}
+
+const preparationNotices = new Map<string, string>();
+const preparationAddress = (view: DurableProjection) => JSON.stringify([view.ref.projectId, view.ref.instanceId, view.acceptanceWorkspace?.prepareKey]);
+
+export function workspacePreparationNotice(view: DurableProjection): string | undefined {
+  return view.acceptanceWorkspace?.preparationGate ? preparationNotices.get(preparationAddress(view)) : undefined;
+}
+
+export function workspacePreparationSummary(view: DurableProjection): string | undefined {
+  const stuck = workspacePreparationNotice(view);
+  if (stuck) return stuck;
+  const observed = view.acceptanceWorkspace?.preparation;
+  if (!observed || !("stage" in observed.result)) return;
+  const { result, basis, generation } = observed;
+  const stages: Record<typeof result.stage, string> = { candidate: "候选核验", materials: "签发依据", entry: "入口核验",
+    registration: "工作区登记", workspace: "隔离准备", reconciliation: "原作用对账" };
+  const paths = result.paths?.map(item => `${item.path}（${{ present: "存在", missing: "缺失", unverified: "无法核验" }[item.state]}）`).join("、");
+  const scope = view.blockedRouting?.a12bPrepareKey === observed.prepareKey ? view.blockedRouting : undefined;
+  const actions = scope?.options.map(option => option.label).join("、");
+  return `A12b ${stages[result.stage]}。第 ${generation} 次观察，候选 ${basis.candidateOid}。 ${result.reason}` +
+    (paths ? ` 已核对路径 ${paths}。` : "") +
+    (scope?.decision?.option === "wait" ? " 当前已选择等待客观条件恢复。" : actions ? ` 可选处置 ${actions}。` : "");
+}
+
+export function setWorkspacePreparationNotice(view: DurableProjection, text?: string) {
+  const address = preparationAddress(view);
+  if (!text) { preparationNotices.delete(address); return; }
+  if (preparationNotices.size >= 128 && !preparationNotices.has(address)) preparationNotices.delete(preparationNotices.keys().next().value!);
+  preparationNotices.set(address, text);
+}
+
+export function evidenceAuditBlockerSummary(view: DurableProjection): string | undefined {
+  const audit = view.evidenceAudit;
+  if (audit?.state !== "blocked") return;
+  const missing = audit.missing.map(row => `${row.requirementId}（${row.reason}）`).join("、");
+  return `${view.stepName} 等待实际取证。候选 ${audit.basis.candidateOid}，证据代次 ${audit.basis.generation}。${missing ? ` 缺项 ${missing}。` : ""}`;
 }
 
 export function durableInstanceView(projection: DurableProjection): DesktopDurableInstance {
@@ -121,9 +246,13 @@ export function durableInstanceView(projection: DurableProjection): DesktopDurab
     stepName,
     attempt,
     waiting: waitingFor,
-    blockedReason,
-    ...(release ? { approval: { requestId: release.requestId, status: release.decision?.action ?? "pending" } } : {}),
+    blockedReason: evidenceAuditBlockerSummary(projection) ?? workspacePreparationSummary(projection) ?? blockedReason,
+    ...(projection.acceptanceEnvironment ? { acceptanceEnvironment: projection.acceptanceEnvironment } : {}),
+    ...(release ? { approval: { requestId: release.requestId, status: release.decision?.action ?? "pending",
+      ...(release.decision ? { decisionId: release.decision.id, source: release.decision.source } : {}) } } : {}),
     ...(projection.scopeDecision ? { scopeDecision: projection.scopeDecision } : {}),
+    ...(projection.evidenceAudit ? { evidenceAudit: { state: projection.evidenceAudit.state,
+      basis: projection.evidenceAudit.basis, missing: projection.evidenceAudit.missing } } : {}),
     ...(projection.delivery ? { delivery: deliverySummary(projection.delivery) } : {}),
     evidence: [
       ...(projection.analysisReport ? [{ kind: "analysis" as const, sha256: projection.analysisReport.evidence.sha256 }] : []),
@@ -156,6 +285,8 @@ interface DurableDelivery {
   runtime: RuntimeKind;
   intent: DurableEffectIntent;
   assignmentTaskId?: string;
+  selectionId?: string;
+  workflowOwnedDispatch?: boolean;
 }
 
 export class DesktopDurableWorkflow {
@@ -171,6 +302,7 @@ export class DesktopDurableWorkflow {
   private startWanted = false;
   private retryAfter = 0;
   private readonly projectWorkers = new Map<string, (projection: DurableProjection) => Promise<void>>();
+  private readonly observedEnvironmentBlocks = new Set<string>();
   private readonly deliveries = new Map<string, DurableDelivery>();
   private readonly sessions = new WeakMap<object, DurableSessionOwner | undefined>();
 
@@ -247,6 +379,14 @@ export class DesktopDurableWorkflow {
     for (const projection of store.activeProjections()) {
       await this.projectWorkers.get(projection.projectRoot)?.(projection);
     }
+    for (const [projectRoot, update] of this.projectWorkers) {
+      const waiting = (await store.listProjections(projectRoot)).filter(projection => projection.acceptanceEnvironment?.state === "blocked"
+        && !this.observedEnvironmentBlocks.has(projection.ref.instanceId));
+      for (const projection of waiting) {
+        await update(projection);
+        this.observedEnvironmentBlocks.add(projection.ref.instanceId);
+      }
+    }
   }
 
   observeProject(projectRoot: string, update: (projection: DurableProjection) => Promise<void>): () => void {
@@ -276,7 +416,7 @@ export class DesktopDurableWorkflow {
     return entries.map(({ file, source, definition, code, message, path: field }) => {
       const first = definition?.steps[definition.start];
       const action = first && "action" in first ? first.action : undefined;
-      const purpose = action === "product-prepare" ? "New product work with full governance"
+      const purpose = action === "product-prepare" || action === "product-prepare-direct" ? "New product work with full governance"
         : action === "observe-existing" || action === "b1-impact-readonly" ? "Existing implementation and supportable file-level scope required"
         : action === "readonly-report" ? "Read-only work, no change authorization" : undefined;
       return ({
@@ -326,6 +466,26 @@ export class DesktopDurableWorkflow {
     return (await this.store()).projection(projectRoot, instanceId);
   }
 
+  evidenceCollectorRoleForProject(projectRoot: string): (flowId: string) => Promise<string | undefined> {
+    let project: Promise<DurableProjection[]> | undefined;
+    const readProject = async () => {
+      if (!await this.hasStoredBusiness()) return [];
+      const root = await fs.realpath(projectRoot);
+      const store = await this.store();
+      return (await store.listProjections(projectRoot)).filter(view => view.status === "waiting" && path.relative(root, view.projectRoot) === "");
+    };
+    return async flowId => {
+      if (!flowId) return undefined;
+      project ??= readProject().catch(() => []);
+      const matching = (await project).filter(view => view.flowId === flowId);
+      if (matching.length !== 1) return undefined;
+      const view = matching[0];
+      const roleId = view?.evidenceCollectorRoleId;
+      return view?.schema === 2 && view.engine !== "incompatible" && view.engine !== "history-missing" && view.evidenceAuditEnabled === true
+        && roleId && roleId.trim() === roleId ? roleId : undefined;
+    };
+  }
+
   async owns(projectRoot: string, instanceId?: string): Promise<boolean> {
     const store = await this.store();
     if ((await store.owner(projectRoot, instanceId))?.engine === "dapr") return true;
@@ -365,6 +525,45 @@ export class DesktopDurableWorkflow {
     return clientMessageId === undefined ? undefined : this.deliveries.get(`${projectRoot}\0${clientMessageId}`);
   }
 
+  async rejectWorkflowDispatch(ref: DurableInstanceRef, task: DurableTaskBinding, reason: string, chief: string): Promise<string | undefined> {
+    const store = await this.store();
+    const view = store.lookup(ref);
+    const pending = view?.pendingTasks?.find(item => item.taskId === task.taskId && item.stepId === view.stepId
+      && item.attempt === view.attempt && item.state === "pending" && item.dispatch.actor === "application");
+    const legacyIntent = pending?.capability === "author-intent-direct" && task.roleId === "product"
+      && task.stage === "A2" && task.parentTaskId === ref.instanceId;
+    if (!view || view.status !== "waiting" || !view.flowId || task.stageAttempt !== view.attempt
+      || !view.workflowOwnedDispatch && !legacyIntent) return undefined;
+    const effect = store.listEffects(ref, "model-send").find(item => item.intent.task?.taskId === task.taskId);
+    if (effect && effect.state !== "not-started") return undefined;
+    const revision = view.documentRevision;
+    if (revision?.status === "pending" && revision.task.taskId === task.taskId && revision.roleId === task.roleId
+      && revision.task.parentTaskId === task.parentTaskId) {
+      await store.failDocumentRevision(ref, { revisionId: revision.id,
+        reason: `修订未派达。原因 ${redactRoleLogSummary(reason, view.projectRoot)}` });
+      this.activate();
+      return undefined;
+    }
+    const kind = legacyIntent ? "product-dispatch-failed" : "task-dispatch-failed";
+    const key = `${kind}:${task.taskId}`;
+    const summary = `${task.stage} 工作流任务未派达（${ref.instanceId}），请幕僚处理。原因：${redactRoleLogSummary(reason, view.projectRoot)}`;
+    const notice = await recordWorkflowNotice(view.projectRoot, chief, { ref: key, summary, taskId: task.taskId });
+    if (notice === "failed") {
+      store.block(ref, "workflow-notice-unavailable", summary);
+      return undefined;
+    }
+    if (!pending) {
+      store.block(ref, "workflow-dispatch-failed", summary);
+      return undefined;
+    }
+    const saved = await store.submitCapability(ref, {
+      key, stepId: view.stepId, attempt: view.attempt, flowId: view.flowId,
+      source: { roleId: "host", originId: task.taskId, parentTaskId: task.taskId },
+      input: { kind, task, reason: summary.slice(0, 500) },
+    });
+    return saved.ok && saved.value.state !== "ignored" ? summary : undefined;
+  }
+
   taskEffectClaims(
     session: { projectRoot: string; taskId?: string; roleId: string },
     currentClientMessage: () => string | undefined,
@@ -381,6 +580,9 @@ export class DesktopDurableWorkflow {
       if (!projection || currentDelivery() !== delivery ||
         (input.expected.branch !== undefined && input.expected.branch !== projection.baseline?.branch)) {
         return durableFailure("workflow-task-write-stale", "The original task or task branch changed.");
+      }
+      if (projection.a11Disposition?.retest && projection.a11Disposition.childTask.taskId === task?.taskId) {
+        return durableFailure("workflow-a11-retest-write-forbidden", "A11 同候选补测回合禁止文件写入和 Git 写操作。");
       }
       const current = delivery.intent.stepId === projection.stepId && delivery.intent.attempt === projection.attempt;
       const pending = projection.pendingTasks?.find(item => item.taskId === task?.taskId && item.roleId === session.roleId
@@ -404,7 +606,9 @@ export class DesktopDurableWorkflow {
         const settled = await store.settleEffect(delivery.ref, { key: claim.value.key, token: claim.value.token, outcome, evidence, result });
         if (!settled.ok) throw new Error(`${settled.code}: ${settled.message}`);
       };
-      if (claim.value.execute && currentDelivery() !== delivery) {
+      const activeDisposition = store.lookup(delivery.ref)?.a11Disposition;
+      if (claim.value.execute && (currentDelivery() !== delivery
+        || activeDisposition?.retest && activeDisposition.childTask.taskId === task?.taskId)) {
         await finish("not-started", "session changed before the actual write or Git command");
         return durableFailure("workflow-task-write-stale", "The task session changed before execution.");
       }

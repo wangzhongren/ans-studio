@@ -150,7 +150,7 @@ interface Harness {
   hangNext: (roleId: string) => () => void;
 }
 
-function makeHarness(opts: { deliveryQueueStorePath?: string } = {}): Harness {
+function makeHarness(opts: { deliveryQueueStorePath?: string; durableWorkflow?: ConstructorParameters<typeof SessionManager>[0]["durableWorkflow"] } = {}): Harness {
   const l = listing();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
@@ -231,6 +231,7 @@ function makeHarness(opts: { deliveryQueueStorePath?: string } = {}): Harness {
       }),
     // 2026-10-20 客户要求：投递队列持久化（重启自动续跑）——测试注入临时 store（缺省 ⇒ 不持久化）。
     ...(opts.deliveryQueueStorePath !== undefined ? { deliveryQueueStorePath: opts.deliveryQueueStorePath } : {}),
+    ...(opts.durableWorkflow ? { durableWorkflow: opts.durableWorkflow } : {}),
   });
   createdManagers.push(mgr);
   return {
@@ -813,6 +814,47 @@ test("2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delive
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("Dapr watchdog stays informational and restart retires only known unstarted producer rows", async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ans-dapr-delivery-store-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const storePath = path.join(dir, "queue.json");
+  const durableWorkflow = {
+    owns: async (root: string) => root === PROJECT_ROOT,
+    delivery: () => undefined,
+    store: async () => ({ owner: async (root: string) => root === PROJECT_ROOT ? { engine: "dapr" } : { engine: "legacy" } }),
+  } as unknown as ConstructorParameters<typeof SessionManager>[0]["durableWorkflow"];
+  const key = (signal: string, sequence: number) => ["watchdog", PROJECT_ROOT, signal, sequence].join("\0");
+  const at = new Date().toISOString();
+  const queued = (kind: "system" | "message", dedupKey: string, state: "queued" | "in-flight" = "queued") => ({
+    key: { projectRoot: PROJECT_ROOT, roleId: "su", runtime: "demo" }, state, enqueuedAt: at,
+    item: { kind, targetRoleId: "su", sourceRoleId: kind === "system" ? "" : "su", text: "Same visible patrol", summary: "Same visible patrol", dedupKey, enqueuedAt: at },
+  });
+  const inFlight = key("patrol", 3);
+  const customer = "msg\u00001\u00002";
+  const unrelated = key("install-row", 4);
+  fs.writeFileSync(storePath, JSON.stringify({ version: 1, items: [
+    queued("system", key("patrol", 1)),
+    queued("system", key("alert-queue-stuck:chief", 2)),
+    queued("system", inFlight, "in-flight"),
+    queued("message", customer),
+    queued("system", unrelated),
+  ] }));
+  const h = makeHarness({ deliveryQueueStorePath: storePath, durableWorkflow });
+  const result = await h.mgr.restorePersistedDeliveries();
+  assert.equal(result.skipped, 2);
+  assert.equal(result.restored, 3);
+  const persisted = JSON.parse(fs.readFileSync(storePath, "utf8")).items as ReturnType<typeof queued>[];
+  assert.deepEqual(persisted.map(x => [x.item.dedupKey, x.state]), [[inFlight, "in-flight"], [customer, "queued"], [unrelated, "queued"]]);
+  assert.deepEqual(h.openCalls, []);
+  assert.equal(await h.mgr.watchdogDeliver(PROJECT_ROOT, { text: "new patrol", summary: "new patrol", dedupKey: key("patrol", 5), uiOnlyWhenBusy: true }), "informational");
+  assert.equal(h.mgr.watchdogSnapshot(PROJECT_ROOT)?.queues[0]?.items.length, 3);
+  assert.deepEqual(h.envelopes.filter(e => e.event.kind === "message" && (e.event.detail as { source?: string })?.source === "delivery-note")
+    .map(e => e.event.summary), ["Same visible patrol", "Same visible patrol", "new patrol"]);
+  assert.equal((await h.mgr.restorePersistedDeliveries()).restored, 0);
+  assert.deepEqual(h.sent.su, []);
+  await h.mgr.stop(null);
 });
 
 // ————————————————— view_image 桌面投递（2026-10-26） —————————————————

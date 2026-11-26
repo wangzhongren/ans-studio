@@ -38,6 +38,7 @@
     "@earendil-works/pi-mcp": "1.1.0",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@openai/codex": "0.162.1",
+    "npm": "11.19.1",
     "yaml": "2.9.0",
     "zod": "4.6.7"
   },

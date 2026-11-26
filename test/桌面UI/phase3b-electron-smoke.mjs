@@ -343,7 +343,7 @@ app.whenReady().then(async () => {
   await sleep(120);
   check(
     "JUDGE_ENABLE_SHOWS_AMBER_MARKER_AND_WARNING",
-    await js(`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning'),x=document.getElementById('shell-judge-warning-text'),wrap=t.closest('.composer-auto-approve');return t.checked&&l.textContent==='替我审批中 · 自动代理'&&wrap.classList.contains('is-on')&&!w.hidden&&document.getElementById('shell-judge-warning-close').textContent==='知道了'&&x.textContent.includes('替我审批中：shell 命令与写盘/写卡确认')&&x.textContent.includes('按所属开关回落逐张卡');})()`),
+    await js(`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning'),x=document.getElementById('shell-judge-warning-text'),wrap=t.closest('.composer-auto-approve');return t.checked&&l.textContent==='替我审批中 · 自动代理'&&wrap.classList.contains('is-on')&&!w.hidden&&document.getElementById('shell-judge-warning-close').textContent==='知道了'&&x.textContent.includes('自动代理代你审核 shell 命令请求。')&&x.textContent.includes('未获有效审批时，本次命令不会执行。关闭开关后，可手动审核后续命令请求。')&&!/写盘|写卡/.test(x.textContent);})()`),
   );
   await shot("1360-judge-toggles-warning");
   await js(`document.getElementById('shell-judge-warning-close').click()`);
@@ -360,7 +360,7 @@ app.whenReady().then(async () => {
   await sleep(120);
   check(
     "DECISION_ENABLE_SHOWS_GROUP_WARNING",
-    await js(`(()=>{const t=document.getElementById('judge-decision-toggle'),x=document.getElementById('shell-judge-warning-text');return t.checked&&document.getElementById('judge-decision-label').textContent==='替我决策中 · 自动代理'&&!document.getElementById('shell-judge-warning').hidden&&x.textContent.includes('替我决策中：提案接受、任命、验收将由自动代理代批。')&&!x.textContent.includes('替我审批中：');})()`),
+    await js(`(()=>{const t=document.getElementById('judge-decision-toggle'),x=document.getElementById('shell-judge-warning-text');return t.checked&&document.getElementById('judge-decision-label').textContent==='替我决策'&&t.closest('label').title==='幕僚代决策'&&!document.getElementById('shell-judge-warning').hidden&&x.textContent.trim()==='幕僚代决策';})()`),
   );
   await js(`document.getElementById('shell-judge-warning-close').click()`);
   await js(`document.getElementById('judge-decision-toggle').click()`);

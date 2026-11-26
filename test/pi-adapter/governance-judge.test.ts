@@ -18,6 +18,7 @@ import { mkdtemp, rm, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFakeRuntimeAdapter, createPiRuntimeAdapter } from "../../src/provider/pi/session.ts";
+import { buildChiefDecisionTools } from "../../src/provider/runtime/tools.ts";
 import {
   ALL_JUDGE_TOOL_NAMES,
   buildGovernanceJudgeTools,
@@ -31,7 +32,8 @@ import { createRealPiRuntimeAdapter } from "../../src/common/pi-adapter/real-ada
 import { resolvePiProviderConfig } from "../../src/common/pi-adapter/provider-config.ts";
 import { createInteractionGate } from "../../src/common/pi-adapter/timeout.ts";
 import type {
-  RuntimeProviderOptions, RuntimeSessionStorage, SessionEvent, ShellJudgeReadStats, ToolDefinition,
+  ChiefDecisionExecutionContext, DecidePendingRequestInput, RuntimeProviderOptions, RuntimeSessionStorage,
+  SessionEvent, ShellJudgeReadStats, ToolDefinition,
 } from "../../src/model/runtime.ts";
 import { makeGate, makeRole } from "./fixtures.ts";
 
@@ -273,6 +275,126 @@ test("真实适配器 judgeMode：注入非 judge 工具在构造期被拒绝（
     );
   });
 });
+
+const chiefRole = () => ({ ...makeRole(), id: "chief", kind: "built-in-governance" as const, governanceFunction: "chief" as const });
+
+function chiefDecisionContext(): ChiefDecisionExecutionContext {
+  return {
+    roleId: "chief", executionId: "pi-bounded-decision", mode: "bounded-decision",
+    productionWriteAuthority: false, tools: ["decide_pending_request"],
+    limits: { maxTurns: 1, timeoutMs: 5000, maxAttempts: 1 },
+    request: {
+      requestId: "pi-merge:2", baseDigest: "a".repeat(64), delegationRevision: 3,
+      originRoleId: "application", cardKind: "merge-main", durableWorkflow: { generation: 2, multiple: false },
+      question: "选择当前工作流卡的决定。", options: [{ id: "merge", label: "合并" }, { id: "reject", label: "拒绝" }],
+      evidenceRefs: [{ snapshotId: "materials", path: "docs/materials.md", version: 1, sha256: "b".repeat(64) }],
+    },
+  };
+}
+
+test("Pi 有界幕僚只注册决定工具，经 SDK 处理有效和陈旧的决定", async () => temp(async (dir) => {
+  const sdk = await engine();
+  const context = chiefDecisionContext();
+  const seen: DecidePendingRequestInput[] = [];
+  const tools = buildChiefDecisionTools(async input => {
+    seen.push(input);
+    return { ok: true, requestId: input.requestId, status: "settled", source: {
+      kind: "chief-delegated", actorRoleId: "chief", originRoleId: context.request.originRoleId,
+      ...input, at: "2026-11-18T00:00:00.000Z",
+    } };
+  }, context);
+  const { requestId, baseDigest, delegationRevision } = context.request;
+  const choice: DecidePendingRequestInput = { requestId, baseDigest, delegationRevision, disposition: "select", selected: ["merge"], reason: "证据支持合并" };
+  sdk.faux.setResponses([
+    sdk.ai.fauxAssistantMessage([
+      sdk.ai.fauxToolCall(tools[0]!.name, { ...choice, delegationRevision: delegationRevision - 1 }),
+      sdk.ai.fauxToolCall(tools[0]!.name, { ...choice }),
+    ]),
+    sdk.ai.fauxAssistantMessage("done"),
+  ]);
+  const denyStorage = async () => assert.fail("有界幕僚会话访问了会话存储");
+  const storage: RuntimeSessionStorage = {
+    runtime: "pi", roleId: "chief", directory: join(dir, ".ans"), nativeDirectory: join(dir, ".ans", "native"),
+    readLatest: denyStorage, saveSession: denyStorage, appendReplay: denyStorage,
+    readReplay: denyStorage, checkpointReplay: denyStorage,
+  };
+  const previous = process.env.ANS_PI_SERVER_TOOLS;
+  process.env.ANS_PI_SERVER_TOOLS = "definitely-unknown-server-tool";
+  try {
+    const session = await createRealPiRuntimeAdapter({
+      ...providerOptions(dir, tools, {
+        judgeMode: true, chiefDecisionContext: context, storage,
+        installedMcpServers: [{ name: "decoy", command: "definitely-not-a-real-binary", args: [] }],
+        contextSections: ["DO_NOT_INCLUDE_IN_BOUNDED_CHIEF_PROMPT"],
+      }),
+      config: judgeConfig, logger: log, sessionDir: join(dir, ".ans", "sessions", "chief"),
+    }, sdk.dependencies).bindRole(chiefRole());
+    try {
+      assert.deepEqual(sdk.native.getActiveToolNames(), ["decide_pending_request"]);
+      assert.equal(sdk.constructed.noTools, "builtin");
+      assert.equal(sdk.mcpExtensionCalls, 0);
+      assert.equal(session.contextSource, "in-memory");
+      assert.equal(sdk.constructed.resourceLoader?.getSystemPrompt()?.includes("DO_NOT_INCLUDE_IN_BOUNDED_CHIEF_PROMPT"), false);
+      const surface = session.inspectApplicationToolSurface?.();
+      assert.equal(surface?.status, "observed");
+      assert.deepEqual(surface.appTools, ["decide_pending_request"]);
+      assert.deepEqual(surface.foreignMcpServers, []);
+      assert.deepEqual(surface.nativeBuiltinTools, []);
+      await session.prompt("判断这张卡");
+      const [stale, settled] = sdk.native.messages.filter(message => message.role === "toolResult");
+      assert.equal(stale?.isError, true);
+      assert.match(stale.content.find(block => block.type === "text")?.text ?? "", /stale request\/basis\/revision/);
+      assert.equal(settled?.isError, false);
+    } finally {
+      await session.dispose();
+    }
+    assert.deepEqual(seen, [choice]);
+    assert.equal((await readdir(dir)).includes(".ans"), false);
+  } finally {
+    if (previous === undefined) delete process.env.ANS_PI_SERVER_TOOLS;
+    else process.env.ANS_PI_SERVER_TOOLS = previous;
+  }
+}));
+
+test("Pi 有界幕僚在加载 SDK 前拒绝冒充、无效上下文、工具集错误与绑定漂移", async () => temp(async (dir) => {
+  const context = chiefDecisionContext();
+  const tools = buildChiefDecisionTools(async () => assert.fail("决定工具不得执行"), context);
+  const oldJudgeTool = buildGovernanceJudgeTools({ projectRoot: dir, report: () => {}, stats: stats() })[0]!;
+  const base = providerOptions(dir, tools, { judgeMode: true, chiefDecisionContext: context });
+  const adapter = (extra: Partial<RuntimeProviderOptions> = {}) => createRealPiRuntimeAdapter({ ...base, ...extra }, {
+    loadPi: async () => assert.fail("无效绑定不得加载 SDK"),
+  });
+  for (const impostor of [makeRole(), { ...chiefRole(), kind: "project" as const }, { ...chiefRole(), governanceFunction: undefined }]) {
+    await assert.rejects(adapter().bindRole(impostor), /需要真实内置 Chief/);
+  }
+  for (const extra of [
+    { judgeMode: undefined }, { chiefDecisionContext: undefined }, { chiefDecisionContext: undefined, judgeMode: undefined },
+    { chiefDecisionContext: { ...context, request: { ...context.request, baseDigest: "invalid" } } },
+    { tools: [] }, { tools: [...tools, oldJudgeTool] }, { tools: [...tools, ...tools] },
+  ]) {
+    await assert.rejects(adapter(extra).bindRole(chiefRole()), /需要有效的决策上下文且只接受 decide_pending_request/);
+  }
+  const pendingAdapter = adapter();
+  context.request.delegationRevision++;
+  await assert.rejects(pendingAdapter.bindRole(chiefRole()), /决策上下文已变更/);
+}));
+
+test("Pi 有界幕僚在 SDK 装配期间拒绝已改变的上下文", async () => temp(async (dir) => {
+  const sdk = await engine();
+  const context = chiefDecisionContext();
+  const tools = buildChiefDecisionTools(async () => assert.fail("决定工具不得执行"), context);
+  const adapter = createRealPiRuntimeAdapter({
+    ...providerOptions(dir, tools, { judgeMode: true, chiefDecisionContext: context }), config: judgeConfig, logger: log,
+  }, {
+    ...sdk.dependencies,
+    async buildRuntime() {
+      context.request.delegationRevision++;
+      return sdk.dependencies.buildRuntime();
+    },
+  });
+  await assert.rejects(adapter.bindRole(chiefRole()), /决策上下文已变更/);
+  assert.equal(sdk.constructed, undefined);
+}));
 
 // —————————————————————— ④ legacy 直接入口（createPiRuntimeAdapter） ——————————————————————
 

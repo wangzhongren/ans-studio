@@ -17,7 +17,7 @@ function unwrap<T>(result: DurableResult<T>): T {
   return result.value;
 }
 
-test('real desktop Git effects honor B2 and the active customer snapshot, and recover one merge', async t => {
+test('real desktop Git effects honor B2 and the bound delegated snapshot, and recover one merge', async t => {
   const { project, dataDir, cleanup } = await fixture(t);
   const source = 'change.txt';
   const roleDir = join(project, '角色卡', 'owner');
@@ -127,13 +127,25 @@ test('real desktop Git effects honor B2 and the active customer snapshot, and re
     expected: { branch, mainOid: snapshot.mainOid, tipOid: snapshot.tipOid, files: snapshot.files },
   };
   assert.equal(service.claimEffect(ref, operation).ok, false);
-  const decision = { ...b4, kind: 'release-decision' as const, source: 'customer' as const, key: 'approval',
-    requestId: release.requestId, digest: release.digest, generation: release.generation, action: 'approve' as const };
-  unwrap(await service.submit(ref, decision));
-  assert.equal((await service.submit(ref, { ...decision, key: 'opposite', action: 'reject' })).ok, false);
+  const approvalBinding = { requestId: release.requestId, digest: release.digest, generation: release.generation };
+  const provenance = { source: 'delegated-chief', ...approvalBinding, delegationRevision: 8, reason: 'The verified scope and candidate agree.' } as const;
+  const decision = { ...b4, ...approvalBinding, key: 'approval', action: 'approve' as const, provenance };
+  const current = () => true;
+  assert.equal((await service.submit(ref, { ...decision, kind: 'release-decision', source: 'delegated-chief' })).ok, false);
+  assert.equal((await service.decideRelease(ref, { ...decision, generation: firstRelease.generation }, current)).ok, false);
+  let checks = 0;
+  assert.equal((await service.decideRelease(ref, decision, () => ++checks < 4)).ok, false);
+  const branchBefore = git(project, 'rev-parse', 'main');
+  git(project, 'update-ref', 'refs/heads/main', snapshot.tipOid);
+  assert.equal((await service.decideRelease(ref, decision, current)).ok, false);
+  assert.equal(service.lookup(ref)?.release?.decision, undefined);
+  git(project, 'update-ref', 'refs/heads/main', branchBefore);
+  const approved = unwrap(await service.decideRelease(ref, decision, current)).release!;
+  assert.deepEqual(approved.decision?.provenance, provenance);
+  assert.equal((await service.decideRelease(ref, { ...decision, key: 'opposite', action: 'reject' }, current)).ok, false);
+  assert.equal(git(project, 'rev-parse', 'main'), branchBefore);
   let token = '';
-  const merge = await mergeDurableMain({ projectRoot: project, workflowId: ref.instanceId, flowId: 'fixture', requestId: release.requestId,
-    snapshot, confirmation: { by: 'customer', decisionId: decision.key }, claim: async () => {
+  const merge = await mergeDurableMain({ projectRoot: project, workflowId: ref.instanceId, flowId: 'fixture', release: approved, claim: async () => {
       const claimed = unwrap(service.claimEffect(ref, operation));
       assert.equal(claimed.execute, true);
       token = claimed.token;
@@ -148,6 +160,7 @@ test('real desktop Git effects honor B2 and the active customer snapshot, and re
   unwrap(await service.submit(ref, { ...b4, kind: 'release-merged', source: 'host', key: 'actual-result',
     requestId: release.requestId, effectKey: operation.key, mainOid: recovered.mainOid, closed: true }));
   assert.equal(service.apply({ ref, stepId: b4.stepId, entry: 3, turn: 0 }).terminal, 'delivered');
+  assert.equal(service.lookup(ref)?.delivery?.releaseRequestId, release.requestId);
   assert.equal(git(project, 'rev-parse', 'main'), recovered.mainOid);
   assert.equal(await readFile(join(project, source), 'utf8'), 'implemented\n');
 });

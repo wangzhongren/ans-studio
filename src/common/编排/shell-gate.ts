@@ -119,6 +119,10 @@ import type { ShellApprovalContext } from "../../model/runtime.ts";
 export type { ShellGate, ShellReviewResult };
 /** 入参别名：与 session.ts 的 `ShellReviewRequest` 同形。 */
 export type ShellGateRequest = ShellReviewRequest;
+export type PrepareImplementationSelfTest = (req: ShellGateRequest) => Promise<
+  { mode: "ordinary" } | { mode: "denied"; reason: string }
+  | { mode: "strict"; prepare(): Promise<() => boolean> }
+>;
 
 // —— 门禁引擎 (c) 的依赖形状（注入；「按实际来」） ——
 //
@@ -580,6 +584,7 @@ export interface CreateShellGateOptions {
   writeGuard?: (req: ShellGateRequest) => ShellWriteGuardDecision;
   /** 执行前写审计快照（仅在最终 allow 时调用；失败不阻塞执行）。 */
   snapshotBefore?: (req: ShellGateRequest) => Promise<void> | void;
+  prepareImplementationSelfTest?: PrepareImplementationSelfTest;
   /**
    * 2026-10-29（客户 Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文加载器（有界脚本内容）。
    * 返回 ok:false ⇒ fail-closed 拒绝（不弹卡、不交 judge）；缺省不传 ⇒ 无上下文（旧行为）。
@@ -988,10 +993,15 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       const scriptOutcome = await runA(contextualReq, {
         bBranch: BRANCH_SCRIPT_REVIEW,
         bAttr: byTagged,
-        why:
-          `脚本/不可静态解析的写命令：${scriptDecision.reason} ` +
-          "请依据命令行/argv 与提供的脚本内容核对是否越出角色写区、是否破坏性/越权；" +
-          "开关开启时由判断 agent 决定，关闭时由客户本人确认。",
+        why: contextualReq.acceptanceWorkspaceScope?.operation === "static"
+          ? "应用隔离工作区的静态文件复制及回环预览。请核对固定的应用复制操作、限定的浏览器文件和输出槽，以及文件核验后由应用建立的有时限回环预览。现有审批仍须作出明确决定。"
+          : contextualReq.acceptanceWorkspaceScope !== undefined
+            ? "应用隔离工作区的验收构建及产物预览。请核对固定构建命令及输出槽，以及构建核验后由应用建立的有时限回环预览。现有审批仍须作出明确决定。"
+          : contextualReq.acceptanceEnvironmentScope !== undefined
+          ? "应用隔离目录中的依赖恢复命令。请依据实际 argv、工作目录和宿主核验范围审查安装、清理及排他发布的风险。现有审批仍须作出明确决定。"
+          : `脚本/不可静态解析的写命令：${scriptDecision.reason} ` +
+            "请依据命令行/argv 与提供的脚本内容核对是否越出角色写区、是否破坏性/越权；" +
+            "开关开启时由判断 agent 决定，关闭时由客户本人确认。",
       });
       return { ...scriptOutcome, reviewedReq: contextualReq };
     }
@@ -1253,6 +1263,8 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       ...(req.roleId !== undefined ? { roleId: req.roleId } : {}),
       ...(req.manualOnly === true ? { manualOnly: true } : {}),
       ...(req.approvalContext !== undefined ? { approvalContext: req.approvalContext } : {}),
+      ...(req.acceptanceEnvironmentScope !== undefined ? { acceptanceEnvironmentScope: req.acceptanceEnvironmentScope } : {}),
+      ...(req.acceptanceWorkspaceScope !== undefined ? { acceptanceWorkspaceScope: req.acceptanceWorkspaceScope } : {}),
     };
 
     let out: OperatorOutcome | null | undefined;
@@ -1316,8 +1328,15 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   const gate = async (req: ShellGateRequest): Promise<ShellReviewResult> => {
     // 超时包装整个审核；超时 = 拒绝（§7.5 退路 3）。
     let outcome: ReviewOutcome;
+    let retest: Awaited<ReturnType<PrepareImplementationSelfTest>> | undefined;
     try {
-      outcome = await withTimeout(decide(req), timeoutMs, "shell 审核");
+      if (opts.prepareImplementationSelfTest) {
+        retest = { mode: "denied", reason: "无法核对当前补测工具回合。" };
+        retest = await opts.prepareImplementationSelfTest(req);
+      }
+      outcome = retest?.mode === "denied"
+        ? { result: { allow: false, by: "retest:scope", reason: retest.reason }, conclusion: "deny", branch: "a11-retest-scope" }
+        : await withTimeout(decide(req), timeoutMs, "shell 审核");
     } catch (err) {
       const timedOut = isTimeoutError(err);
       outcome = {
@@ -1368,6 +1387,16 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       };
     }
     // 2026-10-29（§6.5）：最终放行后、spawn 之前拍快照（执行后由 run_shell 调 postAudit 对比）。
+    if (retest && retest.mode !== "ordinary") {
+      if (!finalOutcome.result.allow) return { ...finalOutcome.result, implementationSelfTest: { strictAuditReady: false } };
+      try {
+        if (retest.mode !== "strict" || !auditOutcome.ok) throw new Error("原审批审计未可靠登记。");
+        const isCurrent = await retest.prepare();
+        return { ...finalOutcome.result, implementationSelfTest: { strictAuditReady: true, isCurrent } };
+      } catch (error) {
+        return { allow: false, by: "retest:audit", reason: reasonOf(error), implementationSelfTest: { strictAuditReady: false } };
+      }
+    }
     if (finalOutcome.result.allow === true && typeof opts.snapshotBefore === "function") {
       try {
         await opts.snapshotBefore(req);
@@ -1522,6 +1551,7 @@ export interface ShellGateBuildDeps {
   writeGuard?: (req: ShellGateRequest) => ShellWriteGuardDecision;
   /** 执行前写审计快照（仅在最终 allow 时调用；失败不阻塞执行）。 */
   snapshotBefore?: (req: ShellGateRequest) => Promise<void> | void;
+  prepareImplementationSelfTest?: PrepareImplementationSelfTest;
   /** 不透明执行审查上下文加载器（见 `CreateShellGateOptions.approvalContextLoader`）。 */
   approvalContextLoader?: (req: ShellGateRequest) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
   /** 审核结束回调（见 `CreateShellGateOptions.onReviewed`；2026-10-31 判拒升级）。 */
@@ -1577,6 +1607,7 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     advisoryRuleset: deps.advisoryRuleset,
     ...(deps.writeGuard !== undefined ? { writeGuard: deps.writeGuard } : {}),
     ...(deps.snapshotBefore !== undefined ? { snapshotBefore: deps.snapshotBefore } : {}),
+    ...(deps.prepareImplementationSelfTest ? { prepareImplementationSelfTest: deps.prepareImplementationSelfTest } : {}),
     ...(deps.approvalContextLoader !== undefined ? { approvalContextLoader: deps.approvalContextLoader } : {}),
     ...(deps.onReviewed !== undefined ? { onReviewed: deps.onReviewed } : {}),
     ...(deps.takeGrant !== undefined ? { takeGrant: deps.takeGrant } : {}),

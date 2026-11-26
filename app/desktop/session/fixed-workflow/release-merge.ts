@@ -31,7 +31,7 @@ import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.t
 import { isRuntimeKind } from "../../runtime-config.ts";
 import type { DurableEvidenceRef, DurableProjection, DurableReleaseRequest, DurableReleaseSnapshot } from "../../../../src/model/durable-workflow.ts";
 import type { FixedReleaseTriggerStage } from "../../workflow.ts";
-import { buildMergeMainCardRequest, mergeMainCardRequestId, toMergeMainCardDecision } from "../../customer-input.ts";
+import { buildMergeMainCardRequest, durableDecisionProvenance, mergeMainCardRequestId, toMergeMainCardDecision } from "../../customer-input.ts";
 import { createDesktopReleaseGitPort, mergeDurableMain, previewDurableMerge, verifyDurableMerge } from "../git-ports.ts";
 import { durableHash } from "../../durable-workflow.ts";
 import { emitDeliveryNote } from "../shared/notifier.ts";
@@ -87,7 +87,9 @@ export class FixedWorkflowRelease {
     if ((projection.action !== "b4-customer-merge-main" && projection.action !== "customer-publish") || projection.engine !== "healthy"
       || !projection.baseline || !projection.implementation || !(projection.scope || projection.writeSets?.length)) return;
     const durable = this.deps.durableWorkflow;
-    if (!durable || !this.deps.getRegisteredProjectLifecycle?.(projection.projectRoot)) return;
+    const registration = this.deps.getRegisteredProjectLifecycle?.(projection.projectRoot);
+    if (!durable || !registration) return;
+    const isRegistered = () => this.deps.getRegisteredProjectLifecycle?.(projection.projectRoot)?.selectionId === registration.selectionId;
     const store = await durable.store();
     const { ref, projectRoot, stepId, attempt, release } = projection;
     const definitionFile = projection.schema === 2 && projection.definitionSource === "project" ? projection.definitionFile : undefined;
@@ -155,12 +157,17 @@ export class FixedWorkflowRelease {
     let token: string | undefined;
     const merged = await mergeDurableMain({
       projectRoot, workflowId: ref.instanceId, flowId: projection.flowId ?? projection.scope?.dispatch?.flowId ?? ref.definitionId,
-      requestId: release.requestId, snapshot, definitionFile, confirmation: { by: "customer", decisionId: release.decision.id },
+      release, definitionFile,
       claim: async () => {
         const fresh = await this.durablePreview(projection);
         if (!fresh.ok) return fresh;
-        if (!this.sameDurableSnapshot(fresh.snapshot, snapshot)) {
+        if (!isRegistered() || !this.sameDurableSnapshot(fresh.snapshot, snapshot)) {
           return { ok: false, code: "release-preview-drift", message: "The approved release preview has changed." };
+        }
+        if (projection.evidenceAuditEnabled || projection.scope?.evidenceRequirements?.length) {
+          const verified = await store.verifyEvidenceAuditRelease(ref);
+          if (!verified.ok) return verified;
+          if (!isRegistered()) return { ok: false, code: "release-preview-drift", message: "The project selection changed during evidence verification." };
         }
         const claim = await store.claimEffect(ref, { ...address, key: effectKey, kind: "release-merge",
           requestId: release.requestId, snapshotDigest: release.digest,
@@ -207,6 +214,7 @@ export class FixedWorkflowRelease {
     for (const original of report.artifacts ?? []) {
       const current = await store.readEvidence(projectRoot, original.path);
       if (!current.ok) return current;
+      if (current.value.sha256 !== original.sha256) return { ok: false, code: "release-evidence-drift", message: "An accepted implementation artifact has changed." };
       operatorReportArtifacts.push(current.value);
     }
     let acceptanceArchive: DurableEvidenceRef | undefined;
@@ -241,9 +249,13 @@ export class FixedWorkflowRelease {
   private presentDurableCard(projection: DurableProjection, release: DurableReleaseRequest, diffStat: string): void {
     if (!this.deps.customerInput || this.durableCards.get(projection.projectRoot)?.requestId === release.requestId) return;
     const { projectRoot, ref, stepId, attempt } = projection;
+    const registration = this.deps.getRegisteredProjectLifecycle?.(projectRoot);
+    if (!registration) return;
     this.closeDurablePresentation(projectRoot);
     const controller = new AbortController();
     this.durableCards.set(projectRoot, { requestId: release.requestId, controller });
+    const selectedProject = () => this.deps.getRegisteredProjectLifecycle?.(projectRoot)?.selectionId === registration.selectionId;
+    const active = () => !controller.signal.aborted && selectedProject() && this.durableCards.get(projectRoot)?.controller === controller;
     const { snapshot } = release;
     const request = buildMergeMainCardRequest({
       workflowId: ref.instanceId, flowId: projection.flowId ?? projection.scope?.dispatch?.flowId ?? ref.definitionId, releaseId: release.releaseId,
@@ -251,16 +263,50 @@ export class FixedWorkflowRelease {
       nonMainBaseline: snapshot.baselineOid !== snapshot.mainOid, fileCount: snapshot.files.length,
       diffStat, mergeKind: "merge", highRiskNotes: ["仅本地合并。请核对正式报告中未在运行期验证的内容。"],
     });
+    request.question = "是否由应用将已验收的当前候选合并到本地 main？";
     const roleId = this.chiefTaskRoleIdOf(projectRoot) ?? "chief";
     const runtime = projection.metadata.runtime;
+    const durable = this.deps.durableWorkflow!;
+    const readCurrent = async () => {
+      if (!active()) return undefined;
+      const current = await durable.lookup(ref);
+      if (!active() || !current || current.status !== "waiting" || current.stepId !== stepId || current.attempt !== attempt
+        || current.release?.requestId !== release.requestId || current.release.digest !== release.digest
+        || current.release.generation !== release.generation || current.release.decision) return undefined;
+      const preview = await this.durablePreview(current);
+      return active() && preview.ok && this.sameDurableSnapshot(preview.snapshot, snapshot) ? current : undefined;
+    };
+    const execute = this.port.durableDecisionExecutor(projectRoot, runtime);
     const result = this.deps.customerInput(request, {
       projectRoot, roleId, ...(isRuntimeKind(runtime) ? { runtime } : {}), requestId: release.requestId, sessionSignal: controller.signal,
-      persistReleaseDecision: async action => {
-        const durable = this.deps.durableWorkflow!;
+      governanceModel: "trio",
+      durableDecision: { cardKind: "merge-main", generation: release.generation, host: execute && {
+        execute,
+        prepare: async () => {
+          const current = await readCurrent();
+          if (!current) throw new Error("The accepted release candidate, baseline, or evidence changed.");
+          const store = await durable.store();
+          const report = store.getEvidence(ref, snapshot.operatorReport) as { handback?: { summary?: string } } | undefined;
+          const archived = current.action === "customer-publish" ? store.listCapabilityEvents(ref).findLast(row => row.receipt.state === "consumed"
+            && row.event.input.kind === "archive-verified" && row.event.input.tipOid === snapshot.tipOid)?.event.input : undefined;
+          if (!active() || !report || current.action === "customer-publish" && archived?.kind !== "archive-verified") {
+            throw new Error("Accepted implementation or independent acceptance materials are unavailable.");
+          }
+          const artifacts = [snapshot.operatorReport, ...(snapshot.operatorReportArtifacts ?? []),
+            ...(archived?.kind === "archive-verified" ? [archived.criteria, archived.report, archived.archive] : [])];
+          return { baseDigest: release.digest, isCurrent: async () => !!await readCurrent(),
+            context: JSON.stringify({ projectRoot, stage: current.action, snapshot, diffStat,
+              acceptedReport: report.handback?.summary?.slice(0, 8_000), independentArchive: archived }),
+            evidenceRefs: artifacts.map(artifact => ({ ...artifact, snapshotId: release.digest })) };
+        },
+      } },
+      persistReleaseDecision: async (action, delegated, isMainFrameCurrent) => {
+        const hasAuthority = () => selectedProject() && (delegated ? delegated.isCurrent() : isMainFrameCurrent?.() === true);
+        if (!hasAuthority()) return { ok: false, message: "The release requires a decision in the current project window.", stale: true };
         const store = await durable.store();
         const current = await durable.lookup(ref);
         const decisionKey = `release-decision:${release.requestId}`;
-        if (!this.deps.getRegisteredProjectLifecycle?.(projectRoot) || current?.release?.requestId !== release.requestId) {
+        if (!hasAuthority() || current?.release?.requestId !== release.requestId) {
           return { ok: false, message: "The release card is no longer current.", stale: true };
         }
         if (current.release.decision) {
@@ -268,13 +314,12 @@ export class FixedWorkflowRelease {
             ? { ok: true, decisionId: current.release.decision.id }
             : { ok: false, message: "The opposite decision was already recorded." };
         }
-        if (controller.signal.aborted) return { ok: false, message: "The release card has closed.", stale: true };
-        const preview = await this.durablePreview(current);
-        if (!preview.ok || !this.sameDurableSnapshot(preview.snapshot, snapshot)) {
+        if (!await readCurrent()) {
           return { ok: false, message: "The release preview has changed. Wait for the updated card.", stale: true };
         }
-        const saved = await store.submit(ref, { stepId, attempt, kind: "release-decision", source: "customer",
-          key: decisionKey, requestId: release.requestId, digest: release.digest, generation: release.generation, action });
+        const saved = await store.decideRelease(ref, { stepId, attempt,
+          key: decisionKey, requestId: release.requestId, digest: release.digest, generation: release.generation, action,
+          provenance: durableDecisionProvenance(release.generation, delegated) }, () => active() && hasAuthority());
         if (!saved.ok || saved.value.state === "ignored") {
           return { ok: false, message: saved.ok ? "This release decision has expired." : saved.message,
             stale: saved.ok || saved.code === "release-decision-stale" };

@@ -97,7 +97,7 @@ test("project_state 精确透传 definitionId，拒绝非法标识", async () =>
   assert.deepEqual(queries, [valid]);
 });
 
-test("workflow-start 卡只供应用呈现，通用卡工具及独立决定上下文均拒绝", async () => {
+test("workflow-start 卡只供应用呈现，通用工具及旧决定上下文均拒绝", async () => {
   const appRequest: CustomerInputRequest = {
     kind: "choice", cardKind: "workflow-start", title: "确认启用",
     options: [{ id: "approve-workflow-start", label: "启用" }],

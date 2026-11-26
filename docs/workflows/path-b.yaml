@@ -1,6 +1,6 @@
 schema: 2
 id: path-b
-version: 2
+version: 3
 name: 路径 B
 start: qualify-change
 steps:
@@ -22,6 +22,7 @@ steps:
     next: implement
   implement:
     action: b3-implement-and-accept
+    role: module-owner
     next: release
   release:
     action: b4-customer-merge-main

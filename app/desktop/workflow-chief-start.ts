@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 import type { DurableRequestWorkflowStartFn, DurableResult, DurableStartProposal } from "../../src/model/durable-workflow.ts";
 import type { CustomerInputRequest } from "../../src/model/runtime.ts";
-import type { DesktopCustomerInputFn } from "./customer-input.ts";
+import { durableDecisionProvenance, type ChiefDecisionExecutor, type DesktopCustomerInputFn } from "./customer-input.ts";
 import { durableFailure, durableHash, type DesktopDurableWorkflow } from "./durable-workflow.ts";
 import { mainT } from "./i18n.ts";
 import { isRuntimeKind } from "./runtime-config.ts";
@@ -24,6 +24,7 @@ interface StartWindow {
 interface StartDependencies {
   durable: DesktopDurableWorkflow;
   customer?: DesktopCustomerInputFn;
+  executeDecision?(projectRoot: string, runtime: unknown): ChiefDecisionExecutor | undefined;
   selection(projectRoot: string): StartWindow | undefined;
   hasActiveTurn(projectRoot: string): boolean;
   hasPendingCard?(projectRoot: string): boolean;
@@ -197,18 +198,41 @@ export class WorkflowChiefStart {
         { id: WORKFLOW_START_OPTION_IDS[1], label: mainT("main.workflowStart.reject") }],
     };
     const runtime = isRuntimeKind(proposal.requirement.runtime) ? proposal.requirement.runtime : undefined;
+    const execute = this.dependencies.executeDecision?.(projectRoot, runtime);
+    const readCurrentProposal = async () => {
+      if (!isCurrent()) return undefined;
+      const store = await this.dependencies.durable.store();
+      const fresh = await store.refreshWorkflowStartProposal(projectRoot, proposal.activationId, isCurrent);
+      return fresh.ok && isCurrent() && fresh.value.state === "pending" && fresh.value.requestId === card.requestId
+        && fresh.value.decisionDigest === proposal.decisionDigest && fresh.value.generation === proposal.generation ? fresh.value : undefined;
+    };
     void Promise.resolve(customer(request, {
-      projectRoot, roleId: "chief", runtime, requestId: card.requestId, sessionSignal: controller.signal,
+      projectRoot, roleId: "chief", runtime, requestId: card.requestId, sessionSignal: controller.signal, governanceModel: "trio",
+      durableDecision: { cardKind: "workflow-start", generation: proposal.generation, host: execute && {
+        execute,
+        prepare: async () => {
+          const current = await readCurrentProposal();
+          if (!current?.decisionDigest || !current.definition.file || !current.definition.fileDigest) {
+            throw new Error("无法核验当前客户需求、启用提议或工作流定义。");
+          }
+          return {
+            baseDigest: current.decisionDigest, isCurrent: async () => !!await readCurrentProposal(),
+            context: JSON.stringify({ projectRoot, requirement: current.requirement.text, reason: current.reason, definition: current.definition }),
+            evidenceRefs: [{ snapshotId: current.decisionDigest, path: current.definition.file, sha256: current.definition.fileDigest }],
+          };
+        },
+      } },
       persistWorkflowDecision: async (answer, delegated, isMainFrameCurrent) => {
-        const mayDecide = () => isCurrent() && isMainFrameCurrent?.() === true;
-        if (!mayDecide() || delegated || answer.kind !== "choice" || answer.selected.length !== 1) {
+        const mayDecide = () => isCurrent() && (delegated ? delegated.isCurrent() : isMainFrameCurrent?.() === true);
+        if (!mayDecide() || answer.kind !== "choice" || answer.selected.length !== 1) {
           return { ok: false, message: mainT("main.workflowStart.approvalRequired"), stale: !mayDecide() };
         }
         const option = answer.selected[0];
         const action = option === WORKFLOW_START_OPTION_IDS[0] ? "approve" : option === WORKFLOW_START_OPTION_IDS[1] ? "reject" : undefined;
         if (!action) return { ok: false, message: mainT("main.workflowStart.approvalRequired") };
         const store = await this.dependencies.durable.store();
-        const saved = await store.decideWorkflowStart({ projectRoot, activationId: proposal.activationId, requestId: card.requestId, action }, mayDecide);
+        const saved = await store.decideWorkflowStart({ projectRoot, activationId: proposal.activationId, requestId: card.requestId, action,
+          provenance: durableDecisionProvenance(proposal.generation, delegated) }, mayDecide);
         if (!saved.ok) return { ok: false, message: saved.message };
         if (saved.value.state === "stale") return { ok: false, message: mainT("main.workflowStart.approvalRequired"), stale: true };
         card.replied = true;

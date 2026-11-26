@@ -39,7 +39,7 @@ import type { PlanEscalationFn, PlanEscalationInput, PlanEscalationResult } from
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn, WorkflowEvent, WorkflowArtifactRef, BasisEvent } from "../../../src/model/runtime.ts";
 import type { InstallSkillFn, InstallSkillPayload, InstallSkillReceipt, UninstallSkillFn, ReportHandbackMetadata } from "../../../src/model/runtime.ts";
 import type { InstallMcpFn, InstallMcpPayload, InstallMcpReceipt, UninstallMcpFn } from "../../../src/model/runtime.ts";
-import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn, ChiefDecisionBasis, ChiefDecisionHost } from "../customer-input.ts";
+import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn, ChiefDecisionBasis, ChiefDecisionExecutor, ChiefDecisionHost } from "../customer-input.ts";
 import type { ProjectListing } from "../../../src/service/role/resolve-role.ts";
 import { loadEffectiveConfig as defaultLoadEffectiveConfig, type ConfigSourceKind, type LoadConfigOptions, type LoadedConfig } from "../../../src/common/shared/config-loader.ts";
 import { RUNTIME_KINDS, type RuntimeKind } from "../../../src/common/shared/runtime-shared.ts";
@@ -73,6 +73,7 @@ import { FixedWorkflowRelease } from "./fixed-workflow/release-merge.ts";
 import { FixedWorkflowPanel } from "./fixed-workflow/panel.ts";
 import type { FixedDispatchPort, HandbackSink } from "./contracts/ports.ts";
 import { Lifecycle, type LifecyclePorts } from "./lifecycle/index.ts";
+import { durableChiefDecisionExecutor } from "../durable-workflow.ts";
 import type { LifecycleManagerPeer } from "./lifecycle/host.ts";
 
 /** 同时**保活**的会话数上限（B-2 路线 a 的 LRU 上限；设计建议 3）。超出即淘汰**最久未用**者（dispose；界面侧历史由渲染层自持——切回时恢复并明示「模型上下文已重启」）。淘汰候选不含 busy 会话（P1-2），也不含各项目的主理（`primaryRoleId`，2026-10-26 客户指令）。 */
@@ -334,8 +335,10 @@ export class SessionManager {
   // B6（2026-11-13）两阶段装配：fixed-workflow 模块（L5；白名单 card-gateway/evidence/run-change/git-ports） 与 dispatch 模块（L4；fixed 经 FixedDispatchPort 端口）。模块构造器零副作用（只存引用/箭头）； 端口只在运行期调用（两阶段装配）。构造顺序沿用 B3–B5 口径：全部下游模块实例先于本段就绪。
   this.fixedDispatchPort = { routeFixedPathDispatch: (projectRoot, runtime, fromRoleId, d, targetRoleId, task, source, dispatchFlowId) => this.routeFixedPathDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source, dispatchFlowId), dispatchAdvisorySummary: (advisories) => this.dispatchAdvisorySummary(advisories),
    }; const fixedWorkflowRefs: FixedWorkflowRefs = { sessions: this.sessions, activeDispatchKeys: this.activeDispatchKeys, starTaskIds: this.starTaskIds, lastGovernanceRuntime: this.lastGovernanceRuntime, lastRoleActivity: this.lastRoleActivity, runChange: this.runChange, evidence: this.evidence, cardGateway: this.cardGateway,
-   }; const fixedWorkflowPorts: FixedWorkflowPorts = { openInternal: (req, userInitiated) => this.openInternal(req, userInitiated), findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId), drainAllQueuesFor: (projectRoot) => this.drainAllQueuesFor(projectRoot), enqueueDelivery: (projectRoot,
-   targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), appDispatchClientMessageId: (dedupKey) => this.appDispatchClientMessageId(dedupKey), }; this.fixedWorkflowRoute = new FixedWorkflowRoute(fixedWorkflowRefs,
+   }; const fixedWorkflowPorts: FixedWorkflowPorts = { openInternal: (req, userInitiated) => this.openInternal(req, userInitiated),
+   durableDecisionExecutor: (projectRoot, runtime) => this.durableDecisionExecutor(projectRoot, runtime),
+   findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId), drainAllQueuesFor: (projectRoot) => this.drainAllQueuesFor(projectRoot), enqueueDelivery: (projectRoot,
+   targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item), drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime), pendingAppTaskDelivery: (projectRoot, targetRoleId, runtime, clientMessageId) => this.pendingAppTaskDelivery(projectRoot, targetRoleId, runtime, clientMessageId), appDispatchClientMessageId: (dedupKey) => this.appDispatchClientMessageId(dedupKey), }; this.fixedWorkflowRoute = new FixedWorkflowRoute(fixedWorkflowRefs,
    fixedWorkflowPorts, deps); this.fixedWorkflowRelease = new FixedWorkflowRelease(fixedWorkflowRefs, fixedWorkflowPorts, deps); this.fixedWorkflowCards = new FixedWorkflowCards(fixedWorkflowRefs, fixedWorkflowPorts, this.fixedWorkflowRelease, deps); this.fixedWorkflowPanel = new FixedWorkflowPanel();
    this.dispatch = new Dispatch( { sessions: this.sessions, activeDispatchKeys: this.activeDispatchKeys, starTaskIds: this.starTaskIds, deliveredAppTaskIds: this.deliveredAppTaskIds, deliveredDeliveryKeys: this.deliveredDeliveryKeys, deliveryQueues: () => this.deliveryQueues, activeDeliveries: () => this.activeDeliveries,
    lastRoleActivity: this.lastRoleActivity, }, { openInternal: (req, userInitiated) => this.openInternal(req, userInitiated), findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId), enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId,
@@ -352,6 +355,10 @@ export class SessionManager {
     });
   }
   hasActiveRoleTurn(projectRoot: string): boolean { return this.fixedWorkflowRoute.hasActiveRoleTurn(projectRoot); }
+
+  durableDecisionExecutor(projectRoot: string, runtime: unknown): ChiefDecisionExecutor | undefined {
+    return durableChiefDecisionExecutor(this.deps, this.lifecycle, projectRoot, runtime);
+  }
 
   /** 时钟（薄委托 → `shared/clock.ts`；注入以便单测；缺省 Date.now——与会话时间戳、投递入队时间同源）。 */
   private now(): number { return now(this.deps); }
@@ -753,7 +760,7 @@ export class SessionManager {
   /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   lastTurnOf(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined { return this.diagnostics.lastTurnOf(projectRoot, roleId, runtime); }
   /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
-  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string; uiOnlyWhenBusy?: boolean }): void { this.diagnostics.watchdogDeliver(projectRoot, message); }
+  watchdogDeliver(projectRoot: string, message: Parameters<Diagnostics["watchdogDeliver"]>[1]): ReturnType<Diagnostics["watchdogDeliver"]> { return this.diagnostics.watchdogDeliver(projectRoot, message); }
   /** **`rebuild-session` 恢复动作**（W4，2026-10-16 客户批准；设计 §6.3）——新公共入口： dispose＋重开（保留 ANS 回放；F-5-opt1 注记适用）；**在跑轮次不打断**（busy ⇒ 拒绝并如实回执）。 与陈旧重建（O-1）同链串行（`rebuildChains` 按会话键——同一角色至多一个重建在跑）。 */
   async rebuildSession(target: string | SessionTarget, beforeDispose?: (entry: LiveSession) => Promise<boolean>): Promise<RebuildSessionResult> { return this.lifecycle.rebuildSession(target, beforeDispose); }
   /** `rebuildSession` 的链内实现（同 `rebuildIfBoundaryStaleUnsafe` 同款步骤，**去掉陈旧判据**——手动触发）。 */

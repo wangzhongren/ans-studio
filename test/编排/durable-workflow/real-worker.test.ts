@@ -42,8 +42,9 @@ test('actual Dapr continues a pinned instance and overdue timer after control pl
       await attach();
       const ref = unwrap(await workflow.start({ projectRoot: project, definitionId: 'read-only-example', requestId: 'real-1' })).ref;
       const graphRef = unwrap(await workflow.start({ projectRoot: project, definitionId: 'path-a',
-        requestId: 'real-graph-2', source: 'preset' })).ref;
-      await until(() => workflow.lookup(graphRef)?.engine === 'healthy', 'second executor registered alongside legacy history');
+        requestId: 'real-graph-2', source: 'preset', metadata: { summary: 'Build a racing game.', runtime: 'claude' } })).ref;
+      await until(() => workflow.lookup(graphRef)?.pendingTasks?.length === 1, 'direct A1 task registered alongside legacy history');
+      const intake = workflow.lookup(graphRef)!.pendingTasks![0]!;
       const request = { kind: 'stage-request' as const, source: 'chief' as const, key: 'stage-b1', stepId: 'inspect', attempt: 1,
         sourceTaskId: 'customer', requestDigest: hash('inspect'), dispatch: { text: 'inspect' } };
       unwrap(await workflow.submit(ref, request));
@@ -77,7 +78,22 @@ test('actual Dapr continues a pinned instance and overdue timer after control pl
       assert.equal(workflow.lookup(ref)?.ref.definitionVersion, 1);
       await until(() => workflow.lookup(graphRef)?.engine === 'healthy', 'same graph executor resumes');
       assert.equal(workflow.lookup(graphRef)?.ref.activityContract, 2);
-      assert.equal(workflow.lookup(graphRef)?.action, 'product-prepare');
+      assert.equal(workflow.lookup(graphRef)?.action, 'product-prepare-direct');
+      assert.deepEqual(workflow.lookup(graphRef)?.pendingTasks, [intake]);
+      const sendKey = 'model:' + intake.taskId;
+      const address = { stepId: intake.stepId, attempt: intake.attempt };
+      const send = unwrap(workflow.claimEffect(graphRef, { ...address, key: sendKey, kind: 'model-send', task: intake.task,
+        expected: { roleId: 'product', runtime: 'claude', inputDigest: hash(intake.dispatch.text), clientMessageId: 'intake' } }));
+      unwrap(workflow.settleEffect(graphRef, { key: sendKey, token: send.token, outcome: 'succeeded',
+        evidence: 'test fixture model turn', result: { turnId: 'product-turn' } }));
+      assert.equal(workflow.lookup(graphRef)?.stepId, intake.stepId);
+      const intakeEvidence = unwrap(workflow.storeEvidence(graphRef, { report: { version: 1, reportId: 'intake-ready',
+        taskId: intake.taskId, origin: 'submitted-report', status: 'completed', summary: { text: 'Ready' },
+        source: { roleId: 'product', runtime: 'claude', turnId: 'product-turn' } } }));
+      unwrap(await workflow.submitCapability(graphRef, { ...address, key: 'report:intake-ready', flowId: intake.flowId,
+        source: { roleId: 'product', originId: 'product-turn', parentTaskId: intake.taskId },
+        input: { kind: 'task-report', task: intake.task, evidence: intakeEvidence } }));
+      await until(() => workflow.lookup(graphRef)?.stepId === 'write-intent', 'reported direct intake advances once after restart');
       assert.equal(unwrap(await workflow.validateDefinition(project, 'read-only-example')).version, 2);
       const task = { stage: 'readonly' as const, stageAttempt: 1, executionAttempt: 1, parentTaskId: 'parent', taskId: 'owner-1', roleId: 'owner' };
       const evidence = unwrap(workflow.storeEvidence(ref, { report: 'verified' }));

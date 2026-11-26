@@ -47,7 +47,7 @@ import {
   type ShellJudgeAuditWithManual,
   type ShellJudgeResultPayload,
 } from "../../app/desktop/operator-channel.ts";
-import type { ShellJudgeFn, ShellJudgeOutcome, ShellJudgeRequest } from "../../src/model/runtime.ts";
+import type { AcceptanceEnvironmentReviewScope, AcceptanceWorkspaceReviewScope, ShellJudgeFn, ShellJudgeOutcome, ShellJudgeRequest } from "../../src/model/runtime.ts";
 // G-2/W5（2026-10-16 客户批准）：恢复确认卡呈现端（与 shell 卡共享 `confirm-card.ts` 通用件——本组钉住
 // **恰 allow:true 才为真、等待不设限（裁定 4）、关窗/中止=未获执行** 的卡侧语义；执行桥在 dispatch-delivery 组）。
 import { createRecoveryConfirmPresenter } from "../../app/desktop/recovery-channel.ts";
@@ -1323,6 +1323,74 @@ function judgeStub(outcome: ShellJudgeOutcome, seen?: ShellJudgeRequest[]): Shel
     return outcome;
   };
 }
+
+test("isolated npm scope reaches the existing presenter and judge without changing a refusal", async () => {
+  const stagingDirectory = "D:/proj/.ans/acceptance-npm-Abc123";
+  const acceptanceEnvironmentScope: AcceptanceEnvironmentReviewScope = {
+    kind: "application-isolated-npm-restore", projectRoot: "D:/proj", stagingDirectory, stagingIdentity: { dev: "123", ino: "456" },
+    publishDirectory: "D:/proj/node_modules", instanceId: "workflow", flowId: "flow", stepId: "environment", attempt: 1,
+    taskId: "task", roleId: "maintainer", turnId: "turn", toolCallId: "call-1", effectKey: "install",
+    candidateOid: "a".repeat(40), criteriaSha256: "b".repeat(64), manifestSha256: "c".repeat(64), lockSha256: "d".repeat(64),
+  };
+  const raw = `npm ci --ignore-scripts --prefix=${stagingDirectory}`;
+  const ordinary = req(raw, ["npm", "ci", "--ignore-scripts", `--prefix=${stagingDirectory}`], stagingDirectory, "Review");
+  const prompt = { ...ordinary, acceptanceEnvironmentScope };
+  const display = describeShellCommand(prompt);
+  const card = buildShellConfirmRequest("scope", display);
+  assert.equal(card.command, raw);
+  assert.equal(card.reasonRaw, "Review");
+  assert.equal(card.cwd, stagingDirectory);
+  assert.deepEqual(card.acceptanceEnvironmentScope, acceptanceEnvironmentScope);
+  assert.ok(card.reasonPlain.includes(stagingDirectory) && card.reasonPlain.includes(acceptanceEnvironmentScope.publishDirectory));
+  assert.ok(card.reasonPlain.includes("123/456") && card.reasonPlain.includes("npm ci"));
+  assert.ok(display.text.includes(acceptanceEnvironmentScope.publishDirectory));
+  assert.equal(buildShellConfirmRequest("ordinary", describeShellCommand(ordinary)).acceptanceEnvironmentScope, undefined);
+
+  const manual = createDesktopOperatorChannel({ operatorId: "human", presenter: {
+    async present(_prompt, shown) {
+      assert.deepEqual(shown.acceptanceEnvironmentScope, acceptanceEnvironmentScope);
+      return { allow: false, note: "Explicit refusal" };
+    },
+  } });
+  assert.deepEqual(await manual(prompt), { outcome: "deny", operatorId: "human", reason: "Explicit refusal" });
+  const observed: ShellJudgeRequest[] = [];
+  const automated = createDesktopOperatorChannel({ operatorId: "automation", judge: { isEnabled: () => true },
+    presenter: { async present() { assert.fail("a refusal must not open an alternate approval path"); } } });
+  const judge = judgeStub({ verdict: "deny", reason: "Explicit refusal", reasonCode: "no-alternative" }, observed);
+  assert.equal((await automated(prompt, judgeMetadata({ judge }))).outcome, "deny");
+  assert.equal((await automated(ordinary, judgeMetadata({ judge }))).outcome, "deny");
+  assert.equal(observed[0]?.command, raw);
+  assert.deepEqual(observed[0]?.argv, ordinary.argv);
+  assert.deepEqual(observed[0]?.acceptanceEnvironmentScope, acceptanceEnvironmentScope);
+  assert.equal(observed[1]?.acceptanceEnvironmentScope, undefined);
+});
+
+test("a frozen acceptance workspace scope cannot request desktop preview approval", async () => {
+  const projectRoot = "D:/proj";
+  const workspaceDirectory = projectRoot + "/.ans/acceptance-runs/task";
+  const acceptanceWorkspaceScope: AcceptanceWorkspaceReviewScope = {
+    kind: "application-isolated-acceptance-workspace", operation: "static", projectRoot, workspaceDirectory,
+    workspaceIdentity: { dev: "123", ino: "456" }, inputDirectory: workspaceDirectory + "/input",
+    outputDirectory: workspaceDirectory + "/output", evidenceDirectory: workspaceDirectory + "/evidence",
+    launcherPath: workspaceDirectory + "/build.mjs", launcherSha256: "d".repeat(64),
+    instanceId: "workflow", flowId: "flow", stepId: "assessment", attempt: 1, taskId: "task",
+    roleId: "verifier", turnId: "turn", toolCallId: "tool", effectKey: "effect", candidateOid: "a".repeat(40),
+    criteriaSha256: "b".repeat(64), previewLoopback: true, previewTtlMs: 600_000,
+  };
+  const argv = ["node", acceptanceWorkspaceScope.launcherPath];
+  const raw = argv.join(" ");
+  const prompt = { ...req(raw, argv, acceptanceWorkspaceScope.inputDirectory, "Review"), acceptanceWorkspaceScope };
+  const channel = createDesktopOperatorChannel({ operatorId: "human", presenter: {
+    async present() { assert.fail("retired approval must never open a shell card"); },
+  } });
+  assert.equal((await channel(prompt)).outcome, "unavailable");
+  const automated = createDesktopOperatorChannel({ operatorId: "automation", judge: { isEnabled: () => true },
+    presenter: { async present() { assert.fail("retired approval must not fall back to a shell card"); } } });
+  const observed: ShellJudgeRequest[] = [];
+  const judge = judgeStub({ verdict: "allow", reason: "Must not be reached", reasonCode: "allow" }, observed);
+  assert.equal((await automated(prompt, judgeMetadata({ judge }))).outcome, "unavailable");
+  assert.deepEqual(observed, []);
+});
 
 test("替我审·开关关：不调 judge，presenter 原路径逐字不变（默认手动）", async () => {
   let judgeCalls = 0;

@@ -12,8 +12,11 @@ import { createGitRoleRuntime, createDirectRoleRuntime, recordTaskObservation, p
 import type { OrchestrationEvent, HandbackEvent } from "../../../../src/common/编排/handback.ts";
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../../../src/common/shared/diagnostics.ts";
 import { mainT } from "../../i18n.ts";
-import { durableHash } from "../../durable-workflow.ts";
-import { DURABLE_GRAPH_EXECUTOR } from "../../../../src/model/durable-workflow.ts";
+import { durableHash, recordWorkflowNotice } from "../../durable-workflow.ts";
+import { a11ResumeKey, a11RetestReviewWakeKey } from "../../durable-workflow-a.ts";
+import { preflightDesktopA11RetestDelivery } from "../../durable-blocked-routing.ts";
+import { desktopQueuedAcceptanceIsCurrent } from "../../durable-acceptance-workspace.ts";
+import { DURABLE_EVIDENCE_AUDIT_EXECUTOR, DURABLE_GRAPH_EXECUTOR } from "../../../../src/model/durable-workflow.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult, WorkflowDocumentRef, WorkflowStage } from "../../../../src/model/runtime.ts";
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn, WorkflowEvent, WorkflowArtifactRef, BasisEvent } from "../../../../src/model/runtime.ts";
 import type {
@@ -31,6 +34,8 @@ import {
   isAssistantTextEvent, shouldSuppressStarTaskReport,
 } from "../shared/text.ts";
 import { sessionKey, targetKey, queueKey, type TargetKeyState } from "../shared/keys.ts";
+import { emitDeliveryNote } from "../shared/notifier.ts";
+import { chiefTaskRoleIdOf } from "../shared/roles.ts";
 import { now } from "../shared/clock.ts";
 import {
   taskCreators, rememberTaskCreator, readTasks, isFixedTask, appendTaskStateResult, appendTaskState,
@@ -337,10 +342,36 @@ export class LifecycleSend {
         throw new Error("workflow-owner-conflict: This turn is outside the active durable workflow.");
       }
       const store = await durable.store();
+      const view = store.lookup(sent.ref);
+      const disposition = view?.a11Disposition;
+      const retest = disposition?.retest && sent.intent.task?.taskId === disposition.childTask.taskId ? disposition : undefined;
+      const review = disposition?.retest && sent.intent.task?.taskId === disposition.parentTask.taskId
+        && sent.intent.key.startsWith(`model:a11-wake:${disposition.childTask.taskId}:`);
+      const selected = () => !!sent.selectionId && sent.selectionId === this.deps.getRegisteredProjectLifecycle?.(entry.projectRoot)?.selectionId;
+      const reviewCurrent = () => !review || selected() && sent.intent.key === `model:${a11RetestReviewWakeKey(store.lookup(sent.ref))}`;
+      const retestCurrent = () => {
+        const view = store.lookup(sent.ref);
+        return !!retest && view?.status === "waiting" && view.engine === "healthy" && view.stepId === sent.intent.stepId
+          && view.attempt === sent.intent.attempt && view.a11Disposition?.key === retest.key && view.a11Disposition.state === "resumed"
+          && view.a11Disposition.generation === retest.generation && sent.intent.key === `model:${a11ResumeKey(retest.key)}`
+          && selected();
+      };
+      if (retest && !retestCurrent() || !reviewCurrent()) throw new Error("workflow-a11-retest-delivery-retired: 原 A11 补测投递已失效。");
+      if (retest && view) {
+        const blocker = await preflightDesktopA11RetestDelivery(store, view, retest);
+        if (!current() || !retestCurrent()) throw new Error("workflow-a11-retest-delivery-retired: 原 A11 补测投递已失效。");
+        if (blocker) {
+          const failed = await store.failA11Retest(sent.ref, retest.key, blocker, retestCurrent);
+          if (failed.ok) durable.activate();
+          throw new Error(`workflow-a11-retest-delivery-unavailable: ${blocker}`);
+        }
+      }
       const claim = await store.claimEffect(sent.ref, sent.intent);
       if (!claim.ok) {
-        if (sent.ref.executor === DURABLE_GRAPH_EXECUTOR && claim.code === "effect-attempt-retired") {
-          origin.assignmentRejectionCode = claim.code;
+        if ((sent.ref.executor === DURABLE_GRAPH_EXECUTOR || sent.ref.executor === DURABLE_EVIDENCE_AUDIT_EXECUTOR) && (claim.code === "effect-attempt-retired"
+          || sent.intent.task?.stage === "A12b" && ["acceptance-preparation-dispatch-held", "acceptance-preparation-generation-stale", "evidence-audit-dispatch-held", "evidence-audit-generation-stale", "evidence-audit-execution-retired", "evidence-audit-legacy-blocked"].includes(claim.code))) {
+          origin.assignmentRejectionCode = "effect-attempt-retired";
+          if (claim.code !== "effect-attempt-retired") durable.activate();
           createDiagnosticLogger({ component: "desktop.delivery", projectRoot: entry.projectRoot, roleId: entry.roleId })
             .record("delivery.durable.retired", { requestId: sent.intent.key, reasonCode: claim.code });
         }
@@ -351,30 +382,72 @@ export class LifecycleSend {
         throw new Error("workflow-send-uncertain: An earlier execution must be reconciled.");
       }
       const { key: effectKey, token } = claim.value;
-      if (!current()) {
+      const task = sent.intent.task;
+      if (task?.stage === "A12b" && (!selected()
+        || !await desktopQueuedAcceptanceIsCurrent(durable, entry.projectRoot, origin.clientMessageId).catch(() => false)
+        || !selected())) {
+        origin.assignmentRejectionCode = "effect-attempt-retired";
+        await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "not-started", evidence: "A12b evidence or frozen receipt changed before the actual model send" });
+        durable.activate();
+        throw new Error("evidence-audit-generation-stale: 当前 A12b 证据或冻结回执已发生变化。");
+      }
+      if (!current() || retest && !retestCurrent() || !reviewCurrent()) {
         await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "not-started", evidence: "session changes before model send" });
         throw new Error("workflow-send-session-changed: The intended session is no longer current.");
       }
-      const graph = sent.ref.executor === DURABLE_GRAPH_EXECUTOR;
+      const graph = sent.ref.executor === DURABLE_GRAPH_EXECUTOR || sent.ref.executor === DURABLE_EVIDENCE_AUDIT_EXECUTOR;
+      const stage = sent.intent.task?.stage;
+      const directProduct = graph && (stage === "A1" || stage === "A2")
+        && sent.intent.task?.roleId === "product" && sent.intent.task.parentTaskId === sent.ref.instanceId;
       const writeAcknowledgement = (turnId: string) => store.settleEffect(sent.ref, { key: effectKey, token,
-        outcome: "succeeded", evidence: "The runtime acknowledged the exact delivered model turn.", result: { turnId } });
+        outcome: "succeeded", evidence: directProduct
+          ? "The exact runtime turn completed delivery." : "The runtime acknowledged the exact delivered model turn.",
+        result: { turnId } });
       if (graph) {
         const started = promptOptions.onTurnStarted;
         promptOptions = { ...promptOptions, onTurnStarted: metadata => {
           started?.(metadata);
-          if (origin.turnId === metadata.turnId && metadata.turnId) writeAcknowledgement(metadata.turnId);
+          if (origin.turnId !== metadata.turnId || !metadata.turnId) return;
+          if (directProduct) {
+            store.settleEffect(sent.ref, { key: effectKey, token, outcome: "unknown",
+              evidence: "The exact product turn opened. Delivery and the product report are still unverified.",
+              result: { turnId: metadata.turnId } });
+          } else {
+            writeAcknowledgement(metadata.turnId);
+          }
         } };
       }
       try {
         await entry.handle.send(text, promptOptions);
       } catch (error) {
-        if (graph && origin.turnId) writeAcknowledgement(origin.turnId);
-        else await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "unknown",
-          evidence: "model send failed after the host entered the effect boundary",
-          ...(origin.turnId ? { result: { turnId: origin.turnId } } : {}) });
+        if (graph && !directProduct && origin.turnId) writeAcknowledgement(origin.turnId);
+        else {
+          const settled = await store.settleEffect(sent.ref, { key: effectKey, token, outcome: "unknown",
+            evidence: "model send failed after the host entered the effect boundary",
+            ...(origin.turnId ? { result: { turnId: origin.turnId } } : {}) });
+          if (settled.ok && retest) {
+            const failed = await store.failA11Retest(sent.ref, retest.key, "补测送达已进入实际执行边界，无法核对原回合。", retestCurrent);
+            if (failed.ok) durable.activate();
+          } else if (settled.ok && (directProduct && stage === "A2" || sent.workflowOwnedDispatch)) {
+            const chief = chiefTaskRoleIdOf(entry.projectRoot, this.deps);
+            const taskId = sent.intent.task?.taskId;
+            const summary = `${stage ?? sent.intent.stepId} 工作流投递结果待核对（${sent.ref.instanceId}${taskId ? `，任务 #${taskId}` : ""}）。发送已进入运行时边界，请幕僚核对原回执。`;
+            store.block(sent.ref, directProduct ? "product-dispatch-uncertain" : "workflow-dispatch-uncertain", summary);
+            if (chief && await recordWorkflowNotice(entry.projectRoot, chief, {
+              ref: `${directProduct ? "product-send-uncertain" : "workflow-send-uncertain"}:${taskId ?? sent.intent.key}`, summary, taskId,
+            }) === "recorded") emitDeliveryNote(entry.projectRoot, entry.runtime, chief, chief, summary, this.deps);
+          }
+        }
         throw error;
       }
       const turnId = origin.turnId;
+      const recovered = directProduct && turnId && store.listEffects(sent.ref, "model-send").some(effect =>
+        effect.intent.key === effectKey && effect.token === token && effect.state === "succeeded"
+        && effect.result?.result?.turnId === turnId);
+      if (recovered) {
+        acceptAssignment();
+        return;
+      }
       const receipt = graph && turnId ? writeAcknowledgement(turnId) : await store.settleEffect(sent.ref, {
         key: effectKey, token, outcome: turnId ? "succeeded" : "unknown",
         evidence: turnId ? "runtime acknowledged the model turn and send returned" : "missing runtime turn receipt",

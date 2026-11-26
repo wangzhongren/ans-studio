@@ -4,14 +4,16 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
+import { fileURLToPath } from "node:url";
 import { buildMergeMainCardRequest, createCustomerInputChannel, MERGE_MAIN_OPTION_IDS } from "../../app/desktop/customer-input.ts";
 import { DesktopDurableWorkflow } from "../../app/desktop/durable-workflow.ts";
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { FixedWorkflowRelease } from "../../app/desktop/session/fixed-workflow/release-merge.ts";
 import { createDesktopTaskGitShellPort, mergeDurableMain, previewDurableMerge, verifyDurableMerge, verifyDurableTaskCommit } from "../../app/desktop/workflow-git.ts";
-import { DURABLE_ACTIVITY_CONTRACT, DURABLE_EXECUTOR, type DurableEffectOutcome, type DurableEffectRecord,
+import { DURABLE_ACTIVITY_CONTRACT, DURABLE_EXECUTOR, DURABLE_EVIDENCE_AUDIT_EXECUTOR, DURABLE_EVIDENCE_AUDIT_ACTIVITY_CONTRACT,
+  DURABLE_GRAPH_EXECUTOR, DURABLE_GRAPH_ACTIVITY_CONTRACT, type DurableDefinitionSnapshot, type DurableEffectOutcome, type DurableEffectRecord,
   type DurableFact, type DurableProjection, type DurableReleaseSnapshot, type DurableResult } from "../../src/model/durable-workflow.ts";
-import { DurableLedger, repositoryIdentity } from "../../src/provider/durable-workflow/public.ts";
+import { DurableLedger, repositoryIdentity, workspaceIdentity } from "../../src/provider/durable-workflow/public.ts";
 
 function git(root: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -133,17 +135,23 @@ test("the actual Git commit and merge use their effect claim and can be verified
   const { mainOid, tipOid, diffDigest, files } = preview.value;
   const snapshot: DurableReleaseSnapshot = { mainOid, tipOid, diffDigest, files, branch, baselineOid,
     b3CloseKey: "close-key", operatorReport: { path: "ans-evidence/accepted", sha256: "b".repeat(64) } };
-  const release = { projectRoot: root, workflowId: "dw-test", flowId: "test", requestId: "decision-one", snapshot,
-    confirmation: { by: "customer" as const, decisionId: "decision-one" } };
+  const release = { projectRoot: root, workflowId: "dw-test", flowId: "test", requestId: "decision-one", snapshot };
+  const binding = { requestId: release.requestId, digest: diffDigest, generation: 1 };
+  const request = { ...binding, logicalKey: "release", releaseId: "rel", snapshot,
+    decision: { id: release.requestId, action: "approve" as const, at: new Date().toISOString(), source: "delegated-chief" as const,
+      provenance: { ...binding, source: "delegated-chief" as const, delegationRevision: 3, reason: "Verified candidate" } } };
   let entered = 0;
-  const refused = await mergeDurableMain({ ...release, claim: async () => {
+  const wrong = { ...request, decision: { ...request.decision, provenance: { ...request.decision.provenance, requestId: "another-card" } } };
+  const invalid = await mergeDurableMain({ ...release, release: wrong, claim: async () => assert.fail("Invalid approval must not reach Git") });
+  assert.equal(invalid.ok, false);
+  const refused = await mergeDurableMain({ ...release, release: request, claim: async () => {
     entered++;
     return { ok: false, code: "stale-test-approval", message: "Approval replaced." };
   } });
   assert.equal(refused.ok, false);
   assert.equal(git(root, "rev-parse", "main"), mainOid);
   assert.equal(git(root, "branch", "--show-current"), branch);
-  const merged = await mergeDurableMain({ ...release, claim: async () => { entered++; return { ok: true }; } });
+  const merged = await mergeDurableMain({ ...release, release: request, claim: async () => { entered++; return { ok: true }; } });
   assert.ok(merged.ok);
   assert.equal(entered, 2);
   const actual = await verifyDurableMerge({ ...release, writePaths: files });
@@ -157,8 +165,6 @@ test("the actual Git commit and merge use their effect claim and can be verified
     const ref = { projectId: "fixture", instanceId: release.workflowId, definitionId: "path-b", definitionVersion: 1,
       definitionDigest: diffDigest, executor: DURABLE_EXECUTOR, activityContract: DURABLE_ACTIVITY_CONTRACT };
     const address = { stepId: "release", attempt: 1 };
-    const request = { logicalKey: "release", releaseId: "rel", requestId: release.requestId, digest: diffDigest, generation: 1,
-      snapshot, decision: { id: release.requestId, action: "approve" as const, at: new Date().toISOString(), source: "customer" as const } };
     const projection: DurableProjection = {
       ...address, ref, projectRoot: root, stepName: "Release", definitionName: "Path B", status: "waiting",
       action: "b4-customer-merge-main", engine: "healthy", pendingFacts: 0, metadata: {}, release: request,
@@ -225,6 +231,71 @@ function refused(result: DurableResult<unknown>, code: string): void {
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.code, code);
 }
+
+test("project-state resolves only the sole active frozen declaration in the actual project and flow", async t => {
+  const temporary = path.resolve(os.tmpdir());
+  const fixture = await fs.mkdtemp(path.join(temporary, "ans-roster-context-"));
+  const root = path.join(fixture, "current");
+  const other = path.join(fixture, "other");
+  await Promise.all([fs.mkdir(root), fs.mkdir(other)]);
+  const userDataRoot = path.join(fixture, "user-data");
+  const app = new DesktopDurableWorkflow({ userDataRoot, resourceRoot: root,
+    presetRoot: fileURLToPath(new URL("../../", import.meta.url)) });
+  t.after(async () => {
+    await app.close();
+    assert.equal(path.dirname(fixture), temporary);
+    await fs.rm(fixture, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  });
+  const [workspace, neighbour] = await Promise.all([workspaceIdentity(root), workspaceIdentity(other)]);
+  assert.equal(await app.evidenceCollectorRoleForProject(root)("racing"), undefined);
+  assert.equal(await app.hasStoredBusiness(), false);
+  const store = await app.store();
+  const declared = accepted(await store.validateDefinition(root, "path-a", { source: "preset" }));
+  const undeclared = accepted(await store.validateDefinition(root, "path-b", { source: "preset" }));
+  assert.ok(declared.schema === 2 && declared.evidenceAudit?.collectorRoleId);
+  const role = declared.evidenceAudit.collectorRoleId;
+  const ledger = new DurableLedger(path.join(userDataRoot, "business"));
+  try {
+    // Persist isolated state fixtures to exercise the desktop lookup only. This test does not run workflow approval.
+    const save = (name: string, definition: DurableDefinitionSnapshot, flowId: string | undefined,
+      project = workspace, status: DurableProjection["status"] = "waiting", projectRoot = project.root, engine: DurableProjection["engine"] = "healthy", workflowOwned = true) => {
+      const evidence = definition.schema === 2 && !!definition.evidenceAudit;
+      ledger.save({ ref: { projectId: project.projectId, instanceId: `dw-${name}`, definitionId: definition.id, definitionVersion: definition.version,
+        definitionDigest: definition.digest, executor: evidence ? DURABLE_EVIDENCE_AUDIT_EXECUTOR : DURABLE_GRAPH_EXECUTOR,
+        activityContract: evidence ? DURABLE_EVIDENCE_AUDIT_ACTIVITY_CONTRACT : DURABLE_GRAPH_ACTIVITY_CONTRACT },
+      definition, definitionSource: "preset", projectRoot, commonDir: project.repository?.commonDir ?? "",
+      requestId: name, metadata: workflowOwned ? { workflowOwnedDispatch: "true" } : {}, stepId: definition.start, entry: 1, attempt: 1, status, engine,
+      scheduled: true, scheduling: false, visits: {}, graph: { flowId, tasks: [], proofs: {} } });
+    };
+    save("racing-current", declared, "racing");
+    save("racing-history", declared, "racing", workspace, "blocked");
+    for (const engine of ["pending", "offline", "incompatible", "history-missing"] as const) {
+      save(engine, declared, engine, workspace, "waiting", workspace.root, engine);
+    }
+    save("old-current", undeclared, "old");
+    save("unbound-current", declared, undefined);
+    save("unactivated", declared, "unactivated", workspace, "waiting", workspace.root, "healthy", false);
+    save("different-project", declared, "only-there", neighbour);
+    save("legacy-alias-shape", declared, "wrong-root", workspace, "waiting", neighbour.root);
+
+    const proposedDefinition = path.join(root, "docs", "workflows", "path-a.yaml");
+    await fs.mkdir(path.dirname(proposedDefinition), { recursive: true });
+    const preset = await fs.readFile(new URL("../../docs/workflows/path-a.yaml", import.meta.url), "utf8");
+    await fs.writeFile(proposedDefinition, preset.replace(`collectorRoleId: ${role}`, "collectorRoleId: unapproved-draft-collector"));
+    const resolve = app.evidenceCollectorRoleForProject(root);
+    assert.equal(await resolve("racing"), role);
+    assert.equal(await resolve("pending"), role);
+    assert.equal(await resolve("offline"), role);
+    for (const flow of ["old", "racing-other", "", "only-there", "wrong-root", "incompatible", "history-missing", "unactivated"]) assert.equal(await resolve(flow), undefined, flow);
+    assert.equal(await app.evidenceCollectorRoleForProject(other)("racing"), undefined);
+    assert.equal(await app.evidenceCollectorRoleForProject(other)("only-there"), role);
+
+    save("racing-conflict", undeclared, "racing");
+    assert.equal(await app.evidenceCollectorRoleForProject(root)("racing"), undefined);
+  } finally {
+    ledger.close();
+  }
+});
 
 test("a saved delivery is scoped to its selected project and the first open receipt survives reopening", async t => {
   let closeWindow: (() => Promise<void>) | undefined;

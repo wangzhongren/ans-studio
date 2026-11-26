@@ -24,6 +24,7 @@ import {
   scanRunManifestsForState,
 } from "../../src/common/编排/project-state.ts";
 import { writeRunManifest, type RunManifest } from "../../src/common/编排/run-manifest.ts";
+import { PROJECT_MODULES_SCHEMA_EXAMPLE, PROJECT_ROSTER_SCHEMA_EXAMPLE } from "../../src/common/编排/workflow-preconditions.ts";
 import type { ProjectStateTask } from "../../src/model/project-state.ts";
 
 type TaskMirror = TaskCardView & {
@@ -116,6 +117,68 @@ async function addTask(root: string, input: TaskInput): Promise<void> {
 async function hashFile(file: string): Promise<string> {
   return createHash("sha256").update(await fs.readFile(file)).digest("hex");
 }
+
+test("evidence roster reference checks use the exact frozen flow, matching owner and paired documents", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-project-state-evidence-roster-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const flows = { "flow-a": "collector-alpha", "flow-b": "collector-bravo", "flow-pinned": "collector-pinned" };
+  for (const [flowId, roleId] of Object.entries(flows)) {
+    const actual = (text: string) => text.replaceAll("demo", flowId).replaceAll("core", "acceptance-evidence")
+      .replace("category: acceptance-evidence", "category: evidence").replaceAll("src/", `docs/verification/${flowId}/`)
+      .replaceAll("implementer", roleId).replace("<小项目省略理由；默认项目不要照抄>", "Small fixture with one role.");
+    const intent = `docs/product/${flowId}-intent-v1.md`;
+    const proposal = `docs/proposals/${flowId}-proposal-v1.md`;
+    await writeDoc(root, intent, `# Intent for ${flowId}`);
+    await writeDoc(root, proposal, `---\nschema: project-proposal/v2\n---\nSee ${intent}.`);
+    await writeDoc(root, `docs/contracts/${flowId}-architecture-v1.md`, `See ${proposal}.`);
+    await writeDoc(root, `docs/proposals/${flowId}-modules-v1.md`, actual(PROJECT_MODULES_SCHEMA_EXAMPLE));
+    await writeDoc(root, `docs/proposals/${flowId}-roster-v1.md`, actual(PROJECT_ROSTER_SCHEMA_EXAMPLE));
+  }
+  await writeManifest(root, manifest("flow-pinned", "run-20261102-flow-pinned-aaaaaaaa", "pinned"));
+  const consulted: string[] = [];
+  const evidenceCollectorRoleIdForFlow = async (flow: string) => {
+    consulted.push(flow);
+    return flows[flow as keyof typeof flows];
+  };
+  const active = await buildProjectStateView(root, { evidenceCollectorRoleIdForFlow });
+  assert.deepEqual(consulted.sort(), ["flow-a", "flow-b"]);
+  const references = (view: typeof active, flowId: string) => view.versions.filter(entry => entry.flowId === flowId
+    && (entry.docKind === "modules" || entry.docKind === "roster"));
+  for (const flowId of ["flow-a", "flow-b"]) {
+    const docs = references(active, flowId);
+    assert.equal(docs.length, 2);
+    assert.ok(docs.every(entry => !entry.referenceIssue && entry.latest?.sha256));
+  }
+  assert.ok(references(active, "flow-pinned").every(entry => entry.referenceIssue));
+  const scoped = await buildProjectStateView(root, { flowId: "flow-b", limits: { flows: 1 }, evidenceCollectorRoleIdForFlow });
+  assert.equal(references(scoped, "flow-b").length, 2);
+  for (const provider of [undefined, () => "collector-alpha", () => { throw new Error("optional host lookup unavailable"); }]) {
+    const scoped = await buildProjectStateView(root, { flowId: "flow-b", evidenceCollectorRoleIdForFlow: provider });
+    assert.ok(references(scoped, "flow-b").every(entry => entry.referenceIssue));
+  }
+  const selected = { flowId: "flow-b", evidenceCollectorRoleIdForFlow };
+  const rosterPath = "docs/proposals/flow-b-roster-v1.md";
+  const modulesPath = "docs/proposals/flow-b-modules-v1.md";
+  const [roster, modules] = await Promise.all([
+    fs.readFile(path.join(root, rosterPath), "utf8"), fs.readFile(path.join(root, modulesPath), "utf8"),
+  ]);
+  for (const mutate of [
+    (text: string) => text.replaceAll("docs/verification/flow-b/", "docs/verification/flow-a/"),
+    (text: string) => text.replaceAll("docs/verification/flow-b/", "docs/verification/"),
+    (text: string) => text.replace("category: evidence", "category: ordinary"),
+  ]) {
+    await writeDoc(root, rosterPath, mutate(roster));
+    await writeDoc(root, modulesPath, mutate(modules));
+    assert.ok(references(await buildProjectStateView(root, selected), "flow-b").every(entry => entry.referenceIssue));
+  }
+  await writeDoc(root, modulesPath, modules);
+  await writeDoc(root, rosterPath, roster.replace("\n---\n", "\n  - id: collector-other\n    displayName: Other\n"
+    + "    purpose: Second owner\n    capability: collect\n    modules: [acceptance-evidence]\n---\n"));
+  assert.ok(references(await buildProjectStateView(root, selected), "flow-b").every(entry => entry.referenceIssue));
+  await fs.rm(path.join(root, rosterPath));
+  const unpaired = await buildProjectStateView(root, { flowId: "flow-b", evidenceCollectorRoleIdForFlow });
+  assert.equal(references(unpaired, "flow-b").find(entry => entry.docKind === "modules")?.referenceIssue?.includes("治理"), true);
+});
 
 test("flow 合并/focus：多候选不猜 -c；唯一候选 derived；chief 事件与 cleared 正反例", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-project-state-focus-"));

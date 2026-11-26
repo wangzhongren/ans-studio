@@ -45,7 +45,7 @@ import type { DirectiveInterpretRequest, DirectiveInterpretResult } from "../../
 import { intentArtifactPath } from "../../src/common/编排/governance-judge-intent.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
 // 2026-10-20：内置治理角色判定同样经该 Service 公开出口（看护自动中止按角色映射开关用；不复制 id 列表）。
-import { inspectPinnedBoundaries, isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
+import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
 
 import { buildProjectConfig as realBuildProjectConfig, buildEffectiveProjectConfig, deriveGovernanceRecord, deriveGovernanceRecordWithPins, readRoleDocsIndex, projectDocumentCandidates, type DocsIndexEntry, type GovernanceRecordStatus, type RoleRootDocEntry } from "./project.ts";
@@ -471,6 +471,7 @@ import {
 } from "./durable-workflow.ts";
 import type { DurableRequestWorkflowStartFn, DurableResult } from "../../src/model/durable-workflow.ts";
 import { WorkflowChiefStart, type DesktopWorkflowStartProposal } from "./workflow-chief-start.ts";
+import { A11_STOP_COMMAND, openWorkflowStopConfirmation } from "./durable-blocked-routing.ts";
 import { MERGE_MAIN_OPTION_IDS } from "./customer-input.ts";
 
 export interface DesktopDeps {
@@ -1261,14 +1262,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           })
           .catch((error) => diagnostic.error("watchdog.stuck.terminate.failed", error));
       },
-      // 2026-10-20 真机（Convener 卡 1h、队列 24）：看护覆盖**所有角色**（含内置治理角色）——
-      // 自动开关按角色映射：内置治理角色 ↑「替我决策」、项目角色 ↑「替我审批」；关闭或未配置自动中止时限 ⇒ 只告警。
-      autoRecoveryEnabled: (root, roleId) => {
-        const builtIn =
-          listingCache.get(root)?.roles.find((role) => role.roleId === roleId)?.builtIn === true ||
-          isBuiltInGovernanceRoleId(roleId);
-        return builtIn ? decisionJudgeSwitch.isEnabled() : shellJudgeSwitch.isEnabled();
-      },
+      // The watchdog requires its own explicit positive deadline before attempting recovery.
+      autoRecoveryEnabled: () => true,
       // 自动中止（**默认禁用**，仅显式配置正时限时由看护调用）：请求停止该回合，成功后按既有投递机再
       // drain 一次（settled 前 drain 自判忙并保留；settled 后由既有路径放行）。失败只记诊断、不循环。
       onTurnDeadline: (root, roleId, runtime) => {
@@ -2167,6 +2162,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const workflowChiefStart = deps.durableWorkflow ? new WorkflowChiefStart({
     durable: deps.durableWorkflow,
     customer: deps.customerInput,
+    executeDecision: (projectRoot, runtime) => manager.durableDecisionExecutor(projectRoot, runtime),
     selection: projectRoot => importedProjectRoot === projectRoot && registeredProjectLifecycle?.projectRoot === projectRoot
       && listingCache.get(projectRoot)?.governanceModel === "trio" ? registeredProjectLifecycle : undefined,
     hasActiveTurn: projectRoot => manager.hasActiveRoleTurn(projectRoot),
@@ -3207,6 +3203,14 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         return workflowInput ? { ...customerMetadata, workflowInput } : customerMetadata;
       };
       const rawImages = input && Array.isArray(input.images) ? input.images : [];
+      if (text.trim() === A11_STOP_COMMAND) {
+        if (rawImages.length || !isMainFrameCurrent?.()) {
+          return { ok: false, error: "请在当前项目主窗口的幕僚输入框单独输入停止指令。" };
+        }
+        const result = await durableCall({ projectRoot: customerTarget.projectRoot }, (durable, projectRoot, _request, isCurrent) =>
+          openWorkflowStopConfirmation(durable, projectRoot, () => isCurrent() && isMainFrameCurrent()));
+        return result.ok ? { ok: true } : { ok: false, error: result.message };
+      }
       // —— 客户授权平面（C1，2026-11-03）：**先**解析标记（纯函数、零副作用），早于图片校验/manager.send。——
       // 命中：带图 ⇒ 直接拒绝（不解码、不投递、不落账）；无图 ⇒ 只调用指令控制器（绝不 manager.send/handle.send），
       // 不产生角色轮次、不写 lastUserText/inputAccepted/turnId/outcome/sessionCurrent、不发 session:events。

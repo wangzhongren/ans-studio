@@ -35,15 +35,16 @@ import { loadLatestRoster as loadLatestWorkflowRoster } from "../../../../src/co
 import type { CompleteTeamPlanFn, CustomerInputRequest, TaskStateEvent, WorkflowDocumentRef, WorkflowEvent } from "../../../../src/model/runtime.ts";
 import { WORKFLOW_LEDGER_SCHEMA } from "../../../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../../../src/common/shared/runtime-shared.ts";
-import type { DurableFact, DurablePendingTask, DurableProjection } from "../../../../src/model/durable-workflow.ts";
+import type { DurableCapabilityEvent, DurableFact, DurablePendingTask, DurableProjection } from "../../../../src/model/durable-workflow.ts";
 import type { RoleSessionHandle } from "../../../../src/pipeline/orchestration/run-role.ts";
+import { implementationTestRulesText } from "../../../../src/pipeline/orchestration/durable-workflow.ts";
 import { isFixedReleaseTriggerStage, type FixedReleaseTriggerStage } from "../../workflow.ts";
-import { completeGraphBaseline, graphTurn } from "../../durable-workflow-a.ts";
+import { evidenceOperatorBinding, completeGraphBaseline, graphTurn, operationsTasks, operationsWakeKey, parkDesktopA11Disposition, workflowTaskEffectMatches } from "../../durable-workflow-a.ts";
 import { durableHash } from "../../durable-workflow.ts";
 import { appendTaskEvent, taskEvent } from "../../../../src/common/编排/task-state.ts";
 import type { SessionManagerDeps } from "../contracts/deps.ts";
 import type { LiveSession } from "../contracts/session-types.ts";
-import { createDesktopBaselineGitPort } from "../git-ports.ts";
+import { createDesktopBaselineGitPort, verifyDurableTaskCommit } from "../git-ports.ts";
 import { now } from "../shared/clock.ts";
 import { sessionKey } from "../shared/keys.ts";
 import { emitDeliveryNote } from "../shared/notifier.ts";
@@ -239,6 +240,9 @@ export class FixedWorkflowCards {
       const store = await durable.store();
       for (const view of await store.listProjections(projectRoot)) {
         const pending = view.schema === 2 && view.pendingTasks?.find(task => task.taskId === input.taskId);
+        if (pending && (pending.evidenceWorkOrder || pending.capability === "operations-implementation" && pending.workItemId && view.workflowOwnedDispatch)) {
+          return this.closeOperationsChild(view, pending, actorRoleId, input, signal);
+        }
         if (pending) return this.closeGraphTask(view, pending, actorRoleId, input, signal);
       }
       return this.closeDurableTask(projectRoot, actorRoleId, input, signal);
@@ -288,12 +292,105 @@ export class FixedWorkflowCards {
     return closed;
   }
 
+  private async closeOperationsChild(
+    view: DurableProjection, child: DurablePendingTask, actorRoleId: string, input: FixedCloseCreatedTaskToolInput, signal?: AbortSignal,
+  ): Promise<Awaited<ReturnType<typeof closeFixedWorkflowTask>>> {
+    const fail = (code: string, message: string) => ({ ok: false as const, code, message });
+    const { parent: a11, children } = operationsTasks(view);
+    const parent = a11?.state === "pending" ? a11.task : child.evidenceWorkOrder ? evidenceOperatorBinding(view) : undefined;
+    const { ref, projectRoot } = view;
+    const assigned = child.evidenceWorkOrder ? view.evidenceAudit?.collector?.taskId === child.taskId
+      : children.some(task => task.taskId === child.taskId);
+    if (!parent || actorRoleId !== parent.roleId || !assigned) return fail("workflow-a11-close-forbidden", "收口需要本次活动运营任务。");
+    const durable = this.deps.durableWorkflow!;
+    const live = await graphTurn(durable, () => [...this.sessions.values()].find(entry => entry.projectRoot === projectRoot
+      && entry.roleId === actorRoleId && entry.assignedTaskId === parent.taskId && entry.origins.running?.taskId === parent.taskId))();
+    const current = () => !!live && live.current() && !signal?.aborted;
+    if (!live || !current() || live.view.ref.instanceId !== ref.instanceId || live.delivery.intent.task?.taskId !== parent.taskId) {
+      return fail("workflow-a11-close-forbidden", "收口需要绑定本次真实运营父任务的已投递回合。");
+    }
+    const store = await durable.store();
+    if (child.evidenceWorkOrder) {
+      if (!child.report || (input.outcome !== "accepted" && input.outcome !== "rework" && input.outcome !== "rejected")) {
+        return fail("workflow-evidence-close-invalid", "收口需要当前取证角色的正式回交。");
+      }
+      const saved = await store.closeEvidenceCollection(ref, { parentTask: parent, task: child.task,
+        originId: live.source.originId, reportKey: child.report.key, outcome: input.outcome }, current);
+      if (!saved.ok) return saved;
+      if (saved.value.state === "ignored") return fail("workflow-evidence-close-stale", saved.value.reason ?? "原取证工单已退役。");
+      if (!(await this.readTasks(projectRoot)).records.get(child.taskId)?.closed) {
+        const at = new Date(this.now()).toISOString();
+        const mirrored = await appendTaskEvent(projectRoot, taskEvent("task.closed", {
+          taskId: child.taskId, by: "convener", outcome: input.outcome, operationId: input.operationId, eventId: saved.value.key,
+          actionSource: { kind: "role-direct", actorRoleId, action: "close-created-task", operationId: input.operationId,
+            applicationId: "ans-durable-workflow", baseDigest: child.report.evidence.sha256,
+            targetDigest: durableHash(JSON.stringify([child.taskId, child.report.key, input.outcome])), at },
+        }, () => new Date(at)));
+        if (!mirrored.ok) return fail(mirrored.code ?? "workflow-evidence-close-journal", mirrored.message);
+      }
+      durable.activate();
+      return { ok: true, taskId: child.taskId, workflowId: ref.instanceId, stage: child.task.stage === "B3" ? "B3" : "A11", operationId: input.operationId,
+        outcome: input.outcome, eventId: saved.value.key, replay: false, stageCompleted: false };
+    }
+    const key = `a11-close:${child.taskId}:${durableHash(input.operationId).slice(0, 32)}`;
+    const prior = store.listCapabilityEvents(ref).find(row => row.event.key === key && row.event.input.kind === "task-closed");
+    if (prior?.event.input.kind === "task-closed" && prior.event.input.outcome !== input.outcome) {
+      return fail("workflow-a11-close-conflict", "同一收口操作已记录不同结论。");
+    }
+    const answer = (replay: boolean, stageCompleted: boolean) => ({ ok: true as const, taskId: child.taskId, workflowId: ref.instanceId,
+      stage: "A11" as const, operationId: input.operationId, outcome: input.outcome, eventId: key, replay, stageCompleted });
+    if (prior && prior.receipt.state !== "ignored") return answer(true, false);
+    if (child.state !== "reported" || !child.report) return fail("close-report-missing", "子任务缺少尚待处置的原始回交。");
+    const disposition = store.lookup(ref)?.a11Disposition;
+    const retest = disposition?.state === "resumed" && disposition.childTask.taskId === child.taskId ? disposition.retest : undefined;
+    if (retest && live.delivery.intent.key !== `model:${operationsWakeKey(child.taskId, child.report.key, retest.reportReviewGeneration)}`) {
+      return fail("workflow-a11-retest-close-turn", "同候选补测须由原运营收到当期正式回交后核对收口。");
+    }
+    const commit = store.listEffects(ref, "task-commit").findLast(effect => effect.state === "succeeded" && workflowTaskEffectMatches(effect, child));
+    const parked = (close?: DurableCapabilityEvent) => parkDesktopA11Disposition(durable, view, child, current, close);
+    const onParked = (disposition: Exclude<Awaited<ReturnType<typeof parked>>, false>) => disposition.retest?.pendingReportReview
+      ? fail("workflow-a11-self-test-review-parked", "应用已保全正式补测回交。核对原签发标准和同一候选后，再回到当前运营复核。")
+      : disposition.retest ? fail("workflow-a11-self-test-parked", `应用已保全当前候选 ${disposition.candidateOid}，缺少以下符合原审批、运行与审计要求的工单回执。等待原属主当期正式回交后再核对接受。\n${implementationTestRulesText(disposition.retest.missingRequirements)}`)
+      : fail("workflow-a11-disposition-parked", "当前 A11 工作项因实测 Git 状态已挂起。应用将核对原暂存回执或提供处置选项。");
+    const proven = commit?.intent.expected?.head === child.baseOid && commit?.intent.expected
+      ? await verifyDurableTaskCommit(projectRoot, commit.intent.expected) : undefined;
+    const indexBlocked = commit && await parked();
+    if (indexBlocked) return onParked(indexBlocked);
+    const candidateOid = commit?.result?.result?.oid;
+    const commitVerified = proven && proven.oid === candidateOid;
+    const tipOid = commitVerified ? proven.oid : retest && typeof candidateOid === "string" ? candidateOid : undefined;
+    if (!current()) return fail("workflow-a11-close-forbidden", "原运营回合在核验期间已变化。");
+    const close: DurableCapabilityEvent = { key, stepId: child.stepId, attempt: child.attempt, flowId: child.flowId,
+      source: { roleId: actorRoleId, originId: live.source.originId, parentTaskId: parent.taskId },
+      input: { kind: "task-closed", task: child.task, reportKey: child.report.key, outcome: input.outcome, ...(tipOid ? { tipOid } : {}),
+        ...(retest && input.outcome !== "accepted" && input.note ? { defectNote: input.note } : {}) } };
+    const missingReceipts = input.outcome === "accepted" && (commitVerified || retest) && await parked(close);
+    if (missingReceipts) return onParked(missingReceipts);
+    if ((commit || input.outcome === "accepted") && !commitVerified) {
+      return fail("workflow-a11-commit-unverified", "已交回子任务缺少匹配的真实提交。");
+    }
+    const event = await store.submitCapability(ref, close, current);
+    if (!event.ok) {
+      const changed = commit && await parked();
+      if (changed) return onParked(changed);
+      return event;
+    }
+    if (event.value.state === "ignored") return fail("workflow-a11-close-forbidden", event.value.reason ?? "原子任务已退役。");
+    if (!(await this.readTasks(projectRoot)).records.get(child.taskId)?.closed) {
+      const effective = store.lookup(ref)?.pendingTasks?.find(task => task.taskId === child.taskId)?.outcome ?? input.outcome;
+      await appendTaskEvent(projectRoot, taskEvent("task.closed", { taskId: child.taskId, by: "convener", outcome: effective,
+        operationId: input.operationId, eventId: key, ...(input.note ? { note: input.note } : {}) }, () => new Date(this.now())));
+    }
+    return answer(false, false);
+  }
+
   private async closeGraphTask(
     view: DurableProjection, pending: DurablePendingTask, actorRoleId: string,
     input: FixedCloseCreatedTaskToolInput, signal?: AbortSignal,
   ): Promise<Awaited<ReturnType<typeof closeFixedWorkflowTask>>> {
     const fail = (code: string, message: string) => ({ ok: false as const, code, message });
     const { ref, projectRoot } = view;
+    if (view.workflowOwnedDispatch) return fail("workflow-dispatch-owned", "固定工作流根据已回交的事实收口任务。");
     const { task, report, stepId, attempt, flowId } = pending;
     const durable = this.deps.durableWorkflow!;
     const store = await durable.store();

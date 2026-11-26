@@ -1048,24 +1048,24 @@ export const enUS = {
   "ui.judge.bridgeMissing": "Automatic judging is not supported in this version; staying manual",
   "ui.judge.decisionSingleNote": "The legacy governance model (single) does not support decision delegation",
   "ui.judge.shellOffTitle":
-    "Manually confirm each shell command and necessary writes (default)",
+    "Review each shell command request manually (default)",
   "ui.judge.shellOnTitle":
-    "The automatic agent evaluates shell commands and necessary writes first; can be turned off anytime",
+    "The automatic agent reviews shell command requests. You can turn this off at any time.",
   "ui.judge.decisionOffTitle":
-    "Manually confirm each proposal acceptance, appointment, and acceptance (default)",
+    "Handle workflow activation, intent confirmation, proposal confirmation, role appointment, document revision, and merge cards manually (default)",
   "ui.judge.decisionOnTitle":
-    "The automatic agent evaluates proposal acceptance, appointments, and acceptance first; can be turned off anytime",
+    "The chief handles authorized workflow cards. You can turn this off at any time.",
   "ui.judge.warningClose": "Got it",
   "ui.judge.toggleOn.shell":
-    "Approving for you: shell commands and write/appointment-write/removedScheduleWrite confirmations (write / appointment-write / removedScheduleWrite) will be auto-approved by the automatic agent.",
+    "The automatic agent reviews shell command requests for you.",
   "ui.judge.toggleOn.decision":
-    "Deciding for you: proposal acceptance, appointments, and acceptance will be auto-approved by the automatic agent.",
+    "The chief handles six types of authorized workflow cards for you, including workflow activation, intent confirmation, proposal confirmation, role appointment, document revision, and merges.",
   "ui.judge.scopeNote":
-    "The automatic agent only reads project code/documents/role cards (excluding .env, keys/credentials, the .ans ledger/sessions, audit logs, and anything outside the project); it does not write files or run commands. It only acts for you on “accept/appoint/confirm/accept”, and never rejects for you, requests changes, or ticks under-evidenced candidates. When uncertain, lacking evidence, read failures, engine unavailable, timeout, or parse failure occur, it falls back to card-by-card handling for that switch and you decide.",
+    "The automatic agent reviews project code, documents, and role cards with read-only access. A command only runs with valid approval. Turn off the switch to review subsequent command requests manually.",
   "ui.judge.quickPathNote":
-    "The proposal quick path (accept-quick) is not delegated by default; governance direction cards under the legacy model are still confirmed card by card; under single, write confirmations are still manual.",
+    "The app still checks paths, context, and applicable authorization before running commands.",
   "ui.judge.costNote":
-    "Each delegated decision makes one model call (tokens/latency); result rows and the audit trail are marked “judge delegation · approve/decide”; misjudgments are possible and it can be turned off anytime.",
+    "Model calls use tokens and add waiting time. Results and the audit trail identify the approval source. The agent can make mistakes, and you can turn it off at any time.",
   "ui.judge.toggleFailed":
     "Could not confirm the automatic-judging switch (channel error); keeping the previous state.",
   "ui.judge.summaryFallback": "Cannot summarize the command; expand to view the original",

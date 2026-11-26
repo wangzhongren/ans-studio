@@ -1877,6 +1877,7 @@ export async function finalizeIntent(input: FinalizeIntentInput): Promise<Finali
 
 export interface ActivateRoleDocumentsFixedInput {
   projectRoot: string;
+  evidenceCollectorRoleId?: string;
   operationId: string;
   flowId: string;
   workflowId: string;
@@ -2035,7 +2036,7 @@ export async function activateRoleDocumentsFixed(input: ActivateRoleDocumentsFix
   if (sha256Of(Buffer.from(rosterText, "utf8")) !== input.roster.sha256) {
     return serviceFailure("activation-roster-mismatch", `名单字节 hash 与入参不一致：${input.roster.path}。`);
   }
-  const parsedRoster = parseProjectRoster(rosterText, input.flowId);
+  const parsedRoster = parseProjectRoster(rosterText, input.flowId, input.evidenceCollectorRoleId);
   if (!parsedRoster.ok) return serviceFailure("activation-roster-mismatch", `名单非法：${parsedRoster.reason}`);
   if (!parsedRoster.roster.roles.some((role) => role.id === input.targetRoleId)) {
     return serviceFailure("activation-role-not-selected", `目标角色 ${input.targetRoleId} 不在名单内。`);
@@ -2152,6 +2153,7 @@ export interface BasisDocumentView {
 
 export interface RecordBasisInput {
   projectRoot: string;
+  evidenceCollectorRoleId?: string;
   flowId: string;
   workflowId: string;
   operationId: string;
@@ -2287,7 +2289,7 @@ export async function recordBasis(input: RecordBasisInput): Promise<RecordBasisR
       }
     }
   }
-  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId });
+  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId, evidenceCollectorRoleId: input.evidenceCollectorRoleId });
   let reviewRoleId: string = DEFAULT_REVIEW_ROLE_ID;
   if (roster.ok) {
     reviewRoleId = reviewRoleIdOfRoster(roster.roster);
@@ -4075,6 +4077,7 @@ async function appendBaselineBlocked(input: {
 /** `complete_team_plan` v4 fixed 输入（v1.3 §5.1；运营专属；应用执行顺序编排）。 */
 export interface CompleteTeamPlanFixedInput {
   projectRoot: string;
+  evidenceCollectorRoleId?: string;
   flowId: string;
   workflowId: string;
   operationId: string;
@@ -4139,6 +4142,7 @@ export async function completeTeamPlanFixed(input: CompleteTeamPlanFixedInput): 
   }
   const recorded = await recordBasis({
     projectRoot: input.projectRoot,
+    evidenceCollectorRoleId: input.evidenceCollectorRoleId,
     flowId: input.flowId,
     workflowId: input.workflowId,
     operationId: input.operationId,
@@ -4371,6 +4375,22 @@ export async function derivePathBWriteSets(input: DerivePathBWriteSetsInput): Pr
 /** 只读派生。原型所有权与 B1/B2 前置由调用方的权威账本核对。 */
 export function deriveDurablePathBWriteSets(input: Omit<DerivePathBWriteSetsInput, "workflowId">): Promise<DerivePathBWriteSetsResult> {
   return derivePathBScope(input, true);
+}
+
+export async function deriveDurableEvidenceWriter(projectRoot: string, flowId: string, roleId: string): Promise<readonly string[] | undefined> {
+  if (!isWorkflowSlug(flowId) || !isWorkflowSlug(roleId)) return;
+  const prefix = `docs/verification/${flowId}/`;
+  const boundaries = await loadProjectRoleBoundaries(projectRoot);
+  const root = prefix.slice(0, -1);
+  if (!boundaries.get(roleId)?.some(entry => entry.root === "project" && entry.kind === "directory"
+    && boundaryContainsPath([entry], root))) return;
+  const conflicts = [...boundaries.entries()].some(([other, entries]) => other !== roleId && entries.some(entry => {
+    if (entry.root !== "project") return false;
+    const otherPath = entry.path.toLowerCase();
+    return otherPath === root || otherPath.startsWith(prefix) || entry.kind !== "file" && root.startsWith(otherPath + "/");
+  }));
+  if (conflicts) return;
+  return [prefix];
 }
 
 async function derivePathBScope(input: Omit<DerivePathBWriteSetsInput, "workflowId">, requireRosterBoundary: boolean): Promise<DerivePathBWriteSetsResult> {

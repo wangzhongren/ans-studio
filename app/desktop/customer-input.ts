@@ -40,6 +40,7 @@ import { createHash } from "node:crypto";
 // 契约三型（请求/裁决/原始通道）的**唯一来源**（§4 冻结契约家）：只读导入、原样转出——**不逐字镜像**。
 import type {
   ChiefPendingDecisionRequest,
+  DurableChiefDecisionCardKind,
   ChiefDecisionExecutionContext,
   DecidePendingRequestFn,
   CustomerInputRequest,
@@ -418,7 +419,7 @@ export function mergeMainCardPreviewText(preview: MergeMainCardPreviewFacts): st
  * 构造应用自有 `merge-main` 非判断卡（AC-14；MF-IR-8）：`application:true` + 冻结 approve/reject
  * 选项词汇；不进 `GOVERNANCE_CARD_GROUP`、judge 不可代批（`isApplicationDecisionReservedForCustomer`）。
  */
-export function buildMergeMainCardRequest(preview: MergeMainCardPreviewFacts): CustomerInputRequest {
+export function buildMergeMainCardRequest(preview: MergeMainCardPreviewFacts): Extract<CustomerInputRequest, { kind: "choice" }> {
   return {
     kind: "choice",
     title: "合并 main（高风险发布确认）",
@@ -479,6 +480,10 @@ export function toMergeMainCardDecision(outcome: CustomerInputOutcome | null | u
   return { kind: "reject", ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}) };
 }
 
+export const DOCUMENT_REVISION_CARD_KIND = "document-revision";
+export const DOCUMENT_REVISION_OPTIONS = ["approve-document-revision", "reject-document-revision"] as const;
+export const BLOCKED_SCOPE_CARD_KIND = "workflow-blocked-scope";
+
 export function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest): boolean {
   if (request.kind !== "choice") return false;
   const cardKind = (request as { cardKind?: unknown }).cardKind;
@@ -486,6 +491,19 @@ export function isApplicationDecisionReservedForCustomer(request: CustomerInputR
     const ids = request.options.map(option => option.id);
     return request.application === true && request.sourceRoleId === "application" && request.multiple !== true
       && ids.length === 2 && new Set(ids).size === 2 && ids.includes("approve-workflow-start") && ids.includes("reject-workflow-start");
+  }
+  if (cardKind === DOCUMENT_REVISION_CARD_KIND) {
+    const ids = request.options.map(option => option.id);
+    return request.application === true && request.sourceRoleId === "application" && request.multiple !== true
+      && ids.length === DOCUMENT_REVISION_OPTIONS.length && DOCUMENT_REVISION_OPTIONS.every(id => ids.includes(id));
+  }
+  if (cardKind === BLOCKED_SCOPE_CARD_KIND) {
+    const ids = request.options.map(option => option.id);
+    return request.application === true && request.sourceRoleId === "application" && request.multiple !== true
+      && ids.length > 0 && ids.length <= 4 && new Set(ids).size === ids.length
+      && (ids.every(id => id === "wait" || id === "stop" || id === "route" || id === "compromise")
+        || ids.length <= 3 && ids.every(id => id === "wait" || id === "revise" || id === "stop" || id === "rework")
+          && !(ids.includes("revise") && ids.includes("rework")));
   }
   // stable workflow 确认卡：app-owned、无 flowId；客户本人，永不判断/委托/指令。
   if (cardKind === STABLE_WRITE_CARD_KIND) {
@@ -811,6 +829,18 @@ export interface ChiefDecisionHost {
   prepare(request: CustomerInputRequest, metadata?: CustomerInputMetadata): Promise<ChiefDecisionBasis>;
   execute(context: ChiefDecisionExecutionContext, evidence: string, decide: DecidePendingRequestFn, signal: AbortSignal): Promise<void>;
 }
+export type ChiefDecisionExecutor = ChiefDecisionHost["execute"];
+
+export type DelegatedCustomerAnswer = {
+  source: Extract<DirectActionSource, { kind: "chief-delegated" }>;
+  isCurrent(): boolean;
+};
+
+export function durableDecisionProvenance(generation: number, delegated?: DelegatedCustomerAnswer): import("../../src/model/durable-workflow.ts").DurableDecisionProvenance {
+  if (!delegated) return { source: "customer" };
+  const { requestId, baseDigest: digest, delegationRevision, reason } = delegated.source;
+  return { source: "delegated-chief", requestId, digest, generation, delegationRevision, reason };
+}
 
 export interface CustomerInputChannel {
   /**
@@ -854,7 +884,7 @@ export interface CustomerInputChannel {
   presentAcceptanceTriageCard: PresentAcceptanceTriageCardFn;
 }
 
-export type PersistReleaseDecision = (choice: "approve" | "reject") => Promise<
+export type PersistReleaseDecision = (choice: "approve" | "reject", delegated?: DelegatedCustomerAnswer, isMainFrameCurrent?: () => boolean) => Promise<
   { ok: true; decisionId: string } | { ok: false; message: string; stale?: boolean }
 >;
 
@@ -862,10 +892,8 @@ export type DurableCustomerAnswer =
   | { kind: "confirm"; confirmed: boolean; acknowledged?: string[] }
   | { kind: "choice"; selected: string[]; acknowledged?: string[] };
 
-export type PersistDurableCustomerAnswer = (answer: DurableCustomerAnswer, delegated?: {
-  source: Extract<DirectActionSource, { kind: "chief-delegated" }>;
-  isCurrent(): boolean;
-}, isMainFrameCurrent?: () => boolean) => ReturnType<PersistReleaseDecision>;
+export type PersistDurableCustomerAnswer = (answer: DurableCustomerAnswer, delegated?: DelegatedCustomerAnswer,
+  isMainFrameCurrent?: () => boolean) => ReturnType<PersistReleaseDecision>;
 
 /**
  * 桌面侧的客户通道（**带角色上下文**）：与冻结家 `CustomerInputFn` 同形，但多一个 `ctx.roleId`——
@@ -890,6 +918,8 @@ export type DesktopCustomerInputFn = (
     /** 每会话判断闭包（编排 `createGovernanceJudge`；与 shell judge 同一份 runtimeOptions/createAdapter）。 */
     governanceJudge?: GovernanceJudgeFn;
     chiefDecision?: ChiefDecisionHost;
+    /** From the application presenter paired with its durable decision port. */
+    durableDecision?: { cardKind: DurableChiefDecisionCardKind; generation: number; host?: ChiefDecisionHost; customerOnly?: true };
     /** 当前轮投递给该角色的文本（≤4KB；判断 agent 的 `turnText` 输入）。缺省不猜。 */
     turnText?: string;
     /**
@@ -1025,6 +1055,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       governanceModel?: "single" | "trio";
       governanceJudge?: GovernanceJudgeFn;
       chiefDecision?: ChiefDecisionHost;
+      durableDecision?: Parameters<DesktopCustomerInputFn>[1]["durableDecision"];
       turnText?: string;
       /** 卡片呈现成功回调（仅需求变更审批卡携带；presenter 成功后才调用一次）。 */
       onPresented?: () => void;
@@ -1049,7 +1080,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     appCard?: AppCardState;
   }
   const durableChoices = new Map<string, { persist: PersistReleaseDecision; accepted: boolean }>();
-  const workflowChoices = new Map<string, { request: CustomerInputRequest; persist: PersistDurableCustomerAnswer; accepted: boolean }>();
+  const workflowChoices = new Map<string, { request: CustomerInputRequest; persist: PersistDurableCustomerAnswer; accepted: boolean; customerOnly?: true }>();
 
   /** 应用自有 choice 卡（分诊卡）的通道状态：不是角色工具请求、不写账本、不推导下一步。 */
   interface AppCardState {
@@ -1115,7 +1146,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
    * 推导/回调均隔离：抛错只记诊断，绝不影响已完成的客户决定与排队流转。
    */
   const notifyNextStep = (entry: ChannelEntry, outcome: CustomerInputOutcome): void => {
-    if (outcome.outcome !== "answered" || opts.onNextStep === undefined) return;
+    if (entry.ctx.durableDecision || outcome.outcome !== "answered" || opts.onNextStep === undefined) return;
     let payload: GovernanceNextStepPayload | null;
     try {
       payload = deriveGovernanceNextStep(entry.request, outcome);
@@ -1940,10 +1971,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     presentNow(entry);
   };
   const tryChiefDecision = (entry: ChannelEntry): boolean => {
-    if (!isChiefBusinessCard(entry)) return false;
+    const durable = entry.ctx.durableDecision;
+    if (durable?.customerOnly || (!durable && !isChiefBusinessCard(entry))) return false;
     const mode = delegationState();
     if (!mode.enabled || entry.ctx.governanceModel !== "trio") return false;
-    if (entry.chiefAttempted) {
+    if (entry.chiefAttempted && (!durable || entry.chiefRevision === mode.revision)) {
       entry.payload.judgeNotice = mainT("main.customerInput.chief.noValidDecision");
       return false;
     }
@@ -1976,6 +2008,10 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         diagnostic.error("chief-decision.failed", error, { requestId: entry.payload.id, stage: "materials", phase: "materials" });
         if (!valid()) return;
         const detail = reasonOf(error).trim();
+        if (durable) {
+          chiefWaiting(entry, detail || mainT("main.customerInput.chief.contextUnavailable"));
+          return;
+        }
         settleEntry(entry, {
           outcome: "declined",
           reason: detail === ""
@@ -1985,7 +2021,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         }, "judging");
       };
       try {
-        const host = entry.ctx.chiefDecision;
+        const host = durable ? durable.host : entry.ctx.chiefDecision;
         if (host === undefined) throw new Error("幕僚决策上下文不可用");
         if (entry.request.acknowledgments?.some(item => item.required)) throw new Error("本请求需专门确认勾选，幕僚不能代作客户确认");
         let basis: ChiefDecisionBasis;
@@ -2000,61 +2036,85 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
           return;
         }
         const kind = cardKindOf(entry);
-        if (kind !== "appointment" && kind !== "acceptance" && kind !== "decision" && kind !== "proposal") return;
+        if (!durable && kind !== "appointment" && kind !== "acceptance" && kind !== "decision" && kind !== "proposal") return;
         const options = entry.request.kind === "choice" ? entry.request.options : [
           { id: "confirm", label: "同意" }, { id: "reject", label: "拒绝" },
         ];
-        const request: ChiefPendingDecisionRequest = {
+        const binding = {
           requestId: entry.payload.id, baseDigest: basis.baseDigest, delegationRevision: mode.revision,
-          originRoleId: entry.payload.roleId, cardKind: kind,
+          originRoleId: entry.payload.roleId,
           ...(entry.request.flowId !== undefined ? { flowId: entry.request.flowId } : {}),
           ...(entry.metadata?.taskId !== undefined ? { taskId: entry.metadata.taskId } : {}),
           question: entry.request.title, options: structuredClone(options), evidenceRefs: structuredClone(basis.evidenceRefs),
         };
+        const request: ChiefPendingDecisionRequest = durable
+          ? { ...binding, cardKind: durable.cardKind, durableWorkflow: { generation: durable.generation,
+              multiple: entry.request.kind === "choice" && entry.request.multiple === true } }
+          : { ...binding, cardKind: kind as "appointment" | "acceptance" | "decision" | "proposal" };
         const context: ChiefDecisionExecutionContext = {
           roleId: "chief", executionId: `chief-${entry.payload.id}-${mode.revision}`, mode: "bounded-decision",
           request, productionWriteAuthority: false, tools: ["decide_pending_request"],
           limits: { maxTurns: 1, maxAttempts: 1, timeoutMs: 120_000 },
         };
+        let settling = false;
         const decide: DecidePendingRequestFn = async (input, signal) => {
           const fail = (errorCode: string, message: string) => { failureReason = message; return { ok: false as const, requestId: request.requestId, status: "stale" as const, errorCode, message }; };
-          if (!valid() || signal?.aborted || input.requestId !== request.requestId
+          if (settling || !valid() || signal?.aborted || input.requestId !== request.requestId
             || input.baseDigest !== request.baseDigest || input.delegationRevision !== mode.revision) return fail("chief-stale", "委托模式、版本或未决请求已改变");
           if (!input.reason.trim()) return fail("chief-reason-missing", "需要选择理由");
           const disposition = input.disposition;
-          if (input.disposition !== "select" && input.disposition !== "reject" && input.disposition !== "revise") return fail("chief-choice-invalid", "非法决定");
+          if (disposition !== "select" && (durable || disposition !== "reject" && disposition !== "revise")) return fail("chief-choice-invalid", "非法决定");
           const selected = input.disposition === "select" ? [...new Set(input.selected)] : undefined;
-          if (selected !== undefined && (selected.length === 0 || selected.some(id => !options.some(option => option.id === id))
+          if (selected !== undefined && (selected.length === 0 || durable && input.disposition === "select" && selected.length !== input.selected.length
+            || selected.some(id => !options.some(option => option.id === id))
             || (entry.request.kind === "choice" && entry.request.multiple !== true && selected.length !== 1)
             || (entry.request.kind === "confirm" && (selected.length !== 1 || !["confirm", "reject"].includes(selected[0]!))))) return fail("chief-choice-invalid", "选择不在本次合法选项内");
-          if (!(await basis.isCurrent()) || !valid() || signal?.aborted) return fail("chief-base-stale", "基线或物证已改变；需重新发起请求");
-          // Single synchronous CAS after every await. No external callbacks before settlement.
-          const actionSource: Extract<DirectActionSource, { kind: "chief-delegated" }> = {
-            kind: "chief-delegated", actorRoleId: "chief", originRoleId: request.originRoleId,
-            requestId: request.requestId, baseDigest: request.baseDigest, delegationRevision: mode.revision,
-            disposition, ...(selected !== undefined ? { selected } : {}), reason: input.reason, at: new Date().toISOString(),
-          };
-          const workflowChoice = workflowChoices.get(entry.payload.id);
-          if (workflowChoice) {
-            const answer: DurableCustomerAnswer = entry.request.kind === "choice" ? { kind: "choice", selected: selected ?? [] }
-              : { kind: "confirm", confirmed: selected?.[0] === "confirm" };
-            const saved = await workflowChoice.persist(answer, { source: actionSource, isCurrent: valid });
-            if (!saved.ok) return fail("chief-stale", saved.message);
-            workflowChoice.accepted = true;
-          }
-          const declined = input.disposition === "reject" || input.disposition === "revise" || (entry.request.kind === "confirm" && selected?.[0] === "reject");
-          settleEntry(entry, declined
-            ? { outcome: "declined", operatorId: "chief", actionSource, reason: disposition === "revise" ? `${input.reason} ${mainT("main.customerInput.chief.revisionRequested")}` : input.reason }
-            : { outcome: "answered", operatorId: "chief", actionSource,
-                value: entry.request.kind === "confirm" ? { confirmed: true } : { selected } }, "judging");
+          settling = true;
+          const current = () => valid() && !signal?.aborted;
           try {
-            opts.emitJudgeResult?.({ version: 1, id: `chief-${++judgeResultSeq}`, requestId: request.requestId,
-              anchorKey: entry.payload.anchorKey, toolCallId: entry.payload.toolCallId ?? "", roleId: entry.payload.roleId,
-              projectRoot: entry.payload.projectRoot, runtime: entry.payload.runtime, at: actionSource.at,
-              requestTitle: entry.request.title, group: "decision", cardKind: kind, engine: entry.ctx.runtime ?? "demo",
-              reasonCode: "chief-delegated", actionSource, selected, reason: input.reason });
-          } catch (error) { diagnostic.error("chief-decision.notice.failed", error, { requestId: request.requestId }); }
-          return { ok: true, requestId: request.requestId, status: "settled", source: actionSource };
+            if (!(await basis.isCurrent()) || !current()) return fail("chief-base-stale", "基线或物证已改变；需重新发起请求");
+            const actionSource: Extract<DirectActionSource, { kind: "chief-delegated" }> = {
+              kind: "chief-delegated", actorRoleId: "chief", originRoleId: request.originRoleId,
+              requestId: request.requestId, baseDigest: request.baseDigest, delegationRevision: mode.revision,
+              disposition, ...(selected !== undefined ? { selected } : {}), reason: input.reason, at: new Date().toISOString(),
+            };
+            const workflowChoice = workflowChoices.get(entry.payload.id);
+            const releaseChoice = durableChoices.get(entry.payload.id);
+            let decisionId: string | undefined;
+            if (workflowChoice) {
+              const answer: DurableCustomerAnswer = entry.request.kind === "choice" ? { kind: "choice", selected: selected ?? [] }
+                : { kind: "confirm", confirmed: selected?.[0] === "confirm" };
+              const saved = await workflowChoice.persist(answer, { source: actionSource, isCurrent: current });
+              if (!saved.ok) return fail("chief-stale", saved.message);
+              workflowChoice.accepted = true;
+              decisionId = saved.decisionId;
+            } else if (releaseChoice) {
+              const action = selected?.[0] === MERGE_MAIN_OPTION_IDS[0] ? "approve" : "reject";
+              const saved = await releaseChoice.persist(action, { source: actionSource, isCurrent: current });
+              if (!saved.ok) return fail("chief-stale", saved.message);
+              releaseChoice.accepted = true;
+              decisionId = saved.decisionId;
+            }
+            // A saved decision wins a concurrent UI fallback. Keep the successful tool receipt live.
+            if (durable && entry.chiefAbort === controller) entry.chiefAbort = undefined;
+            const from = durable && entry.state === "active" ? "active" : "judging";
+            const declined = disposition === "reject" || disposition === "revise" || (entry.request.kind === "confirm" && selected?.[0] === "reject");
+            settleEntry(entry, declined
+              ? { outcome: "declined", operatorId: "chief", actionSource, reason: disposition === "revise" ? `${input.reason} ${mainT("main.customerInput.chief.revisionRequested")}` : input.reason }
+              : { outcome: "answered", operatorId: "chief", actionSource, ...(decisionId ? { decisionId } : {}),
+                  value: entry.request.kind === "confirm" ? { confirmed: true } : { selected } }, from);
+            if (durable && entry.presented) notifyExpired(entry, "幕僚决定已保存。");
+            try {
+              opts.emitJudgeResult?.({ version: 1, id: `chief-${++judgeResultSeq}`, requestId: request.requestId,
+                anchorKey: entry.payload.anchorKey, toolCallId: entry.payload.toolCallId ?? "", roleId: entry.payload.roleId,
+                projectRoot: entry.payload.projectRoot, runtime: entry.payload.runtime, at: actionSource.at, flowId: request.flowId,
+                requestTitle: entry.request.title, group: "decision", cardKind: request.cardKind, engine: entry.ctx.runtime ?? "demo",
+                reasonCode: "chief-delegated", actionSource, selected, reason: input.reason });
+            } catch (error) { diagnostic.error("chief-decision.notice.failed", error, { requestId: request.requestId }); }
+            return { ok: true, requestId: request.requestId, status: "settled", source: actionSource };
+          } finally {
+            settling = false;
+          }
         };
         stage = "execution";
         await host.execute(context, basis.context, decide, controller.signal);
@@ -2063,9 +2123,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         // `stage` 不在诊断落盘白名单（src/common/shared/diagnostics.ts `FIELD_NAMES`，本修复不越界改 src/）；
         // 用既有白名单键 `phase` 一并落盘，保证诊断可区分 materials/execution（B1 AC-13）。
         diagnostic.error("chief-decision.failed", error, { requestId: entry.payload.id, stage, phase: stage });
-        if (valid()) chiefWaiting(entry, stage === "materials"
+        if (valid()) chiefWaiting(entry, failureReason ?? (stage === "materials"
           ? mainT("main.customerInput.chief.contextUnavailable")
-          : mainT("main.customerInput.chief.noValidDecision"));
+          : mainT("main.customerInput.chief.noValidDecision")));
       }
     })();
     return true;
@@ -2079,7 +2139,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     }
     if (delegationState().enabled) {
       for (const entry of [...pending.values()]) {
-        if (isChiefBusinessCard(entry) && (!workflowChoices.has(entry.payload.id) || entry.ctx.chiefDecision)) tryChiefDecision(entry);
+        if (entry.ctx.durableDecision || isChiefBusinessCard(entry) && !workflowChoices.has(entry.payload.id)) tryChiefDecision(entry);
       }
     }
   });
@@ -2237,8 +2297,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   /** 既有呈现路径（判断门 → judging / 直接呈现）；**不分诊**——分诊前闸在 `presentEntry`。 */
   const presentEntryNow = (entry: ChannelEntry): void => {
-    if (workflowChoices.has(entry.payload.id)) {
-      if (entry.ctx.chiefDecision && tryChiefDecision(entry)) return;
+    if (workflowChoices.has(entry.payload.id) || durableChoices.has(entry.payload.id)) {
+      if (entry.ctx.durableDecision && tryChiefDecision(entry)) return;
       presentNow(entry);
       return;
     }
@@ -2544,11 +2604,24 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
     req = structuredClone(req);
+    const durable = ctx.durableDecision;
+    if (durable && (!ctx.requestId || durable.cardKind !== req.cardKind || !Number.isSafeInteger(durable.generation) || durable.generation < 1
+      || durable.customerOnly && (durable.cardKind !== BLOCKED_SCOPE_CARD_KIND || durable.host)
+      || (durable.cardKind === MERGE_MAIN_CARD_KIND ? !ctx.persistReleaseDecision : !ctx.persistWorkflowDecision))) {
+      return { outcome: "unavailable", reason: "The decision requires a verified application workflow card." };
+    }
     if (req.cardKind === "workflow-start" && (!ctx.persistWorkflowDecision || !isApplicationDecisionReservedForCustomer(req))) {
       return { outcome: "unavailable", reason: "Workflow activation requires an application-issued customer card." };
     }
+    if (req.cardKind === DOCUMENT_REVISION_CARD_KIND && (!ctx.persistWorkflowDecision || !isApplicationDecisionReservedForCustomer(req))) {
+      return { outcome: "unavailable", reason: "A document revision requires an application-issued customer card." };
+    }
+    if (req.cardKind === BLOCKED_SCOPE_CARD_KIND && (!durable || !ctx.persistWorkflowDecision || !isApplicationDecisionReservedForCustomer(req))) {
+      return { outcome: "unavailable", reason: "A blocked scope decision requires a verified application-issued workflow card." };
+    }
     if (ctx.persistWorkflowDecision && (!ctx.requestId ||
-      (req.cardKind !== "intent-confirm" && req.cardKind !== "proposal" && req.cardKind !== "appointment" && req.cardKind !== "workflow-start"))) {
+      (req.cardKind !== "intent-confirm" && req.cardKind !== "proposal" && req.cardKind !== "appointment" && req.cardKind !== "workflow-start"
+        && req.cardKind !== DOCUMENT_REVISION_CARD_KIND && req.cardKind !== BLOCKED_SCOPE_CARD_KIND))) {
       return { outcome: "unavailable", reason: "Invalid durable workflow card." };
     }
     if (ctx.persistReleaseDecision !== undefined && (
@@ -2594,7 +2667,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       }
       const id = ctx.requestId ?? (opts.nextId ? opts.nextId() : `op-${++seq}`);
       if (ctx.persistReleaseDecision) durableChoices.set(id, { persist: ctx.persistReleaseDecision, accepted: false });
-      if (ctx.persistWorkflowDecision) workflowChoices.set(id, { request: req, persist: ctx.persistWorkflowDecision, accepted: false });
+      if (ctx.persistWorkflowDecision) workflowChoices.set(id, { request: req, persist: ctx.persistWorkflowDecision, accepted: false,
+        ...(durable?.customerOnly ? { customerOnly: true } : {}) });
       const payload: OperatorRequestPayload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
       // 镜像面（四角色评审 §6.1）：由 SessionManager 计算并给出；仅非空字符串进入载荷。
       // 同一请求仍只登记一条 pending、只结算一次——本字段不改变任何校验/账本/下一步推导。
@@ -2622,6 +2696,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
           ...(ctx.governanceModel !== undefined ? { governanceModel: ctx.governanceModel } : {}),
           ...(ctx.governanceJudge !== undefined ? { governanceJudge: ctx.governanceJudge } : {}),
           ...(ctx.chiefDecision !== undefined ? { chiefDecision: ctx.chiefDecision } : {}),
+          ...(ctx.durableDecision !== undefined ? { durableDecision: ctx.durableDecision } : {}),
           ...(typeof ctx.turnText === "string" && ctx.turnText !== "" ? { turnText: ctx.turnText } : {}),
           ...(ctx.onPresented !== undefined ? { onPresented: ctx.onPresented } : {}),
         },
@@ -2685,7 +2760,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       }
       presentEntry(entry);
     }).then(outcome => {
-      if (ctx.persistReleaseDecision && ctx.requestId && outcome.outcome !== "answered") {
+      if (ctx.persistReleaseDecision && ctx.requestId && !durableChoices.get(ctx.requestId)?.accepted) {
         requestResults.delete(ctx.requestId);
       }
       if (ctx.persistWorkflowDecision && ctx.requestId && !workflowChoices.get(ctx.requestId)?.accepted) {
@@ -2846,7 +2921,10 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (typeof input.id !== "string") return undefined;
     const workflow = workflowChoices.get(input.id);
     if (workflow) {
-      if (workflow.request.cardKind === "workflow-start" && !isMainFrameCurrent?.()) {
+      const blockedScope = workflow.request.cardKind === BLOCKED_SCOPE_CARD_KIND;
+      const delegation = delegationState();
+      if (blockedScope && !workflow.customerOnly && delegation.enabled) return { ok: false, error: "请先关闭替我决策，再由当前窗口本人选择。" };
+      if ((workflow.request.cardKind === "workflow-start" || workflow.request.cardKind === DOCUMENT_REVISION_CARD_KIND || blockedScope) && !isMainFrameCurrent?.()) {
         return { ok: false, error: "Confirm this workflow in the current main project window." };
       }
       const entry = pending.get(input.id);
@@ -2873,7 +2951,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         return invalid;
       }
       try {
-        const saved = await workflow.persist(answer, undefined, isMainFrameCurrent);
+        const current = isMainFrameCurrent && (() => isMainFrameCurrent() && (workflow.accepted || pending.get(input.id as string) === entry)
+          && (!blockedScope || workflow.customerOnly || !delegationState().enabled && delegationState().revision === delegation.revision));
+        const saved = await workflow.persist(answer, undefined, current);
         if (!saved.ok) return { ok: false, error: saved.message, expired: saved.stale };
         workflow.accepted = true;
         if (entry && pending.get(input.id) === entry) {
@@ -2901,7 +2981,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     }
     const selected = decision.selected[0]!;
     try {
-      const saved = await choice.persist(selected === MERGE_MAIN_OPTION_IDS[0] ? "approve" : "reject");
+      const current = isMainFrameCurrent && (() => isMainFrameCurrent() && (choice.accepted || pending.get(input.id as string) === entry));
+      const saved = await choice.persist(selected === MERGE_MAIN_OPTION_IDS[0] ? "approve" : "reject", undefined, current);
       if (!saved.ok) return { ok: false, error: saved.message, expired: saved.stale };
       choice.accepted = true;
       if (entry && pending.get(input.id) === entry) {

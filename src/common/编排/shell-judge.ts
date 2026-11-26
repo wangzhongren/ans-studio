@@ -56,7 +56,7 @@ import type { RuntimeAdapterFactory, RuntimeAdapterFactoryOptions } from "../../
 import { resolveShellJudgeBudget, type ShellJudgeBudget } from "../runtime-core/shell-judge/policy.ts";
 import { RUNTIME_KINDS } from "../shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
-import { buildShellJudgePrompt, buildShellJudgeSystemPrompt, SHELL_JUDGE_ARGV_LIMIT, SHELL_JUDGE_COMMAND_LIMIT_BYTES } from "./shell-judge-prompt.ts";
+import { buildShellJudgePrompt, buildShellJudgeSystemPrompt, hasIsolatedAcceptanceRestore, SHELL_JUDGE_ARGV_LIMIT, SHELL_JUDGE_COMMAND_LIMIT_BYTES } from "./shell-judge-prompt.ts";
 import { guardShellCommand } from "./shell-command-guard.ts";
 import {
   normalizeShellJudgeVerdict,
@@ -226,11 +226,11 @@ const DENY_ALL_GATE: WriteGate = () => ({
   allowedByRoot: { skill: [], project: [] },
 });
 
-function judgeRole(): ResolvedRole {
+function judgeRole(isolatedAcceptanceRestore: boolean): ResolvedRole {
   return {
     id: SHELL_JUDGE_ROLE_ID,
     kind: "project",
-    cardText: buildShellJudgeSystemPrompt(),
+    cardText: buildShellJudgeSystemPrompt(isolatedAcceptanceRestore),
     boundary: {
       entries: [],
       boundarySource: SHELL_JUDGE_ROLE_ID,
@@ -494,7 +494,10 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
       stats,
       budget,
     };
-    const role = judgeRole();
+    const isolatedAcceptanceRestore = hasIsolatedAcceptanceRestore(request, opts.project.projectRoot);
+    const role = judgeRole(isolatedAcceptanceRestore);
+    const promptRequest = !isolatedAcceptanceRestore && request.acceptanceEnvironmentScope !== undefined
+      ? { ...request, acceptanceEnvironmentScope: undefined } : request;
     let lastMessage = "";
     let session: RoleSession | undefined;
     let disposed = false;
@@ -558,7 +561,7 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
           return { kind: "settled" };
         }
         try {
-          await bound.prompt(buildShellJudgePrompt(request, budget));
+          await bound.prompt(buildShellJudgePrompt(promptRequest, budget));
           if (stopped) return { kind: "settled" };
           for await (const event of bound.events()) {
             if (event.kind === "message" && !event.summary.startsWith("用户指令：")) lastMessage = event.summary;

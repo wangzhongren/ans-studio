@@ -21,6 +21,11 @@ files:
 extraResources:
   - from: 'release-output/dapr-assets/${os}-${arch}/dapr-runtime'
     to: dapr-runtime
+  # Preserve npm's bundled dependency tree for the isolated package-lock runner.
+  - from: 'node_modules/npm'
+    to: 'app/node_modules/npm'
+  - from: 'node_modules/npm/node_modules'
+    to: 'app/node_modules/npm/node_modules'
 artifactName: 'ANS-Studio-${version}-${os}-${arch}.${ext}'
 mac:
   icon: app/desktop/assets/ans-studio-ans-icon.png

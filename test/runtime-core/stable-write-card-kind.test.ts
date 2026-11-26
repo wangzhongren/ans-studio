@@ -63,6 +63,21 @@ test("request_confirmation 卡种不变：GovernanceConfirmCardKind 仍仅 appoi
   assert.equal(stable as string, "stable-write");
 });
 
+test("document-revision 由应用呈现，保留账本身份并排除通用工具卡种", () => {
+  const kind: AppOwnedGovernanceCardKind = "document-revision";
+  const created: Pick<RequestCreatedEvent, "cardKind"> = { cardKind: kind };
+  const resolved: Pick<RequestResolvedEvent, "cardKind"> = { cardKind: kind };
+  assert.equal(created.cardKind, "document-revision");
+  assert.equal(resolved.cardKind, "document-revision");
+  // @ts-expect-error 内置文件修订卡仅由应用呈现
+  const choice: GovernanceChoiceCardKind = "document-revision";
+  // @ts-expect-error 内置文件修订卡仅由应用呈现
+  const confirm: GovernanceConfirmCardKind = "document-revision";
+  assert.equal(choice, kind);
+  assert.equal(confirm, kind);
+  assert.equal(governanceCardGroup(kind), undefined);
+});
+
 test("判断分组不变：GROUP 精确键集不变；stable-write 永不判断/代选", () => {
   assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "stable-write"), false);
   assert.equal(governanceCardGroup("stable-write"), undefined);
@@ -86,11 +101,12 @@ test("判断分组不变：GROUP 精确键集不变；stable-write 永不判断/
 test("白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏", () => {
   // 2026-11-10 T3（v1.3 §8.4/AC-14）：app-owned 增 `merge-main`（客户本人合并 main 确认卡）；
   // GROUP 键集仍逐字不变，`merge-main` 不进判断分组（下方断言）。
-  assert.deepEqual([...GOVERNANCE_APP_OWNED_CARD_KINDS], ["stable-write", "merge-main", "workflow-start"]);
+  const appOwned = ["stable-write", "merge-main", "workflow-start", "document-revision"] as const;
+  assert.deepEqual([...GOVERNANCE_APP_OWNED_CARD_KINDS], appOwned);
   assert.equal(Object.isFrozen(GOVERNANCE_APP_OWNED_CARD_KINDS), true);
   assert.equal(Object.isFrozen(GOVERNANCE_CARD_KINDS), true);
-  assert.deepEqual([...GOVERNANCE_CARD_KINDS].sort(), [...OLD_GROUP_KEYS, "stable-write", "merge-main", "workflow-start"].sort());
-  assert.equal(GOVERNANCE_CARD_KINDS.length, 10, "GROUP 7 键 + app-owned 3 键");
+  assert.deepEqual([...GOVERNANCE_CARD_KINDS].sort(), [...OLD_GROUP_KEYS, ...appOwned].sort());
+  assert.equal(GOVERNANCE_CARD_KINDS.length, 11, "GROUP 7 键 + app-owned 4 键");
   assert.equal(new Set(GOVERNANCE_CARD_KINDS).size, GOVERNANCE_CARD_KINDS.length, "白名单不得重复");
   assert.equal(GOVERNANCE_CARD_KINDS.includes("stable-write"), true);
   assert.equal(GOVERNANCE_CARD_KINDS.includes("merge-main"), true);

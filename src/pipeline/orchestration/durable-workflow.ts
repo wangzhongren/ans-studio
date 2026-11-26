@@ -1,10 +1,13 @@
 import { DaprWorkflowClient, WorkflowRuntime, WorkflowRuntimeStatus } from '@dapr/dapr';
 import type { Task, WorkflowContext } from '@dapr/dapr';
 import { DURABLE_ACTIVITY, DURABLE_ACTIVITY_CONTRACT, DURABLE_EXECUTOR, DURABLE_WAKE_EVENT, DURABLE_GRAPH_ACTIVITY,
-  DURABLE_GRAPH_ACTIVITY_CONTRACT, DURABLE_GRAPH_EXECUTOR, DURABLE_GRAPH_WAKE_EVENT } from '../../model/durable-workflow.ts';
+  DURABLE_GRAPH_ACTIVITY_CONTRACT, DURABLE_GRAPH_EXECUTOR, DURABLE_GRAPH_WAKE_EVENT, DURABLE_EVIDENCE_AUDIT_EXECUTOR,
+  DURABLE_EVIDENCE_AUDIT_ACTIVITY, DURABLE_EVIDENCE_AUDIT_ACTIVITY_CONTRACT, DURABLE_EVIDENCE_AUDIT_WAKE_EVENT } from '../../model/durable-workflow.ts';
 import type { DurableConnection, DurableDefinitionSnapshot, DurableInstanceRef, DurableWorkerStatus } from '../../model/durable-workflow.ts';
 import { DurableWorkflowService } from '../../service/durable-workflow/public.ts';
 import type { ActivityInput, ActivityOutcome } from '../../service/durable-workflow/public.ts';
+export { implementationTestCommand, implementationTestMatches, implementationTestRulesText, implementationWorkOrderText,
+  verifyImplementationRetestInputs } from '../../service/durable-workflow/public.ts';
 
 type Execution = { ref: DurableInstanceRef; definition: DurableDefinitionSnapshot };
 type Wake = { ref: DurableInstanceRef; key: string };
@@ -19,7 +22,13 @@ export interface OpenDurableWorkflowOptions {
 
 const compiledContract: Contract = { executor: DURABLE_EXECUTOR, activityContract: DURABLE_ACTIVITY_CONTRACT };
 const graphContract: Contract = { executor: DURABLE_GRAPH_EXECUTOR, activityContract: DURABLE_GRAPH_ACTIVITY_CONTRACT };
-const compiled = [compiledContract, graphContract];
+const auditContract: Contract = { executor: DURABLE_EVIDENCE_AUDIT_EXECUTOR, activityContract: DURABLE_EVIDENCE_AUDIT_ACTIVITY_CONTRACT };
+const compiled = [compiledContract, graphContract, auditContract];
+function channel(contract: number) {
+  if (contract === DURABLE_EVIDENCE_AUDIT_ACTIVITY_CONTRACT) return { activity: DURABLE_EVIDENCE_AUDIT_ACTIVITY, wakeEvent: DURABLE_EVIDENCE_AUDIT_WAKE_EVENT };
+  if (contract === DURABLE_GRAPH_ACTIVITY_CONTRACT) return { activity: DURABLE_GRAPH_ACTIVITY, wakeEvent: DURABLE_GRAPH_WAKE_EVENT };
+  return { activity: DURABLE_ACTIVITY, wakeEvent: DURABLE_WAKE_EVENT };
+}
 
 function sameRef(first: DurableInstanceRef, second: DurableInstanceRef | undefined): boolean {
   return second !== undefined && first.projectId === second.projectId && first.instanceId === second.instanceId
@@ -34,8 +43,7 @@ function* executeDefinition(ctx: WorkflowContext, input: Execution): Generator<T
     || ref.definitionDigest !== definition.digest || ref.definitionId !== definition.id || ref.definitionVersion !== definition.version) {
     throw new Error('固定工作流输入的身份不匹配。');
   }
-  const activity = definition.schema === 2 ? DURABLE_GRAPH_ACTIVITY : DURABLE_ACTIVITY;
-  const wakeEvent = definition.schema === 2 ? DURABLE_GRAPH_WAKE_EVENT : DURABLE_WAKE_EVENT;
+  const { activity, wakeEvent } = channel(ref.activityContract);
   let stepId = definition.start;
   let entry = 0;
   while (true) {
@@ -109,11 +117,12 @@ export function openDurableWorkflow(options: OpenDurableWorkflowOptions) {
     const candidate = new WorkflowRuntime({ daprHost, daprPort, daprApiToken });
     const candidateClient = new DaprWorkflowClient({ daprHost, daprPort, daprApiToken });
     for (const contract of registered) {
-      const activity = contract.activityContract === DURABLE_GRAPH_ACTIVITY_CONTRACT ? DURABLE_GRAPH_ACTIVITY : DURABLE_ACTIVITY;
+      const { activity } = channel(contract.activityContract);
       candidate.registerWorkflowByName(contract.executor, executeDefinition);
-      candidate.registerActivityWithName<ActivityInput, ActivityOutcome>(activity, (context, input) => {
+      candidate.registerActivityWithName<ActivityInput, ActivityOutcome>(activity, async (context, input) => {
         if (context.getWorkflowInstanceId() !== input.ref.instanceId || input.ref.executor !== contract.executor
           || input.ref.activityContract !== contract.activityContract) throw new Error('活动调用的实例或契约不匹配。');
+        await service.prepareA11BlockedReduction(input);
         return service.apply(input);
       });
     }
@@ -178,7 +187,7 @@ export function openDurableWorkflow(options: OpenDurableWorkflowOptions) {
       const ref = resumable.get(item.instanceId);
       if (!ref) continue;
       try {
-        const wakeEvent = ref.activityContract === DURABLE_GRAPH_ACTIVITY_CONTRACT ? DURABLE_GRAPH_WAKE_EVENT : DURABLE_WAKE_EVENT;
+        const { wakeEvent } = channel(ref.activityContract);
         await dapr.raiseEvent(item.instanceId, wakeEvent, { ref, key: item.key } satisfies Wake, AbortSignal.timeout(4000));
         service.postponeOutbox(item, true);
       } catch {
@@ -211,6 +220,14 @@ export function openDurableWorkflow(options: OpenDurableWorkflowOptions) {
   }
 
   return {
+    prepareWorkflowDispatch: service.prepareWorkflowDispatch.bind(service),
+    requestDocumentRevision: service.requestDocumentRevision.bind(service),
+    submitDocumentRevision: service.submitDocumentRevision.bind(service),
+    readDocumentRevisionReview: service.readDocumentRevisionReview.bind(service),
+    decideDocumentRevision: service.decideDocumentRevision.bind(service),
+    resumeDocumentRevision: service.resumeDocumentRevision.bind(service),
+    failDocumentRevision: service.failDocumentRevision.bind(service),
+    prepareDirectIntentGate: service.prepareDirectIntentGate.bind(service),
     listDefinitions: service.listDefinitions.bind(service), validateDefinition: service.validateDefinition.bind(service),
     copyPreset: service.copyPreset.bind(service), importDefinition: service.importDefinition.bind(service),
     start: service.start.bind(service), owner: service.owner.bind(service), projection: service.projection.bind(service),
@@ -219,12 +236,42 @@ export function openDurableWorkflow(options: OpenDurableWorkflowOptions) {
     decideWorkflowStart: service.decideWorkflowStart.bind(service), startApprovedWorkflow: service.startApprovedWorkflow.bind(service),
     lookup: service.lookup.bind(service), activeProjections: service.activeProjections.bind(service),
     submitCapability: service.submitCapability.bind(service), listCapabilityEvents: service.listCapabilityEvents.bind(service),
+    recordAcceptanceEnvironmentMissing: service.recordAcceptanceEnvironmentMissing.bind(service),
+    recordAcceptancePreparation: service.recordAcceptancePreparation.bind(service),
+    evidenceAuditAccess: service.evidenceAuditAccess.bind(service),
+    decideB2EvidenceScope: service.decideB2EvidenceScope.bind(service),
+    evidenceAuditDispatchPermit: service.evidenceAuditDispatchPermit.bind(service),
+    verifyEvidenceAudit: service.verifyEvidenceAudit.bind(service),
+    verifyEvidenceAuditRelease: service.verifyEvidenceAuditRelease.bind(service),
+    prepareEvidenceAudit: service.prepareEvidenceAudit.bind(service),
+    dispatchEvidenceCollection: service.dispatchEvidenceCollection.bind(service),
+    recordEvidenceCollection: service.recordEvidenceCollection.bind(service),
+    recordEvidenceExecution: service.recordEvidenceExecution.bind(service),
+    closeEvidenceCollection: service.closeEvidenceCollection.bind(service),
+    recordEvidenceBlocker: service.recordEvidenceBlocker.bind(service),
+    acceptanceDispatchPermit: service.acceptanceDispatchPermit.bind(service),
+    requestAcceptancePreparationStop: service.requestAcceptancePreparationStop.bind(service),
+    dispatchAcceptanceEnvironment: service.dispatchAcceptanceEnvironment.bind(service),
+    settleAcceptanceEnvironment: service.settleAcceptanceEnvironment.bind(service),
+    recordImplementationSelfTest: service.recordImplementationSelfTest.bind(service),
+    parkA11Disposition: service.parkA11Disposition.bind(service),
+    observeA11Disposition: service.observeA11Disposition.bind(service),
+    resumeA11Disposition: service.resumeA11Disposition.bind(service),
+    failA11Retest: service.failA11Retest.bind(service),
+    requestA11DispositionStop: service.requestA11DispositionStop.bind(service),
+    claimA11RecoveryEffect: service.claimA11RecoveryEffect.bind(service),
+    retryA11RecoveryEffect: service.retryA11RecoveryEffect.bind(service),
+    prepareBlockedScopeChange: service.prepareBlockedScopeChange.bind(service),
+    decideBlockedScopeChange: service.decideBlockedScopeChange.bind(service),
+    resumeBlockedScopeChange: service.resumeBlockedScopeChange.bind(service),
+    completeIntentDecision: service.completeIntentDecision.bind(service), decideRelease: service.decideRelease.bind(service),
     graphCardDigest: service.graphCardDigest, bindRepository: service.bindRepository.bind(service),
     withDomainOperation: service.withDomainOperation.bind(service), checkExistingBaseline: service.checkExistingBaseline.bind(service),
     listProjections: service.listProjections.bind(service), submit: service.submit.bind(service),
     listFacts: service.listFacts.bind(service), readEvidence: service.readEvidence.bind(service),
     storeEvidence: service.storeEvidence.bind(service), getEvidence: service.getEvidence.bind(service),
     claimEffect: service.claimEffect.bind(service), settleEffect: service.settleEffect.bind(service),
+    settleAcceptanceBrowserCapture: service.settleAcceptanceBrowserCapture.bind(service),
     listEffects: service.listEffects.bind(service), taskGitScope: service.taskGitScope.bind(service), taskWriteScope: service.taskWriteScope.bind(service),
     block: service.block.bind(service),
     acknowledgeDelivery: service.acknowledgeDelivery.bind(service),

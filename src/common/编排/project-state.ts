@@ -60,6 +60,7 @@ import {
 import {
   loadLatestRoster,
   parseProjectModules,
+  type LoadedRoster,
 } from "./workflow-preconditions.ts";
 import { shortenSummary, readTaskState, taskCardOf, taskCards, type TaskRecord } from "./task-state.ts";
 import {
@@ -100,6 +101,8 @@ export interface ProjectStateScope {
   full?: boolean;
   /** 可选只读过滤（工具 `project_state` 入参）。 */
   flowId?: string;
+  /** Host-only lookup for the exact effective frozen workflow paired with a flow. */
+  evidenceCollectorRoleIdForFlow?: (flowId: string) => string | undefined | Promise<string | undefined>;
   now?: Date;
   limits?: Partial<ProjectStateLimits>;
   /** 派生下一步文案（A2/A3 可注入 i18n；缺省用机器可读英文短语）。 */
@@ -445,21 +448,23 @@ interface ReferenceIssueResult {
   blockers: ProjectStateBlocker[];
   errors: ProjectStateError[];
   issues: Map<ProjectStateDocKind, string>;
+  evidenceRoster?: boolean;
 }
 
 async function collectReferenceIssues(
   projectRoot: string,
-  flowId: string | undefined,
+  flowId: string,
   docs: Partial<Record<ProjectStateDocKind, VersionedDocPointer>>,
+  evidenceCollectorRoleId?: string,
 ): Promise<ReferenceIssueResult> {
   const blockers: ProjectStateBlocker[] = [];
   const errors: ProjectStateError[] = [];
   const issues = new Map<ProjectStateDocKind, string>();
-  if (flowId === undefined) return { blockers, errors, issues };
-
   const rosterDoc = docs.roster;
+  let evidenceRoster: LoadedRoster | undefined;
   if (rosterDoc !== undefined) {
-    const loaded = await loadLatestRoster({ projectRoot, flowId });
+    const loaded = await loadLatestRoster({ projectRoot, flowId, evidenceCollectorRoleId });
+    if (evidenceCollectorRoleId && loaded.ok && loaded.path === rosterDoc.path) evidenceRoster = loaded;
     if (!loaded.ok) {
       const message = `roster 解析/引用失败：${loaded.reason}`;
       issues.set("roster", message);
@@ -485,7 +490,10 @@ async function collectReferenceIssues(
       issues.set("modules", message);
     }
     if (text !== undefined) {
-      const parsed = parseProjectModules(text, flowId);
+      const paired = evidenceRoster ? parseProjectModules(text, flowId, evidenceCollectorRoleId) : undefined;
+      const parsed = evidenceRoster && paired?.ok && paired.doc.version === modulesDoc.version
+        && JSON.stringify(paired.doc.modules) === JSON.stringify(evidenceRoster.roster.modules)
+        ? paired : parseProjectModules(text, flowId);
       if (!parsed.ok) {
         const message = `modules 解析/引用失败：${parsed.reason}`;
         issues.set("modules", message);
@@ -500,7 +508,7 @@ async function collectReferenceIssues(
       }
     }
   }
-  return { blockers, errors, issues };
+  return { blockers, errors, issues, evidenceRoster: evidenceRoster !== undefined };
 }
 
 // —————————————— 质量报告存在性（evidence 指针） ——————————————
@@ -825,10 +833,6 @@ export async function buildProjectStateView(
   }
 
   const focus = focusOf(state.events, flowIds, manifests, derivationByFlow, unclosedCountByFlow, supersededBy, generatedAt);
-  const focusDocs = focus.flowId !== undefined ? (docCatalog.byFlow.get(focus.flowId) ?? {}) : {};
-  const reference = await collectReferenceIssues(projectRoot, focus.flowId, focusDocs);
-  errors.push(...reference.errors);
-
   // 版本漂移（focus pinned run 与磁盘更新契约文档）。
   let newerKinds = new Set<ProjectStateDocKind>();
   const focusActive = focus.flowId !== undefined ? derivationByFlow.get(focus.flowId)?.active : null;
@@ -836,19 +840,6 @@ export async function buildProjectStateView(
     const newer = await findNewerContractDocs(projectRoot, focusActive);
     newerKinds = new Set(newer.map((doc) => doc.kind));
   }
-
-  const { notes, nextStep: chiefNextStep } = collectNotes(state.events);
-  const blockers = buildBlockers({
-    tasks: allTasks,
-    unclosedIds,
-    focus,
-    derivationByFlow,
-    requests,
-    supersededBy,
-    notes,
-    referenceBlockers: reference.blockers,
-    newerKinds,
-  });
 
   // ———— flows ————
   const flowViews: ProjectStateFlow[] = [];
@@ -895,7 +886,7 @@ export async function buildProjectStateView(
     return (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? "") || a.flowId.localeCompare(b.flowId);
   });
   const flowsTruncated = flowViews.length > limits.flows;
-  let flows = flowViews.slice(0, limits.flows);
+  let flows = (scope.flowId === undefined ? flowViews : flowViews.filter((flow) => flow.flowId === scope.flowId)).slice(0, limits.flows);
 
   // ———— tasks ————
   const scopedTasks = scope.flowId !== undefined ? allTasks.filter((task) => task.flowId === scope.flowId) : allTasks;
@@ -907,10 +898,19 @@ export async function buildProjectStateView(
   // ———— versions ————
   const versionViews: ProjectStateVersion[] = [];
   let versionsTruncated = false;
-  const flowsForVersions = full ? [...flows] : flows.filter((flow) => flow.flowId === focus.flowId);
+  const flowsForVersions = full ? [...flows] : flows.filter((flow) => flow.flowId === focus.flowId
+    || scope.flowId === flow.flowId && viewerTasks.some((task) => task.flowId === flow.flowId));
+  const referenceBlockers: ProjectStateBlocker[] = [];
   for (const flow of flowsForVersions) {
     const docs = docCatalog.byFlow.get(flow.flowId) ?? {};
     const pinnedManifest = manifests.find((manifest) => manifest.flowId === flow.flowId && manifest.state === "pinned");
+    let evidenceCollectorRoleId: string | undefined;
+    if (!pinnedManifest && (docs.roster || docs.modules)) {
+      try { evidenceCollectorRoleId = await scope.evidenceCollectorRoleIdForFlow?.(flow.flowId); } catch { /* Ordinary reads keep their default checks. */ }
+    }
+    const reference = await collectReferenceIssues(projectRoot, flow.flowId, docs, evidenceCollectorRoleId);
+    errors.push(...reference.errors);
+    referenceBlockers.push(...reference.blockers);
     const kinds = full && flow.flowId === focus.flowId
       ? VERSIONED_DOC_KINDS
       : [...new Set([...Object.keys(docs), ...Object.keys(pinnedManifest?.documents ?? {})])] as ProjectStateDocKind[];
@@ -922,7 +922,9 @@ export async function buildProjectStateView(
       if (latest === undefined && (pinRef === undefined || pinRef === null) && !focusKind) continue;
       let latestPointer: ProjectStateLatestVersionPointer | undefined;
       if (latest !== undefined) {
-        const sha = flow.flowId === focus.flowId ? await fileSha256(projectRoot, latest.path) : undefined;
+        const withDigest = flow.flowId === focus.flowId || flow.flowId === scope.flowId
+          || reference.evidenceRoster && (kind === "modules" || kind === "roster");
+        const sha = withDigest ? await fileSha256(projectRoot, latest.path) : undefined;
         latestPointer = { path: latest.path, version: latest.version, ...(sha !== undefined ? { sha256: sha } : {}) };
       }
       const pinnedPointer = pinRef !== undefined && pinRef !== null
@@ -945,6 +947,9 @@ export async function buildProjectStateView(
     if (entries.length > limits.versionsPerFlow) versionsTruncated = true;
     versionViews.push(...entries.slice(0, limits.versionsPerFlow));
   }
+  const { notes, nextStep: chiefNextStep } = collectNotes(state.events);
+  const blockers = buildBlockers({ tasks: allTasks, unclosedIds, focus, derivationByFlow, requests,
+    supersededBy, notes, referenceBlockers, newerKinds });
 
   // ———— evidence（只做指针存在性） ————
   const evidenceViews: ProjectStateEvidence[] = [];

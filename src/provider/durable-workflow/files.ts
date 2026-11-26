@@ -46,6 +46,78 @@ async function readBoundedFile(file: string, maxBytes: number): Promise<Buffer> 
   }
 }
 
+async function revisionLocation(projectRoot: string, path: string): Promise<{ directory: string; file: string }> {
+  const segments = path.split('/');
+  const basename = segments.pop()!;
+  if (!basename || !segments.length || path.length > 500 || /[\\:\x00-\x1f]/.test(path)
+    || [...segments, basename].some(part => !part || part === '.' || part === '..' || /[ .]$/.test(part))) {
+    throw new Error('修订文件路径不规范。');
+  }
+  let directory = await realpath(projectRoot);
+  for (const component of segments) {
+    directory = join(directory, component);
+    const stat = await lstat(directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink() || relative(directory, await realpath(directory)) !== '') {
+      throw new Error('修订目录存在链接或重定向。');
+    }
+  }
+  return { directory, file: join(directory, basename) };
+}
+
+export async function readRevisionProjectFile(projectRoot: string, path: string, maxBytes: number): Promise<Buffer | undefined> {
+  const { file } = await revisionLocation(projectRoot, path);
+  const stat = await lstat(file).catch(error => {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  });
+  if (!stat) return undefined;
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || relative(file, await realpath(file)) !== '') {
+    throw new Error('修订文件不是普通文件或存在重定向。');
+  }
+  const bytes = await readBoundedFile(file, maxBytes);
+  const after = await lstat(file);
+  if (after.dev !== stat.dev || after.ino !== stat.ino || after.mtimeMs !== stat.mtimeMs || after.size !== stat.size || after.nlink !== 1) {
+    throw new Error('修订文件读取期间已变化。');
+  }
+  return bytes;
+}
+
+/** Publish over an exclusive link and identify precisely the temporary inode left after a crash. */
+export async function publishRevisionProjectFile(projectRoot: string, path: string, bytes: Buffer, recover: boolean): Promise<void> {
+  const { directory, file } = await revisionLocation(projectRoot, path);
+  const temporary = join(directory, '.workflow-revision-' + digest(stableJson([path, digest(bytes)])) + '.tmp');
+  const statAt = (name: string) => lstat(name).catch(error => {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  });
+  const target = await statAt(file);
+  const temporaryStat = await statAt(temporary);
+  if (target) {
+    if (!recover || !target.isFile() || target.isSymbolicLink()) throw new Error('规范后继版本路径已被占用：' + path);
+    if (temporaryStat && target.nlink === 2 && temporaryStat.isFile() && !temporaryStat.isSymbolicLink()
+      && temporaryStat.dev === target.dev && temporaryStat.ino === target.ino) {
+      if (!(await readBoundedFile(temporary, bytes.length)).equals(bytes)) throw new Error('修订暂存和已链接目标已漂移。');
+      await unlink(temporary);
+    }
+    if (!(await readRevisionProjectFile(projectRoot, path, bytes.length))?.equals(bytes)) throw new Error('实际修订目标与批准摘要不一致。');
+    return;
+  }
+  if (temporaryStat) {
+    if (!recover || !temporaryStat.isFile() || temporaryStat.isSymbolicLink() || temporaryStat.nlink !== 1
+      || !(await readBoundedFile(temporary, bytes.length)).equals(bytes)) throw new Error('待核对的修订暂存无法验证。');
+  } else {
+    const handle = await open(temporary, 'wx', 0o600);
+    try {
+      await handle.writeFile(bytes);
+      await handle.sync();
+    } finally { await handle.close(); }
+  }
+  try {
+    if ((await revisionLocation(projectRoot, path)).directory !== directory) throw new Error('修订目录已变化。');
+    await link(temporary, file);
+  } finally { await unlink(temporary).catch(() => undefined); }
+}
+
 export async function readImportedDefinition(file: string, maxBytes: number): Promise<Buffer> {
   if (!isAbsolute(file) || !/\.ya?ml$/i.test(file) || !(await lstat(file)).isFile()) throw new Error('仅可导入已选中的普通 YAML 文件。');
   return readBoundedFile(await realpath(file), maxBytes);
@@ -108,6 +180,21 @@ export async function gitRead(cwd: string, args: string[]): Promise<string> {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_')));
   const { stdout } = await run('git', args, { cwd, env, timeout: 6000, windowsHide: true, maxBuffer: 1024 * 1024 });
   return stdout.trim();
+}
+
+export async function readCandidateBlob(cwd: string, oid: string, path: string, maxBytes: number): Promise<Buffer> {
+  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(oid) || !path || path.length > 1024
+    || /[\\:\x00-\x1f]/.test(path) || path.split('/').some(part => ['', '.', '..'].includes(part))) {
+    throw new Error('候选文件需要实际提交和规范项目路径。');
+  }
+  const entry = await gitRead(cwd, ['ls-tree', '--full-tree', '-z', oid, '--', ':(literal)' + path]);
+  const blob = /^100(?:644|755) blob ([0-9a-f]{40,64})\t/.exec(entry)?.[1];
+  if (!blob || !entry.endsWith('\0') || entry.slice(entry.indexOf('\t') + 1, -1) !== path) {
+    throw new Error('候选树没有该普通文件。');
+  }
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_')));
+  const { stdout } = await run('git', ['cat-file', 'blob', blob], { cwd, env, encoding: 'buffer', maxBuffer: maxBytes, timeout: 6000, windowsHide: true });
+  return stdout;
 }
 
 export async function repositoryIdentity(projectRoot: string): Promise<RepositoryIdentity> {

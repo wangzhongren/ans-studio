@@ -6,19 +6,23 @@ import { fileURLToPath } from "node:url";
 import { WORKFLOW_START_OPTION_IDS } from "../../../app/desktop/workflow-chief-start.ts";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
 import { readWorkflowLedger } from "../../../src/common/编排/workflow-service.ts";
-import { app, businessDb, emptyFixture, fixture, git, modelFixture, resourceRoot, successful, target as trackedFile, until, unwrap, write, type Log } from "./fixture.ts";
+import { app, businessDb, emptyFixture, fixture, git, modelFixture, resourceRoot, sqliteSnapshot, successful, target as trackedFile, until, unwrap, write, type Log } from "./fixture.ts";
 
 const native = { skip: !resourceRoot && "Set ANS_W5_DAPR_ROOT to verified Windows bundle resources", timeout: 120_000 };
 const [approve, reject] = WORKFLOW_START_OPTION_IDS;
 const matchWindow = () => true;
 
 async function assertLegacyFirstStagesDenied(turn: import("./fixture.ts").ModelTurn) {
+  if (!turn.toolNames.includes("dispatch_task")) {
+    assert.equal(turn.toolNames.includes("redispatch_task"), false);
+    return;
+  }
   for (const [workflowPath, stage] of [["A", "A1"], ["B", "B1"]]) {
     const legacy = await turn.call("dispatch_task", { roleId: "convener", task: `Attempt the old ${stage} shortcut`,
       flowId: "w5-old-shortcut", workflowId: "forged-workflow-id", workflowPath, stage, taskKind: "stage-request",
       workflowAction: "advance", sideEffect: "read-only" });
     assert.equal(legacy.ok, false);
-    assert.match(legacy.message ?? "", /workflow-start-confirmation-required/);
+    assert.match(legacy.message ?? "", /workflow-start-confirmation-required|workflow-dispatch-owned/);
   }
 }
 
@@ -27,6 +31,9 @@ test("ordinary Chief proposes preset A, and a trusted customer starts it only af
   const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
   const requirement = "Create an isolated local example with a new governed implementation";
   const releaseParent = Promise.withResolvers<void>();
+  const releaseProduct = Promise.withResolvers<void>();
+  const releaseNextProduct = Promise.withResolvers<void>();
+  const productTurns: string[] = [];
   let instanceId: string | undefined;
   let chiefAck: string | undefined;
   let choice: { definitionId: string; source: "preset"; expectedDigest: string; reason: string };
@@ -36,7 +43,7 @@ test("ordinary Chief proposes preset A, and a trusted customer starts it only af
       chiefAck = turn.turnId;
       const catalog = await turn.call("project_state", { definitionId: "path-a" });
       assert.equal(catalog.ok, true, catalog.message);
-      assert.ok(catalog.message?.includes(`preset | id=path-a | v1 | ${choice.expectedDigest}`), catalog.message);
+      assert.ok(catalog.message?.includes(`preset | id=path-a | v4 | ${choice.expectedDigest}`), catalog.message);
       const receipt = await turn.call("request_workflow_start", choice);
       assert.equal(receipt.ok, true, receipt.message);
       const duplicate = await turn.call("request_workflow_start", choice);
@@ -47,19 +54,36 @@ test("ordinary Chief proposes preset A, and a trusted customer starts it only af
       await assertLegacyFirstStagesDenied(turn);
       await releaseParent.promise;
       await assertLegacyFirstStagesDenied(turn);
-    } else if (turn.roleId === "chief") {
-      assert.ok(instanceId, turn.text);
-      await successful(turn, "dispatch_task", { roleId: "convener", task: "Prepare the new product example after approval",
-        flowId: "w5-chief-a", workflowId: instanceId, taskKind: "stage-request", workflowPath: "A", stage: "A1",
-        workflowAction: "advance", sideEffect: "read-only" });
+    } else if (turn.roleId === "product") {
+      const taskId = /任务编号：#([0-9a-z-]+)\b/.exec(turn.text)?.[1];
+      assert.ok(taskId, turn.text);
+      const task = (await readTaskState(f.root)).records.get(taskId)?.created;
+      assert.ok(task, turn.text);
+      if (task.stage === "A2") {
+        await releaseNextProduct.promise;
+        return;
+      }
+      assert.equal(task.stage, "A1");
+      assert.equal(task.to, "product");
+      assert.equal(task.sideEffect, "read-only");
+      assert.ok(turn.text.includes(requirement), turn.text);
+      assert.ok(task.flowId && turn.text.includes(task.flowId), turn.text);
+      const illegal = await turn.call("write_file", { path: `docs/product/${task.flowId}-outside-a1.md`, content: "Not authorized by A1" });
+      assert.equal(illegal.ok, false, illegal.message);
+      productTurns.push(taskId);
+      log("product-direct-a1-write-denied", { taskId, illegal });
+      await releaseProduct.promise;
+      if (turn.signal.aborted) return;
+      await successful(turn, "submit_report", { status: "completed", summary: "The customer requirement is bounded. Product intake is ready for intent drafting." });
     }
   }, log);
   const handle = await app(f, model, log);
-  t.after(() => { releaseParent.resolve(); return handle.close(); });
+  t.after(() => { releaseParent.resolve(); releaseProduct.resolve(); releaseNextProduct.resolve(); return handle.close(); });
   const project = { projectRoot: f.root };
   const target = { ...project, roleId: "chief", runtime: "pi" as const };
   const definition = unwrap(await handle.desktop.validateDurableWorkflow({ ...project, definitionId: "path-a", source: "preset" }));
   assert.ok(definition.digest);
+  assert.equal(definition.version, 4);
   choice = { definitionId: "path-a", source: "preset", expectedDigest: definition.digest, reason: "A new project needs full product governance" };
   const blocked = await handle.desktop.startDurableWorkflow({ ...project, ...choice, enabled: true, requestId: "w5-bypass", summary: requirement });
   assert.equal(blocked.ok, false);
@@ -118,13 +142,34 @@ test("ordinary Chief proposes preset A, and a trusted customer starts it only af
       return row;
     }
   }, model.errors);
-  const first = await until("valid A1 dispatch after approval", async () => (await readTaskState(f.root)).events.find(event =>
-    event.kind === "task.created" && event.workflowId === instanceId && event.stage === "A1"), model.errors);
+  const taskId = await until("the actual product role receives its direct A1 task", async () => productTurns[0], model.errors);
+  const inFlight = (await readTaskState(f.root)).events;
+  const a1Tasks = inFlight.filter(event => event.kind === "task.created" && event.workflowId === instanceId && event.stage === "A1");
+  assert.equal(a1Tasks.length, 1);
+  const [first] = a1Tasks;
+  assert.equal(first.kind, "task.created");
+  assert.equal(first.taskId, taskId);
+  assert.equal(first.to, "product");
+  assert.match(first.flowId ?? "", /^intake-[a-f0-9]{24}$/);
+  assert.equal(inFlight.some(event => event.kind === "task.created" && event.workflowId === instanceId && event.stage === "A2"), false);
   const projection = unwrap(await handle.desktop.getDurableWorkflowProjection({ ...project, instanceId }));
   assert.equal(projection.instance?.definitionDigest, definition.digest);
+  assert.equal(projection.instance?.action, "product-prepare-direct");
+  assert.equal(projection.instance?.flowId, first.flowId);
   assert.equal(projection.controlPlane.state, "ready");
+  assert.ok(instanceId);
+  const beforeReport = sqliteSnapshot(f, instanceId);
   assert.equal(businessDb(f, db => db.prepare("SELECT id FROM instance").all()).length, 1);
-  log("real-first-action-after-customer-approval", { started, first, projection });
+  await assert.rejects(access(path.join(f.root, ".git")), { code: "ENOENT" });
+  await assert.rejects(access(path.join(f.root, `docs/product/${first.flowId}-outside-a1.md`)), { code: "ENOENT" });
+  releaseProduct.resolve();
+  const advanced = await until("the saved A1 report advances the same instance to A2", async () => {
+    const view = unwrap(await handle.desktop.getDurableWorkflowProjection({ ...project, instanceId })).instance;
+    if (view?.action === "author-intent-direct") return view;
+  }, model.errors);
+  assert.equal(advanced.flowId, first.flowId);
+  assert.deepEqual(productTurns, [taskId]);
+  log("real-first-action-after-customer-approval", { started, first, projection, beforeReport, advanced, afterReport: sqliteSnapshot(f, instanceId) });
 });
 
 for (const scope of ["bundled-b", "imported"] as const) test(`ordinary Chief confirms ${scope} and reaches its real B1 role dispatch`, native, async t => {

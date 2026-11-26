@@ -49,6 +49,7 @@ export interface DeliveryStoreRefs {
 export interface DeliveryStorePorts {
   enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void;
   drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void>;
+  reconcileRecoveredInformation(projectRoot: string, roleId: string, item: DeliveryItem): Promise<(() => void) | undefined>;
   managerId(): string;
   inventoryState(): SessionInventoryState;
 }
@@ -73,6 +74,7 @@ export interface DeliveryStoreState {
 
 /** 投递队列快照序列化/原子写/重启恢复（原 SessionManager 7 方法的同签名实现）。 */
 export class DeliveryStore {
+  private readonly restoredInFlight = new Set<string>();
   private readonly state: DeliveryStoreState;
   private readonly refs: DeliveryStoreRefs;
   private readonly port: DeliveryStorePorts;
@@ -158,7 +160,8 @@ export class DeliveryStore {
       for (const item of queue) {
         const snapshot = this.persistableDeliveryItem(item);
         if (snapshot === undefined) continue;
-        items.push({ key: { projectRoot, roleId, runtime }, item: snapshot, state: "queued", enqueuedAt: item.enqueuedAt });
+        const state = item.queueEntryId && this.restoredInFlight.has(item.queueEntryId) ? "in-flight" : "queued";
+        items.push({ key: { projectRoot, roleId, runtime }, item: snapshot, state, enqueuedAt: item.enqueuedAt });
       }
     }
     for (const [key, item] of this.activeDeliveries) {
@@ -348,6 +351,7 @@ export class DeliveryStore {
     }
     const seen = new Set<string>();
     const drainKeys = new Set<string>();
+    const retired = new Map<string, () => void>();
     for (const raw of rawItems as unknown[]) {
       const parsed = this.parsePersistedDeliveryItem(raw);
       if (parsed === undefined) {
@@ -382,6 +386,16 @@ export class DeliveryStore {
         report.skipped += 1;
         continue;
       }
+      const persistedState = (raw as Record<string, unknown>).state;
+      if (persistedState === "queued") {
+        const present = await this.port.reconcileRecoveredInformation(projectRoot, roleId, item).catch(() => undefined);
+        if (present) {
+          retired.set(identity, present);
+          report.skipped += 1;
+          continue;
+        }
+      }
+      if (persistedState === "in-flight" && item.queueEntryId) this.restoredInFlight.add(item.queueEntryId);
       if (item.kind === "handback") this.enqueuedHandbackKeys.add(item.dedupKey);
       if (item.kind === "dispatch") this.activeDispatchKeys.add(item.dedupKey);
       if (typeof item.taskId === "string" && item.taskId !== "") {
@@ -396,12 +410,15 @@ export class DeliveryStore {
         runtime,
         targetRoleId: item.targetRoleId,
         sourceRoleId: item.sourceRoleId,
+        queueEntryId: item.queueEntryId,
         text: item.text,
         summary: item.summary || mainT("main.session.recoveryDelivery", { role: item.sourceRoleId }),
         dedupKey: item.dedupKey,
         ...(item.flowId !== undefined ? { flowId: item.flowId } : {}),
         ...(item.taskId !== undefined ? { taskId: item.taskId } : {}),
         ...(item.clientMessageId !== undefined ? { clientMessageId: item.clientMessageId } : {}),
+        ...(item.systemAssignment !== undefined ? { systemAssignment: item.systemAssignment } : {}),
+        ...(item.notificationSource !== undefined ? { notificationSource: item.notificationSource } : {}),
         ...(item.handback !== undefined ? { handback: item.handback } : {}),
         ...(item.report !== undefined ? { report: item.report } : {}),
         ...(item.liveReport !== undefined ? { liveReport: item.liveReport } : {}),
@@ -413,6 +430,17 @@ export class DeliveryStore {
       report.items.push({ projectRoot, roleId, runtime, kind: item.kind, summary: item.summary });
     }
     diagnostic.record("delivery.queue.restored", { count: report.restored });
+    if (retired.size) {
+      this.persistDeliveryQueues();
+      const seq = this.deliveryPersistSeq;
+      const settled = await this.deliveryPersistChain;
+      if (settled.committedSeq >= seq) {
+        for (const [identity, present] of retired) {
+          this.deliveredDeliveryKeys.add(identity);
+          present();
+        }
+      }
+    }
     // 自动重投（复用既有串行投递机；目标未开会自动开启，忙则排队——与正常运行完全同一条路径）。
     for (const queueKey of drainKeys) {
       const [projectRoot = "", roleId = "", runtimeRaw = ""] = queueKey.split("\u0000");

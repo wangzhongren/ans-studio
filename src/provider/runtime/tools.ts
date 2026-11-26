@@ -2,19 +2,30 @@
 import { coreToolTarget, utf8Prefix } from "../../common/runtime-core/tool-display.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { resolveProjectList } from "../../common/runtime-core/list-dir.ts";
+import { sensitiveClass, SHELL_JUDGE_MAX_LIST_ENTRIES } from "../../common/runtime-core/shell-judge/policy.ts";
+import { isolatePackageManifest, readPackageManifest, verifyPackageLock } from "../../common/runtime-core/governed-package-lock.ts";
+import { resolveApprovedCommandTransport } from "../../common/runtime-core/approved-command-transport.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { readFile, realpath, stat, lstat, unlink } from "node:fs/promises";
+import { lstatSync, readdirSync, realpathSync, readFileSync } from "node:fs";
+import { readFile, readdir, realpath, stat, lstat, unlink } from "node:fs/promises";
 import { dirname, extname, isAbsolute, relative, resolve, join } from "node:path";
 import type {
   WriteGate,
   WriteGateContext,
   WriteGateOperation,
-  ClaimFileWriteFn, FileWriteClaim, FileWriteClaimOutcome,
+  ClaimFileWriteFn, FileWriteClaim, FileWriteClaimOutcome, GovernedPackageLockGenerator,
   FileGateStage, FileGateFacts, FileGateProtectionFacts, CanonicalWriteFacts, CurrentFileFacts,
   ShellGate,
+  AcceptanceEnvironmentReviewScope,
+  AcceptanceEnvironmentShellObservation,
+  AcceptanceEnvironmentToolCall,
+  ImplementationSelfTestObservation,
+  ImplementationSelfTestTransport,
   ShellPostAuditFn,
+  ShellStrictAuditObservation,
   ShellExecutionOutcome,
+  ShellReviewRequest,
   ShellReviewResult,
   ShellEscalationFn,
   ReadonlyGitCapability,
@@ -57,6 +68,7 @@ import type {
   SubmitVersionChangeFn, SubmitRefactorFn, RequestStableWriteFn,
   SubmitVersionChangeInput, SubmitRefactorInput, RequestStableWriteInput,
   PlanEscalationFn, PlanEscalationInput,
+  DocumentRevisionToolReceipt, RequestDocumentRevisionFn, SubmitDocumentRevisionFn,
   VersionChangeTargetSubmission,
   SelectRunChangeInput, CompleteTeamPlanInput, ActivateRoleDocumentsInput, CloseCreatedTaskInput,
   FixedCloseCreatedTaskInput, FixedActivateRoleDocumentsInput, TaskClosedOutcome,
@@ -68,6 +80,9 @@ import type {
 import { isDirectActionReceipt, isDirectActionSource, isGitOid, isGitBasis, isGitLiteralPath, isGitCapabilityResult } from "../../model/trunk.ts";
 import { isWorkflowPath, isWorkflowStage } from "../../model/runtime.ts";
 import {
+  DOCUMENT_REVISION_CONTENT_MAX_BYTES,
+  DOCUMENT_REVISION_PATH_MAX_CHARS,
+  DOCUMENT_REVISION_REASON_MAX_CHARS,
   PLAN_ESCALATION_CATEGORIES,
   PLAN_ESCALATION_SUMMARY_MAX,
   PLAN_ESCALATION_ERROR_CODES,
@@ -132,7 +147,7 @@ import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
 import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
 import type { MessageKey } from "../../common/shared/i18n/keys.ts";
-import { describeTool, WORKFLOW_DEFINITION_DIGEST_PATTERN, WORKFLOW_DEFINITION_ID_PATTERN } from "./schema.ts";
+import { describeDurableChiefDecisionTool, describeTool, WORKFLOW_DEFINITION_DIGEST_PATTERN, WORKFLOW_DEFINITION_ID_PATTERN } from "./schema.ts";
 // E2 X-R2/X-R4（rapporteur / convener）：requirement-change 动作前置的角色模块 public entry。
 // E0.3 §2 依赖方向：engines（含 Provider）只经角色模块 `index.ts` 只读消费；本前置不经 Service，
 // 也不 import 角色模块内部文件/门禁引擎私有 common。模块为纯数据/纯策略（无 I/O、无状态）。
@@ -169,6 +184,7 @@ import { PI_CREDENTIAL_ENV_VARS, RUNTIME_CREDENTIAL_ENV_VARS } from "../../commo
 import { isAbsoluteAny, isWithinReal } from "../../common/shared/path-primitives.ts";
 import {
   atomicWriteFile,
+  checkRelativePathSafe,
   ensureParentDir,
   guardWriteTarget,
   recheckParentInsideWriteRoot,
@@ -651,9 +667,10 @@ async function observeCurrentFile(abs: string): Promise<{ facts: CurrentFileFact
   }
 }
 async function beginFileInvocation(gate: WriteGate, name: string, abs: string, operation: WriteGateOperation,
-  host: FileGateHost, writeRoot: string, roots?: readonly string[], signal?: AbortSignal): Promise<
+  host: FileGateHost, writeRoot: string, roots?: readonly string[], signal?: AbortSignal,
+  operationId: string = randomUUID(), targetAuthority?: ScopedWriteAuthority): Promise<
     { ok: true; invocation: FileInvocation; raw?: Buffer } | { ok: false; result: ToolResult }> {
-  const invocation: FileInvocation = { active: true, gateActive: false, invocationId: randomUUID(), operationId: randomUUID(), target: abs, operation, host };
+  const invocation: FileInvocation = { active: true, gateActive: false, invocationId: randomUUID(), operationId, target: abs, operation, host };
   const reject = (result: ToolResult) => { invocation.active = false; return { ok: false as const, result }; };
   if (signal?.aborted || !host.isCurrent() || !isAbsolute(host.projectRoot) || !isAbsolute(host.skillRoot))
     return reject({ ok: false, message: `${name}: host roots/protocol unavailable or invocation aborted` });
@@ -670,6 +687,7 @@ async function beginFileInvocation(gate: WriteGate, name: string, abs: string, o
   if (!guarded.ok) return reject({ ok: false, message: `${name}: ${guarded.reason}` });
   if (signal?.aborted || !host.isCurrent() || JSON.stringify(await canonicalFileFacts(invocation)) !== JSON.stringify(invocation.canonical))
     return reject({ ok: false, message: `${name}: canonical/host facts drift before content read` });
+  if (targetAuthority && !await targetAuthority(guarded.target.rel)) return reject(evidenceScopeDenial(name));
   const current = await observeCurrentFile(abs);
   invocation.currentFile = current.facts;
   if (current.facts.state === "unknown") return reject({ ok: false, message: `${name}: current file unknown (${current.facts.reason}); no write` });
@@ -691,7 +709,7 @@ async function writeGuarded(
   abs: string,
   writeRoot: string,
   data: Buffer,
-  opts: { createParent: boolean },
+  opts: { createParent: boolean; verifySource?: () => Promise<boolean>; targetAuthority?: ScopedWriteAuthority },
   operation: WriteGateOperation,
   signal?: AbortSignal,
   onWrite?: (abs: string) => boolean | void | Promise<boolean | void>,
@@ -742,6 +760,8 @@ async function writeGuarded(
       if (!invocation.host.isCurrent()) return { ok: false, message: `${name}: host facts expired; no write` };
     }
 
+    if (opts.targetAuthority && !await opts.targetAuthority(path)) return evidenceScopeDenial(name);
+
     // 仅 write_file 需要建父目录。递归 mkdir 失败时也可能已经建成部分目录。
     if (opts.createParent) {
       try {
@@ -775,6 +795,10 @@ async function writeGuarded(
     // 原子写（同目录 temp + rename）。
     if (claim && !invocation?.host.isCurrent()) return { ok: false, message: `${name}: host facts expired; no write` };
     try {
+      if (opts.verifySource && (!await opts.verifySource() || !invocation?.host.isCurrent())) {
+        return { ok: false, message: `${name}：来源清单或任务已变化，未写入` };
+      }
+      if (opts.targetAuthority && !await opts.targetAuthority(path)) return evidenceScopeDenial(name);
       signal?.throwIfAborted();
       mutationStarted = true;
       await atomicWriteFile(abs, data, signal);
@@ -816,7 +840,7 @@ async function writeGuarded(
 }
 
 /** write_file：获准后 mkdir -p 父目录 → 原子写 content（UTF-8，不加 BOM）。 */
-function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>, protectedGitRoots?: readonly string[], host?: FileGateHost, claimFileWrite?: ClaimFileWriteFn): ExecutableTool {
+function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>, protectedGitRoots?: readonly string[], host?: FileGateHost, claimFileWrite?: ClaimFileWriteFn, targetAuthority?: ScopedWriteAuthority): ExecutableTool {
   const name = "write_file";
   return {
     name,
@@ -825,6 +849,7 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWri
       if (claimFileWrite !== undefined && !host) return { ok: false, message: `${name}：写入认领需要 host-facts-v1` };
       const path = readTargetPath(call.args);
       if (path === undefined) return { ok: false, message: `${name}: 缺少 path 参数，无法判定写入目标` };
+      if (targetAuthority && !await targetAuthority(path)) return evidenceScopeDenial(name);
       const content = readStringArg(call.args, ["content", "text"]);
       if (content === undefined) return { ok: false, message: `${name}: 缺少 content 参数，无法写入` };
 
@@ -835,10 +860,10 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWri
       const data = Buffer.from(content, "utf8");
       if (host) {
         if (writeRoot === undefined) return { ok: false, message: `${name}: staged protocol requires actual writeRoot` };
-        const staged = await beginFileInvocation(gate, name, resolveWriteAbs(path, writeRoot), "write", host, writeRoot, protectedGitRoots, call.signal);
+        const staged = await beginFileInvocation(gate, name, resolveWriteAbs(path, writeRoot), "write", host, writeRoot, protectedGitRoots, call.signal, undefined, targetAuthority);
         if (!staged.ok) return staged.result;
         try { return await writeGuarded(gate, name, path, staged.invocation.target, writeRoot, data,
-          { createParent: true }, "write", call.signal, onWrite, protectedGitRoots, staged.invocation, claimFileWrite); }
+          { createParent: true, targetAuthority }, "write", call.signal, onWrite, protectedGitRoots, staged.invocation, claimFileWrite); }
         finally { staged.invocation.active = false; }
       }
       const pre = govern(gate, name, path, writeRoot, { contentSha256: sha256Hex(data), operation: "write" });
@@ -847,7 +872,55 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWri
         return { ok: true, message: `${name} 已获准（写入）：${path}（本次构造未配置 writeRoot，已判定但未落盘）` };
       }
       if (call.signal?.aborted) return { ok: false, message: `${name}：会话已中止，未写入` };
-      return writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: true }, "write", call.signal, onWrite, protectedGitRoots);
+      return writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: true, targetAuthority }, "write", call.signal, onWrite, protectedGitRoots);
+    },
+  };
+}
+
+const GENERATE_PACKAGE_LOCK_TOOL_NAME = "generate_package_lock";
+
+function makeGeneratePackageLockTool(gate: WriteGate, writeRoot: string, host: FileGateHost,
+  claimFileWrite: ClaimFileWriteFn, port: GovernedPackageLockGenerator, currentTurnId: () => string | undefined,
+  onWrite?: (abs: string) => boolean | void | Promise<boolean | void>): ExecutableTool {
+  const name = GENERATE_PACKAGE_LOCK_TOOL_NAME;
+  const target = "package-lock.json";
+  return {
+    name,
+    async handler(call) {
+      if (Reflect.ownKeys(call.args).length) return { ok: false, message: `${name}：不接受参数` };
+      try {
+        const turnId = currentTurnId();
+        const callId = call.toolCallId;
+        if (!turnId || typeof callId !== "string" || !callId.trim()) {
+          return { ok: false, message: `${name}：缺少受信回合或工具调用标识，未生成` };
+        }
+        const operationId = sha256Hex(Buffer.from(JSON.stringify([name, turnId, callId])));
+        const grant = await port.authorize(call.signal);
+        const activeHost = { ...host, isCurrent: () => !call.signal?.aborted && currentTurnId() === turnId && host.isCurrent() && grant?.isCurrent() === true };
+        if (!activeHost.isCurrent()) return { ok: false, message: `${name}：缺少当前 A11 子任务的生成授权` };
+        const staged = await beginFileInvocation(gate, name, resolveWriteAbs(target, writeRoot), "write", activeHost, writeRoot, host.protectedRoots, call.signal, operationId);
+        if (!staged.ok) return staged.result;
+        const { invocation } = staged;
+        try {
+          const root = invocation.canonical!.projectRoot;
+          const source = await readPackageManifest(root);
+          const manifest = isolatePackageManifest(source);
+          const verifySource = async () => activeHost.isCurrent() && source.equals(await readPackageManifest(root)) && activeHost.isCurrent();
+          if (!activeHost.isCurrent()) return { ok: false, message: `${name}：任务已变化，未生成` };
+          const generated = await port.generate(Buffer.from(manifest), call.signal);
+          if (!generated.ok) return { ok: false, message: `${name} 生成失败（${generated.code}）：${generated.message}` };
+          const data = Buffer.from(generated.value);
+          verifyPackageLock(data, manifest);
+          if (!await verifySource()) return { ok: false, message: `${name}：来源清单或任务已变化，未写入` };
+          const changed = await recheckFileInvocation(invocation);
+          if (changed) return { ok: false, message: `${name}: ${changed}; no write` };
+          const result = await writeGuarded(gate, name, target, invocation.target, writeRoot, data,
+            { createParent: false, verifySource }, "write", call.signal, onWrite, host.protectedRoots, invocation, claimFileWrite);
+          return result.ok ? { ...result, message: `${result.message} SHA-256 ${sha256Hex(data)}` } : result;
+        } finally { invocation.active = false; }
+      } catch (error) {
+        return { ok: false, message: `${name}：无法核验清单、候选或任务，未写入（${reasonOf(error)}）` };
+      }
     },
   };
 }
@@ -873,7 +946,7 @@ function decodeForEdit(raw: Buffer): { ok: true; text: string; bom: boolean } | 
 }
 
 /** edit_file：获准后读原文件 → old_string 替换（未命中不写）→ 原子写回。 */
-function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>, protectedGitRoots?: readonly string[], host?: FileGateHost, claimFileWrite?: ClaimFileWriteFn): ExecutableTool {
+function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>, protectedGitRoots?: readonly string[], host?: FileGateHost, claimFileWrite?: ClaimFileWriteFn, targetAuthority?: ScopedWriteAuthority): ExecutableTool {
   const name = "edit_file";
   return {
     name,
@@ -882,6 +955,7 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrit
       if (claimFileWrite !== undefined && !host) return { ok: false, message: `${name}：写入认领需要 host-facts-v1` };
       const path = readTargetPath(call.args);
       if (path === undefined) return { ok: false, message: `${name}: 缺少 path 参数，无法判定写入目标` };
+      if (targetAuthority && !await targetAuthority(path)) return evidenceScopeDenial(name);
       const oldString = readStringArg(call.args, ["old_string", "oldString"]);
       const newString = readStringArg(call.args, ["new_string", "newString"]);
       if (oldString === undefined || newString === undefined) {
@@ -889,7 +963,7 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrit
       }
 
       if (host && writeRoot === undefined) return { ok: false, message: `${name}: staged protocol requires actual writeRoot` };
-      const staged = host ? await beginFileInvocation(gate, name, resolveWriteAbs(path, writeRoot!), "edit", host, writeRoot!, protectedGitRoots, call.signal) : undefined;
+      const staged = host ? await beginFileInvocation(gate, name, resolveWriteAbs(path, writeRoot!), "edit", host, writeRoot!, protectedGitRoots, call.signal, undefined, targetAuthority) : undefined;
       if (staged && !staged.ok) return staged.result;
       const invocation = staged?.ok ? staged.invocation : undefined;
       try {
@@ -910,7 +984,10 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrit
         if (staged?.ok) {
           if (staged.raw === undefined) return { ok: false, message: `${name}: target is missing; no edit` };
           raw = staged.raw;
-        } else raw = await readFile(pre.abs);
+        } else {
+          if (targetAuthority && !await targetAuthority(path)) return evidenceScopeDenial(name);
+          raw = await readFile(pre.abs);
+        }
       } catch (err) {
         return { ok: false, message: `${name} 失败：无法读取目标 ${path}（${reasonOf(err)}）` };
       }
@@ -930,14 +1007,14 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrit
       const readParent = await recheckParentInsideWriteRoot(writeRoot, readTarget.target.parentAbs, readTarget.target.parentReal);
       if (!readParent.ok) return { ok: false, message: `${name} 拒绝编辑：${readParent.reason}` };
 
-      return await writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, "edit", call.signal, onWrite, protectedGitRoots, invocation, claimFileWrite);
+      return await writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false, targetAuthority }, "edit", call.signal, onWrite, protectedGitRoots, invocation, claimFileWrite);
       } finally { if (invocation) invocation.active = false; }
     },
   };
 }
 
 /** 构造受治理的读取工具（read_file）：读不经过写门禁。 */
-function makeReadTool(readRoot: string): ExecutableTool {
+function makeReadTool(readRoot: string, scope?: EvidencePathScope): ExecutableTool {
   return {
     name: "read_file",
     async handler(call) {
@@ -945,9 +1022,11 @@ function makeReadTool(readRoot: string): ExecutableTool {
       if (path === undefined) {
         return { ok: false, message: "read_file: 缺少 path 参数" };
       }
-      const absolute = isAbsolute(path) ? path : resolve(readRoot, path);
+      const absolute = scope ? await scope.resolve(path, "file") : isAbsolute(path) ? path : resolve(readRoot, path);
+      if (absolute === undefined) return evidenceScopeDenial("read_file");
       try {
         const content = await readFile(absolute, "utf8");
+        if (scope && await scope.resolve(path, "file") !== absolute) return evidenceScopeDenial("read_file");
         return { ok: true, message: `read_file: ${path}\n\n${content}` };
       } catch (err) {
         const code = (err as NodeJS.ErrnoException | undefined)?.code;
@@ -1077,7 +1156,7 @@ function viewImagePolicyLimit(value: number, fallback: number): number {
  * 调用注入能力（tool-result 时为 Service 注入的内联受理回执）→ 按回执归一交付。
  * 任一校验失败都不触达交付、不写盘、不联网；失败一律 fail-closed（不交付图片，文案如实）。
  */
-function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: GovernedToolsOptions): ExecutableTool {
+function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: GovernedToolsOptions, scope?: EvidencePathScope): ExecutableTool {
   const name = VIEW_IMAGE_TOOL_NAME;
   const policy = options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY;
   const delivery = policy.delivery;
@@ -1121,6 +1200,9 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: Governed
         return fail("path-syntax", `${name} 拒绝读取：${syntax}——${notReadNotQueued}`, { path });
       }
 
+      const scopedPath = await scope?.resolve(path, "file");
+      if (scope && scopedPath === undefined) return evidenceScopeDenial(name);
+
       let rootReal: string;
       try {
         rootReal = await realpath(readRoot);
@@ -1129,7 +1211,7 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: Governed
       }
       let real: string;
       try {
-        real = await realpath(resolve(readRoot, path));
+        real = scopedPath ?? await realpath(resolve(readRoot, path));
       } catch (err) {
         const code = (err as NodeJS.ErrnoException | undefined)?.code;
         const why = code === "ENOENT" ? "不存在或不可访问" : reasonOf(err);
@@ -1177,6 +1259,7 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: Governed
           : `${name}：本轮已中止，图片附件未排队——不要当它已提供；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
       }
 
+      if (scope && await scope.resolve(path, "file") !== real) return evidenceScopeDenial(name);
       const image: PromptImage = { type: "image", data: raw.toString("base64"), mimeType };
       const input: ViewImageInput = { path, image, ...(turnId !== undefined ? { turnId } : {}) };
 
@@ -1364,6 +1447,246 @@ function shellGuardMessage(name: string, hit: ShellGuardHit): string {
     : `${head}若这些符号是字面量，请加引号或改用等价写法（如 grep -e a -e b）；确需管道/重定向/变量展开，请拆分为多条命令，或把逻辑写成脚本文件后执行。`;
 }
 
+const RESTORE_ACCEPTANCE_ENVIRONMENT_TOOL_NAME = "restore_acceptance_environment";
+/** This quoting mirrors the foreground tokenizer. The executable receives the original argv. */
+function displayFixedArgv(argv: readonly string[]): string {
+  return argv.map(arg => {
+    if (/^[a-zA-Z0-9_./:=@,+%-]+$/.test(arg)) return arg;
+    return "'" + arg.replaceAll("'", "'\"'\"'") + "'";
+  }).join(" ");
+}
+
+function pinAcceptanceDirectory(path: string): {
+  path: string;
+  identity: AcceptanceEnvironmentReviewScope["stagingIdentity"];
+  isCurrent: () => boolean;
+} | undefined {
+  if (!isAbsolute(path)) return undefined;
+  try {
+    const canonical = realpathSync.native(path);
+    const before = lstatSync(canonical, { bigint: true });
+    if (!before.isDirectory()) return undefined;
+    const identity = Object.freeze({ dev: before.dev.toString(), ino: before.ino.toString() });
+    return { path: canonical, identity, isCurrent: () => {
+      try {
+        if (realpathSync.native(path) !== canonical) return false;
+        const current = lstatSync(canonical, { bigint: true });
+        return current.isDirectory() && current.dev === before.dev && current.ino === before.ino;
+      } catch {
+        return false;
+      }
+    } };
+  } catch {
+    return undefined;
+  }
+}
+
+function bindAcceptanceReviewScope(
+  value: AcceptanceEnvironmentReviewScope,
+  call: AcceptanceEnvironmentToolCall,
+  stage: NonNullable<ReturnType<typeof pinAcceptanceDirectory>>,
+): { scope: AcceptanceEnvironmentReviewScope; publishParentsCurrent(): boolean } | undefined {
+  if (!value || value.kind !== "application-isolated-npm-restore") return undefined;
+  const { instanceId, flowId, stepId, attempt, taskId, effectKey, candidateOid, manifestSha256, lockSha256, criteriaSha256 } = value;
+  if (value.projectRoot !== call.cwd || value.stagingDirectory !== stage.path
+    || dirname(stage.path) !== join(call.cwd, ".ans") || !/^acceptance-npm-[A-Za-z0-9]{6}$/.test(stage.path.split(/[\\/]/).at(-1) ?? "")
+    || value.roleId !== call.roleId || value.turnId !== call.turnId || value.toolCallId !== call.toolCallId
+    || value.stagingIdentity?.dev !== stage.identity.dev || value.stagingIdentity?.ino !== stage.identity.ino
+    || ![instanceId, flowId, stepId, taskId, effectKey, call.roleId, call.turnId, call.toolCallId]
+      .every(id => typeof id === "string" && id.trim().length > 0 && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id))
+    || !Number.isSafeInteger(attempt) || attempt < 1
+    || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(candidateOid)
+    || ![manifestSha256, criteriaSha256, ...(lockSha256 === undefined ? [] : [lockSha256])]
+      .every(hash => typeof hash === "string" && /^[a-f0-9]{64}$/.test(hash))) return undefined;
+  let publishDirectory = join(call.cwd, "node_modules");
+  const parents: NonNullable<ReturnType<typeof pinAcceptanceDirectory>>[] = [];
+  let publishIdentity: AcceptanceEnvironmentReviewScope["publishIdentity"];
+  if (value.publishIdentity !== undefined) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(taskId) || effectKey !== `environment-install:${taskId}`) return undefined;
+    const appState = join(call.cwd, ".ans");
+    const dependencies = join(appState, "acceptance-deps");
+    const taskDirectory = join(dependencies, taskId);
+    publishDirectory = join(taskDirectory, "node_modules");
+    if (value.publishDirectory !== publishDirectory) return undefined;
+    for (const path of [appState, dependencies, taskDirectory]) {
+      const parent = pinAcceptanceDirectory(path);
+      if (!parent || parent.path !== path) return undefined;
+      parents.push(parent);
+    }
+    publishIdentity = parents.at(-1)!.identity;
+    if (value.publishIdentity?.dev !== publishIdentity.dev || value.publishIdentity.ino !== publishIdentity.ino) return undefined;
+  }
+  if (value.publishDirectory !== publishDirectory) return undefined;
+  const scope: AcceptanceEnvironmentReviewScope = Object.freeze({
+    kind: "application-isolated-npm-restore", projectRoot: call.cwd,
+    stagingDirectory: stage.path, stagingIdentity: stage.identity, publishDirectory,
+    ...(publishIdentity === undefined ? {} : { publishIdentity }),
+    instanceId, flowId, stepId, attempt, taskId, roleId: call.roleId, turnId: call.turnId, toolCallId: call.toolCallId, effectKey,
+    candidateOid, manifestSha256, ...(lockSha256 === undefined ? {} : { lockSha256 }), criteriaSha256,
+  });
+  return { scope, publishParentsCurrent: () => parents.every(parent => parent.isCurrent()) };
+}
+
+/** Permit only the isolated npm runner's vetted command shape, with the scope's fixed paths. */
+function matchesAcceptanceRestoreArgv(argv: readonly string[], scope: AcceptanceEnvironmentReviewScope): boolean {
+  const cwd = scope.stagingDirectory;
+  const locked = scope.lockSha256 !== undefined;
+  if (argv[0] !== "npm" || argv[1] !== (locked ? "ci" : "install")) return false;
+  const required = [
+    "--ignore-scripts", "--workspaces=false", "--allow-directory=none", "--allow-file=none", "--allow-git=none", "--allow-remote=none",
+    "--registry=https://registry.npmjs.org/", `--prefix=${cwd}`, `--userconfig=${join(cwd, "user.npmrc")}`,
+    `--globalconfig=${join(cwd, "global.npmrc")}`, `--cache=${join(cwd, "cache")}`,
+    ...(locked ? [] : ["--no-package-lock"]),
+  ];
+  const permitted = new Set([...required, "--include=dev", "--include=optional", "--no-audit", "--no-fund", "--no-update-notifier",
+    "--fetch-retries=1", "--fetch-retry-mintimeout=1000", "--fetch-timeout=20000", "--logs-max=0", "--color=false", "--progress=false"]);
+  const flags = argv.slice(2);
+  return new Set(flags).size === flags.length && required.every(flag => flags.includes(flag))
+    && flags.every(flag => permitted.has(flag) && !/[\x00-\x1f\x7f]/.test(flag));
+}
+
+function acceptanceFilesCurrent(scope: AcceptanceEnvironmentReviewScope, fresh = false): boolean {
+  const cwd = scope.stagingDirectory;
+  try {
+    const absent = (path: string) => lstatSync(path, { throwIfNoEntry: false }) === undefined;
+    const matches = (name: string, maxBytes: number, hash?: string) => {
+      const path = join(cwd, name);
+      const entry = lstatSync(path);
+      if (!entry.isFile() || entry.nlink !== 1 || entry.size > maxBytes) return false;
+      return hash === undefined ? entry.size === 0 : sha256Hex(readFileSync(path)) === hash;
+    };
+    const lockName = "package-lock.json";
+    const privateControls = ["package.json", "user.npmrc", "global.npmrc", ...(scope.lockSha256 ? [lockName] : [])];
+    return absent(scope.publishDirectory) && absent(join(cwd, ".npmrc")) && absent(join(cwd, "npm-shrinkwrap.json"))
+      && (!fresh || readdirSync(cwd).every(name => privateControls.includes(name)))
+      && matches("package.json", 256 * 1024, scope.manifestSha256)
+      && matches("user.npmrc", 0) && matches("global.npmrc", 0)
+      && (scope.lockSha256 ? matches(lockName, 4 * 1024 * 1024, scope.lockSha256) : absent(join(cwd, lockName)));
+  } catch {
+    return false;
+  }
+}
+
+function makeRestoreAcceptanceEnvironmentTool(
+  prepare: NonNullable<GovernedToolsOptions["restoreAcceptanceEnvironment"]>,
+  shellGate: ShellGate,
+  shellCwd: string,
+  reviewTimeoutMs: number,
+  roleId: string,
+  currentTurnId: () => string | undefined,
+  gate?: InteractionGate,
+  postAudit?: ShellPostAuditFn,
+): ExecutableTool {
+  const name = RESTORE_ACCEPTANCE_ENVIRONMENT_TOOL_NAME;
+  let inFlight = false;
+  return {
+    name,
+    async handler(call) {
+      const fail = (message: string) => ({ ok: false, message: `${name}：${message}` });
+      if (Reflect.ownKeys(call.args).length) return fail("不接受参数");
+      const { toolCallId, signal } = call;
+      const turnId = currentTurnId();
+      if (!turnId || typeof toolCallId !== "string" || !toolCallId.trim() || signal?.aborted) return fail("当前任务回合或调用标识不可用");
+      if (inFlight) return fail("当前请求仍在处理");
+      const project = pinAcceptanceDirectory(shellCwd);
+      if (!project) return fail("当前会话的项目目录不可用");
+      const identity = Object.freeze({ roleId, turnId, toolCallId, cwd: project.path });
+      inFlight = true;
+      try {
+        const prepared = await prepare(identity, signal);
+        if (!prepared.ok) return fail(prepared.message);
+        const plan = prepared.value;
+        const taskIsCurrent = plan.isCurrent.bind(plan);
+        const executeApproved = plan.executeApproved.bind(plan);
+        const settleRejection = plan.reject.bind(plan);
+        const unavailable = "当前任务、回合或目录已失效";
+        const reject = async (decision: "denied" | "unavailable", message: string) => {
+          try {
+            await settleRejection(Object.freeze({ decision, message }));
+            return fail(message);
+          } catch {
+            return fail(`${message}，应用未能记录结果`);
+          }
+        };
+        const plannedCwd = plan.cwd;
+        const cwd = pinAcceptanceDirectory(plannedCwd);
+        if (!cwd || resolve(plannedCwd) !== cwd.path) return await reject("unavailable", unavailable);
+        const argv = Object.freeze([...plan.argv]);
+        let bound: ReturnType<typeof bindAcceptanceReviewScope>;
+        try { bound = bindAcceptanceReviewScope(plan.acceptanceEnvironmentScope, identity, cwd); }
+        catch { return await reject("unavailable", unavailable); }
+        if (!bound || !matchesAcceptanceRestoreArgv(argv, bound.scope))
+          return await reject("unavailable", "应用核定的范围或参数不符合工具契约");
+        const current = (fresh = false) => {
+          try {
+            return !signal?.aborted && currentTurnId() === turnId && project.isCurrent()
+              && cwd.isCurrent() && taskIsCurrent() === true && bound.publishParentsCurrent() && acceptanceFilesCurrent(bound.scope, fresh);
+          } catch {
+            return false;
+          }
+        };
+        const command = displayFixedArgv(argv);
+        const reviewArgv = [...argv];
+        Object.freeze(reviewArgv);
+        const request: ShellReviewRequest = {
+          command, argv: reviewArgv, cwd: cwd.path, toolCallId, entry: "run_shell" as const, roleId,
+          acceptanceEnvironmentScope: bound.scope,
+        };
+        Object.freeze(request);
+        let review: ShellReviewResult | undefined;
+        let reviewError: string | undefined;
+        gate?.begin();
+        try {
+          review = await withTimeout(raceAbort(Promise.resolve().then(() => {
+            if (!current(true)) throw new Error(unavailable);
+            return shellGate(request);
+          }), signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
+        } catch (error) {
+          reviewError = `命令审批未完成（${reasonOf(error)}）`;
+        } finally {
+          gate?.end();
+        }
+        if (review?.allow !== true) {
+          return review?.allow === false
+            ? await reject("denied", review.reason)
+            : await reject("unavailable", reviewError ?? "命令审批未明确放行");
+        }
+        const runAudit = async (outcome: ShellExecutionOutcome) => {
+          try { return await postAudit?.(request, outcome); } catch { return undefined; }
+        };
+        let auditResult: ReturnType<typeof runAudit> | undefined;
+        const audit = (outcome: ShellExecutionOutcome) => auditResult ??= runAudit(outcome);
+        if (!current(true) || typeof review.by !== "string" || !review.by.trim()) {
+          await audit({ error: unavailable });
+          return await reject("unavailable", unavailable);
+        }
+        let executionActive = true;
+        const approval = Object.freeze({
+          ...identity, cwd: cwd.path, argv, reviewedBy: review.by,
+          acceptanceEnvironmentScope: bound.scope,
+          isCurrent: () => executionActive && current(),
+        });
+        let result: Awaited<ReturnType<typeof executeApproved>>;
+        try {
+          result = await executeApproved(approval, signal);
+        } catch (error) {
+          await audit({ error: reasonOf(error) });
+          return fail(`执行没有返回结果（${reasonOf(error)}）`);
+        } finally {
+          executionActive = false;
+        }
+        const audited = await audit(result.ok ? result.value.execution ?? {} : { error: result.message });
+        if (audited?.violations.length) return fail("执行后的写审计发现越界改动，请核对应用审计记录");
+        return result.ok ? { ok: true, message: result.value.message } : fail(result.message);
+      } catch (error) {
+        return fail(reasonOf(error));
+      } finally {
+        inFlight = false;
+      }
+    },
+  };
+}
+
 /**
  * 凭据环境变量名（设计 §7.9）。**spawn 时必须从子进程 env 中剥离**。
  *
@@ -1398,6 +1721,10 @@ export function buildShellEnv(base: Record<string, string | undefined>, extraCre
 }
 
 interface ShellExecOutcome {
+  /** A direct spawn was called, even if the OS could not start the child. */
+  spawnAttempted?: boolean;
+  /** Private process fact, set only after the direct spawn succeeds. */
+  started?: boolean;
   code?: number;
   signal?: string | null;
   stdout: string;
@@ -1431,7 +1758,7 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
     try {
       child = spawn(argv[0], argv.slice(1), { cwd, shell: false, windowsHide: true, env, ...(useProcessGroup ? { detached: true } : {}) });
     } catch (err) {
-      resolveOutcome({ stdout: "", stderr: "", error: reasonOf(err) });
+      resolveOutcome({ stdout: "", stderr: "", error: reasonOf(err), spawnAttempted: true });
       return;
     }
     observeOwnedShell(lifecycle, child, useProcessGroup, () => {
@@ -1443,6 +1770,8 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
     let errLen = 0;
     let stdoutTruncated = false;
     let stderrTruncated = false;
+    let started = false;
+    child.once("spawn", () => { started = true; });
     let settled = false;
     let terminating: "abort" | "timeout" | undefined;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1459,6 +1788,8 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
       if (cleanupTimer) clearTimeout(cleanupTimer);
       const observed: ShellExecOutcome = {
         ...outcome,
+        spawnAttempted: true,
+        started,
         stdoutTruncated,
         stderrTruncated,
         ...(terminating === "timeout" ? { timedOut: true, timeoutMs: execTimeoutMs } : {}),
@@ -1596,8 +1927,35 @@ function isReadonlyGitProgram(argv: readonly string[]): boolean {
   return base.toLowerCase().replace(/\.(exe|cmd|bat)$/, "") === "git";
 }
 
-function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, execTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined, extraCredentialEnvVars?: readonly string[], shellPostAudit?: ShellPostAuditFn, lifecycle?: RuntimeToolLifecycle, roleId?: string, readonlyGit?: ReadonlyGitCapability): ExecutableTool {
+function sameShellArgv(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+/** Classify the result of the existing approved-command resolver, using the original argv for comparison. */
+function describeSelfTestTransport(approved: readonly string[], spawned: readonly string[]): ImplementationSelfTestTransport {
+  const [executable, ...argv] = spawned;
+  let kind: ImplementationSelfTestTransport["kind"] = "direct";
+  if (process.platform === "win32" && executable === process.execPath) {
+    if (approved[0] === "node" && sameShellArgv(approved.slice(1), argv)) kind = "bundled-node";
+    if (approved[0] === "npm" && isAbsolute(argv[0] ?? "") && sameShellArgv(approved.slice(1), argv.slice(1))) kind = "bundled-npm";
+  }
+  return Object.freeze({ kind, executable, argv: Object.freeze(argv) });
+}
+
+function verifiedSelfTestTransport(approved: readonly string[], transport: ImplementationSelfTestTransport): boolean {
+  return isAbsolute(transport.executable) && (transport.kind !== "direct"
+    || sameShellArgv(approved, [transport.executable, ...transport.argv]));
+}
+
+function strictAuditResult(audit: ShellStrictAuditObservation | undefined, violations: number): ShellStrictAuditObservation {
+  if (violations > 0) return { status: "failed", reason: "补测写审计发现未获批准的改动" };
+  if (audit?.status === "passed" && /^[0-9a-f]{64}$/.test(audit.digest)) return { status: "passed", digest: audit.digest };
+  return { status: "failed", reason: audit?.status === "failed" && audit.reason ? audit.reason : "缺少已结算的补测写审计" };
+}
+
+function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, execTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined, extraCredentialEnvVars?: readonly string[], shellPostAudit?: ShellPostAuditFn, lifecycle?: RuntimeToolLifecycle, roleId?: string, readonlyGit?: ReadonlyGitCapability, observers?: Pick<GovernedToolsOptions, "observeAcceptanceEnvironmentShell" | "observeImplementationSelfTest">, collectionCurrent?: EvidenceAuditCurrent): ExecutableTool {
   const name = SHELL_TOOL_NAME;
+  const { observeAcceptanceEnvironmentShell: observeAcceptanceShell, observeImplementationSelfTest } = observers ?? {};
   return {
     name,
     async handler(call) {
@@ -1608,15 +1966,78 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       const split = splitCommand(command);
       if (split.argv.length === 0) return { ok: false, message: `${name}: command 为空，无命令可执行` };
       const argv = split.argv;
+      if (collectionCurrent && (isReadonlyGitProgram(argv) || !await collectionCurrent()))
+        return { ok: false, message: "run_shell：当前取证工单没有该命令的执行权限。" };
       const cwd = shellCwd;
       const toolCallId = typeof call.toolCallId === "string" ? call.toolCallId : "";
       const turnId = currentTurnId?.();
-      // 2026-10-29（方案 v2.1 §6.5）：执行后写审计——越界写入如实附在工具结果里（不静默）。
-      const auditNote = async (outcome: ShellExecutionOutcome): Promise<{ note: string; violated: boolean }> => {
-        if (shellPostAudit === undefined) return { note: "", violated: false };
+      const request: ShellReviewRequest = { command, argv, cwd, toolCallId, entry: "run_shell",
+        ...(roleId !== undefined ? { roleId } : {}), ...(turnId !== undefined ? { turnId } : {}) };
+      const observesNpmScript = argv[0] === "npm" && (
+        ((argv[1] === "run" || argv[1] === "run-script") && !!argv[2]) || argv[1] === "start" || argv[1] === "test"
+      );
+      const observedCall: AcceptanceEnvironmentToolCall | undefined =
+        roleId && turnId && toolCallId && (observeImplementationSelfTest || observeAcceptanceShell && observesNpmScript)
+          ? { roleId, turnId, toolCallId, cwd } : undefined;
+      const observedArgv = observedCall ? Object.freeze([...argv]) : undefined;
+      const observe = observedCall && observedArgv && observeAcceptanceShell && observesNpmScript
+        ? async (fact: Omit<AcceptanceEnvironmentShellObservation, keyof AcceptanceEnvironmentToolCall | "argv">) => {
+          try { await observeAcceptanceShell(Object.freeze({ ...observedCall, argv: observedArgv, ...fact })); }
+          catch (error) { diagnostics?.error("shell.acceptance-observation.failed", error, { turnId, toolCallId, toolName: name }); }
+        }
+        : undefined;
+      let review: ShellReviewResult | undefined;
+      const currentObservation = () => !call.signal?.aborted && currentTurnId?.() === turnId
+        && observedArgv !== undefined && sameShellArgv(observedArgv, argv);
+      let evidenceExecutionRef: string | undefined;
+      const publishSelfTest = async (fact: Omit<ImplementationSelfTestObservation, keyof AcceptanceEnvironmentToolCall | "argv">) => {
+        if (!observeImplementationSelfTest || !observedCall || !observedArgv || !currentObservation()) return;
         try {
-          const result = await shellPostAudit({ command, argv, cwd, toolCallId, entry: "run_shell", ...(roleId !== undefined ? { roleId } : {}) }, outcome);
-          if (result.violations.length === 0) return { note: "", violated: false };
+          const receipt = await observeImplementationSelfTest(Object.freeze({ ...observedCall, argv: observedArgv, ...fact }));
+          const ref = receipt?.evidenceExecutionRef;
+          if (collectionCurrent && fact.process?.started && fact.writeAuditPassed && fact.strictAudit?.status === "passed"
+            && typeof ref === "string" && ref.length <= 600 && /^evidence-execution:[^:\x00-\x1f\x7f]+:[a-f0-9]{64}$/.test(ref)
+            && ref.endsWith(":" + sha256Hex(Buffer.from(observedCall.toolCallId)))
+            && await collectionCurrent() && currentObservation()) evidenceExecutionRef = ref;
+        }
+        catch (error) { diagnostics?.error("shell.implementation-observation.failed", error, { turnId, toolCallId, toolName: name }); }
+      };
+      const reportUnstartedRetest = async (failure: string) => {
+        if (review?.implementationSelfTest === undefined) return;
+        await publishSelfTest({ reviewedBy: review?.allow === true ? review.by : "", outcome: Object.freeze({ error: failure }),
+          process: Object.freeze({ started: false }), writeAuditPassed: false, failure });
+      };
+      let processStarted = false;
+      let processTransport: ImplementationSelfTestTransport | undefined;
+      let foregroundOutcome: ShellExecOutcome | undefined;
+      const implementationReference = () => observeImplementationSelfTest && observedCall && currentObservation()
+        && (processStarted || review?.implementationSelfTest !== undefined)
+        ? "\n本次 Shell 工具调用 ID：" + JSON.stringify(observedCall.toolCallId)
+          + (evidenceExecutionRef ? "\n应用已登记执行证据：" + JSON.stringify(evidenceExecutionRef) : "")
+        : "";
+      // 2026-10-29（方案 v2.1 §6.5）：执行后写审计——越界写入如实附在工具结果里（不静默）。
+      const auditNote = async (outcome: ShellExecutionOutcome, stderr: string): Promise<{ note: string; violated: boolean }> => {
+        const reviewedBy = review?.allow === true ? review.by : undefined;
+        const observedOutcome = observedCall ? Object.freeze({ ...outcome }) : undefined;
+        const observeExit = observe && review?.allow === true ? (writeAuditPassed?: boolean) => observe({
+          decision: "allowed", reviewedBy, outcome: observedOutcome, stderr,
+          ...(writeAuditPassed !== undefined ? { writeAuditPassed } : {}),
+        }) : undefined;
+        let writeAuditPassed: boolean | undefined;
+        let strictAudit: ShellStrictAuditObservation | undefined;
+        const strict = review?.implementationSelfTest?.strictAuditReady === true;
+        const auditUnavailable = () => {
+          if (!strict) return { note: "", violated: false };
+          strictAudit = { status: "failed", reason: "补测写审计未能读取或结算" };
+          return { note: `\n补测写审计：${strictAudit.reason}`, violated: true };
+        };
+        try {
+          if (shellPostAudit === undefined) return auditUnavailable();
+          const result = await shellPostAudit({ ...request }, outcome);
+          writeAuditPassed = result.violations.length === 0;
+          if (strict) strictAudit = strictAuditResult(result.strictAudit, result.violations.length);
+          if (writeAuditPassed) return strictAudit?.status === "failed"
+            ? { note: `\n补测写审计：${strictAudit.reason}`, violated: true } : { note: "", violated: false };
           const shown = result.violations.slice(0, 8).map((v) => `${v.change}:${v.path}`).join("、");
           const more = result.violations.length > 8 ? ` 等 ${result.violations.length} 项` : "";
           return {
@@ -1626,7 +2047,23 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
             violated: true,
           };
         } catch {
-          return { note: "", violated: false };
+          return auditUnavailable();
+        } finally {
+          if (observeExit) await observeExit(writeAuditPassed);
+          if (observedOutcome && (processStarted || strict) && typeof reviewedBy === "string" && reviewedBy.trim()) {
+            const failure = strict ? observedOutcome.error ?? (strictAudit?.status === "failed" ? strictAudit.reason : undefined) : undefined;
+            await publishSelfTest({
+              reviewedBy, outcome: observedOutcome,
+              process: Object.freeze({ started: processStarted, ...(processTransport ? { transport: processTransport } : {}) }),
+              writeAuditPassed: strict ? processStarted && strictAudit?.status === "passed" : writeAuditPassed === true,
+              ...(strictAudit ? { strictAudit: Object.freeze(strictAudit) } : {}),
+              ...(failure ? { failure } : {}),
+              ...(strict && processStarted && foregroundOutcome ? { output: Object.freeze({
+                stdout: foregroundOutcome.stdout, stderr: foregroundOutcome.stderr,
+                stdoutTruncated: foregroundOutcome.stdoutTruncated === true, stderrTruncated: foregroundOutcome.stderrTruncated === true,
+              }) } : {}),
+            });
+          }
         }
       };
 
@@ -1636,31 +2073,52 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       const guardHit = detectUnsupportedShellSyntax(split);
       if (guardHit !== undefined) {
         diagnostics?.record("shell.guard.blocked", { turnId, toolCallId, toolName: name, reasonCode: guardHit.token, excerpt: command.slice(0, 240) });
+        if (observe) await observe({ decision: "denied" });
         return { ok: false, message: shellGuardMessage(name, guardHit) };
       }
 
       // —— 唯一的命令级闸：只有恰好 allow:true 才继续（判定与执行在同一条我们的代码路径上）——
-      let review: ShellReviewResult | undefined;
       const began = Date.now();
+      let reviewFailure: { error: unknown } | undefined;
       gate?.begin();
       diagnostics?.record("shell.review.start", { turnId, toolCallId, toolName: name });
       try {
-        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId, entry: "run_shell", ...(roleId !== undefined ? { roleId } : {}) }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
+        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ ...request }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
       } catch (err) {
         diagnostics?.error("shell.review.failed", err, { turnId, toolCallId, toolName: name });
-        // 审核抛错 / 超时 → **绝不 spawn**（fail-closed；超时 = 拒绝，§7.5.2）。
-        return { ok: false, message: `${name} 未执行：审核未通过（${reasonOf(err)}）` };
+        reviewFailure = { error: err };
       } finally {
         gate?.end();
         diagnostics?.record("shell.review.end", { turnId, toolCallId, toolName: name, durationMs: Date.now() - began, decision: review?.allow === true ? "allow" : "deny" });
       }
-      if (call.signal?.aborted) return { ok: false, message: `${name} 未执行：会话已中止` };
+      // 审核抛错 / 超时 → **绝不 spawn**（fail-closed；超时 = 拒绝，§7.5.2）。
+      if (reviewFailure) {
+        if (observe) await observe({ decision: "unavailable" });
+        return { ok: false, message: `${name} 未执行：审核未通过（${reasonOf(reviewFailure.error)}）` };
+      }
+      if (call.signal?.aborted) {
+        if (observe) await observe({ decision: "unavailable", ...(review?.by ? { reviewedBy: review.by } : {}) });
+        return { ok: false, message: `${name} 未执行：会话已中止` };
+      }
       // 恰好 allow:true 才放行；deny / undefined / 任何非明确 allow → 一律不执行（无 token 可依）。
       if (review === undefined || review === null || review.allow !== true) {
         const denied = review !== undefined && review !== null && review.allow === false ? review : undefined;
         const why = denied !== undefined ? denied.reason : "审核未返回明确的允许（缺 allow:true）";
         const by = denied !== undefined ? `，审者：${denied.by}` : "";
-        return { ok: false, message: `${name} 未执行：审核拒绝（${why}${by}）` };
+        if (observe) await observe(denied ? { decision: "denied", reviewedBy: denied.by } : { decision: "unavailable" });
+        const message = `${name} 未执行：审核拒绝（${why}${by}）`;
+        await reportUnstartedRetest(message);
+        return { ok: false, message: message + implementationReference() };
+      }
+
+      const retest = review.implementationSelfTest;
+      if (collectionCurrent && !retest)
+        return { ok: false, message: "run_shell：取证命令缺少当前工单的严格审批与写审计，未执行。" };
+      if (retest && (!retest.strictAuditReady || !shellPostAudit || !observeImplementationSelfTest || !observedCall
+        || !review.by?.trim() || !currentObservation() || isReadonlyGitProgram(argv))) {
+        const error = "补测的审批、回合或写审计未准备完成（implementation-self-test-not-ready）";
+        await reportUnstartedRetest(error);
+        return { ok: false, message: `${name} 未执行：${error}` + implementationReference(), execution: { error } };
       }
 
       // 客户升级授权放行说明（2026-10-31 方案 v1.3 §6.3）：只按 `ShellReviewResult.grant` 如实附注；
@@ -1708,8 +2166,32 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
           stdoutTruncated: facts.stdoutTruncated === true,
           stderrTruncated: facts.stderrTruncated === true,
         };
+        processStarted = facts.exitCode !== undefined || facts.signal != null;
       } else {
-        outcome = await runShell(argv, cwd, buildShellEnv(process.env, extraCredentialEnvVars), call.signal, execTimeoutMs, lifecycle);
+        const selfTest = observeImplementationSelfTest && observedCall && observedArgv ? { cwd, isCurrent: currentObservation } : undefined;
+        const transport = await resolveApprovedCommandTransport(argv, buildShellEnv(process.env, extraCredentialEnvVars), undefined, selfTest);
+        let transportError = "error" in transport ? transport.error : undefined;
+        const observedTransport = observedArgv && "argv" in transport ? describeSelfTestTransport(observedArgv, transport.argv) : undefined;
+        if (retest && transportError === undefined) {
+          try {
+            if (!currentObservation() || retest.isCurrent() !== true) transportError = "补测的原任务回合已失效（implementation-self-test-stale）";
+          } catch { transportError = "无法重核补测回合（implementation-self-test-stale）"; }
+          if (!observedArgv || !observedTransport || !verifiedSelfTestTransport(observedArgv, observedTransport)) {
+            transportError ??= "补测的实际执行器或入口无法核验（implementation-self-test-transport-unverified）";
+          }
+        }
+        if (transportError !== undefined || "error" in transport) {
+          outcome = { stdout: "", stderr: "", error: "error" in transport ? transport.error : transportError };
+        } else {
+          if (collectionCurrent && (!await collectionCurrent() || !currentObservation() || retest?.isCurrent() !== true)) {
+            await reportUnstartedRetest("取证工单已失效");
+            return { ok: false, message: "run_shell：取证工单已失效，未执行。" };
+          }
+          outcome = await runShell(transport.argv, cwd, transport.env, call.signal, execTimeoutMs, lifecycle);
+          if (outcome.spawnAttempted) processTransport = observedTransport;
+        }
+        foregroundOutcome = outcome;
+        processStarted = outcome.started === true;
       }
       const transportNote = gitRouted ? "\n说明：本次为只读 Git 白名单命令，经应用固定 Git 传输执行（不按 PATH 查找程序）。" : "";
       // —— 命令级超时（F-1-a）：如实返回「超时已终止（N ms）」+ 已收集的部分输出；**轮次继续**
@@ -1717,7 +2199,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       if (outcome.timedOut === true) {
         const timeoutMs = outcome.timeoutMs ?? execTimeoutMs;
         diagnostics?.record("shell.exec.timeout", { turnId, toolCallId, toolName: name, timeoutMs, durationMs: Date.now() - execBegan });
-        const audited = await auditNote({ ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}), timedOut: true });
+        const audited = await auditNote({ ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}), timedOut: true }, outcome.stderr);
         const head = outcome.error === undefined
           ? `${name} 超时已终止（${timeoutMs} ms）：命令超过本次执行时限，已被终止。`
           : `${name} 超时已触发（${timeoutMs} ms），但终止清理未在预算内完成（${outcome.error}）——进程可能仍在运行，请如实向客户说明。`;
@@ -1733,21 +2215,21 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
             stdoutTruncated: outcome.stdoutTruncated === true,
             stderrTruncated: outcome.stderrTruncated === true,
           },
-          message: `${head}\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。` + audited.note + grantNote + transportNote,
+          message: head + implementationReference() + `\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。` + audited.note + grantNote + transportNote,
         };
       }
       if (outcome.error !== undefined) {
-        const audited = await auditNote({ error: outcome.error, ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) });
-        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}` + audited.note + grantNote + transportNote, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
+        const audited = await auditNote({ error: outcome.error, ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) }, outcome.stderr);
+        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}` + audited.note + grantNote + transportNote + implementationReference(), execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
       }
       const code = outcome.code;
-      const audited = await auditNote({ ...(code !== undefined ? { exitCode: code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) });
+      const audited = await auditNote({ ...(code !== undefined ? { exitCode: code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) }, outcome.stderr);
       return {
         ok: code === 0 && !audited.violated,
         execution: { ...(code !== undefined ? {exitCode:code} : {}), ...(outcome.signal ? {signal:outcome.signal} : {}), stdout:outcome.stdout, stderr:outcome.stderr, stdoutTruncated:outcome.stdoutTruncated === true, stderrTruncated:outcome.stderrTruncated === true },
         message:
-          `${name} 已执行：${command}（exit ${code ?? "?"}${outcome.signal ? `，signal ${outcome.signal}` : ""}）\n` +
-          `stdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}` + audited.note + grantNote + transportNote,
+          `${name} 已执行：${command}（exit ${code ?? "?"}${outcome.signal ? `，signal ${outcome.signal}` : ""}）` + implementationReference() +
+          `\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}` + audited.note + grantNote + transportNote,
       };
     },
   };
@@ -2180,7 +2662,7 @@ function judgeReceipt(
 /** Presentation only: consume the committed source, never today's delegation switch.
  * Preserve the complete typed outcome so the original author sees revision reasons and provenance.
  */
-function chiefDelegatedInputReceipt(name: string, req: CustomerInputRequest, out: CustomerInputOutcome): ToolResult | undefined {
+function chiefDelegatedInputReceipt(name: string, req: CustomerInputRequest, out: CustomerInputOutcome, durableFixedWorkflow = false): ToolResult | undefined {
   if (out.outcome === "unavailable" || out.actionSource === undefined) return undefined;
   const source = out.actionSource;
   const raw = `\n原始回执：${JSON.stringify(out)}`;
@@ -2193,7 +2675,8 @@ function chiefDelegatedInputReceipt(name: string, req: CustomerInputRequest, out
     const action = source.disposition === "revise" ? "幕僚要求修订"
       : source.disposition === "reject" ? "幕僚拒绝" : "幕僚选择未同意";
     return { ok: false, message: `${name}：${action}（chief-delegated；原因：${detail}）。`
-      + (source.disposition === "revise" ? "本次退修未获批准；原发起角色应按理由修订并重新提交。" : "本次未获批准；按原请求回报链处理。") + raw };
+      + (durableFixedWorkflow ? "工作流根据本次决定选择下一节点。"
+        : source.disposition === "revise" ? "本次退修未获批准；原发起角色应按理由修订并重新提交。" : "本次未获批准；按原请求回报链处理。") + raw };
   }
   const malformed = (): ToolResult => ({ ok: false,
     message: `${name}：幕僚决定回执与选择结果不一致，不能视为批准；请核对原请求。${raw}` });
@@ -2211,7 +2694,8 @@ function chiefDelegatedInputReceipt(name: string, req: CustomerInputRequest, out
     || JSON.stringify(selected) !== JSON.stringify(source.selected)) return malformed();
   const selection = selected.map(id => { const option = req.options.find(option => option.id === id)!; return `${id}（${option.label}）`; }).join("、");
   return { ok: true, message: `${name}：幕僚已选择（chief-delegated）：${selection}。理由：${source.reason}。`
-    + "请按该决定及原有执行权限继续；未选中的项不得擅自代选。" + raw };
+    + (durableFixedWorkflow ? "工作流根据本次决定选择下一节点；未选中的项不得擅自代选。"
+      : "请按该决定及原有执行权限继续；未选中的项不得擅自代选。") + raw };
 }
 
 /**
@@ -2661,18 +3145,57 @@ function intentConfirmationReceipt(result: ToolResult, out: CustomerInputOutcome
       : `\n意图确认应用状态：committed${detail}。原Service已完成本次应用；后续操作仍须通过原有授权校验。`) };
 }
 
+/** A6 alone can refine the original accept into a host-issued concrete card choice. */
+function durableProposalSelectionReceipt(
+  name: string, req: CustomerInputRequest, out: Extract<CustomerInputOutcome, { outcome: "answered" }>,
+  fixed: boolean, roleId?: string,
+): ToolResult {
+  const invalid = { ok: false, message: `${name}：应用定案回执与当期提案选择不一致，请核对原卡。` };
+  const selection = out.durableProposalSelection;
+  if (!fixed || req.kind !== "choice" || req.cardKind !== "proposal" || req.multiple === true
+    || !req.options.some(option => option.id === "accept") || !Array.isArray(out.value.selected)
+    || out.value.selected.length !== 1 || out.value.selected[0] !== "accept" || out.judge !== undefined || out.intentConfirmation !== undefined
+    || !selection || typeof selection.requestId !== "string" || !selection.requestId.trim()
+    || selection.requestId.length > 500 || /[\x00-\x1f\x7f]/.test(selection.requestId)
+    || out.decisionId !== `decision-${selection.requestId}` || typeof selection.baseDigest !== "string"
+    || !/^[a-f0-9]{64}$/.test(selection.baseDigest) || typeof selection.selectedOptionId !== "string"
+    || !/^choice-[a-f0-9]{32}$/.test(selection.selectedOptionId) || !directRecord(selection.decisionValues)) return invalid;
+  const values = Object.entries(selection.decisionValues);
+  if (values.length > 16 || values.some(([key, value]) => !/^[a-z][a-z0-9-]{0,63}$/.test(key)
+    || !(typeof value === "boolean" || Number.isSafeInteger(value) || typeof value === "string" && value.trim() === value
+      && value.length > 0 && value.length <= 160 && !/[\x00-\x1f\x7f]/.test(value)))) return invalid;
+
+  const source = out.actionSource;
+  let attribution = operatorTag(out.operatorId);
+  if (source !== undefined && !isDirectActionSource(source)) return invalid;
+  if (source?.kind === "chief-delegated") {
+    if (!roleId || source.originRoleId !== roleId || source.disposition !== "select" || source.requestId !== selection.requestId
+      || source.baseDigest !== selection.baseDigest || source.selected?.length !== 1 || source.selected[0] !== selection.selectedOptionId) return invalid;
+    attribution = `幕僚代决策（chief-delegated；理由：${source.reason}）`;
+  } else {
+    if (out.operatorId === "chief" || isJudgeOperator(out.operatorId) || out.operatorId?.startsWith("system:")) return invalid;
+    if (source && (source.kind !== "customer-decision" || source.decisionId !== out.decisionId
+      || (source.requestId !== undefined && source.requestId !== selection.requestId))) return invalid;
+  }
+  return {
+    ok: true,
+    message: `${name}：当期提案已批准（${attribution}）。实际定案 ${selection.selectedOptionId}：${JSON.stringify(Object.fromEntries(values))}。`
+      + `\n应用记录的决定 id（decisionId）：${out.decisionId}。工作流依据已落账的实际选择推进。`,
+  };
+}
+
 function makeRequestChoiceTool(
   fn: CustomerInputFn,
   timeoutMs: number | undefined,
   gate: InteractionGate | undefined,
   currentTurnId?: () => string | undefined,
-  scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">,
+  scope?: Pick<GovernedToolsOptions, "roleId" | "runtime" | "durableFixedWorkflow">,
 ): ExecutableTool {
   const name = REQUEST_CHOICE_TOOL_NAME;
   return {
     name,
     async handler(call) {
-      const hostResult = ["intentConfirmation", "domainApply"].find(key => Object.hasOwn(call.args, key));
+      const hostResult = ["intentConfirmation", "domainApply", "durableProposalSelection"].find(key => Object.hasOwn(call.args, key));
       if (hostResult !== undefined) return { ok: false, message: `${name}: ${hostResult} is host-only；未发起选择请求` };
       const baseMetadata = customerMetadata(call.signal, currentTurnId?.(), scope, call.toolCallId);
       const taskId = readStringArg(call.args, ["taskId", "task_id"]);
@@ -2718,7 +3241,11 @@ function makeRequestChoiceTool(
 
       const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, { ...metadata, ...governance.value });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
-      const delegated = chiefDelegatedInputReceipt(name, req, out);
+      const durableFixedWorkflow = scope?.durableFixedWorkflow === true;
+      if (out.outcome === "answered" && out.durableProposalSelection !== undefined) {
+        return durableProposalSelectionReceipt(name, req, out, durableFixedWorkflow, scope?.roleId);
+      }
+      const delegated = chiefDelegatedInputReceipt(name, req, out, durableFixedWorkflow);
       if (delegated !== undefined) return intentConfirmationReceipt(delegated, out);
       if (out.outcome === "declined") {
         // 应用在触达客户通道之前结算：卡片未呈现，不得说成客户拒绝。
@@ -2726,7 +3253,7 @@ function makeRequestChoiceTool(
         // 判断 agent 自动退回：不是客户拒绝。仅验收卡（cardKind:"acceptance"）走应用返工路由
         // （2026-10-23 验收返工路由 §5.3.3）；其他卡种/未给 cardKind 用通用文案。
         if (isJudgeOperator(out.operatorId)) {
-          return judgeDeclined(name, out.reason, governance.value.cardKind === "acceptance");
+          return judgeDeclined(name, out.reason, !durableFixedWorkflow && governance.value.cardKind === "acceptance");
         }
         return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
       }
@@ -2747,10 +3274,9 @@ function makeRequestChoiceTool(
         return opt !== undefined ? `${opt.id}（${opt.label}）` : id;
       });
       const selection = labels.length > 0 ? labels.join("、") : "（未选择任何项）";
-      // 2026-10-29（方案 v2.1 §5.4/M4）：D3 裁决 id 随回执交给模型（appointment-write 的必要凭据；
-      // 只由应用写入 `out.decisionId`，模型不可自报）。非 D3 卡也如实透传，行为无害。
       const decisionNote = out.decisionId !== undefined && out.decisionId !== ""
-        ? `\nD3 裁决 id（decisionId）：${out.decisionId}——appointment-write 必须原样携带。`
+        ? durableFixedWorkflow ? `\n应用记录的决定 id（decisionId）：${out.decisionId}。`
+          : `\nD3 裁决 id（decisionId）：${out.decisionId}——appointment-write 必须原样携带。`
         : "";
       if (out.judge !== undefined) {
         // 判断 agent 代批：不得说成客户本人选择（评审 §7.5）。
@@ -2764,7 +3290,8 @@ function makeRequestChoiceTool(
         message:
           `${name}：客户已选择（${operatorTag(out.operatorId)}）：` +
           `${selection}。` +
-          `请按客户的选择继续；**未选中的项不得擅自代选**。` + decisionNote,
+          (durableFixedWorkflow ? "工作流根据本次选择推进；**未选中的项不得擅自代选**。"
+            : "请按客户的选择继续；**未选中的项不得擅自代选**。") + decisionNote,
       }, out);
     },
   };
@@ -3154,7 +3681,7 @@ function criteriaRefOf(args: Record<string, unknown>): CriteriaRef | undefined {
  * **绝无副作用**：不执行项目脚本、不写盘、不改 artifact/sidecar、不授予写权；数据源缺席/失败如实回报，
  * 不得据此宣称证据通过。
  */
-function makeEvidenceCheckTool(fn: EvidenceCheckFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+function makeEvidenceCheckTool(fn: EvidenceCheckFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">, evidenceScope?: EvidencePathScope): ExecutableTool {
   const name = EVIDENCE_CHECK_TOOL_NAME;
   return {
     name,
@@ -3186,6 +3713,15 @@ function makeEvidenceCheckTool(fn: EvidenceCheckFn, currentTurnId?: () => string
         ...(acId !== undefined && acId.trim() !== "" ? { acId: acId.trim() } : {}),
         criteriaRef,
       };
+      if (evidenceScope) {
+        const sidecar = input.metaPath ?? input.artifact + ".meta.json";
+        const [artifactFile, sidecarPath, criteriaFile] = await Promise.all([
+          evidenceScope.resolve(input.artifact, "file"),
+          evidenceScope.resolve(sidecar, "file-or-missing"),
+          evidenceScope.resolve(criteriaRef.path, "file"),
+        ]);
+        if (!artifactFile || !sidecarPath || !criteriaFile || call.signal?.aborted) return evidenceScopeDenial(name);
+      }
       let text: string | null | undefined | void;
       try {
         const turnId = currentTurnId?.();
@@ -4227,6 +4763,61 @@ function makeRequestWorkflowStartTool(fn: DurableRequestWorkflowStartFn): Execut
   };
 }
 
+const REQUEST_DOCUMENT_REVISION_TOOL_NAME = "request_document_revision";
+const SUBMIT_DOCUMENT_REVISION_TOOL_NAME = "submit_document_revision";
+const DOCUMENT_REVISION_REQUEST_KEYS: ReadonlySet<string> = new Set(["path", "reason"]);
+const DOCUMENT_REVISION_SUBMISSION_KEYS: ReadonlySet<string> = new Set(["content"]);
+const DOCUMENT_REVISION_BUILTINS: ReadonlySet<string> = new Set(["product", "rapporteur", "nominator", "convener", "verifier"]);
+
+function documentRevisionReceipt(name: string, receipt: unknown): ToolResult {
+  if (directRecord(receipt)) {
+    if (receipt.ok === false && typeof receipt.code === "string" && typeof receipt.message === "string") {
+      return { ok: false, message: `${name}：${receipt.code} · ${receipt.message}` };
+    }
+    if (receipt.ok === true && directRecord(receipt.value)) {
+      const { requestId, status, message } = receipt.value;
+      if (typeof requestId === "string" && requestId.trim() && typeof status === "string" && status.trim()
+        && typeof message === "string" && message.trim()) {
+        const facts: DocumentRevisionToolReceipt = { requestId, status, message };
+        return { ok: true, message: `${name}：${JSON.stringify(facts)}` };
+      }
+    }
+  }
+  return { ok: false, message: `${name}：无法核对应用记录，请查询本次修订状态。` };
+}
+
+type DocumentRevisionInput = Parameters<RequestDocumentRevisionFn>[0] | Parameters<SubmitDocumentRevisionFn>[0];
+
+function makeDocumentRevisionTool<Input extends DocumentRevisionInput>(name: string, keys: ReadonlySet<string>,
+  parse: (args: Record<string, unknown>) => Input | undefined,
+  submit: (input: Input, signal?: AbortSignal) => Promise<unknown>, currentTurnId: () => string | undefined): ExecutableTool {
+  return { name, async handler(call) {
+    const unknown = unknownGovernanceArg(call.args, keys, name);
+    if (unknown) return unknown;
+    const input = parse(call.args);
+    if (!input) return governanceArgumentError(name, "参数超出本次工具约定的字段、格式或大小限制");
+    if (!currentTurnId() || call.signal?.aborted) return { ok: false, message: `${name}：当前修订回合未运行。` };
+    try {
+      return documentRevisionReceipt(name, await submit(input, call.signal));
+    } catch {
+      return { ok: false, message: `${name}：提交结果待核对，请查询本次修订状态。` };
+    }
+  } };
+}
+
+function makeDocumentRevisionRequestTool(request: RequestDocumentRevisionFn, currentTurnId: () => string | undefined): ExecutableTool {
+  return makeDocumentRevisionTool(REQUEST_DOCUMENT_REVISION_TOOL_NAME, DOCUMENT_REVISION_REQUEST_KEYS, ({ path, reason }) =>
+    isGitLiteralPath(path) && path.length <= DOCUMENT_REVISION_PATH_MAX_CHARS && path === path.trim()
+      && typeof reason === "string" && reason.trim() && reason.length <= DOCUMENT_REVISION_REASON_MAX_CHARS && !reason.includes("\0")
+      ? { path, reason: reason.trim() } : undefined, request, currentTurnId);
+}
+
+function makeDocumentRevisionSubmissionTool(submit: SubmitDocumentRevisionFn, currentTurnId: () => string | undefined): ExecutableTool {
+  return makeDocumentRevisionTool(SUBMIT_DOCUMENT_REVISION_TOOL_NAME, DOCUMENT_REVISION_SUBMISSION_KEYS, ({ content }) =>
+    typeof content === "string" && content.trim() && Buffer.byteLength(content, "utf8") <= DOCUMENT_REVISION_CONTENT_MAX_BYTES && !content.includes("\0")
+      ? { content } : undefined, submit, currentTurnId);
+}
+
 // —————————————— 治理权力矩阵只读工具（governance-authority-matrix，C2，2026-11-05） ——————————————
 
 export const GOVERNANCE_MATRIX_TOOL_NAME = "governance_matrix";
@@ -4701,6 +5292,7 @@ function makeDirectCapabilityTools(options: GovernedToolsOptions, decisionContex
         if (value.status !== "settled" || !isDirectActionSource(source) || source.kind !== "chief-delegated"
           || source.requestId !== call.args.requestId || source.baseDigest !== call.args.baseDigest
           || source.delegationRevision !== call.args.delegationRevision || source.disposition !== call.args.disposition
+          || (decisionContext?.request.durableWorkflow !== undefined && source.reason !== call.args.reason)
           || (decisionContext !== undefined && source.originRoleId !== decisionContext.request.originRoleId)
           || JSON.stringify(source.selected) !== JSON.stringify(call.args.selected)) return directUnknownResult(entry.name);
       } else if (!["pending", "stale", "rejected"].includes(String(value.status))
@@ -4731,15 +5323,24 @@ function makeDirectCapabilityTools(options: GovernedToolsOptions, decisionContex
 /** Separate real-chief session: no normal governed tools, writes, dispatch, close or MCP. */
 export function buildChiefDecisionTools(fn: DecidePendingRequestFn, context: ChiefDecisionExecutionContext): ToolDefinition[] {
   if (!isChiefDecisionExecutionContext(context)) throw new Error("Invalid chief decision context");
+  const bound = structuredClone(context);
+  const { request } = bound;
+  const description = request.durableWorkflow !== undefined
+    ? describeDurableChiefDecisionTool(request) : describeTool(DECIDE_PENDING_REQUEST_TOOL_NAME);
+  const boundSchema = request.durableWorkflow !== undefined ? structuredClone(description.parameters) : undefined;
   let attempts = 0;
-  const [tool] = makeDirectCapabilityTools({ roleId: "chief", decidePendingRequest: fn }, context);
-  return [{ ...describeTool(DECIDE_PENDING_REQUEST_TOOL_NAME), name: DECIDE_PENDING_REQUEST_TOOL_NAME,
-    inputSchema: describeTool(DECIDE_PENDING_REQUEST_TOOL_NAME).parameters, displayInputRule: "none", async handler(call) {
-      if (call.args.requestId !== context.request.requestId || call.args.baseDigest !== context.request.baseDigest
-        || call.args.delegationRevision !== context.request.delegationRevision) return { ok: false, message: "decide_pending_request: stale request/basis/revision" };
+  const [tool] = makeDirectCapabilityTools({ roleId: "chief", decidePendingRequest: fn }, bound);
+  return [{ ...description, name: DECIDE_PENDING_REQUEST_TOOL_NAME,
+    inputSchema: description.parameters, displayInputRule: "none", async handler(call) {
+      if (call.args.requestId !== request.requestId || call.args.baseDigest !== request.baseDigest
+        || call.args.delegationRevision !== request.delegationRevision) return { ok: false, message: "decide_pending_request: stale request/basis/revision" };
+      if (boundSchema) {
+        const error = directShapeError(call.args, boundSchema);
+        if (error) return { ok: false, message: `decide_pending_request: invalid-arguments ${error}` };
+      }
       if (call.args.disposition === "select" && Array.isArray(call.args.selected)
-        && call.args.selected.some(id => !context.request.options.some(option => option.id === id))) return { ok: false, message: "decide_pending_request: invalid selected option" };
-      if (attempts >= context.limits.maxAttempts) return { ok: false, message: "decide_pending_request: decision attempt budget exhausted; inspect the existing request state" };
+        && call.args.selected.some(id => !request.options.some(option => option.id === id))) return { ok: false, message: "decide_pending_request: invalid selected option" };
+      if (attempts >= bound.limits.maxAttempts) return { ok: false, message: "decide_pending_request: decision attempt budget exhausted; inspect the existing request state" };
       attempts++;
       return tool!.handler(call);
     } }];
@@ -5457,14 +6058,149 @@ function observeInjectedCapabilities<T extends object>(value: T, lifecycle: Runt
     };
   } });
 }
-export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptions, lifecycle?: RuntimeToolLifecycle): ToolDefinition[] {
-  if (lifecycle && options) {
-    const original = options;
-    const currentTurnId = () => original.currentTurnId?.();
-    const backgroundTasks = original.backgroundTasks
-      ? observeInjectedCapabilities(original.backgroundTasks, lifecycle, currentTurnId) : undefined;
-    options = observeInjectedCapabilities({ ...original, ...(backgroundTasks ? { backgroundTasks } : {}) }, lifecycle, currentTurnId);
+
+type EvidenceAuditCurrent = () => Promise<boolean>;
+type ScopedWriteAuthority = (path: string) => Promise<boolean>;
+
+function evidenceScopeDenial(tool: string): ToolResult {
+  return { ok: false, message: `${tool}：路径或操作不在当前取证或审计工单的授权范围内。` };
+}
+
+function evidencePath(path: string) {
+  if (isAbsoluteAny(path) || process.platform !== "win32" && path.includes("\\")) return undefined;
+  const normalized = path.replaceAll("\\", "/").replace(/^\.\//, "").replace(/\/$/, "");
+  const segments = normalized.split("/");
+  // Explicitly bound .ans assets may be evidence. The whole app-state root is never a scope.
+  if (/[:\x00-\x1f\x7f]/.test(normalized) || !checkRelativePathSafe(normalized).ok
+    || segments.includes("") || normalized.toLowerCase() === ".ans"
+    || sensitiveClass(segments[0]?.toLowerCase() === ".ans" ? segments.slice(1) : segments) !== undefined) return undefined;
+  return normalized;
+}
+
+function evidencePathKey(path: string): string {
+  return process.platform === "win32" ? path.toLowerCase() : path;
+}
+
+/** Check both the literal host grant and the actual file identity, including aliases within the project. */
+function makeEvidencePathScope(projectRoot: string | undefined, literals: readonly string[] = [], current: EvidenceAuditCurrent) {
+  const root = projectRoot ? pinAcceptanceDirectory(projectRoot) : undefined;
+  const paths = literals.flatMap(path => {
+    const literal = typeof path === "string" ? evidencePath(path) : undefined;
+    return literal ? [{ path: evidencePathKey(literal), directory: /[\\/]$/.test(path) }] : [];
+  });
+  const within = (path: string) => paths.some(entry => entry.directory ? path.startsWith(entry.path + "/") : path === entry.path);
+  const canList = (path: string) => paths.some(entry => !path || entry.path.startsWith(path + "/")
+    || entry.directory && (entry.path === path || path.startsWith(entry.path + "/")));
+  return {
+    hasPaths: paths.length > 0,
+    async resolve(requested: string, kind: "file" | "directory" | "file-or-missing" | "write"): Promise<string | undefined> {
+      const listedRoot = kind === "directory" && ["", "."].includes(requested);
+      const literal = listedRoot ? "" : evidencePath(requested);
+      if (!root || literal === undefined || !await current() || !root.isCurrent()) return undefined;
+      const key = evidencePathKey(literal);
+      if (!(kind === "directory" ? canList(key) : within(key))) return undefined;
+      const abs = resolve(root.path, literal);
+      try {
+        const actual = kind === "write" || kind === "file-or-missing" ? await canonicalProtectionPath(abs) : await realpath(abs);
+        if (!root.isCurrent() || evidencePathKey(actual) !== evidencePathKey(abs)) return undefined;
+        if (kind === "write") return actual;
+        const entry = await lstat(actual).catch(error => {
+          if (kind === "file-or-missing" && (error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+          throw error;
+        });
+        if (!entry || (kind === "directory" ? entry.isDirectory() : entry.isFile() && entry.nlink === 1)) return actual;
+      } catch { /* Missing, inaccessible, or drifting evidence proves nothing. */ }
+      return undefined;
+    },
+    allowsEntry(path: string, directory: boolean): boolean {
+      const literal = evidencePath(path);
+      if (!literal) return false;
+      const key = evidencePathKey(literal);
+      return directory ? canList(key) : within(key);
+    },
+    relative(path: string): string {
+      return root ? relative(root.path, path).replaceAll("\\", "/") : "";
+    },
+  };
+}
+type EvidencePathScope = ReturnType<typeof makeEvidencePathScope>;
+
+function makeEvidenceListTool(scope: EvidencePathScope): ExecutableTool {
+  const name = LIST_DIR_TOOL_NAME;
+  return { name, async handler(call) {
+    const raw = call.args.path === undefined ? "." : call.args.path;
+    if (typeof raw !== "string") return evidenceScopeDenial(name);
+    const dir = await scope.resolve(raw, "directory");
+    if (dir === undefined || call.signal?.aborted) return evidenceScopeDenial(name);
+    try {
+      const rel = scope.relative(dir);
+      const entries = (await readdir(dir, { withFileTypes: true }))
+        .filter(entry => (entry.isFile() || entry.isDirectory())
+          && scope.allowsEntry(rel ? `${rel}/${entry.name}` : entry.name, entry.isDirectory()))
+        .map(entry => entry.isDirectory() ? `${entry.name}/` : entry.name)
+        .sort((a, b) => a.localeCompare(b));
+      if (await scope.resolve(raw, "directory") !== dir) return evidenceScopeDenial(name);
+      const body = entries.slice(0, SHELL_JUDGE_MAX_LIST_ENTRIES).join("\n") || "（空目录或无可列条目）";
+      return { ok: true, message: `${name}: ${rel || "."}\n\n${body}${entries.length > SHELL_JUDGE_MAX_LIST_ENTRIES ? "\n\n[已截断：条目超过上限]" : ""}` };
+    } catch {
+      return { ok: false, message: `${name}：当前证据目录不可读取。` };
+    }
+  } };
+}
+
+function makeEvidenceAuditTools(gate: WriteGate, options: GovernedToolsOptions, lifecycle?: RuntimeToolLifecycle): ExecutableTool[] {
+  const { evidenceAuditAccess: access, evidenceAuditIsCurrent: check, roleId, runtime, currentTurnId } = options;
+  if (access !== "audit" && access !== "collect") return [];
+  const current: EvidenceAuditCurrent = async () => {
+    try { return !!check && await check() === true; } catch { return false; }
+  };
+  const readRoot = options.projectRoot ?? options.readRoot;
+  const readScope = makeEvidencePathScope(readRoot, options.evidenceAuditReadPaths, current);
+  const tools = readRoot ? [makeReadTool(readRoot, readScope), makeEvidenceListTool(readScope)] : [];
+  if (readRoot && options.viewImage)
+    tools.push(makeViewImageTool(options.viewImage, readRoot, options, readScope));
+  if (options.evidenceCheck) {
+    const checkEvidence = makeEvidenceCheckTool(options.evidenceCheck, currentTurnId, { roleId, runtime }, readScope);
+    tools.push({ ...checkEvidence, async handler(call) {
+      if (!await current() || call.signal?.aborted) return evidenceScopeDenial(checkEvidence.name);
+      const result = await checkEvidence.handler(call);
+      return await current() ? result : evidenceScopeDenial(checkEvidence.name);
+    } });
   }
+  if (options.reportHandback) {
+    const handback = makeSubmitReportTool(options.reportHandback, currentTurnId, options.diagnostics, { roleId, runtime });
+    tools.push({ ...handback, async handler(call) {
+      if (!await current() || call.signal?.aborted) return evidenceScopeDenial(handback.name);
+      return handback.handler(call);
+    } });
+  }
+
+  const writeRoot = options.writeRoot;
+  const reportPath = options.evidenceAuditReportPath;
+  const writePaths = access === "collect" ? options.evidenceCollectionWritePaths
+    : reportPath && !/[\\/]$/.test(reportPath) ? [reportPath] : [];
+  const writeScope = makeEvidencePathScope(writeRoot, writePaths, current);
+  if (writeRoot && readRoot && resolve(writeRoot) === resolve(readRoot) && writeScope.hasPaths) {
+    const host = fileGateHost(options);
+    const protectedRoots = host?.protectedRoots ?? options.protectedGitRoots;
+    const authorize: ScopedWriteAuthority = async path => !!await writeScope.resolve(path, "write");
+    tools.push(
+      makeWriteFileTool(gate, writeRoot, options.versionedDocAfterWrite, protectedRoots, host, options.claimFileWrite, authorize),
+      makeEditFileTool(gate, writeRoot, options.versionedDocAfterWrite, protectedRoots, host, options.claimFileWrite, authorize),
+    );
+  }
+  if (access === "collect" && options.shellGate && options.shellPostAudit && options.observeImplementationSelfTest
+    && options.shellCwd && roleId && currentTurnId) {
+    const reviewMs = options.shellReviewTimeoutMs ?? readTimeoutMs(process.env, SHELL_REVIEW_TIMEOUT_ENV, DEFAULT_SHELL_REVIEW_TIMEOUT_MS);
+    const execMs = options.shellExecTimeoutMs ?? readTimeoutMs(process.env, SHELL_EXEC_TIMEOUT_ENV, DEFAULT_SHELL_EXEC_TIMEOUT_MS);
+    tools.push(makeRunShellTool(options.shellGate, options.shellCwd, reviewMs, execMs, options.interactionGate, options.diagnostics,
+      currentTurnId, options.extraCredentialEnvVars, options.shellPostAudit, lifecycle, roleId, undefined,
+      { observeImplementationSelfTest: options.observeImplementationSelfTest }, current));
+  }
+  return tools;
+}
+
+function makeOrdinaryGovernedTools(gate: WriteGate, options?: GovernedToolsOptions, lifecycle?: RuntimeToolLifecycle): ExecutableTool[] {
   const readRoot = options?.readRoot ?? process.cwd();
   const writeRoot = options?.writeRoot;
   const host = fileGateHost(options);
@@ -5475,6 +6211,21 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     makeReadTool(readRoot),
     makeListDirTool(readRoot),
   ];
+  const packageLock = options?.governedPackageLock;
+  if (options?.durableFixedWorkflow === true && packageLock && host && writeRoot && options.claimFileWrite && options.currentTurnId
+    && resolve(writeRoot) === resolve(host.projectRoot)) {
+    tools.push(makeGeneratePackageLockTool(gate, writeRoot, host, options.claimFileWrite, packageLock, options.currentTurnId, options.versionedDocAfterWrite));
+  }
+
+  if (options?.durableFixedWorkflow === true && options.currentTurnId && options.roleId) {
+    const { roleId, currentTurnId, requestDocumentRevision, submitDocumentRevision } = options;
+    if (requestDocumentRevision && !submitDocumentRevision && roleId === "convener") {
+      tools.push(makeDocumentRevisionRequestTool(requestDocumentRevision, currentTurnId));
+    }
+    if (submitDocumentRevision && !requestDocumentRevision && DOCUMENT_REVISION_BUILTINS.has(roleId)) {
+      tools.push(makeDocumentRevisionSubmissionTool(submitDocumentRevision, currentTurnId));
+    }
+  }
 
   // 结构性保证（2026-10-26 图片查看，沿 dispatch_task 先例）：**未注入 viewImage 能力时
   // `view_image` 不存在**（能力缺席 = 最强 fail-closed；即便 policy 为 tool-result 也不注册）。
@@ -5482,7 +6233,6 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // `viewImagePolicy`（Service 按 `RUNTIME_VIEW_IMAGE_POLICY` 注入）单一决定，工具层不写引擎分支。
   const viewImage = options?.viewImage;
   if (viewImage !== undefined) tools.push(makeViewImageTool(viewImage, readRoot, options));
-
   // 结构性保证（设计 §7.5.1）：**未注入 ShellGate 时 run_shell 根本不存在**。
   // 「能力缺席」是最强的 fail-closed——不是「注册了再在 execute 里判空」，而是工具压根不在集合里，
   // 模型无法请求、扩展层也无需守它。这是与本模式（写类工具在 execute 内判空）刻意的不同处理。
@@ -5495,8 +6245,15 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     // 与 reviewMs 同址在构建时解析一次；`RuntimeSessionOptions` 以 `...options` 透传，桌面端经 env 即可起效。
     const execMs =
       options?.shellExecTimeoutMs ?? readTimeoutMs(process.env, SHELL_EXEC_TIMEOUT_ENV, DEFAULT_SHELL_EXEC_TIMEOUT_MS);
-    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars, options?.shellPostAudit, lifecycle, options?.roleId, options?.readonlyGit));
-
+    const fixedWorkflow = options?.durableFixedWorkflow === true;
+    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars, options?.shellPostAudit, lifecycle, options?.roleId, options?.readonlyGit,
+      fixedWorkflow ? { observeAcceptanceEnvironmentShell: options?.observeAcceptanceEnvironmentShell, observeImplementationSelfTest: options?.observeImplementationSelfTest } : undefined));
+    if (fixedWorkflow && options?.restoreAcceptanceEnvironment && options.currentTurnId && options.roleId && options.shellCwd) {
+      tools.push(makeRestoreAcceptanceEnvironmentTool(
+        options.restoreAcceptanceEnvironment, shellGate, shellCwd, reviewMs,
+        options.roleId, options.currentTurnId, options.interactionGate, options.shellPostAudit,
+      ));
+    }
     // 结构性保证（2026-10-31 升级方案 v1.3 §6.4，「注入才注册」）：`request_shell_escalation`
     // **只在 shell 已 arm（注入了 ShellGate）且注入了 `shellEscalation` 能力时**注册；能力缺席 ⇒
     // 工具压根不在集合里（fail-closed），模型无法请求。判断会话不经过本函数，天然不可见。
@@ -5527,7 +6284,9 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     // **缺省不设限（G-1）**：仅显式配置（option 或环境变量）才计时。
     const inputMs = options?.customerInputTimeoutMs ?? readOptionalTimeoutMs(process.env, CUSTOMER_INPUT_TIMEOUT_ENV);
     tools.push(makeRequestConfirmationTool(customerInput, inputMs, options?.interactionGate, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
-    tools.push(makeRequestChoiceTool(customerInput, inputMs, options?.interactionGate, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+    tools.push(makeRequestChoiceTool(customerInput, inputMs, options?.interactionGate, options?.currentTurnId, {
+      roleId: options?.roleId, runtime: options?.runtime, durableFixedWorkflow: options?.durableFixedWorkflow,
+    }));
   }
 
   // 结构性保证（2026-11-04 下载申请，沿 customerInput 先例）：**未注入 requestDownload 能力时
@@ -5690,11 +6449,26 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // `产物汇报` 不存在**。只给质检（内置 verifier）——由调用方（编排/桌面注入端）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。工具只转交载荷并如实转达回执：不写盘、
   // 不写 flow、不假装应用已接受；**汇报成功 ≠ 自动完成**，是否收口由应用校验后决定。
+  return tools;
+}
+
+export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptions, lifecycle?: RuntimeToolLifecycle): ToolDefinition[] {
+  if (lifecycle && options) {
+    const original = options;
+    const currentTurnId = () => original.currentTurnId?.();
+    const backgroundTasks = original.backgroundTasks
+      ? observeInjectedCapabilities(original.backgroundTasks, lifecycle, currentTurnId) : undefined;
+    options = observeInjectedCapabilities({ ...original, ...(backgroundTasks ? { backgroundTasks } : {}) }, lifecycle, currentTurnId);
+  }
+  const tools = options?.evidenceAuditAccess === undefined
+    ? makeOrdinaryGovernedTools(gate, options, lifecycle)
+    : makeEvidenceAuditTools(gate, options, lifecycle);
   // Observe customer waits without storing titles, previews or selected values.
   // 中止兜底文案需要知道 view_image 的交付方式（tool-result 不得声称排队/下一轮附件）。
   const viewImageDelivery = (options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY).delivery;
+  const taskGitAvailable = options?.taskGitAvailable === true && !!options.shellGate && !!options.readonlyGit;
   return tools.map((tool) => {
-    const { parameters, ...description } = describeTool(tool.name);
+    const { parameters, ...description } = describeTool(tool.name, options?.durableFixedWorkflow === true, taskGitAvailable, options?.evidenceAuditAccess);
     // B17（2026-11-11，RR15 实测）：fixed activate 的 **MCP 可见 inputSchema** 也必须允许 path-only；
     // 否则模型按提示只传 path 时会在 MCP 输入校验层被 `sha256 expected string` 拒绝（工具 handler
     // 的 modeShapeSchema 放宽不足以覆盖 schema 暴露面）。legacy 注入面仍用共享 schema。
@@ -5708,6 +6482,9 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
       // 恰好中止，也不能把它改写成「未启动/未停止」的谎言（B4 诚实面）。
       return call.signal?.aborted && result.ok && result.backgroundTask === undefined
         && !DIRECT_CAPABILITY_NAMES.has(tool.name) && tool.name !== SUBMIT_VERSION_CHANGE_TOOL_NAME
+        && tool.name !== GENERATE_PACKAGE_LOCK_TOOL_NAME
+        && tool.name !== RESTORE_ACCEPTANCE_ENVIRONMENT_TOOL_NAME
+        && tool.name !== REQUEST_DOCUMENT_REVISION_TOOL_NAME && tool.name !== SUBMIT_DOCUMENT_REVISION_TOOL_NAME
         && !GIT_CAPABILITY_TOOL_NAMES.has(tool.name)
         ? abortedToolResult(tool.name, viewImageDelivery) : result;
     } };
