@@ -2,22 +2,23 @@
 // 项目管理：i18n 硬编码守卫的确定性源码扫描器（测试夹具，不进入产品代码）。
 //
 // 设计说明（限制如实记录）：
-//  · 本仓库的 TypeScript 是 7.x 原生编译器，公开 API 是 `typescript/unstable/*` 的
-//    JSON-RPC 服务进程，不适合作为离线、确定性的单测依赖；因此本守卫**不使用 AST**，
-//    而使用一个自包含的词法扫描：
+//  · 对源码先做以下词法扫描：
 //      1) 按状态机去除 `//` 与 `/* ... */` 注释（字符串/模板字面量内的 `//`、`/*` 不误删；
 //         模板 `${...}` 表达式内的注释也会去除）；
 //      2) 在去注释后的文本中查找 Han 字符（`\p{Script=Han}`）。
+//  · 出现命中且不在 allowlist 中时，仅使用 Vite 的 TS/TSX AST 确认实际静态模块字面量。
+//    屏蔽能解析到仓库内源码的相对路径中的 Han，再按同一判据扫描。
 //  · 因此扫描范围是目标集合（字符串/模板/JSX 文本）的**保守超集**：非注释的标识符、
 //    正则字面量中的中文也会被报告。当前仓库没有中文标识符；若未来出现，应改写或把文件
 //    列入 allowlist 并说明理由。
 //  · 已知盲区：JSX 文本中若出现字面 `//`（如裸 URL），其行尾内容会被当作行注释跳过；
 //    字符串/模板中的 URL 不受影响。正则字面量中若出现 `/*` 会被误判为块注释。
 //    这两类在扫描目标中均未出现；新增时由人工复核。
-//  · 守卫只读源码，不修改任何文件；allowlist 之外出现中文即失败。
+//  · 守卫只读源码，不修改任何文件；allowlist 之外的其余中文命中即失败。
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { parseSync } from "vite";
 
 /** 扫描目标：路径 + 是否单文件（目录则递归）。 */
 export interface GuardTarget {
@@ -245,6 +246,50 @@ export function evaluateGuard(
   return { allowed: hits.length === 0 || allowlist.has(path), hits };
 }
 
+function isInside(root: string, target: string): boolean {
+  const path = relative(root, target);
+  return path !== "" && path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
+}
+
+function resolvesToRepositorySource(repoRoot: string, file: string, specifier: string): boolean {
+  if (!/^\.{1,2}\//.test(specifier) || /[\\%?#\u0000-\u001f]/.test(specifier)
+    || !SOURCE_EXTENSION_PATTERN.test(specifier)) return false;
+
+  const target = resolve(dirname(file), specifier);
+  if (!isInside(repoRoot, target)) return false;
+  try {
+    const physicalTarget = realpathSync(target);
+    return isInside(realpathSync(repoRoot), physicalTarget)
+      && SOURCE_EXTENSION_PATTERN.test(physicalTarget)
+      && statSync(physicalTarget).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function maskStaticSourceModuleSpecifiers(repoRoot: string, file: string, source: string): string {
+  const { errors, program } = parseSync(file, source);
+  if (errors.length > 0) return source;
+
+  const pieces: string[] = [];
+  let previousEnd = 0;
+  for (const statement of program.body) {
+    if (statement.type !== "ImportDeclaration" && statement.type !== "ExportNamedDeclaration"
+      && statement.type !== "ExportAllDeclaration") continue;
+    const specifier = statement.source;
+    if (!specifier) continue;
+
+    const original = source.slice(specifier.start, specifier.end);
+    const masked = original.replace(HAN_RUN, (han) => " ".repeat(han.length));
+    if (masked === original || !resolvesToRepositorySource(repoRoot, file, specifier.value)) continue;
+    pieces.push(source.slice(previousEnd, specifier.start), masked);
+    previousEnd = specifier.end;
+  }
+  if (pieces.length === 0) return source;
+  pieces.push(source.slice(previousEnd));
+  return pieces.join("");
+}
+
 /** 读取文件并判定（守卫测试的逐文件入口）。 */
 export function evaluateGuardFile(
   repoRoot: string,
@@ -252,6 +297,10 @@ export function evaluateGuardFile(
   allowlist: ReadonlySet<string>,
 ): { path: string; allowed: boolean; hits: HanHit[] } {
   const path = toRepoPath(repoRoot, file);
-  const result = evaluateGuard(path, readFileSync(file, "utf8"), allowlist);
-  return { path, ...result };
+  const source = readFileSync(file, "utf8");
+  const result = evaluateGuard(path, source, allowlist);
+  if (result.allowed) return { path, ...result };
+
+  const masked = maskStaticSourceModuleSpecifiers(repoRoot, file, source);
+  return { path, ...(masked === source ? result : evaluateGuard(path, masked, allowlist)) };
 }

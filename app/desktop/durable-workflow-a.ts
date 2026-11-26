@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { parse } from "yaml";
 import { loadEffectiveConfig } from "../../src/common/shared/config-loader.ts";
+import { createTranslator } from "../../src/common/shared/i18n/index.ts";
 import { renderWorkReportPrompt } from "../../src/common/编排/handback.ts";
 import { parseIntentDecisionRequirements, parseProposalDecisionFields, proposalDecisionChoiceId, proposalDecisionChoices } from "../../src/common/编排/workflow-preconditions.ts";
 import { preflightDurableEnvironmentOwner, preflightDurableImplementationOwner, preflightDurableReviewWrite } from "../../src/pipeline/orchestration/run-role.ts";
@@ -25,6 +26,8 @@ import { buildEffectiveProjectConfig } from "./project.ts";
 import { refreshListingNow } from "./session/shared/roles.ts";
 import { acquireProjectGitCriticalSection, createDurableGraphBaselineGitPort, durableBaselineOrigin, observeA11Git, previewDurableMerge,
   verifyDurableGraphBaseline, type DurableBaselineOrigin } from "./workflow-git.ts";
+import { mainLocale, mainT, type MainTranslate } from "./i18n.ts";
+import roleText from "./durable-workflow-role-text.json" with { type: "json" };
 
 export interface DesktopGraphTaskProfile {
   stage: WorkflowStage;
@@ -52,21 +55,21 @@ export function graphTaskProfile(view: DurableProjection): DesktopGraphTaskProfi
 export function workflowRoleDuty(stage: WorkflowStage, flowId: string, proposalRequestId?: string, evidenceCollectorRoleId?: string): string {
   const proposal = `docs/proposals/${flowId}`;
   const quality = `docs/quality/${flowId}`;
-  const collector = evidenceCollectorRoleId ? ` 原方案若需验收取证，请核对已批准的 ${evidenceCollectorRoleId} 角色，仅使用 acceptance-evidence 工作项，modules 与 roster 均记 category: evidence，唯一属主为该角色，唯一路径 docs/verification/${flowId}/。由原 A6 批准和 A8 激活。应用把写域收窄至本次工单。生产工作项不包含取证角色，质检只审计已登记证据。` : "";
+  const collector = evidenceCollectorRoleId ? `${roleText.pathA.approvedEvidenceCollectorInstruction[0]}${evidenceCollectorRoleId}${roleText.pathA.approvedEvidenceCollectorInstruction[1]}${flowId}${roleText.pathA.approvedEvidenceCollectorInstruction[2]}` : "";
   switch (stage) {
-    case "A1": return "只读受理需求，按产品职责给出摘要和关键待确认项，然后提交报告。";
-    case "A2": return `按产品职责写 docs/product/${flowId}-intent-vN.md，提交报告并给出产物路径。`;
-    case "A4": return "只读受理策划任务，给出方案需要处理的关键决策和建议范围，本轮用 submit_report 回交。";
-    case "A5": return `按 doc_format 核对格式，写 ${proposal}-proposal-vN.md、${proposal}-modules-vN.md、${proposal}-roster-vN.md 和 docs/contracts/${flowId}-architecture-vN.md。新项目优先选职责清楚的小规模名单。submit_report 的 evidence 逐项填实际裸相对路径。括注、验证说明及结论写在 summary。${collector}`;
-    case "A7": return `读取已批准的 ${proposal}-roster-vN.md，核对人员职责及边界准备事项，本轮用 submit_report 回交。`;
-    case "A8": return `读取已批准的 ${proposal}-roster-vN.md，为每个必需角色写角色卡、boundary.md 和 boundary.yaml。逐个调用 activate_role_documents 完成激活${proposalRequestId ? `，proposalDecisionId 为 decision-${proposalRequestId}` : ""}。只在全部通过后提交 completed，否则回报 blocked 和具体缺项。${collector}`;
-    case "A9": return `按 doc_format 撰写 docs/scheduling/${flowId}-team-vN.md，并调用 complete_team_plan 登记计划和 Git 基线。以工具回执为准。`;
+    case "A1": return roleText.pathA.prepareProduct;
+    case "A2": return `${roleText.pathA.authorProductIntent[0]}${flowId}${roleText.pathA.authorProductIntent[1]}`;
+    case "A4": return roleText.pathA.preparePlan;
+    case "A5": return `${roleText.pathA.authorProposal[0]}${proposal}${roleText.pathA.authorProposal[1]}${proposal}${roleText.pathA.authorProposal[2]}${proposal}${roleText.pathA.authorProposal[3]}${flowId}${roleText.pathA.authorProposal[4]}${collector}`;
+    case "A7": return `${roleText.pathA.preparePersonnel[0]}${proposal}${roleText.pathA.preparePersonnel[1]}`;
+    case "A8": return `${roleText.pathA.authorPersonnelCards[0]}${proposal}${roleText.pathA.authorPersonnelCards[1]}${proposalRequestId ? `${roleText.pathA.roleActivationProposalDecision[0]}${proposalRequestId}` : ""}${roleText.pathA.authorPersonnelCards[2]}${collector}`;
+    case "A9": return `${roleText.pathA.registerTeamBaseline[0]}${flowId}${roleText.pathA.registerTeamBaseline[1]}`;
     case "A11":
-    case "B3": return '在本任务授予的写集内实施，使用字面路径 git add 和 git commit -m "提交说明"（含空格的消息整体加引号）。提交正式报告，列出文件路径、commit OID、改动和静态核对结果。只运行前述受限 Git 命令。';
-    case "A12a": return `按本次需求编制独立验收标准 ${quality}-criteria-vN.md，正式报告列出标准文件路径。`;
-    case "A12b": return `对照 ${quality}-criteria-vN.md 独立检查实际候选，写 ${quality}-report-vN.md，报告列出该文件路径。通过时 submit_report completed，明确说明实际验证方式和限制。需要返工时在报告的 YAML frontmatter 写 outcome: rework，再提交 blocked。缺证或无法验证时报告 blocked 并说明原因。`;
-    case "B1": return "只读核对现有实现与客户改动要求，报告变更影响、核对依据、涉及文件和边界。以 submit_report 回交。";
-    default: return "按当前任务职责开展工作，以 submit_report 回交结论和证据。";
+    case "B3": return roleText.pathA.governedImplementation;
+    case "A12a": return `${roleText.pathA.authorIndependentCriteria[0]}${quality}${roleText.pathA.authorIndependentCriteria[1]}`;
+    case "A12b": return `${roleText.pathA.assessIndependentCandidate[0]}${quality}${roleText.pathA.assessIndependentCandidate[1]}${quality}${roleText.pathA.assessIndependentCandidate[2]}`;
+    case "B1": return roleText.pathA.observeExistingImplementation;
+    default: return roleText.pathA.defaultWorkInstruction;
   }
 }
 
@@ -134,11 +137,11 @@ export function isOperationsParentEffect(effect: DurableEffectRecord, parent: Du
 
 export async function preflightDesktopReviewer(input: DurableReviewPreflight, deps: SessionManagerDeps): Promise<DurableResult<true>> {
   if (deps.refreshListing && !await refreshListingNow(input.projectRoot, deps)) {
-    return graphFailure("workflow-reviewer-listing-unavailable", "无法刷新项目验收角色和边界。");
+    return graphFailure("workflow-reviewer-listing-unavailable", mainT("main.durableWorkflow.pathA.refreshAcceptanceRoleFailed"));
   }
   const listing = deps.getListing(input.projectRoot);
   if (!listing?.roles.some(role => role.roleId === input.roleId)) {
-    return graphFailure("workflow-reviewer-unavailable", `当前项目缺少验收角色 ${input.roleId}。`);
+    return graphFailure("workflow-reviewer-unavailable", mainT("main.durableWorkflow.pathA.acceptanceRoleMissing", { roleId: input.roleId }));
   }
   const { project } = await buildEffectiveProjectConfig(listing, {
     buildProjectConfig: deps.buildProjectConfig, loadEffectiveConfig: deps.loadEffectiveConfig ?? loadEffectiveConfig,
@@ -148,11 +151,11 @@ export async function preflightDesktopReviewer(input: DurableReviewPreflight, de
 
 export async function preflightDesktopEnvironmentOwner(projectRoot: string, roleId: string, deps: SessionManagerDeps): Promise<DurableResult<true>> {
   if (deps.refreshListing && !await refreshListingNow(projectRoot, deps)) {
-    return graphFailure("workflow-environment-owner-listing-unavailable", "无法刷新依赖属主和角色边界。");
+    return graphFailure("workflow-environment-owner-listing-unavailable", roleText.pathA.refreshDependencyRoleFailed);
   }
   const listing = deps.getListing(projectRoot);
   if (!listing?.roles.some(role => role.roleId === roleId)) {
-    return graphFailure("workflow-environment-owner-unavailable", "当前项目没有该获批依赖属主。");
+    return graphFailure("workflow-environment-owner-unavailable", roleText.pathA.approvedDependencyOwnerMissing);
   }
   const { project } = await buildEffectiveProjectConfig(listing, {
     buildProjectConfig: deps.buildProjectConfig, loadEffectiveConfig: deps.loadEffectiveConfig ?? loadEffectiveConfig,
@@ -162,11 +165,11 @@ export async function preflightDesktopEnvironmentOwner(projectRoot: string, role
 
 export async function preflightDesktopImplementationOwner(projectRoot: string, roleId: string, paths: readonly string[], deps: SessionManagerDeps): Promise<DurableResult<true>> {
   if (deps.refreshListing && !await refreshListingNow(projectRoot, deps)) {
-    return graphFailure("workflow-implementation-owner-listing-unavailable", "无法刷新当前项目的实施归属和角色边界。");
+    return graphFailure("workflow-implementation-owner-listing-unavailable", roleText.pathA.refreshImplementationOwnerFailed);
   }
   const listing = deps.getListing(projectRoot);
   if (!listing || listing.roles.filter(role => role.roleId === roleId).length !== 1) {
-    return graphFailure("workflow-implementation-owner-unavailable", "无法唯一核对当前工作项的获批属主。");
+    return graphFailure("workflow-implementation-owner-unavailable", roleText.pathA.approvedImplementationOwnerNotUnique);
   }
   const { project } = await buildEffectiveProjectConfig(listing, {
     buildProjectConfig: deps.buildProjectConfig, loadEffectiveConfig: deps.loadEffectiveConfig ?? loadEffectiveConfig,
@@ -191,17 +194,17 @@ export async function requestEvidenceCollectionFromTurn(
   const originId = source.origin.turnId;
   const reject = (message: string): DispatchReceipt => ({ ok: false, message: `workflow-evidence-dispatch-invalid: ${message}` });
   if (!parent || !originId || actorRoleId !== parent.roleId || source.entry.assignedTaskId !== parent.taskId
-    || (source.origin.taskId ?? source.entry.assignedTaskId) !== parent.taskId || !isCurrent()) return reject("取证派工需要当前实际运营父任务。");
+    || (source.origin.taskId ?? source.entry.assignedTaskId) !== parent.taskId || !isCurrent()) return reject(roleText.pathA.collectEvidenceNeedsOperationsParent);
   if (request.moduleId !== "acceptance-evidence" || request.taskKind || request.workflowAction || request.workflowPath || request.reviewTarget
     || request.resumeController || request.stage && request.stage !== parent.stage || request.workflowId && request.workflowId !== view.ref.instanceId
     || request.flowId && request.flowId !== view.flowId || request.reworkOf || request.modulePaths?.length
-    || request.sideEffect && request.sideEffect !== "read-only") return reject("取证采用原批准范围和独立工单。");
-  if (!audit || audit.collectorRoleId !== targetRoleId) return reject("当前候选没有匹配目标角色的已批准取证工单。");
+    || request.sideEffect && request.sideEffect !== "read-only") return reject(roleText.pathA.evidenceUsesApprovedScope);
+  if (!audit || audit.collectorRoleId !== targetRoleId) return reject(roleText.pathA.approvedEvidenceOrderMissing);
   const requestId = request.idempotencyKey ?? durableHash(JSON.stringify([parent.taskId, audit.basis.generation, targetRoleId]));
   const saved = await store.dispatchEvidenceCollection(view.ref, { parentTask: parent, roleId: targetRoleId, originId, requestId }, isCurrent);
   if (!saved.ok) return { ok: false, message: `${saved.code}: ${saved.message}` };
-  if (saved.value.state === "ignored") return reject(saved.value.reason ?? "原取证派工尝试已退役。");
-  return { ok: true, message: "已登记当前候选取证派工，请等待实际证据回交。" };
+  if (saved.value.state === "ignored") return reject(saved.value.reason ?? roleText.pathA.evidenceDispatchRetired);
+  return { ok: true, message: roleText.pathA.evidenceDispatchRecorded };
 }
 
 export function evidenceOperatorInstructions(view: DurableProjection): string {
@@ -209,22 +212,22 @@ export function evidenceOperatorInstructions(view: DurableProjection): string {
   const parent = evidenceOperatorBinding(view);
   if (!audit || !parent) return "";
   const missing = audit.missing.map(item => `${item.requirementId} ${item.reason}`).join("；");
-  const verify = `\n证据代次 ${audit.basis.generation}，候选 ${audit.basis.candidateOid}，状态 ${audit.state}。${missing ? ` 缺项 ${missing}。` : ""}`;
-  if (audit.state === "ready") return `${verify}当前取证已收口，按原节点要求完成运营核验。`;
+  const verify = `${roleText.pathA.evidenceOperatorState[0]}${audit.basis.generation}${roleText.pathA.evidenceOperatorState[1]}${audit.basis.candidateOid}${roleText.pathA.evidenceOperatorState[2]}${audit.state}${roleText.pathA.evidenceOperatorState[3]}${missing ? `${roleText.pathA.operatorEvidenceMissing[0]}${missing}${roleText.pathA.operatorEvidenceMissing[1]}` : ""}`;
+  if (audit.state === "ready") return `${verify}${roleText.pathA.evidenceCollectionClosed[1]}`;
   const current = view.pendingTasks?.find(task => task.taskId === audit.collector?.taskId);
-  if (current?.state === "pending") return `${verify}等待原取证任务 #${current.taskId} 的正式回交。`;
+  if (current?.state === "pending") return `${verify}${roleText.pathA.awaitFormalEvidenceHandback[1]}${current.taskId}${roleText.pathA.awaitFormalEvidenceHandback[2]}`;
   if (current?.state === "reported") return audit.missing.length
-    ? `${verify}当前取证任务 #${current.taskId} 仍有具名缺项。使用 submit_report 回交 blocked 并说明实测原因，由应用生成当期可用处置。`
-    : `${verify}核对当前取证任务 #${current.taskId} 的正式报告和本代证据，用 close_created_task accepted 收口。`;
-  return audit.collectorRoleId ? `${verify}派原批准取证角色 ${audit.collectorRoleId} 使用 dispatch_task，moduleId=acceptance-evidence，stage=${parent.stage}，sideEffect=read-only，写域以应用工单为准。核对正式回交后用 close_created_task 收口。缺真实来源时正式回交 blocked 并说明原因。`
-    : `${verify}当前没有已批准的取证角色，请回交具体缺项。`;
+    ? `${verify}${roleText.pathA.evidenceTaskReportedMissingItems[1]}${current.taskId}${roleText.pathA.evidenceTaskReportedMissingItems[2]}`
+    : `${verify}${roleText.pathA.closeReportedEvidenceTask[1]}${current.taskId}${roleText.pathA.closeReportedEvidenceTask[2]}`;
+  return audit.collectorRoleId ? `${verify}${roleText.pathA.dispatchApprovedEvidenceCollector[1]}${audit.collectorRoleId}${roleText.pathA.dispatchApprovedEvidenceCollector[2]}${parent.stage}${roleText.pathA.dispatchApprovedEvidenceCollector[3]}`
+    : `${verify}${roleText.pathA.noApprovedEvidenceCollector[1]}`;
 }
 
 export function evidenceRouteDelivery(view: DurableProjection) {
   const route = view.evidenceAudit?.route;
   if (!route || view.evidenceAudit?.state !== "collecting") return;
   return { task: route.parentTask, key: `evidence-route:${route.requestId}`,
-    text: `已批准当前签发标准下的同等取证路线。请在原运营任务 #${route.parentTask.taskId} 派发新的取证工单，引用应用已核实的实际来源。${evidenceOperatorInstructions(view)}` };
+    text: `${roleText.pathA.dispatchEquivalentEvidenceRoute[0]}${route.parentTask.taskId}${roleText.pathA.dispatchEquivalentEvidenceRoute[1]}${evidenceOperatorInstructions(view)}` };
 }
 
 export function evidenceCollectionPrompt(task: DurablePendingTask): string {
@@ -232,11 +235,11 @@ export function evidenceCollectionPrompt(task: DurablePendingTask): string {
   if (!evidence) return "";
   return [
     task.dispatch.text,
-    `应用取证工单 #${task.taskId}，候选 ${evidence.basis.candidateOid}、分支 ${evidence.basis.branch}、证据代次 ${evidence.basis.generation}。`,
-    `签发标准 ${evidence.basis.standard.path}（SHA-256 ${evidence.basis.standard.sha256}），必需条目 ${evidence.requirementIds.join("、")}。`,
-    ...(evidence.approvedArtifacts?.length ? [`本次批准换路的实际来源，请以原样 JSON 逐项引用：${JSON.stringify(evidence.approvedArtifacts)}。`] : []),
-    `取证写域 ${evidence.writePaths.join("、") || "本次无证据文件写域"}。实际批准的前台命令回执由应用登记。不得修改候选、执行 Git 或签审计结论。`,
-    '使用 submit_report 正式回交。evidence 逐项填写 JSON {"requirementId":"条目","path":"真实相对路径","source":"candidate-file"}。应用命令填 source:"task-command" 和工具返回的实际回执号 receiptId。回执无需文件时 path 为""。缺项填写 {"requirementId":"条目","reason":"实际缺项"}。',
+    `${roleText.pathA.evidenceOrderCandidate[0]}${task.taskId}${roleText.pathA.evidenceOrderCandidate[1]}${evidence.basis.candidateOid}${roleText.pathA.evidenceOrderCandidate[2]}${evidence.basis.branch}${roleText.pathA.evidenceOrderCandidate[3]}${evidence.basis.generation}${roleText.pathA.evidenceOrderCandidate[4]}`,
+    `${roleText.pathA.evidenceOrderCriteria[0]}${evidence.basis.standard.path}${roleText.pathA.evidenceOrderCriteria[1]}${evidence.basis.standard.sha256}${roleText.pathA.evidenceOrderCriteria[2]}${evidence.requirementIds.join("、")}${roleText.pathA.evidenceOrderCriteria[3]}`,
+    ...(evidence.approvedArtifacts?.length ? [`${roleText.pathA.referenceApprovedEvidenceSource[0]}${JSON.stringify(evidence.approvedArtifacts)}${roleText.pathA.referenceApprovedEvidenceSource[1]}`] : []),
+    `${roleText.pathA.evidenceOrderWriteScope[0]}${evidence.writePaths.join("、") || roleText.pathA.evidenceOrderNoWriteScope}${roleText.pathA.evidenceOrderWriteScope[1]}`,
+    roleText.pathA.reportEvidenceCollection,
   ].join("\n");
 }
 
@@ -256,8 +259,8 @@ export function b3EvidenceDelivery(
   });
   if (!fact) return;
   const report = store.getEvidence(view.ref, child.report.evidence) as { handback?: TaskHandback } | undefined;
-  const text = child.state === "reported" && report?.handback ? `${renderWorkReportPrompt(report.handback)}\n请核对原取证任务 #${child.taskId}。`
-    : `原取证任务 #${child.taskId} 已登记为 ${child.state}。`;
+  const text = child.state === "reported" && report?.handback ? `${renderWorkReportPrompt(report.handback)}${roleText.pathA.reviewEvidenceTaskReport[1]}${child.taskId}${roleText.pathA.reviewEvidenceTaskReport[2]}`
+    : `${roleText.pathA.reportedEvidenceTaskState[0]}${child.taskId}${roleText.pathA.reportedEvidenceTaskState[1]}${child.state}${roleText.pathA.reportedEvidenceTaskState[2]}`;
   return { child, parent, key: `evidence-b3:${child.taskId}:${fact.event.key}`, text: text + evidenceOperatorInstructions(view) };
 }
 
@@ -270,53 +273,53 @@ export async function requestOperationsChild(
   const reject = (message: string): DispatchReceipt => ({ ok: false, message: `workflow-a11-dispatch-invalid: ${message}` });
   if (view.a11Disposition?.retest && (view.a11Disposition.state === "parked"
     || operationsTasks(view).children.some(task => task.taskId === view.a11Disposition?.childTask.taskId && !task.outcome))) {
-    return reject("当前工作项的同候选补测或正式收口尚未完成。");
+    return reject(roleText.pathA.implementationRetestUnfinished);
   }
   const turnId = source.origin.turnId;
   if (!parent || parent.state !== "pending" || actorRoleId !== parent.roleId || source.entry.assignedTaskId !== parent.taskId
-    || source.origin.taskId !== parent.taskId || !turnId || !isCurrent()) return reject("派工需要本次有效的运营父任务回合。");
+    || source.origin.taskId !== parent.taskId || !turnId || !isCurrent()) return reject(roleText.pathA.dispatchNeedsCurrentOperationsTurn);
   if (request.moduleId === "acceptance-evidence" && view.evidenceAuditEnabled) {
     return requestEvidenceCollectionFromTurn(store, view, actorRoleId, request, targetRoleId, source, isCurrent);
   }
   if (request.taskKind || request.workflowAction || request.workflowPath || request.reviewTarget || request.resumeController
     || request.stage !== undefined && request.stage !== "A11" || request.workflowId !== undefined && request.workflowId !== view.ref.instanceId
     || request.flowId !== undefined && request.flowId !== parent.flowId || request.reworkOf !== undefined && request.reworkOf !== "A11"
-    || request.sideEffect !== undefined && request.sideEffect !== "code") return reject("当前工作流只受理 A11 的既定实施工作项。");
+    || request.sideEffect !== undefined && request.sideEffect !== "code") return reject(roleText.pathA.dispatchOnlyApprovedA11);
   const requestedPaths = request.modulePaths;
   const matchesPaths = (paths: readonly string[]) => !!requestedPaths?.length && new Set(requestedPaths).size === requestedPaths.length
     && JSON.stringify([...requestedPaths].sort()) === JSON.stringify([...paths].sort());
   const candidates = (view.implementationItems ?? []).filter(item => request.moduleId !== undefined ? item.id === request.moduleId
     : view.blockedRoutingEnabled && requestedPaths?.length ? matchesPaths(item.paths) : item.id === targetRoleId);
-  if (candidates.length !== 1) return reject("无法唯一核对本轮批准工单。请提供当前 workItemId 或该项完整批准写域。");
+  if (candidates.length !== 1) return reject(roleText.pathA.implementationOrderNotUnique);
   const item = candidates[0]!;
   const corrected = item.roleId !== targetRoleId;
   if (corrected && (!view.blockedRoutingEnabled || requestedPaths !== undefined && !matchesPaths(item.paths))) {
-    return reject(`当前请求与工作项 ${item.id} 的批准属主 ${item.roleId} 或写域 ${item.paths.join("、")} 不匹配。`);
+    return reject(`${roleText.pathA.implementationOrderMismatch[0]}${item.id}${roleText.pathA.implementationOrderMismatch[1]}${item.roleId}${roleText.pathA.implementationOrderMismatch[2]}${item.paths.join("、")}${roleText.pathA.implementationOrderMismatch[3]}`);
   }
   const requestId = request.idempotencyKey ?? durableHash(JSON.stringify([item.id, text, request.reworkOf ?? null]));
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,99}$/.test(requestId)) return reject("派工幂等键格式无效。");
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,99}$/.test(requestId)) return reject(roleText.pathA.invalidDispatchKey);
   const key = `a11-dispatch:${parent.taskId}:${requestId}`;
   const input = { kind: "implementation-dispatch" as const, roleId: item.roleId, workItemId: item.id,
     ...(corrected ? { requestedRoleId: targetRoleId } : {}),
     requestId, text, rework: request.reworkOf === "A11", ...(request.modulePaths ? { modulePaths: request.modulePaths } : {}) };
   const previous = store.listCapabilityEvents(view.ref).find(row => row.event.key === key);
-  if (previous && JSON.stringify(previous.event.input) !== JSON.stringify(input)) return reject("同一操作键已绑定其他派工内容。");
-  if (previous && !isCurrent()) return reject("运营父任务回合已经变化。");
+  if (previous && JSON.stringify(previous.event.input) !== JSON.stringify(input)) return reject(roleText.pathA.dispatchKeyPayloadConflict);
+  if (previous && !isCurrent()) return reject(roleText.pathA.operationsTurnChanged);
   if (!previous && view.blockedRoutingEnabled) {
-    if (!verifyOwner) return reject("当前窗口无法核对实际获批写域。");
+    if (!verifyOwner) return reject(roleText.pathA.approvedWriteScopeUnverified);
     const owner = await verifyOwner(item.roleId, item.paths);
     if (!owner.ok) return { ok: false, message: `${owner.code}: ${owner.message}` };
-    if (!isCurrent()) return reject("核对属主期间，运营父任务回合已经变化。");
+    if (!isCurrent()) return reject(roleText.pathA.operationsTurnChangedDuringPreflight);
   }
   const saved = previous ? { ok: true as const, value: previous.receipt } : await store.submitCapability(view.ref,
     { ...graphEventAddress(view), flowId: parent.flowId, key,
       source: { roleId: actorRoleId, originId: turnId, parentTaskId: parent.taskId }, input }, isCurrent);
   if (!saved.ok) return { ok: false, message: `${saved.code}: ${saved.message}` };
-  if (saved.value.state === "ignored") return reject(saved.value.reason ?? "实际派工尝试已退役。");
+  if (saved.value.state === "ignored") return reject(saved.value.reason ?? roleText.pathA.actualDispatchRetired);
   const child = store.lookup(view.ref)?.pendingTasks?.find(task => task.bindingKey === key && task.roleId === item.roleId);
-  const assigned = corrected ? `应用已按批准归属受理工作项 ${item.id}，实际属主 ${item.roleId}` : `工作流已受理工作项 ${item.id}`;
-  return { ok: true, message: child ? `${assigned}，子任务 #${child.taskId}。请等待原任务回交。`
-    : `${assigned}（${saved.value.key}）。请等待原任务回交。` };
+  const assigned = corrected ? `${roleText.pathA.assignedImplementationToOwner[0]}${item.id}${roleText.pathA.assignedImplementationToOwner[1]}${item.roleId}` : `${roleText.pathA.assignedImplementationItem[0]}${item.id}`;
+  return { ok: true, message: child ? `${assigned}${roleText.pathA.assignmentChildReceipt[1]}${child.taskId}${roleText.pathA.assignmentChildReceipt[2]}`
+    : `${assigned}${roleText.pathA.assignmentKeyReceipt[1]}${saved.value.key}${roleText.pathA.assignmentKeyReceipt[2]}` };
 }
 
 function implementationWorkOrderPrompt(task: DurablePendingTask): string | undefined {
@@ -325,8 +328,8 @@ function implementationWorkOrderPrompt(task: DurablePendingTask): string | undef
     || order.task.stage !== "A11" || order.task.stageAttempt !== task.attempt || order.task.executionAttempt !== task.task.executionAttempt
     || order.task.parentTaskId !== task.task.parentTaskId || JSON.stringify([...order.paths].sort()) !== JSON.stringify([...(task.modulePaths ?? [])].sort())) return;
   const deferred = order.deferredChecks.map(item => item.id).join("、");
-  return [`应用已绑定 A11 工作项 ${order.workItemId}，工单 SHA-256 ${order.digest}。`, implementationWorkOrderText(order),
-    deferred ? `运营按签发标准派工取证，A12b 审计 ${deferred}。` : ""].filter(Boolean).join("\n");
+  return [`${roleText.pathA.activeImplementationOrder[0]}${order.workItemId}${roleText.pathA.activeImplementationOrder[1]}${order.digest}${roleText.pathA.activeImplementationOrder[2]}`, implementationWorkOrderText(order),
+    deferred ? `${roleText.pathA.coordinateEvidenceCollection[0]}${deferred}${roleText.pathA.coordinateEvidenceCollection[1]}` : ""].filter(Boolean).join("\n");
 }
 
 function implementationRepairPrompt(view: DurableProjection, task: DurablePendingTask): string {
@@ -345,9 +348,9 @@ function implementationRepairPrompt(view: DurableProjection, task: DurablePendin
   if (!original) return "";
   return [
     "",
-    `应用核对的 A12b 返工依据。原候选 ${repair.sourceCandidateOid}，核准修复文件 ${repair.paths.join("、")}。`,
+    `${roleText.pathA.acceptanceReworkCandidate[0]}${repair.sourceCandidateOid}${roleText.pathA.acceptanceReworkCandidate[1]}${repair.paths.join("、")}${roleText.pathA.acceptanceReworkCandidate[2]}`,
     repair.reason,
-    "仅在当前应用工单的字面写域内解决该阻碍，保留原批准的脚本和资源约束，再按工单实际自测和正式回交。",
+    roleText.pathA.repairImplementationWithinScope,
   ].join("\n");
 }
 
@@ -369,59 +372,59 @@ export function nextOperationsDelivery(
         if (row.receipt.state === "ignored" || input.kind !== "implementation-self-test" || input.receipt.task.taskId !== active.taskId
           || input.receipt.candidateOid !== resumed.candidateOid || input.receipt.workOrderDigest !== resumed.workOrderDigest
           || resumed.retest && input.receipt.turnId !== original?.handback?.turnId) return [];
-        return [`${input.receipt.executionDigest}，工具调用 ${input.receipt.toolCallId}，命令 ${JSON.stringify(input.receipt.argv)}，退出 0，写入审计通过`];
+        return [`${input.receipt.executionDigest}${roleText.pathA.passingRetestReceipt[1]}${input.receipt.toolCallId}${roleText.pathA.passingRetestReceipt[2]}${JSON.stringify(input.receipt.argv)}${roleText.pathA.passingRetestReceipt[3]}`];
       });
       if (resumed.retest) return { task: active, wake: { key: a11ResumeKey(resumed.key), sourceRoleId: "application" }, text: [
-        `应用已为原属主 ${active.roleId} 打开唯一一次 A11 同候选补测。工作项 ${active.workItemId}，原任务 #${active.taskId}，候选 ${resumed.candidateOid}。`,
-        `工单 SHA-256 ${resumed.workOrderDigest}；已签标准 ${resumed.standard.path}，SHA-256 ${resumed.standard.sha256}。`,
-        receipts.length ? `本轮开始前已有的同候选应用自测回执：\n${receipts.join("\n")}` : "本轮开始前未找到匹配的应用自测回执。",
-        `待补要求：\n${implementationTestRulesText(resumed.retest.missingRequirements)}`,
-        "在项目根使用原 run_shell 逐项执行适用自测。命令仍需原审批并通过本回合写入审计。只读查看，保留候选、Git 引用、索引及工作区。",
-        "使用 submit_report 正式回交。在 evidence 中列出实际应用回执 ID 或工具调用 ID，在 summary 说明实际测试命令、候选、结果及限制。全部满足时回交 completed，遇到真实阻碍或测试失败时回交 blocked 并给出可核对依据。",
+        `${roleText.pathA.resumeSameCandidateRetest[0]}${active.roleId}${roleText.pathA.resumeSameCandidateRetest[1]}${active.workItemId}${roleText.pathA.resumeSameCandidateRetest[2]}${active.taskId}${roleText.pathA.resumeSameCandidateRetest[3]}${resumed.candidateOid}${roleText.pathA.resumeSameCandidateRetest[4]}`,
+        `${roleText.pathA.retestOrderAndCriteria[0]}${resumed.workOrderDigest}${roleText.pathA.retestOrderAndCriteria[1]}${resumed.standard.path}${roleText.pathA.retestOrderAndCriteria[2]}${resumed.standard.sha256}${roleText.pathA.retestOrderAndCriteria[3]}`,
+        receipts.length ? `${roleText.pathA.previousSameCandidateRetestReceipts[0]}${receipts.join("\n")}` : roleText.pathA.noPreviousSameCandidateRetestReceipts,
+        `${roleText.pathA.missingRetestRequirements[0]}${implementationTestRulesText(resumed.retest.missingRequirements)}`,
+        roleText.pathA.executeRetestsReadOnly,
+        roleText.pathA.reportActualRetests,
       ].join("\n") };
       const observed = resumed.observation.untrackedPaths?.filter(file => resumed.recovery?.paths.includes(file)) ?? [];
       return { task: active, wake: { key: a11ResumeKey(resumed.key), sourceRoleId: "application" },
         text: [
-          `应用已核对工作项 ${active.workItemId} 的索引并恢复原 A11 任务 #${active.taskId}。现有提交为 ${resumed.candidateOid}。`,
-          ...(observed.length ? [`附加文件字节仍在原处，当前未暂存：${observed.join("、")}。`] : []),
-          receipts.length ? `已保存的同候选应用自测回执：\n${receipts.join("\n")}` : "没有可直接引用的应用自测回执，请核对原工单的实际自测要求。",
+          `${roleText.pathA.a11IndexReconciled[0]}${active.workItemId}${roleText.pathA.a11IndexReconciled[1]}${active.taskId}${roleText.pathA.a11IndexReconciled[2]}${resumed.candidateOid}${roleText.pathA.a11IndexReconciled[3]}`,
+          ...(observed.length ? [`${roleText.pathA.filesNotStaged[0]}${observed.join("、")}${roleText.pathA.filesNotStaged[1]}`] : []),
+          receipts.length ? `${roleText.pathA.savedSameCandidateRetestReceipts[0]}${receipts.join("\n")}` : roleText.pathA.retestReceiptUnavailable,
           work,
-          "请在本回合按实际候选与自测回执重新用 submit_report 正式回交。只在原工作项和自测均满足时回交 completed，保留原提交和附加文件。",
+          roleText.pathA.resubmitImplementationReport,
         ].join("\n") };
     }
     const git = store.taskGitScope(view.ref, active.taskId, active.roleId);
     const duty = git ? view.blockedRoutingEnabled
-      ? '在批准写域使用字面路径 git add，并用 git commit -m "提交说明" 登记实际提交。工单中需要的模块自测继续经原 run_shell 审批与审计。'
+      ? roleText.pathA.authorizedGitCommit
       : workflowRoleDuty("A11", active.flowId)
-      : "按当前任务写集实施，回交实际产物与核对结果。若缺少当前任务 Git 写权限，请明确报告。";
-    const submit = git ? "\n应用已开通受治理的 run_shell Git 通道。请按上面的方式暂存和提交。" : "";
+      : roleText.pathA.implementationWorkWithoutGitPermission;
+    const submit = git ? roleText.pathA.governedGitEnabled : "";
     const approved = view.blockedRoutingEnabled && view.proposalDecision;
-    const values = approved ? `\n当前 A6 已批准定案 ${JSON.stringify(approved.values)}，选择摘要 ${approved.selectionDigest}。` : "";
-    return { task: active, text: `${work}${values}\n${duty}\n批准写域：${active.modulePaths?.join("、") ?? ""}\n原提交：${active.baseOid ?? ""}。${submit}${implementationRepairPrompt(view, active)}` };
+    const values = approved ? `${roleText.pathA.approvedProposalDecisions[0]}${JSON.stringify(approved.values)}${roleText.pathA.approvedProposalDecisions[1]}${approved.selectionDigest}${roleText.pathA.approvedProposalDecisions[2]}` : "";
+    return { task: active, text: `${work}${values}${roleText.pathA.implementationBoundPrompt[2]}${duty}${roleText.pathA.implementationBoundPrompt[3]}${active.modulePaths?.join("、") ?? ""}${roleText.pathA.implementationBoundPrompt[4]}${active.baseOid ?? ""}${roleText.pathA.implementationBoundPrompt[5]}${submit}${implementationRepairPrompt(view, active)}` };
   }
   const plan = view.implementationItems?.map(item => {
     const child = children.findLast(child => child.workItemId === item.id);
     const recordedTip = child && store.listEffects(view.ref, "task-commit").findLast(row =>
       row.state === "succeeded" && workflowTaskEffectMatches(row, child))?.result?.result?.oid;
-    return `- workItemId=${item.id}，属主=${item.roleId}，写域=${item.paths.join("、")}，状态=${child?.state ?? "待派"}${child ? `，任务=${child.taskId}，提交=${child.commitOid ?? recordedTip ?? "待核验"}` : ""}`;
+    return `${roleText.pathA.operationsWorkItemRow[0]}${item.id}${roleText.pathA.operationsWorkItemRow[1]}${item.roleId}${roleText.pathA.operationsWorkItemRow[2]}${item.paths.join("、")}${roleText.pathA.operationsWorkItemRow[3]}${child?.state ?? roleText.pathA.awaitingDispatch}${child ? `${roleText.pathA.operationsWorkItemBinding[0]}${child.taskId}${roleText.pathA.operationsWorkItemBinding[1]}${child.commitOid ?? recordedTip ?? roleText.pathA.awaitingCommitVerification}` : ""}`;
   }).join("\n");
   const repair = view.implementationRepair;
-  const instructions = `本次只协调已定工作项。每次使用 dispatch_task 派一项，roleId=属主，moduleId=workItemId，task=具体目标，idempotencyKey=稳定操作键，stage=A11。` +
-    `等待子任务正式回交后，经 close_created_task 核对并提交 accepted、rework 或 rejected。` +
-    (repair ? "" : "明确 rework 后才可用 reworkOf=A11 为同项申请纠正尝试。") +
-    `完成当前核对后继续派下一项。仅在全部工作项都已接受后才用 submit_report completed 汇总，evidence 逐项包含真实任务 ID 和提交 OID。` +
-    `代码子任务使用当前任务开通的 run_shell 受治理 Git 暂存和提交。集成构建依赖全部模块时，先核对本角色实际交付与提交。` +
-    (view.blockedRoutingEnabled ? "\n角色目标和收口依据来自应用工单。A11 组织模块自测，实际回执由应用记录。收口时若应用已挂起同候选补测，请等待原属主正式回交后再核对收口。真实取证由运营按原批准角色派工，A12b 审计当期登记物证。" : "") +
+  const instructions = roleText.pathA.dispatchEachApprovedWorkItem +
+    roleText.pathA.closeReportedImplementation +
+    (repair ? "" : roleText.pathA.reworkAttemptRequirement) +
+    roleText.pathA.completeAllImplementationItems +
+    roleText.pathA.implementationGitAndIntegration +
+    (view.blockedRoutingEnabled ? roleText.pathA.coordinateModuleSelfTests : "") +
     (view.documentRevisionEnabled
-      ? "\n若内置角色的治理文件有问题以致本节点无法继续，先调用 request_document_revision 提交具体项目相对路径和原因。等待应用回交，再继续原运营任务。其他阻塞用 submit_report blocked 交代缺项。"
-      : "无法继续时用 submit_report blocked 交代缺项。");
-  const repairText = repair ? [`\n本轮是经应用核对的 A12b 准备缺陷返工。原候选 ${repair.sourceCandidateOid}，原因 ${repair.reason}`,
-    `仅为原属主 ${repair.ownerTask.roleId} 开原工作项 ${repair.workItemId}，原任务 #${repair.ownerTask.taskId}。dispatch_task 使用 reworkOf=A11 和完整字面写域 ${repair.paths.join("、")}。`,
-    ...repair.inherited.map(entry => `原已接受项 ${entry.workItemId} 保留 #${entry.taskId} 和提交 ${entry.commitOid}，汇总 evidence 列出这一对。`),
-    "实际核对唯一返工项的新提交和应用自测，按原收口。汇总另列该返工项的新任务 ID 和新提交。"].join("\n") : "";
+      ? roleText.pathA.requestRevisionForGovernanceBlock
+      : roleText.pathA.reportImplementationBlock);
+  const repairText = repair ? [`${roleText.pathA.coordinateAcceptancePreparationRework[0]}${repair.sourceCandidateOid}${roleText.pathA.coordinateAcceptancePreparationRework[1]}${repair.reason}`,
+    `${roleText.pathA.assignOriginalReworkOwner[0]}${repair.ownerTask.roleId}${roleText.pathA.assignOriginalReworkOwner[1]}${repair.workItemId}${roleText.pathA.assignOriginalReworkOwner[2]}${repair.ownerTask.taskId}${roleText.pathA.assignOriginalReworkOwner[3]}${repair.paths.join("、")}${roleText.pathA.assignOriginalReworkOwner[4]}`,
+    ...repair.inherited.map(entry => `${roleText.pathA.retainAcceptedImplementation[0]}${entry.workItemId}${roleText.pathA.retainAcceptedImplementation[1]}${entry.taskId}${roleText.pathA.retainAcceptedImplementation[2]}${entry.commitOid}${roleText.pathA.retainAcceptedImplementation[3]}`),
+    roleText.pathA.reviewSingleReworkResult].join("\n") : "";
   const evidenceInstructions = view.evidenceAudit ? evidenceOperatorInstructions(view)
-    : view.evidenceAuditEnabled ? "\n全部生产工作项收口后，应用将核对当前候选的签发取证条件，再完成运营汇总。" : "";
-  const text = `${parent.dispatch.text}\n工作流 ${view.ref.instanceId}，flowId ${parent.flowId}。\n${plan ?? ""}\n${instructions}${repairText}${evidenceInstructions}`;
+    : view.evidenceAuditEnabled ? roleText.pathA.verifyEvidenceAfterImplementation : "";
+  const text = `${parent.dispatch.text}${roleText.pathA.operationsParentPrompt[1]}${view.ref.instanceId}${roleText.pathA.operationsParentPrompt[2]}${parent.flowId}${roleText.pathA.operationsParentPrompt[3]}${plan ?? ""}${roleText.pathA.operationsParentPrompt[4]}${instructions}${repairText}${evidenceInstructions}`;
   const last = children.at(-1);
   if (!last) return { task: parent, text };
   if (!last.report) return undefined;
@@ -430,7 +433,7 @@ export function nextOperationsDelivery(
     const close = store.listCapabilityEvents(view.ref).findLast(row => row.receipt.state !== "ignored" && (row.event.input.kind === "task-closed" || row.event.input.kind === "evidence-collection-closed")
       && row.event.input.task.taskId === last.taskId && row.event.input.outcome === last.state);
     if (!close) return undefined;
-    return { task: parent, text: `原任务 #${last.taskId} 已登记为 ${last.state}。请按当前状态继续。\n${text}`,
+    return { task: parent, text: `${roleText.pathA.resumeAfterPriorWorkItem[0]}${last.taskId}${roleText.pathA.resumeAfterPriorWorkItem[1]}${last.state}${roleText.pathA.resumeAfterPriorWorkItem[2]}${text}`,
       wake: { key: `a11-progress:${last.taskId}:${close.event.key}`, sourceRoleId: "application" } };
   }
   if (last.state !== "reported" || last.evidenceWorkOrder && !store.listCapabilityEvents(view.ref).some(row =>
@@ -440,8 +443,8 @@ export function nextOperationsDelivery(
   if (!snapshot?.handback) return undefined;
   const retest = view.a11Disposition?.childTask.taskId === last.taskId ? view.a11Disposition.retest : undefined;
   const key = operationsWakeKey(last.taskId, last.report.key, retest?.reportReviewGeneration);
-  const failure = retest?.failure?.assertionFailure ? `\n应用已保存实际测试断言失败的执行依据。工具调用 ${retest.failure.toolCallId}，证据 SHA-256 ${retest.failure.evidence.sha256}。请独立核对候选与断言失败原因。确认代码缺陷且仍有原授权额度时，在 close_created_task 的 note 中列工具调用 ID 和核对依据，再申请返工。` : "";
-  return { task: parent, text: `${renderWorkReportPrompt(snapshot.handback)}\n请核对 #${last.taskId}。${failure}\n${text}`,
+  const failure = retest?.failure?.assertionFailure ? `${roleText.pathA.retestFailureEvidence[0]}${retest.failure.toolCallId}${roleText.pathA.retestFailureEvidence[1]}${retest.failure.evidence.sha256}${roleText.pathA.retestFailureEvidence[2]}` : "";
+  return { task: parent, text: `${renderWorkReportPrompt(snapshot.handback)}${roleText.pathA.reviewImplementationReport[1]}${last.taskId}${roleText.pathA.reviewImplementationReport[2]}${failure}${roleText.pathA.reviewImplementationReport[3]}${text}`,
     wake: { key, sourceRoleId: last.roleId } };
 }
 
@@ -488,7 +491,7 @@ export async function workflowReviewProof(
   const artifact = artifacts?.find(item => item.path.startsWith(prefix) && /^[1-9]\d*\.md$/.test(item.path.slice(prefix.length)));
   const fresh = artifact ? await store.readEvidence(view.projectRoot, artifact.path) : undefined;
   if (!artifact || !fresh?.ok || fresh.value.sha256 !== artifact.sha256) {
-    return graphFailure("workflow-review-evidence-missing", "本次独立验收回交缺少对应的验收文件，或文件已变化。");
+    return graphFailure("workflow-review-evidence-missing", roleText.pathA.acceptanceFileMissingOrChanged);
   }
   const documents = [artifact];
   if (stage === "A12a") return { ok: true, value: { documents, outcome: report.status === "completed" ? "accepted" : "rejected" } };
@@ -501,12 +504,12 @@ export async function workflowReviewProof(
     if (verdict.outcome === "rework" && report.status === "blocked") return { ok: true, value: { documents, outcome: "rework", tipOid: candidateOid } };
     if (report.status !== "completed") return { ok: true, value: { documents, outcome: "rejected" } };
   }
-  return graphFailure("workflow-review-candidate-unverified", "验收报告结论、候选提交或回交状态不匹配。");
+  return graphFailure("workflow-review-candidate-unverified", roleText.pathA.acceptanceHandbackMismatch);
 }
 
 export async function closeWorkflowTask(durable: DesktopDurableWorkflow, view: DurableProjection, pending: DurablePendingTask,
   outcome: TaskClosedOutcome, documents?: readonly DurableEvidenceRef[], tipOid?: string) {
-  if (!pending.report) return graphFailure("close-report-missing", "缺少受派角色的实际报告。");
+  if (!pending.report) return graphFailure("close-report-missing", roleText.pathA.actualRoleReportMissing);
   const store = await durable.store();
   const key = `workflow-close:${pending.taskId}:${pending.report.key}`;
   const saved = await store.submitCapability(view.ref, {
@@ -517,7 +520,7 @@ export async function closeWorkflowTask(durable: DesktopDurableWorkflow, view: D
   });
   if (saved.ok && saved.value.state !== "ignored" && !(await readTaskState(view.projectRoot)).records.get(pending.taskId)?.closed) {
     await appendTaskEvent(view.projectRoot, taskEvent("task.closed", {
-      taskId: pending.taskId, by: "convener", outcome, eventId: key, note: "工作流根据受信回交收口。",
+      taskId: pending.taskId, by: "convener", outcome, eventId: key, note: roleText.pathA.closeFromTrustedHandback,
     }));
   }
   return saved;
@@ -937,38 +940,48 @@ type CardPayload = {
   decisionOptions?: Readonly<Record<string, Readonly<Record<string, DurableProposalDecisionValue>>>>;
 };
 
-function revisionOptions(request: Extract<CustomerInputRequest, { kind: "choice" }>, material: "意图" | "提案") {
+const workflowDecisionT = createTranslator("zh-CN");
+
+function revisionOptions(request: Extract<CustomerInputRequest, { kind: "choice" }>, material: string, t: MainTranslate = mainT) {
   return ["revise", "reject"].map(id => request.options.find(option => option.id === id)
-    ?? { id, label: id === "revise" ? `请修订${material}` : `拒绝${material}` });
+    ?? { id, label: t(id === "revise" ? "main.durableWorkflow.pathA.reviseMaterial" : "main.durableWorkflow.pathA.rejectMaterial", { material }) });
+}
+
+function intentRevisionCard(request: Extract<CustomerInputRequest, { kind: "choice" }>, problem: string, t: MainTranslate = mainT) {
+  return {
+    ...request, multiple: false,
+    options: revisionOptions(request, t("main.durableWorkflow.pathA.intentMaterial"), t),
+    question: t("main.durableWorkflow.pathA.intentRevisionRequired", { problem }),
+  };
 }
 
 async function readCardMaterial(projectRoot: string, refs: readonly WorkflowDocumentRef[], kind: "intent" | "proposal"): Promise<string> {
   const doc = refs.find(item => item.kind === kind);
-  if (!doc) throw new Error("客户卡缺少当前材料引用。");
+  if (!doc) throw new Error(mainT("main.durableWorkflow.pathA.currentCardMaterialMissing"));
   const bytes = await readFile(path.join(projectRoot, doc.path));
-  if (createHash("sha256").update(bytes).digest("hex") !== doc.sha256) throw new Error("准备客户卡期间材料发生变化。");
+  if (createHash("sha256").update(bytes).digest("hex") !== doc.sha256) throw new Error(mainT("main.durableWorkflow.pathA.cardMaterialChanged"));
   return bytes.toString("utf8");
 }
 
 function concreteProposalCard(request: Extract<CustomerInputRequest, { kind: "choice" }>,
-  fields: NonNullable<DurableGraphCard["decisionFields"]>, decisionProblem?: string) {
+  fields: NonNullable<DurableGraphCard["decisionFields"]>, decisionProblem?: string, t: MainTranslate = mainT) {
   const decisionOptions = decisionProblem ? {} : proposalDecisionChoices(fields);
   const approvalOptions = Object.entries(decisionOptions).map(([id, values]) => {
     const chosen = fields.flatMap(field => {
       if (!Object.hasOwn(values, field.id)) return [];
       const value = values[field.id];
       const option = field.options.find(item => item.value === value);
-      return [`${field.label} ${option?.label ?? value} (${JSON.stringify(value)})${field.defaultValue === value ? "，采用提案默认值" : ""}`];
+      return [`${field.label} ${option?.label ?? value} (${JSON.stringify(value)})${field.defaultValue === value ? t("main.durableWorkflow.pathA.usesProposalDefault") : ""}`];
     });
     const recommended = fields.every(field => !Object.hasOwn(values, field.id) ? !field.required && field.defaultValue === undefined
       : field.defaultValue === values[field.id]);
     const label = fields.flatMap(field => Object.hasOwn(values, field.id)
       ? [field.options.find(option => option.value === values[field.id])!.label] : []).join(" · ");
-    return { id, label: label || "批准该组定案", description: chosen.join("。"), ...(recommended ? { recommended: true } : {}) };
+    return { id, label: label || t("main.durableWorkflow.pathA.approveDecisionSet"), description: chosen.join("。"), ...(recommended ? { recommended: true } : {}) };
   });
   return {
-    request: { ...request, multiple: false, options: [...approvalOptions, ...revisionOptions(request, "提案")],
-      ...(decisionProblem ? { description: `提案需要修订后才能定案。${decisionProblem}` } : {}) },
+    request: { ...request, multiple: false, options: [...approvalOptions, ...revisionOptions(request, t("main.durableWorkflow.pathA.proposalMaterial"), t)],
+      ...(decisionProblem ? { description: t("main.durableWorkflow.pathA.proposalRevisionRequired", { problem: decisionProblem }) } : {}) },
     decisionOptions,
   };
 }
@@ -1107,11 +1120,10 @@ export async function prepareDesktopGraphCard(input: {
       const parsed = parseIntentDecisionRequirements(await readCardMaterial(view.projectRoot, refs, "intent"));
       if (!parsed.ok) {
         decisionProblem = parsed.message;
-        cardRequest = { ...sourceRequest, multiple: false, options: revisionOptions(sourceRequest, "意图"),
-          question: `当前意图的定案声明需修订。${decisionProblem}选择修订会请产品提交新版本。` };
+        cardRequest = intentRevisionCard(sourceRequest, decisionProblem);
       }
     } catch (error) {
-      return notPresented(error instanceof Error ? error.message : "无法读取当前意图的定案声明。");
+      return notPresented(error instanceof Error ? error.message : mainT("main.durableWorkflow.pathA.intentDecisionRequirementsUnreadable"));
     }
   } else if (profile.kind === "proposal") {
     try {
@@ -1134,11 +1146,26 @@ export async function prepareDesktopGraphCard(input: {
   const payload: CardPayload = { request: cardRequest, documentRefs: refs, ...(intentId ? { intentId } : {}),
     ...(decisionOptions ? { decisionOptions } : {}), ...(decisionOptions || decisionProblem ? { sourceRequest } : {}) };
   const decisionBinding = { ...(decisionFields ? { decisionFields } : {}), ...(decisionProblem ? { decisionProblem } : {}) };
-  const digest = store.graphCardDigest(view.ref, { ...address, cardKind: profile.kind, documents, options, payload, ...decisionBinding });
+  const digestFor = (body: CardPayload) => store.graphCardDigest(view.ref, {
+    ...address, cardKind: profile.kind, documents, options, payload: body, ...decisionBinding,
+  });
+  const digest = digestFor(payload);
   const last = graphCardRows(store, view).at(-1)?.event.input;
-  if (last?.kind === "card-prepared" && graphCardDecision(store, view, last.card)) return notPresented("This workflow card is already decided.");
-  if (last?.kind === "card-prepared" && last.card.digest === digest) {
-    return presentDesktopGraphCard(durable, view, last.card, source, window);
+  if (last?.kind === "card-prepared") {
+    if (graphCardDecision(store, view, last.card)) return notPresented("This workflow card is already decided.");
+    if (last.card.digest === digest) return presentDesktopGraphCard(durable, view, last.card, source, window);
+    if (decisionFields || decisionProblem) {
+      // An unchanged request can be retried after a locale switch. Match the original full digest
+      // before reusing its pending card, including the original visible text and generation.
+      const alternateT = mainLocale() === "en-US" ? workflowDecisionT : createTranslator("en-US");
+      const alternateRequest = profile.kind === "proposal" && decisionFields
+        ? concreteProposalCard(sourceRequest, decisionFields, decisionProblem, alternateT).request
+        : profile.kind === "intent-confirm" && decisionProblem
+          ? intentRevisionCard(sourceRequest, decisionProblem, alternateT) : undefined;
+      if (alternateRequest && last.card.digest === digestFor({ ...payload, request: alternateRequest })) {
+        return presentDesktopGraphCard(durable, view, last.card, source, window);
+      }
+    }
   }
   if (!input.isCurrent() || !window.isRegistered()) return notPresented("The originating role turn changed while the card was prepared.");
   const generation = last?.kind === "card-prepared" ? last.card.generation + 1 : 1;
@@ -1253,7 +1280,7 @@ async function openDesktopGraphCard(
       : decisionValues || profile.kind === "appointment" || choice === "confirm" || choice === "accept" ? "approve" : "reject";
     if (choice !== "revise" && choice !== "reject") {
       if (card.decisionProblem) return staleCard(card.decisionProblem);
-      if (card.decisionFields && !decisionValues) return staleCard("请从当前提案选择一组实际定案。");
+      if (card.decisionFields && !decisionValues) return staleCard(mainT("main.durableWorkflow.pathA.confirmedDecisionSetRequired"));
     }
     const address = graphEventAddress(view);
     const key = `card-decided:${card.requestId}`;
@@ -1306,8 +1333,19 @@ async function openDesktopGraphCard(
   }
   if (signal.aborted || !window.isRegistered()) return notPresented("The workflow card's project is not open.");
   const runtime = isRuntimeKind(view.metadata.runtime) ? view.metadata.runtime : "pi";
-  const host: ChiefDecisionHost | undefined = window.executeDecision ? {
-    execute: window.executeDecision,
+  const executeDecision = window.executeDecision;
+  const host: ChiefDecisionHost | undefined = executeDecision ? {
+    execute: (context, ...args) => {
+      const source = payload.sourceRequest;
+      let options = context.request.options;
+      // Recreate only app-generated captions for the model; the saved customer card is presented verbatim.
+      if (source?.kind === "choice" && card.cardKind === "proposal" && card.decisionFields) {
+        options = concreteProposalCard(source, card.decisionFields, card.decisionProblem, workflowDecisionT).request.options;
+      } else if (source?.kind === "choice" && card.cardKind === "intent-confirm" && card.decisionProblem) {
+        options = intentRevisionCard(source, card.decisionProblem, workflowDecisionT).options;
+      }
+      return executeDecision({ ...context, request: { ...context.request, options } }, ...args);
+    },
     prepare: async () => {
       const current = async () => {
         if (!present()) return false;
@@ -1342,7 +1380,7 @@ async function openDesktopGraphCard(
 
   const recorded = graphCardDecision(store, view, card);
   const approval = recorded?.input;
-  const invalidReceipt: CustomerInputOutcome = { outcome: "unavailable", reason: "无法核对当前提案选项的已保存决定回执。" };
+  const invalidReceipt: CustomerInputOutcome = { outcome: "unavailable", reason: roleText.pathA.proposalDecisionReceiptUnverified };
   if (recorded?.stepId !== view.stepId || recorded.attempt !== view.attempt
     || approval?.decision !== "approve" || approval.generation !== card.generation || outcome.decisionId !== decisionId
     || approval.selected?.length !== 1 || approval.selected[0] !== selectedOptionId || !approval.decisionValues

@@ -546,7 +546,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 1317 / main 649 / shared 62 / preferences 3，总计 2031", () => {
+test("key 分区计数：ui 1317 / main 771 / shared 62 / preferences 3，总计 2153", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -554,8 +554,8 @@ test("key 分区计数：ui 1317 / main 649 / shared 62 / preferences 3，总计
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 1317, main: 649, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 2031);
+  assert.deepEqual(prefixes, { ui: 1317, main: 771, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 2153);
 });
 
 test("下载申请 key 契约：37 key 中英成对、家族计数、精确文案/占位符一致、英文零 Han", () => {
@@ -906,6 +906,15 @@ test("全局任务状态复用既有 key：run 状态/通用短词/任务中心�
 
 test("key parity：zh-CN 与 en-US 全集一致（顺序无关）", () => {
   assert.deepEqual(Object.keys(enUS).sort(), Object.keys(zhCN).sort());
+});
+
+test("持久工作流文案中英占位符一致", () => {
+  const keys = (Object.keys(zhCN) as MessageKey[])
+    .filter((key) => key.startsWith("main.durableWorkflow."));
+  assert.ok(keys.length > 0);
+  for (const key of keys) {
+    assert.deepEqual(placeholdersOf(zhCN[key]), placeholdersOf(enUS[key]), `占位符不一致：${key}`);
+  }
 });
 
 test("英文泄漏计数：en-US 所有模板值零 Han 字符", () => {

@@ -13,6 +13,7 @@ import { graphTurn, workflowTaskEffectMatches } from "./durable-workflow-a.ts";
 import { prepareAcceptanceNpm } from "./governed-package-lock.ts";
 import type { LiveSession } from "./session/contracts/session-types.ts";
 import { acceptanceDependencyParent, acquireProjectGitCriticalSection, inspectAcceptanceDependencies, readAcceptanceEnvironmentGit, type AcceptanceEnvironmentGitFacts } from "./workflow-git.ts";
+import roleText from "./durable-workflow-role-text.json" with { type: "json" };
 
 type Condition = DurableAcceptanceEnvironmentMissing["condition"];
 type Store = Awaited<ReturnType<DesktopDurableWorkflow["store"]>>;
@@ -55,24 +56,24 @@ async function entriesAt(file: string) {
 async function boundedFile(root: string, relative: string, limit: number): Promise<Buffer> {
   const expected = path.resolve(root, relative);
   if (!relative || path.isAbsolute(relative) || relative.split(/[\\/]/).includes("..") ||
-    path.relative(expected, await realpath(expected))) throw new Error("输入文件路径未经核对。");
+    path.relative(expected, await realpath(expected))) throw new Error(roleText.environment.inputPathUnverified);
   const before = await lstat(expected);
-  if (!before.isFile() || before.nlink !== 1 || before.size < 1 || before.size > limit) throw new Error("输入文件不是可读取的普通文件。");
+  if (!before.isFile() || before.nlink !== 1 || before.size < 1 || before.size > limit) throw new Error(roleText.environment.ordinaryReadableFileRequired);
   const handle = await open(expected, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
   try {
     const matches = (observed: Awaited<ReturnType<typeof handle.stat>>) =>
       observed.isFile() && observed.nlink === 1 && observed.dev === before.dev && observed.ino === before.ino
       && observed.size === before.size && observed.mtimeMs === before.mtimeMs && observed.ctimeMs === before.ctimeMs;
-    if (!matches(await handle.stat())) throw new Error("读取期间输入文件已变化。");
+    if (!matches(await handle.stat())) throw new Error(roleText.environment.inputChangedDuringRead);
     const bytes = Buffer.alloc(before.size);
     let offset = 0;
     while (offset < bytes.length) {
       const { bytesRead } = await handle.read(bytes, offset, bytes.length - offset, offset);
-      if (bytesRead === 0) throw new Error("读取期间输入文件已变化。");
+      if (bytesRead === 0) throw new Error(roleText.environment.inputChangedDuringRead);
       offset += bytesRead;
     }
     if (!matches(await handle.stat()) || !matches(await lstat(expected)) || path.relative(expected, await realpath(expected))) {
-      throw new Error("读取期间输入文件已变化。");
+      throw new Error(roleText.environment.inputChangedDuringRead);
     }
     return bytes;
   } finally {
@@ -101,9 +102,9 @@ function assessmentRequiresBuild(criteria: string, explicit: readonly string[], 
   if (explicit.length) return explicit.includes("build");
   if (typeof scripts.build !== "string") return false;
   return criteria.split(/[\r\n。；！？;]+/).some(clause =>
-    !/(?:不要求|无需|不必|无须|可省略)\s*(?:本地|生产|项目|静态|实际)?\s*(?:构建|启动|运行)|\b(?:no need to|need not|not required to)\s+(?:build|start|run)\b/i.test(clause)
-    && (/(?:本地|生产|项目|静态)\s*构建|\b(?:local|production|project)\s+build\b/i.test(clause)
-      || /(?:记录|核对|验证|检查)\s*(?:实际(?:的)?\s*)?构建(?:\s*[/／、与和或]\s*启动)?\s*(?:指令|命令|脚本)\s*(?:及|和|与|、)\s*(?:实际)?(?:执行)?(?:结果|输出)/.test(clause)
+    !new RegExp(roleText.environment.buildNotRequiredPattern, "i").test(clause)
+    && (new RegExp(roleText.environment.buildMentionPattern, "i").test(clause)
+      || new RegExp(roleText.environment.observeActualBuildPattern).test(clause)
       || /\b(?:record|verify|check)\s+(?:the\s+)?(?:actual\s+)?build(?:\s*(?:\/|and|or)\s*(?:start|startup))?\s+(?:commands?|scripts?)\s+(?:and|with)\s+(?:their\s+)?(?:results?|output)\b/i.test(clause)));
 }
 
@@ -165,12 +166,12 @@ export async function verifyAcceptanceEnvironment(
   const { root } = git.value;
   try {
     const criteriaBytes = await boundedFile(root, basis.criteria.path, 256 * 1024);
-    if (digest(criteriaBytes) !== basis.criteria.sha256) return failure("criteria-drift", "当前独立验收标准已经变化。");
+    if (digest(criteriaBytes) !== basis.criteria.sha256) return failure("criteria-drift", roleText.environment.criteriaChanged);
     const criteria = criteriaBytes.toString("utf8");
     const explicit = explicitNpmScripts(criteria);
     if (!git.value.hasManifest) {
       return !expected && !explicit.length ? { ok: true, value: undefined }
-        : failure("package-manifest", "当前 npm 验收要求缺少候选中已跟踪的 package.json。");
+        : failure("package-manifest", roleText.environment.packageManifestMissing);
     }
     const bytes = await readPackageManifest(root);
     const source = asRecord(JSON.parse(bytes.toString("utf8")));
@@ -178,36 +179,36 @@ export async function verifyAcceptanceEnvironment(
     const required = [...new Set([...explicit, ...["build", "start", "dev"].filter(script => typeof scripts[script] === "string")])];
     if (!required.length && !expected) return { ok: true, value: undefined };
     if (source.packageManager !== undefined && (typeof source.packageManager !== "string" || !/^npm@\d/.test(source.packageManager))) {
-      return failure("package-manager", "候选声明了当前恢复不支持的包管理器。");
+      return failure("package-manager", roleText.environment.unsupportedPackageManager);
     }
     for (const config of [".npmrc", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb"]) {
       if (await entriesAt(path.join(root, config))) {
-        return failure("package-source", `候选存在未经当前恢复规则核验的配置或锁文件 ${config}。`);
+        return failure("package-source", `${roleText.environment.unverifiedConfigOrLock[0]}${config}${roleText.environment.unverifiedConfigOrLock[1]}`);
       }
     }
     const isolatedManifest = isolatePackageManifest(bytes);
     const lockBytes = await entriesAt(path.join(root, "package-lock.json"))
       ? await boundedFile(root, "package-lock.json", 4 * 1024 * 1024) : undefined;
     if (lockBytes) verifyPackageLock(lockBytes, isolatedManifest);
-    else if (/(?:lock\s*file|package-lock\.json|锁文件)/i.test(criteria)) {
-      return failure("lock-required", "当前标准涉及锁文件，需核对正式锁文件或按原渠道澄清标准。");
+    else if (new RegExp(roleText.environment.lockFileMentionPattern, "i").test(criteria)) {
+      return failure("lock-required", roleText.environment.formalLockRequired);
     }
     const manifest = { path: "package.json", sha256: digest(bytes) };
     const lock = lockBytes ? { path: "package-lock.json", sha256: digest(lockBytes) } : undefined;
     if (expected && (expected.manifest.sha256 !== manifest.sha256 || expected.lock?.sha256 !== lock?.sha256)) {
-      return failure("package-input-drift", "候选的依赖清单或锁文件已经变化。");
+      return failure("package-input-drift", roleText.environment.packageInputChanged);
     }
     const rootTarget = path.join(root, "node_modules");
     const existingRoot = await entriesAt(rootTarget);
     if (existingRoot && (!existingRoot.isDirectory() || path.relative(rootTarget, await realpath(rootTarget)))) {
-      return failure("install-target", "现有 node_modules 目录无法核对为当前项目普通目录。");
+      return failure("install-target", roleText.environment.existingModulesDirectoryUnverified);
     }
     const isPrivate = expected?.installTarget === "assessment-private";
     const installParent = isPrivate ? options?.privateParent : root;
     const installTarget = installParent && path.join(installParent, "node_modules");
     const target = isPrivate ? installTarget ? await entriesAt(installTarget) : undefined : existingRoot;
     if (target && (!target.isDirectory() || !installTarget || path.relative(installTarget, await realpath(installTarget)))) {
-      return failure("install-target", "本次安装目标路径无法核对为普通目录。");
+      return failure("install-target", roleText.environment.installTargetDirectoryUnverified);
     }
     const workspaceBuild = supportedWorkspaceBuild(source);
     const lockDocument = lockBytes ? asRecord(JSON.parse(lockBytes.toString("utf8"))) : {};
@@ -219,15 +220,15 @@ export async function verifyAcceptanceEnvironment(
       const condition: Condition = { kind: "npm-local-executable", script, executable };
       const present = !!(target && installParent && await localExecutable(installParent, pkg, executable).catch(() => false));
       if (target && !present && !(options?.workspaceProof && workspaceBuild && !isPrivate)) {
-        return failure("install-target-owned", "现有 node_modules 不具备本次所需入口，原目录保留，需核对其归属和替换权限。");
+        return failure("install-target-owned", roleText.environment.installTargetOwned);
       }
       return { ok: true, value: { git: git.value, manifest, lock, isolatedManifest, lockBytes, condition,
         requiredScripts: required, buildRequiredByStandard: assessmentRequiresBuild(criteria, explicit, scripts),
         projectInstallationExists: existingRoot !== undefined, workspaceBuild, present } };
     }
-    return failure("script-unsupported", "当前标准要求的本地脚本无法对应到一个可核验的已声明 npm 执行入口。");
+    return failure("script-unsupported", roleText.environment.declaredScriptEntryUnverified);
   } catch {
-    return failure("inputs-unverified", "无法核验当前标准、项目清单和公共 npm 依赖来源。");
+    return failure("inputs-unverified", roleText.environment.npmInputsUnverified);
   }
 }
 
@@ -271,14 +272,14 @@ export async function prepareAcceptanceEnvironmentDispatch(
   if (!current() || handled()) return hold;
   const checked = await verifyAcceptanceEnvironment(projectRoot, basis, undefined, { workspaceProof: !!view.acceptanceWorkspace });
   if (!current() || handled()) return hold;
-  const problem = (message: string) => deliver(`\n应用前检遇到的问题：${message} 如果无法安全检查，请在正式报告中记录阻塞与未验证条目。`);
+  const problem = (message: string) => deliver(`${roleText.environment.preflightFailureInstruction[0]}${message}${roleText.environment.preflightFailureInstruction[1]}`);
   if (!checked.ok) return problem(checked.message);
   if (!checked.value) return deliver();
   const workspaceProof = !!view.acceptanceWorkspace && checked.value.workspaceBuild;
   const accepted = workspaceProof && await acceptedAcceptanceDependencyProof(store, view, basis, checked.value);
   if (!current() || handled()) return hold;
   if (accepted || !workspaceProof && checked.value.present) return deliver(
-    `\n应用已核对本地前置条件。按当前转交的 ${basis.criteria.path} 对同一候选独立实测。构建和试玩使用项目已获准的忽略目录或应用认可的隔离输出，并保留现有输出。若项目构建工具支持指定目录，可将输出选为本任务专用的 .ans/acceptance-runs/${pending.taskId}，先核对其不存在。依赖已安装仍需独立实测。`);
+    `${roleText.environment.preflightReadyInstruction[0]}${basis.criteria.path}${roleText.environment.preflightReadyInstruction[1]}${pending.taskId}${roleText.environment.preflightReadyInstruction[2]}`);
   const { manifest, lock, condition } = checked.value;
   const installTarget = workspaceProof && checked.value.projectInstallationExists ? "assessment-private" as const : undefined;
   if (!deliveryStarted()) {
@@ -293,8 +294,8 @@ export async function prepareAcceptanceEnvironmentDispatch(
       if (!saved.ok && !deliveryStarted()) return problem(saved.message);
     }
   }
-  if (installTarget) return problem("当前候选缺少通过验收前检的依赖安装回执，原项目依赖目录已保留。");
-  return deliver(`\n应用已核对当前候选与 ${basis.criteria.path}，并确认 npm 脚本 ${condition.script} 所需的本地入口 ${condition.executable} 缺失。未执行的检查请按正式报告记录阻塞与缺项，frontmatter 可包含 environmentMissing: { script: "${condition.script}", executable: "${condition.executable}" }。已执行的检查请记录实际结果。`);
+  if (installTarget) return problem(roleText.environment.preflightInstallReceiptMissing);
+  return deliver(`${roleText.environment.preflightEntryMissingInstruction[0]}${basis.criteria.path}${roleText.environment.preflightEntryMissingInstruction[1]}${condition.script}${roleText.environment.preflightEntryMissingInstruction[2]}${condition.executable}${roleText.environment.preflightEntryMissingInstruction[3]}${condition.script}${roleText.environment.preflightEntryMissingInstruction[4]}${condition.executable}${roleText.environment.preflightEntryMissingInstruction[5]}`);
 }
 
 export function sameAcceptanceEnvironmentGit(before: AcceptanceEnvironmentGitFacts, after: AcceptanceEnvironmentGitFacts): boolean {
@@ -320,7 +321,7 @@ function npmScript(argv: readonly string[]): string | undefined {
 
 function missingCommand(stderr: string | undefined, executable: string): boolean {
   const literal = executable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return !!stderr && new RegExp(`(?:^|[\\r\\n])[^\\r\\n]{0,120}(?:['"\\s]|^)${literal}(?:['"\\s:]|$)[^\\r\\n]{0,100}(?:not recognized|not found|找不到|不是内部或外部命令)\\b`, "i").test(stderr);
+  return !!stderr && new RegExp(`${roleText.environment.missingExecutableStderrTemplate[0]}${literal}${roleText.environment.missingExecutableStderrTemplate[1]}`, "i").test(stderr);
 }
 
 export function acceptanceCommandObserver(durable: DesktopDurableWorkflow, session: () => LiveSession | undefined) {
@@ -354,7 +355,7 @@ export function acceptanceCommandObserver(durable: DesktopDurableWorkflow, sessi
       reviewedBy: observation.reviewedBy ?? "", argv: [...observation.argv] };
     if (!(await store.settleEffect(view.ref, { key, token: claimed.value.token, outcome: "succeeded",
       evidence: "Application ShellGate decision and actual foreground execution observation.", result })).ok) {
-      throw new Error("本次验收命令回执无法持久登记。");
+      throw new Error(roleText.environment.commandReceiptWriteFailed);
     }
   };
 }
@@ -399,22 +400,22 @@ export async function confirmAcceptanceEnvironmentAssessment(
 ): Promise<DurableResult<true>> {
   const workspace = view.acceptanceWorkspace;
   if (workspace?.basis.assessmentTask.taskId === pending.taskId) {
-    if (workspace.state === "blocked") return failure("assessment-workspace-blocked", workspace.reason ?? "验收工作区受阻。");
+    if (workspace.state === "blocked") return failure("assessment-workspace-blocked", workspace.reason ?? roleText.environment.workspaceBlocked);
     if (workspace.binding) {
       const receipt = workspace.receipt;
       if (workspace.binding.operation === "static") {
         const requirements = workspace.binding.staticRequirements;
         if (!requirements || requirements.build || requirements.requireDeliveryStartup || requirements.requireLogicTest) {
-          return failure("assessment-workspace-blocked", "签发标准还要求实际构建、交付启动或逻辑测试，当前静态预览未核实所需独立操作。");
+          return failure("assessment-workspace-blocked", roleText.environment.staticChecksMissing);
         }
         return receipt?.kind === "acceptance-workspace-static-run" && receipt.stage.turnId === turnId && receipt.stage.writeAuditPassed
           ? { ok: true, value: true }
-          : failure("assessment-unexercised", "当前独立回合缺少获应用批准、与候选文件摘要一致的静态准备及预览回执。");
+          : failure("assessment-unexercised", roleText.environment.staticPrepareOrPreviewReceiptMissing);
       }
       const build = receipt?.kind === "acceptance-workspace-run" ? receipt.build : undefined;
       return build?.turnId === turnId && build.exitCode === 0 && build.writeAuditPassed
         ? { ok: true, value: true }
-        : failure("assessment-unexercised", "当前独立回合缺少获应用批准且实际成功退出的验收工作区构建。");
+        : failure("assessment-unexercised", roleText.environment.workspaceBuildReceiptMissing);
     }
   }
   const env = view.acceptanceEnvironment;
@@ -426,12 +427,12 @@ export async function confirmAcceptanceEnvironmentAssessment(
       "workflow-environment-package-source", "workflow-environment-inputs-unverified"].includes(checked.code)) return { ok: true, value: true };
     return checked;
   }
-  if (checked.value?.present === false) return failure("assessment-unexercised", "独立复验所需的本地 npm 执行入口仍然缺少。");
+  if (checked.value?.present === false) return failure("assessment-unexercised", roleText.environment.independentLocalNpmEntryMissing);
   if (checked.value && (checked.value.buildRequiredByStandard || env.state === "rechecking" && checked.value.requiredScripts.includes("build"))) {
     const observation = store.listEffects(view.ref, "acceptance-check-command").findLast(row => workflowTaskEffectMatches(row, pending)
       && row.result?.result?.turnId === turnId && row.result.result.script === "build");
     if (observation?.state !== "succeeded" || observation.result?.result?.decision !== "allowed" || observation.result.result.verifiedExit !== "0") {
-      return failure("assessment-unexercised", "当前独立回合缺少获应用批准且实际成功退出的本地构建。");
+      return failure("assessment-unexercised", roleText.environment.independentLocalBuildReceiptMissing);
     }
   }
   return { ok: true, value: true };
@@ -572,12 +573,12 @@ export function acceptanceEnvironmentRestore(
     const binding = live?.delivery.intent.task;
     if (!live || !env?.basis || !env.missing || !env.effectKey || !binding || call.turnId !== live.source.originId
       || call.roleId !== binding.roleId || binding.taskId !== live.entry.assignedTaskId || binding.taskId !== live.source.parentTaskId
-      || path.relative(live.view.projectRoot, call.cwd)) return failure("restore-turn", "只有本次应用已绑定的恢复属主回合可以请求 npm 补齐。");
+      || path.relative(live.view.projectRoot, call.cwd)) return failure("restore-turn", roleText.environment.restoreOwnerTurnRequired);
     const { view } = live;
     const { basis, missing, effectKey } = env;
     const { ref, projectRoot } = view;
     const child = acceptanceEnvironmentTask(view, call.roleId, binding.taskId, "child");
-    if (!child || child.state !== "pending") return failure("restore-task", "当前恢复任务已经变化。");
+    if (!child || child.state !== "pending") return failure("restore-task", roleText.environment.restoreTaskChanged);
     const store = await durable.store();
     const current = () => {
       const now = store.lookup(ref);
@@ -591,23 +592,23 @@ export function acceptanceEnvironmentRestore(
         && recovery.missing.installTarget === missing.installTarget
         && active?.state === "pending" && identicalAssessmentTask(active.task, child.task);
     };
-    if (!current()) return failure("restore-task", "当前恢复回合已经结束。");
+    if (!current()) return failure("restore-task", roleText.environment.restoreTurnEnded);
     const owner = await preflightOwner(projectRoot, child.roleId);
     if (!owner.ok) return owner;
     const already = installReceipt(store, view, child);
-    if (already) return failure("restore-already-recorded", `本次恢复已有实际应用回执 ${already.id}。请正式回交该回执与结果，让运营核对。`);
+    if (already) return failure("restore-already-recorded", `${roleText.environment.restoreReceiptReplayInstruction[0]}${already.id}${roleText.environment.restoreReceiptReplayInstruction[1]}`);
     if (store.listEffects(ref, "environment-install").some(effect => effect.intent.key === effectKey)) {
-      return failure("restore-effect-uncertain", "本次作用已经认领，需先核对原实际回执。");
+      return failure("restore-effect-uncertain", roleText.environment.restoreAlreadyClaimed);
     }
     const prepared = await verifyAcceptanceEnvironment(projectRoot, basis, missing);
     if (!prepared.ok) return prepared;
     const privateInstall = missing.installTarget === "assessment-private";
     if (!prepared.value || prepared.value.present || prepared.value.projectInstallationExists !== privateInstall) {
-      return failure("restore-install-target", "本次安装输出不是可创建的空缺目录，需人工核对当前实物。");
+      return failure("restore-install-target", roleText.environment.restoreInstallTargetUnavailable);
     }
     const before = prepared.value;
     const installParent = privateInstall ? acceptanceDependencyParent(before.git.root, child.taskId) : before.git.root;
-    if (!installParent) return failure("restore-install-target", "当前任务无法绑定专用安装目标。");
+    if (!installParent) return failure("restore-install-target", roleText.environment.privateInstallTargetUnbound);
     const staged = await prepareAcceptanceNpm(before.git.root, before.isolatedManifest, before.lockBytes);
     if (!staged.ok) return staged;
     const npm = staged.value;
@@ -615,20 +616,20 @@ export function acceptanceEnvironmentRestore(
     const identity = stagingIdentity(before.git.root, npm.cwd);
     if (!current() || !identity) {
       await dispose();
-      return failure("restore-scope-unverified", "当前回合或应用隔离目录的归属无法核对。");
+      return failure("restore-scope-unverified", roleText.environment.restoreScopeUnverified);
     }
     let publishIdentity: DirectoryIdentity | undefined;
     if (privateInstall) {
       try {
         const owner = path.dirname(installParent);
         await mkdir(owner).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error; });
-        if (!installIdentity(owner) || !current()) throw new Error("专用安装目录不可核验。");
+        if (!installIdentity(owner) || !current()) throw new Error(roleText.environment.privateInstallDirectoryUnverified);
         await mkdir(installParent);
         publishIdentity = installIdentity(installParent);
-        if (!publishIdentity) throw new Error("专用安装目录身份不可核验。");
+        if (!publishIdentity) throw new Error(roleText.environment.privateInstallIdentityUnverified);
       } catch {
         await dispose();
-        return failure("restore-install-target", "当前恢复任务的专用安装目录已有内容、不可核验或任务已经变化。");
+        return failure("restore-install-target", roleText.environment.privateInstallDirectoryUnavailable);
       }
     }
     const installOptions = privateInstall ? { privateParent: installParent } : undefined;
@@ -649,7 +650,7 @@ export function acceptanceEnvironmentRestore(
         criteriaSha256: basis.criteria.sha256, candidateOid: basis.candidateOid, turnId: call.turnId, toolCallId: call.toolCallId, argv: [...npm.argv] } } : {}) });
     if (!claim.ok || !claim.value.execute) {
       await dispose();
-      return claim.ok ? failure("restore-effect-uncertain", "本次作用已被认领，必须核对原应用回执，不能再次运行。") : claim;
+      return claim.ok ? failure("restore-effect-uncertain", roleText.environment.restoreEffectNeedsReconciliation) : claim;
     }
     const scopedCurrent = () => {
       if (!current()) return false;
@@ -676,7 +677,7 @@ export function acceptanceEnvironmentRestore(
         if (completed) return;
         completed = true;
         try {
-          const reason = (decision === "denied" ? "本次依赖补齐命令未获应用批准。" : "应用无法完成本次命令审批或运行前核对。")
+          const reason = (decision === "denied" ? roleText.environment.restoreCommandDenied : roleText.environment.restoreApprovalOrPreflightFailed)
             + message.replace(/[\r\n\x00-\x1f]+/g, " ").slice(0, 250);
           const saved = await settle({ decision, result: "blocked", reason });
           if (!saved.ok) throw new Error(saved.message);
@@ -685,16 +686,16 @@ export function acceptanceEnvironmentRestore(
         }
       },
       async executeApproved(approved, executionSignal) {
-        if (completed) return failure("restore-effect-uncertain", "当前恢复作用已经完成或停止。");
+        if (completed) return failure("restore-effect-uncertain", roleText.environment.restoreEffectAlreadyTerminal);
         completed = true;
         const { reviewedBy } = approved;
         const blocked = async (reason: string, process?: CommandReceipt["process"]) => {
           const receipt = await settle({ decision: "allowed", reviewedBy, result: "blocked", reason, process });
-          return receipt.ok ? failure("restore-blocked", `${reason} 应用回执 ${receipt.value}。`) : receipt;
+          return receipt.ok ? failure("restore-blocked", `${reason}${roleText.environment.restoreResultReceipt[1]}${receipt.value}${roleText.environment.restoreResultReceipt[2]}`) : receipt;
         };
         const release = acquireProjectGitCriticalSection(projectRoot, effectKey);
         try {
-          if (!release) return await blocked("当前项目 Git 临界区已有其他操作。");
+          if (!release) return await blocked(roleText.environment.gitCriticalSectionBusy);
           const beforeExec = await verifyAcceptanceEnvironment(projectRoot, basis, missing, installOptions);
           const refreshed = await preflightOwner(projectRoot, child.roleId);
           if (!beforeExec.ok || !beforeExec.value || beforeExec.value.present || beforeExec.value.projectInstallationExists !== privateInstall
@@ -702,19 +703,19 @@ export function acceptanceEnvironmentRestore(
             || !refreshed.ok || reviewedBy.length === 0 || approved.cwd !== npm.cwd || JSON.stringify(approved.argv) !== JSON.stringify(npm.argv)
             || approved.roleId !== call.roleId || approved.turnId !== call.turnId || approved.toolCallId !== call.toolCallId
             || !sameAcceptanceReviewScope(approved.acceptanceEnvironmentScope, acceptanceEnvironmentScope)
-            || !scopedCurrent() || !approved.isCurrent() || executionSignal?.aborted) return await blocked("审批后候选、标准、工作树、归属或原回合已变化。");
+            || !scopedCurrent() || !approved.isCurrent() || executionSignal?.aborted) return await blocked(roleText.environment.restoreAuthorityChangedAfterApproval);
           const process = await npm.execute(executionSignal);
-          if (process.status !== "exited" || !process.pid) return await blocked("应用未取得正常的 npm 进程退出结果。", process);
+          if (process.status !== "exited" || !process.pid) return await blocked(roleText.environment.restoreNpmExitUnverified, process);
           const afterExec = await verifyAcceptanceEnvironment(projectRoot, basis, missing, installOptions);
           if (!afterExec.ok || !afterExec.value || afterExec.value.present || afterExec.value.projectInstallationExists !== privateInstall
             || !sameAcceptanceEnvironmentGit(before.git, afterExec.value.git)
-            || !scopedCurrent() || !approved.isCurrent()) return await blocked("执行后候选、依据、目标或原回合无法再次核对。", process);
+            || !scopedCurrent() || !approved.isCurrent()) return await blocked(roleText.environment.restoreAuthorityUnverifiedAfterRun, process);
           if (process.exitCode !== 0) {
-            const reason = process.transientNetworkFailure ? `公共 npm 源短暂连接失败（${process.npmErrorCode}），仍缺本地依赖。`
-              : process.npmErrorCode === "ENOTFOUND" ? "无法解析获批公共 npm 源的域名（ENOTFOUND）。"
-              : `npm 安装实际退出状态 ${process.exitCode ?? "异常"}${process.npmErrorCode ? `（${process.npmErrorCode}）` : ""}。`;
+            const reason = process.transientNetworkFailure ? `${roleText.environment.restoreTransientNpmNetworkFailure[0]}${process.npmErrorCode}${roleText.environment.restoreTransientNpmNetworkFailure[1]}`
+              : process.npmErrorCode === "ENOTFOUND" ? roleText.environment.restorePublicNpmDnsFailure
+              : `${roleText.environment.restoreNpmExitFailure[0]}${process.exitCode ?? roleText.environment.restoreNpmExitAbnormal}${process.npmErrorCode ? `（${process.npmErrorCode}）` : ""}${roleText.environment.restoreNpmExitFailure[2]}`;
             const saved = await settle({ decision: "allowed", reviewedBy, process, result: process.transientNetworkFailure ? "retryable" : "blocked", reason, git: afterExec.value.git });
-            return saved.ok ? failure("restore-process", `${reason} 应用回执 ${saved.value}。`) : saved;
+            return saved.ok ? failure("restore-process", `${reason}${roleText.environment.restoreResultReceipt[1]}${saved.value}${roleText.environment.restoreResultReceipt[2]}`) : saved;
           }
           const stillBound = () => scopedCurrent() && !executionSignal?.aborted;
           const directory = acceptanceEnvironmentScope.publishDirectory;
@@ -722,18 +723,18 @@ export function acceptanceEnvironmentRestore(
             () => stillBound() && approved.isCurrent(), stillBound);
           const installed = await verifyAcceptanceEnvironment(projectRoot, basis, missing, installOptions);
           if (!installed.ok || !installed.value?.present || !sameAcceptanceEnvironmentGit(before.git, installed.value.git)) {
-            return await blocked("npm 已退出，但本地执行入口或工作树未通过复核。", process);
+            return await blocked(roleText.environment.restoreExecutableOrTreeUnverified, process);
           }
-          const reason = "确已安装并独立核验本地执行入口。";
+          const reason = roleText.environment.restoreVerifiedLocalExecutable;
           const dependenciesSha256 = await inspectAcceptanceDependencies(installParent).catch(() => undefined);
           if (!dependenciesSha256 || !sameIdentity(publishedIdentity, installIdentity(directory)) || !stillBound()) {
-            return await blocked("安装进程已退出，但发布目录的完整依赖字节或任务身份无法核验。", process);
+            return await blocked(roleText.environment.restorePublishedOutputUnverified, process);
           }
           const receipt = await settle({ decision: "allowed", reviewedBy, process, result: "installed", reason, git: installed.value.git,
             dependenciesSha256, ...(privateInstall ? { dependenciesLocation: { path: directory, identity: publishedIdentity } } : {}) });
-          return receipt.ok ? { ok: true, value: { message: `${reason} 请正式回交应用回执 ${receipt.value}。`, execution: { exitCode: 0 } } } : receipt;
+          return receipt.ok ? { ok: true, value: { message: `${reason}${roleText.environment.restoreSuccessHandbackInstruction[1]}${receipt.value}${roleText.environment.restoreSuccessHandbackInstruction[2]}`, execution: { exitCode: 0 } } } : receipt;
         } catch {
-          return await blocked("应用未能安全完成或核验隔离安装，需保留现场核对。");
+          return await blocked(roleText.environment.restoreSafeCompletionFailed);
         } finally {
           release?.();
           await dispose();
@@ -763,7 +764,7 @@ export async function mirrorAcceptanceEnvironmentClosures(store: Store, view: Du
       const record = task && journal.records.get(task.taskId);
       if (!task || record?.closed || record?.created?.workflowId !== view.ref.instanceId || record.created.to !== task.roleId) continue;
       await appendTaskEvent(view.projectRoot, taskEvent("task.closed", { taskId: task.taskId, by: "convener", outcome,
-        note: "应用依据持久验收环境事实收口当前任务。" }));
+        note: roleText.environment.restoreCloseTaskNote }));
     }
   }
 }
@@ -779,22 +780,22 @@ export function closeAcceptanceEnvironmentChild(
     if (!live || !view || !env?.basis || !env.missing || !env.effectKey || !env.parentTask || !env.childTask
       || env.parentTask.taskId !== live.entry.assignedTaskId || env.parentTask.taskId !== live.delivery.intent.task?.taskId
       || env.parentTask.roleId !== "convener" || env.parentTask.roleId !== live.source.roleId || env.childTask.taskId !== input.taskId) {
-      return failure("close-turn", "恢复收口需要本次实际运营回合及原属主回交。");
+      return failure("close-turn", roleText.environment.restoreCloseRequiresOperationsTurn);
     }
     const { ref, projectRoot } = view;
     const { basis, missing, parentTask, childTask } = env;
     const store = await durable.store();
     const child = acceptanceEnvironmentTask(view, childTask.roleId, childTask.taskId, "child");
     if (!child?.report || child.state !== "reported" || live.delivery.intent.key !== `model:${recoveryWakeKey(child)}`) {
-      return failure("close-report", "本次恢复子任务缺少原始角色报告及应用核对回合。");
+      return failure("close-report", roleText.environment.restoreReportOrReviewMissing);
     }
     const snapshot = store.getEvidence(ref, child.report.evidence) as { handback?: TaskHandback } | undefined;
     if (snapshot?.handback?.taskId !== child.taskId || snapshot.handback.roleId !== child.roleId) {
-      return failure("close-report", "恢复子任务回交来源无法核验。");
+      return failure("close-report", roleText.environment.restoreReportSourceUnverified);
     }
     const receipt = installReceipt(store, view, child);
     let outcome: Parameters<Store["settleAcceptanceEnvironment"]>[1]["outcome"] = {
-      kind: "blocked", reason: "本次任务未形成可核验的批准、进程退出和安装回执，作用需要核对。",
+      kind: "blocked", reason: roleText.environment.restoreEffectProofMissing,
     };
     let disposition: TaskClosedOutcome = "rejected";
     if (receipt && receipt.details.result === "blocked") {
@@ -802,7 +803,7 @@ export function closeAcceptanceEnvironmentChild(
     } else if (receipt?.details.decision === "allowed" && receipt.details.process?.status === "exited" && receipt.details.process.pid
       && receipt.details.turnId === snapshot.handback.turnId && receipt.details.git) {
       const release = acquireProjectGitCriticalSection(projectRoot, `verification:${env.effectKey}`);
-      if (!release) return failure("close-busy", "当前项目 Git 临界区已有其他操作。");
+      if (!release) return failure("close-busy", roleText.environment.gitCriticalSectionBusy);
       try {
         const owner = await preflightOwner(projectRoot, child.roleId);
         const privateInstall = missing.installTarget === "assessment-private";
@@ -832,18 +833,18 @@ export function closeAcceptanceEnvironmentChild(
             disposition = "rework";
           }
         } else {
-          outcome = { kind: "blocked", reason: !owner.ok ? owner.message : !verified.ok ? verified.message : "候选工作树在安装后已经变化。", commandReceiptId: receipt.id };
+          outcome = { kind: "blocked", reason: !owner.ok ? owner.message : !verified.ok ? verified.message : roleText.environment.restoreInstallWorktreeChanged, commandReceiptId: receipt.id };
         }
       } finally {
         release();
       }
     }
-    if (input.outcome !== disposition) return failure("close-outcome", `应用实物核对结果为 ${disposition}。请按该结果处置当前子任务。`);
+    if (input.outcome !== disposition) return failure("close-outcome", `${roleText.environment.restoreCloseWrongDispositionInstruction[0]}${disposition}${roleText.environment.restoreCloseWrongDispositionInstruction[1]}`);
     const current = () => !signal?.aborted && live.current() && store.lookup(ref)?.acceptanceEnvironment?.effectKey === env.effectKey;
-    if (!current()) return failure("close-turn", "运营回合已结束，原核对不能用于当前任务。");
+    if (!current()) return failure("close-turn", roleText.environment.restoreOperationsTurnEnded);
     const saved = await store.settleAcceptanceEnvironment(ref, { parentTask, childTask, originId: live.source.originId, outcome }, current);
     if (!saved.ok) return saved;
-    if (saved.value.state === "ignored") return failure("close-stale", saved.value.reason ?? "当前恢复作用已变化。");
+    if (saved.value.state === "ignored") return failure("close-stale", saved.value.reason ?? roleText.environment.restoreCloseEffectChanged);
     await mirrorAcceptanceEnvironmentClosures(store, view);
     durable.activate();
     return { ok: true, taskId: child.taskId, outcome: disposition, workflowId: ref.instanceId, stage: "A12b",

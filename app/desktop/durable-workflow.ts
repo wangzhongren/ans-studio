@@ -26,6 +26,8 @@ import { buildEffectiveProjectConfig } from "./project.ts";
 import type { SessionManagerDeps } from "./session/contracts/deps.ts";
 import type { LifecycleHost } from "./session/lifecycle/host.ts";
 import type { ClaimDurableTaskGit } from "./workflow-git.ts";
+import { mainT } from "./i18n.ts";
+import roleText from "./durable-workflow-role-text.json" with { type: "json" };
 
 type WorkflowStore = Awaited<ReturnType<typeof openDurableWorkflow>>;
 type DaprHost = ReturnType<typeof createDaprHost>;
@@ -45,7 +47,7 @@ export async function executeChiefDecision(
   const aborted = new Promise<never>((_, reject) => {
     cancel = () => {
       void handle?.abort?.().catch(() => undefined);
-      reject(new Error("幕僚独立决策已取消或达到预算"));
+      reject(new Error(roleText.status.chiefDecisionCancelled));
     };
     bounded.addEventListener("abort", cancel, { once: true });
   });
@@ -78,13 +80,13 @@ export function durableChiefDecisionExecutor(
       bounded.throwIfAborted();
       const listing = deps.getListing(projectRoot);
       if (listing?.governanceModel !== "trio" || !current() || !context.request.durableWorkflow) {
-        throw new Error("当前项目或持久卡的幕僚委托不可用");
+        throw new Error(roleText.status.chiefDelegationUnavailable);
       }
       const { project } = await buildEffectiveProjectConfig(listing, {
         buildProjectConfig: deps.buildProjectConfig, loadEffectiveConfig: host.loadEffectiveConfig,
       });
       bounded.throwIfAborted();
-      if (!current()) throw new Error("项目窗口已切换");
+      if (!current()) throw new Error(roleText.status.projectWindowChanged);
       const createAdapter = deps.createRuntimeAdapterFactory
         ? deps.createRuntimeAdapterFactory(project, runtime, { ...deps.runtimeOptions, shellGate: deps.shellGate })
         : runtime === "pi" ? deps.createPiAdapterFactory(project, deps.shellGate)
@@ -200,14 +202,14 @@ export function workspacePreparationSummary(view: DurableProjection): string | u
   const observed = view.acceptanceWorkspace?.preparation;
   if (!observed || !("stage" in observed.result)) return;
   const { result, basis, generation } = observed;
-  const stages: Record<typeof result.stage, string> = { candidate: "候选核验", materials: "签发依据", entry: "入口核验",
-    registration: "工作区登记", workspace: "隔离准备", reconciliation: "原作用对账" };
-  const paths = result.paths?.map(item => `${item.path}（${{ present: "存在", missing: "缺失", unverified: "无法核验" }[item.state]}）`).join("、");
+  const stages: Record<typeof result.stage, string> = { candidate: mainT("main.durableWorkflow.status.verifyCandidate"), materials: mainT("main.durableWorkflow.status.issuedBasis"), entry: mainT("main.durableWorkflow.status.verifyEntry"),
+    registration: mainT("main.durableWorkflow.status.registerWorkspace"), workspace: mainT("main.durableWorkflow.status.prepareIsolation"), reconciliation: mainT("main.durableWorkflow.status.reconcileOriginalEffect") };
+  const paths = result.paths?.map(item => `${item.path}（${{ present: mainT("main.durableWorkflow.status.pathPresent"), missing: mainT("main.durableWorkflow.status.pathMissing"), unverified: mainT("main.durableWorkflow.status.pathUnverified") }[item.state]}）`).join("、");
   const scope = view.blockedRouting?.a12bPrepareKey === observed.prepareKey ? view.blockedRouting : undefined;
   const actions = scope?.options.map(option => option.label).join("、");
-  return `A12b ${stages[result.stage]}。第 ${generation} 次观察，候选 ${basis.candidateOid}。 ${result.reason}` +
-    (paths ? ` 已核对路径 ${paths}。` : "") +
-    (scope?.decision?.option === "wait" ? " 当前已选择等待客观条件恢复。" : actions ? ` 可选处置 ${actions}。` : "");
+  return mainT("main.durableWorkflow.status.workspacePreparation", { stage: stages[result.stage], generation, candidate: basis.candidateOid, reason: result.reason }) +
+    (paths ? mainT("main.durableWorkflow.status.checkedPaths", { paths }) : "") +
+    (scope?.decision?.option === "wait" ? mainT("main.durableWorkflow.status.waitingForRecovery") : actions ? mainT("main.durableWorkflow.status.availableActions", { actions }) : "");
 }
 
 export function setWorkspacePreparationNotice(view: DurableProjection, text?: string) {
@@ -221,7 +223,7 @@ export function evidenceAuditBlockerSummary(view: DurableProjection): string | u
   const audit = view.evidenceAudit;
   if (audit?.state !== "blocked") return;
   const missing = audit.missing.map(row => `${row.requirementId}（${row.reason}）`).join("、");
-  return `${view.stepName} 等待实际取证。候选 ${audit.basis.candidateOid}，证据代次 ${audit.basis.generation}。${missing ? ` 缺项 ${missing}。` : ""}`;
+  return mainT("main.durableWorkflow.status.awaitingAuditEvidence", { step: view.stepName, candidate: audit.basis.candidateOid, generation: audit.basis.generation, missing: missing ? mainT("main.durableWorkflow.status.missingAuditEvidence", { missing }) : "" });
 }
 
 export function durableInstanceView(projection: DurableProjection): DesktopDurableInstance {
@@ -540,13 +542,13 @@ export class DesktopDurableWorkflow {
     if (revision?.status === "pending" && revision.task.taskId === task.taskId && revision.roleId === task.roleId
       && revision.task.parentTaskId === task.parentTaskId) {
       await store.failDocumentRevision(ref, { revisionId: revision.id,
-        reason: `修订未派达。原因 ${redactRoleLogSummary(reason, view.projectRoot)}` });
+        reason: `${roleText.status.revisionDeliveryFailed[0]}${redactRoleLogSummary(reason, view.projectRoot)}` });
       this.activate();
       return undefined;
     }
     const kind = legacyIntent ? "product-dispatch-failed" : "task-dispatch-failed";
     const key = `${kind}:${task.taskId}`;
-    const summary = `${task.stage} 工作流任务未派达（${ref.instanceId}），请幕僚处理。原因：${redactRoleLogSummary(reason, view.projectRoot)}`;
+    const summary = mainT("main.durableWorkflow.status.taskDeliveryFailed", { stage: task.stage, instanceId: ref.instanceId, reason: redactRoleLogSummary(reason, view.projectRoot) });
     const notice = await recordWorkflowNotice(view.projectRoot, chief, { ref: key, summary, taskId: task.taskId });
     if (notice === "failed") {
       store.block(ref, "workflow-notice-unavailable", summary);
@@ -582,7 +584,7 @@ export class DesktopDurableWorkflow {
         return durableFailure("workflow-task-write-stale", "The original task or task branch changed.");
       }
       if (projection.a11Disposition?.retest && projection.a11Disposition.childTask.taskId === task?.taskId) {
-        return durableFailure("workflow-a11-retest-write-forbidden", "A11 同候选补测回合禁止文件写入和 Git 写操作。");
+        return durableFailure("workflow-a11-retest-write-forbidden", roleText.status.retestWritesForbidden);
       }
       const current = delivery.intent.stepId === projection.stepId && delivery.intent.attempt === projection.attempt;
       const pending = projection.pendingTasks?.find(item => item.taskId === task?.taskId && item.roleId === session.roleId

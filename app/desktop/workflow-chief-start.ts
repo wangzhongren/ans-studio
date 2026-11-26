@@ -7,6 +7,7 @@ import { durableFailure, durableHash, type DesktopDurableWorkflow } from "./dura
 import { mainT } from "./i18n.ts";
 import { isRuntimeKind } from "./runtime-config.ts";
 import type { LiveSession, TrustedWorkflowCustomerInput } from "./session/contracts/session-types.ts";
+import roleText from "./durable-workflow-role-text.json" with { type: "json" };
 
 export const WORKFLOW_START_OPTION_IDS = ["approve-workflow-start", "reject-workflow-start"] as const;
 
@@ -213,7 +214,7 @@ export class WorkflowChiefStart {
         prepare: async () => {
           const current = await readCurrentProposal();
           if (!current?.decisionDigest || !current.definition.file || !current.definition.fileDigest) {
-            throw new Error("无法核验当前客户需求、启用提议或工作流定义。");
+            throw new Error(roleText.workflowStart.unverifiedProposalEvidence);
           }
           return {
             baseDigest: current.decisionDigest, isCurrent: async () => !!await readCurrentProposal(),

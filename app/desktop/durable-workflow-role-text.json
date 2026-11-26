@@ -1,0 +1,748 @@
+{
+  "packageLock": {
+    "installDirectoryUnverified": "应用安装目录无法核验。",
+    "dependencyOutputLimit": "依赖输出超过可核对范围。",
+    "installDirectoryRedirected": "安装目录含重解析跳转。",
+    "localNpmEntryOutsideInstallation": "本地 npm 执行入口指向安装目录外。",
+    "unsupportedInstallFile": "安装目录含不可发布的链接或特殊文件。",
+    "bundledNpmUnavailable": [
+      "应用缺少固定版本的 npm ",
+      "。"
+    ],
+    "projectStateDirectoryUnverified": "应用运行态目录无法核对为当前项目的普通目录。",
+    "isolatedInstallPathChanged": "安装隔离目录路径已变化。",
+    "installFailed": "npm 安装未成功。",
+    "publishTargetUnbound": "安装发布地址未绑定当前任务。",
+    "privateInstallDirectoryChanged": "专用安装目录在审批后已变化。",
+    "approvalTurnRequired": "安装发布需要原审批回合仍生效。",
+    "publicationOrTaskChanged": "安装发布目录或原任务已变化。",
+    "isolatedInstallOwnershipChanged": "安装隔离目录权属已经变化。",
+    "isolatedNpmPreparationFailed": "无法准备应用隔离 npm 工作目录。",
+    "lockTaskCancelled": "锁文件生成任务已取消。",
+    "resolutionTimedOut": "在时限内未能完成依赖解析。",
+    "npmOutputLimit": "npm 的输出超出执行上限。",
+    "bundledNpmStartFailed": "应用内 npm 无法启动。",
+    "npmDidNotExitNormally": "未正常退出",
+    "publicRegistryResolutionFailed": [
+      "公共 registry 依赖解析失败（npm 退出状态 ",
+      "）。"
+    ],
+    "lockOutputUnreadable": "应用内 npm 未生成可读取的锁文件。",
+    "isolatedLockCleanupFailed": "无法完成锁文件隔离运行或清理临时目录。"
+  },
+  "documentRevision": {
+    "operationsParentRequired": "修订申请需要当前的 A11 运营父任务。",
+    "originalOperationsTurnUnverified": "无法核实原运营回合。",
+    "revisionAccepted": [
+      "应用已受理 ",
+      " 的修订，由 ",
+      " 处理。请结束当前回合并等待工作流回交。"
+    ],
+    "assignedRevisionMissing": "当前回合没有应用指派的文件修订任务。",
+    "revisionTurnUnverified": "无法核实当前修订回合。",
+    "revisionCandidateRecorded": "应用已记录修订候选。以应用确认和生效回执为准。",
+    "decisionEvidenceChanged": "原治理依据或修订候选已变化。"
+  },
+  "workflowStart": {
+    "unverifiedProposalEvidence": "无法核验当前客户需求、启用提议或工作流定义。"
+  },
+  "status": {
+    "chiefDecisionCancelled": "幕僚独立决策已取消或达到预算",
+    "chiefDelegationUnavailable": "当前项目或持久卡的幕僚委托不可用",
+    "projectWindowChanged": "项目窗口已切换",
+    "revisionDeliveryFailed": [
+      "修订未派达。原因 ",
+      ""
+    ],
+    "retestWritesForbidden": "A11 同候选补测回合禁止文件写入和 Git 写操作。"
+  },
+  "workspace": {
+    "unverifiedFilePath": "文件路径不可核验。",
+    "unverifiedOrdinaryFile": "文件不是可核验的普通文件。",
+    "fileChangedDuringRead": "文件在读取期间发生变化。",
+    "invalidJsonObject": "无效的 JSON 对象。",
+    "classicScriptPattern": "(?:普通)?经典脚本|\\bclassic\\s+(?:JavaScript\\s+)?scripts?\\b",
+    "disallowedClassicScriptPattern": "(?:禁止|禁用|不得|不能|不允许|不采用|不使用|不加载)[^，,:：]{0,36}(?:经典脚本)|\\b(?:no|disallow(?:s|ed)?|reject(?:s|ed)?|without|avoid)\\s+(?:same-origin\\s+)?classic\\s+(?:JavaScript\\s+)?scripts?\\b",
+    "relativeScriptPattern": "(?:(?:本地|同源)\\s*相对(?:路径)?(?:的)?\\s*(?:(?:JavaScript|JS)\\s*)?脚本|\\b(?:local|same-origin)\\s+relative(?:[\\s-]+path)?\\s+(?:JavaScript\\s+)?scripts?\\b)",
+    "negatedRelativeScriptPrefix": [
+      "(?:禁止|禁用|不得|不能|不允许|不采用|不使用|不加载|不引用|不应|请勿|\\b(?:not|no|disallow|avoid|without)\\b)[^，,:：]{0,36}",
+      ""
+    ],
+    "classicScriptUsePattern": "(?:加载|采用|使用)\\s*(?:同源)?\\s*(?:普通)?经典脚本|\\b(?:use[sd]?|load[sd]?|serve[sd]?)\\s+(?:same-origin\\s+)?classic\\s+(?:JavaScript\\s+)?scripts?\\b",
+    "entryLabelPattern": "(?:(?:为|是|作为|\\bis\\b)\\s*[^，,\\x60]{0,48}(?:入口|\\bentry(?:\\s+point)?\\b)\\s*[，,]\\s*|[，,：:]\\s*)?",
+    "entryLoadsRelativeScript": [
+      "",
+      "",
+      "(?:引用|加载|使用|采用|\\b(?:loads?|references?|uses?)\\b)\\s*",
+      ""
+    ],
+    "obsoleteEntryPattern": "不是|不作为|已废弃|\\b(?:is\\s+not|deprecated|obsolete)\\b",
+    "browserDeliveryPattern": "\\b(?:browser|WebGL)\\b|浏览器",
+    "acceptanceBrowserPattern": "\\b(?:browser|playwright|screenshot)\\b|浏览器|实操|截图",
+    "buildRequiredPattern": "\\b(?:npm run|pnpm(?: run)?|yarn(?: run)?)\\s+build\\b|\\b(?:must|required to|run (?:the )?|execute (?:the )?)(?:\\s+\\w+){0,3}\\s+(?:compile|build)(?:\\s+(?:command|script))?\\b|(?:须|必须|要求|实际|执行|运行)[^。；\\n]{0,16}(?:构建|编译)(?:命令|脚本|产物|成功|后|[，。；\\n])",
+    "deliveryStartupRequiredPattern": "(?:按|依照|依照上述)[^。；\\n]{0,24}(?:交付说明|README|启动说明)[^。；\\n]{0,28}(?:启动|执行)|(?:执行|运行|记录|实际)[^。；\\n]{0,12}(?:启动命令|交付启动器)|\\b(?:run|execute|verify|record)\\s+(?:the\\s+)?(?:documented|delivery|README|startup|launch)\\s+(?:start(?:up)?\\s+)?(?:command|launcher|script)\\b",
+    "logicTestRequiredPattern": "(?:执行|运行)[^。；\\n]{0,18}(?:测试命令|规则测试|逻辑测试)|\\b(?:npm test|node --test)\\b|\\b(?:run|execute)\\s+(?:(?:the|delivered|logic|rule|automated)\\s+){0,3}tests?\\s+command\\b",
+    "auditInstructions": [
+      "\n按本次签发标准逐条只读审计已登记证据。候选 ",
+      "，证据代次 ",
+      "。不得执行、取证或写入。使用 submit_report 的 evidence 逐条填写 JSON {\"requirementId\":\"条目\",\"evidenceIds\":[\"账本记录 ID\"]}；缺项须在结论中明确。\n",
+      "\n"
+    ],
+    "reconcileExistingReceipts": "\n仅核对原账本已有工作区、取证与关闭回执。\n",
+    "buildOutputDirectoryUnverified": "构建输出目录无法核验。",
+    "redirectedBuildDirectory": "构建目录含重解析路径。",
+    "buildOutputPreviewLimit": "构建输出超出预览范围。",
+    "buildPreviewEntryMissing": "构建没有生成可供静态预览的入口。",
+    "staticInputsApprovalMismatch": "静态输入与原批准架构或准备范围不一致。",
+    "dependencySourceBindingMismatch": "工作区依赖来源身份与原绑定不一致。",
+    "workspaceInputCandidateMismatch": "验收工作区输入与原候选不一致。",
+    "workspaceToolchainBindingMismatch": "验收输入或工具链与原绑定不一致。",
+    "evidenceDestinationOccupied": "证据位置已有其他内容，不能覆盖。",
+    "workspaceOperationReceiptMissing": "当前正式报告缺少同一实际回合的工作区操作与预览回执。",
+    "staticFilesChanged": "实际验收静态文件已变化。",
+    "buildArtifactsChanged": "实际验收产物已变化。",
+    "actualEntryChanged": "实际验收入口已变化。",
+    "browserCriteriaInvalid": "当前标准的浏览器验收条目无法解析。",
+    "actualCaptureReceiptsMissing": "当前正式验收缺少应用浏览器产生的实际操作及截图回执。",
+    "browserEvidenceMetadataMissing": "当前报告缺少实际浏览器取证文件及对应元数据。",
+    "browserEvidencePathInvalid": "浏览器证据路径不合法。",
+    "reportScreenshotNotCaptured": "正式报告所列截图缺少本次应用浏览器的真实捕获。",
+    "browserAttachmentBindingMismatch": "浏览器附件元数据与本任务、候选或预览不匹配。",
+    "browserAttachmentRequirementMissing": "浏览器附件未关联当前标准要求实操的验收条目。",
+    "browserAttachmentMetadataUnverified": "本任务浏览器附件名称、实际时间或行数无法核对。",
+    "browserAttachmentDigestMismatch": "浏览器附件的实际内容与证据 metadata 不一致。",
+    "requiredBrowserEvidenceMissing": "当前正式报告缺少部分规定条目的浏览器取证。",
+    "browserInputTimelineChanged": "实际浏览器输入时间序列已变化。",
+    "browserInputTimelineLimit": "实际浏览器输入时间序列超出有界证据范围。",
+    "browserFormalEvidenceLimit": "截图与实际浏览器时间序列超出正式证据范围。",
+    "reconcileBrowserEvidenceEffect": "原浏览器证据作用需要核对。",
+    "evidenceParentUnverified": "项目取证目录的上层路径无法核对。",
+    "evidenceDirectoryUnverified": "项目取证目录无法核对。",
+    "publishedBrowserEvidenceInvalid": "已发布浏览器附件未通过原证据合同。",
+    "acceptanceArtifactsUnverified": "当前验收工件无法核对。"
+  },
+  "environment": {
+    "inputPathUnverified": "输入文件路径未经核对。",
+    "ordinaryReadableFileRequired": "输入文件不是可读取的普通文件。",
+    "inputChangedDuringRead": "读取期间输入文件已变化。",
+    "buildNotRequiredPattern": "(?:不要求|无需|不必|无须|可省略)\\s*(?:本地|生产|项目|静态|实际)?\\s*(?:构建|启动|运行)|\\b(?:no need to|need not|not required to)\\s+(?:build|start|run)\\b",
+    "buildMentionPattern": "(?:本地|生产|项目|静态)\\s*构建|\\b(?:local|production|project)\\s+build\\b",
+    "observeActualBuildPattern": "(?:记录|核对|验证|检查)\\s*(?:实际(?:的)?\\s*)?构建(?:\\s*[/／、与和或]\\s*启动)?\\s*(?:指令|命令|脚本)\\s*(?:及|和|与|、)\\s*(?:实际)?(?:执行)?(?:结果|输出)",
+    "criteriaChanged": "当前独立验收标准已经变化。",
+    "packageManifestMissing": "当前 npm 验收要求缺少候选中已跟踪的 package.json。",
+    "unsupportedPackageManager": "候选声明了当前恢复不支持的包管理器。",
+    "unverifiedConfigOrLock": [
+      "候选存在未经当前恢复规则核验的配置或锁文件 ",
+      "。"
+    ],
+    "lockFileMentionPattern": "(?:lock\\s*file|package-lock\\.json|锁文件)",
+    "formalLockRequired": "当前标准涉及锁文件，需核对正式锁文件或按原渠道澄清标准。",
+    "packageInputChanged": "候选的依赖清单或锁文件已经变化。",
+    "existingModulesDirectoryUnverified": "现有 node_modules 目录无法核对为当前项目普通目录。",
+    "installTargetDirectoryUnverified": "本次安装目标路径无法核对为普通目录。",
+    "installTargetOwned": "现有 node_modules 不具备本次所需入口，原目录保留，需核对其归属和替换权限。",
+    "declaredScriptEntryUnverified": "当前标准要求的本地脚本无法对应到一个可核验的已声明 npm 执行入口。",
+    "npmInputsUnverified": "无法核验当前标准、项目清单和公共 npm 依赖来源。",
+    "preflightFailureInstruction": [
+      "\n应用前检遇到的问题：",
+      " 如果无法安全检查，请在正式报告中记录阻塞与未验证条目。"
+    ],
+    "preflightReadyInstruction": [
+      "\n应用已核对本地前置条件。按当前转交的 ",
+      " 对同一候选独立实测。构建和试玩使用项目已获准的忽略目录或应用认可的隔离输出，并保留现有输出。若项目构建工具支持指定目录，可将输出选为本任务专用的 .ans/acceptance-runs/",
+      "，先核对其不存在。依赖已安装仍需独立实测。"
+    ],
+    "preflightInstallReceiptMissing": "当前候选缺少通过验收前检的依赖安装回执，原项目依赖目录已保留。",
+    "preflightEntryMissingInstruction": [
+      "\n应用已核对当前候选与 ",
+      "，并确认 npm 脚本 ",
+      " 所需的本地入口 ",
+      " 缺失。未执行的检查请按正式报告记录阻塞与缺项，frontmatter 可包含 environmentMissing: { script: \"",
+      "\", executable: \"",
+      "\" }。已执行的检查请记录实际结果。"
+    ],
+    "missingExecutableStderrTemplate": [
+      "(?:^|[\\r\\n])[^\\r\\n]{0,120}(?:['\"\\s]|^)",
+      "(?:['\"\\s:]|$)[^\\r\\n]{0,100}(?:not recognized|not found|找不到|不是内部或外部命令)\\b"
+    ],
+    "commandReceiptWriteFailed": "本次验收命令回执无法持久登记。",
+    "workspaceBlocked": "验收工作区受阻。",
+    "staticChecksMissing": "签发标准还要求实际构建、交付启动或逻辑测试，当前静态预览未核实所需独立操作。",
+    "staticPrepareOrPreviewReceiptMissing": "当前独立回合缺少获应用批准、与候选文件摘要一致的静态准备及预览回执。",
+    "workspaceBuildReceiptMissing": "当前独立回合缺少获应用批准且实际成功退出的验收工作区构建。",
+    "independentLocalNpmEntryMissing": "独立复验所需的本地 npm 执行入口仍然缺少。",
+    "independentLocalBuildReceiptMissing": "当前独立回合缺少获应用批准且实际成功退出的本地构建。",
+    "restoreOwnerTurnRequired": "只有本次应用已绑定的恢复属主回合可以请求 npm 补齐。",
+    "restoreTaskChanged": "当前恢复任务已经变化。",
+    "restoreTurnEnded": "当前恢复回合已经结束。",
+    "restoreReceiptReplayInstruction": [
+      "本次恢复已有实际应用回执 ",
+      "。请正式回交该回执与结果，让运营核对。"
+    ],
+    "restoreAlreadyClaimed": "本次作用已经认领，需先核对原实际回执。",
+    "restoreInstallTargetUnavailable": "本次安装输出不是可创建的空缺目录，需人工核对当前实物。",
+    "privateInstallTargetUnbound": "当前任务无法绑定专用安装目标。",
+    "restoreScopeUnverified": "当前回合或应用隔离目录的归属无法核对。",
+    "privateInstallDirectoryUnverified": "专用安装目录不可核验。",
+    "privateInstallIdentityUnverified": "专用安装目录身份不可核验。",
+    "privateInstallDirectoryUnavailable": "当前恢复任务的专用安装目录已有内容、不可核验或任务已经变化。",
+    "restoreEffectNeedsReconciliation": "本次作用已被认领，必须核对原应用回执，不能再次运行。",
+    "restoreCommandDenied": "本次依赖补齐命令未获应用批准。",
+    "restoreApprovalOrPreflightFailed": "应用无法完成本次命令审批或运行前核对。",
+    "restoreEffectAlreadyTerminal": "当前恢复作用已经完成或停止。",
+    "restoreResultReceipt": [
+      "",
+      " 应用回执 ",
+      "。"
+    ],
+    "gitCriticalSectionBusy": "当前项目 Git 临界区已有其他操作。",
+    "restoreAuthorityChangedAfterApproval": "审批后候选、标准、工作树、归属或原回合已变化。",
+    "restoreNpmExitUnverified": "应用未取得正常的 npm 进程退出结果。",
+    "restoreAuthorityUnverifiedAfterRun": "执行后候选、依据、目标或原回合无法再次核对。",
+    "restoreTransientNpmNetworkFailure": [
+      "公共 npm 源短暂连接失败（",
+      "），仍缺本地依赖。"
+    ],
+    "restorePublicNpmDnsFailure": "无法解析获批公共 npm 源的域名（ENOTFOUND）。",
+    "restoreNpmExitAbnormal": "异常",
+    "restoreNpmExitFailure": [
+      "npm 安装实际退出状态 ",
+      "",
+      "。"
+    ],
+    "restoreExecutableOrTreeUnverified": "npm 已退出，但本地执行入口或工作树未通过复核。",
+    "restoreVerifiedLocalExecutable": "确已安装并独立核验本地执行入口。",
+    "restorePublishedOutputUnverified": "安装进程已退出，但发布目录的完整依赖字节或任务身份无法核验。",
+    "restoreSuccessHandbackInstruction": [
+      "",
+      " 请正式回交应用回执 ",
+      "。"
+    ],
+    "restoreSafeCompletionFailed": "应用未能安全完成或核验隔离安装，需保留现场核对。",
+    "restoreCloseTaskNote": "应用依据持久验收环境事实收口当前任务。",
+    "restoreCloseRequiresOperationsTurn": "恢复收口需要本次实际运营回合及原属主回交。",
+    "restoreReportOrReviewMissing": "本次恢复子任务缺少原始角色报告及应用核对回合。",
+    "restoreReportSourceUnverified": "恢复子任务回交来源无法核验。",
+    "restoreEffectProofMissing": "本次任务未形成可核验的批准、进程退出和安装回执，作用需要核对。",
+    "restoreInstallWorktreeChanged": "候选工作树在安装后已经变化。",
+    "restoreCloseWrongDispositionInstruction": [
+      "应用实物核对结果为 ",
+      "。请按该结果处置当前子任务。"
+    ],
+    "restoreOperationsTurnEnded": "运营回合已结束，原核对不能用于当前任务。",
+    "restoreCloseEffectChanged": "当前恢复作用已变化。"
+  },
+  "blocker": {
+    "stopCommand": "/停止本次工作流",
+    "signedRetestRequirement": [
+      "签发要求 ",
+      "：",
+      ""
+    ],
+    "retestEntryUnavailable": [
+      "签发要求 ",
+      " 的执行入口 ",
+      " 当前不可用。"
+    ],
+    "signedCriteriaBytesUnverified": "送达前无法重新核验原签发标准的当前字节。",
+    "candidateAndIndexUnverified": "送达前无法重新核验原候选及干净的实际 Git 索引和工作区。",
+    "ownerAndOrderUnverified": "送达前无法核对当前补测工单和原属主。",
+    "ownerAndWriteSetUnverified": "当前项目无法核对原工作项的批准属主和写域。",
+    "governedShellUnassembled": "当前宿主未装配受治理的真实 Shell 执行及审批。",
+    "formalHandbackUnassembled": "当前宿主未装配可恢复核验的正式角色回交。",
+    "moduleInspectionCapability": "仅按实际任务和原角色权限读取与核对模块资料。",
+    "moduleShellCapability": "仅工作项自己的自测。每条命令仍经原 Shell 审批、审计与受治理隔离。",
+    "governedShellApprovalUnavailable": "当前运行时未装配受治理的 Shell 审批。",
+    "governedCommitCapability": "真实工作项开通后按批准写域和 Git 作用核验提交。",
+    "governedShellDeliveryUnavailable": "当前运行时无法通过原受治理 Shell 核对应交付。",
+    "externalExecutionUnverified": "当前宿主没有能证明实际运行对象和同一会话来源的外部执行通道。",
+    "approvedBuildUnverified": "当前工具尚无法将实际批准的构建进程与其产物路径及字节摘要绑定为受信证据。",
+    "originalBuildReceiptOnly": "升级宿主只承认原账本实际构建回执。",
+    "originalPreviewReceiptOnly": "升级宿主只承认原账本实际预览回执。",
+    "originalBrowserAndCloseReceiptOnly": "升级宿主只承认原账本实际浏览器证据与关闭回执。",
+    "issuedVerificationCapabilityUnavailable": "当前应用未提供签发标准要求的可核验能力。",
+    "verificationCapabilityInstruction": [
+      "\n应用已核对本次正式标准任务的宿主能力。\n",
+      "\n"
+    ],
+    "criteriaVerificationSchema": "正式标准保留唯一 final ans-criteria/v1 区块。在同文件 YAML 前置区写 verificationRequirements 数组。每项使用区块里的实际 id、stage（A11 或 A12b）、capability 和 evidence 数组。",
+    "criteriaPerRequirementRule": "每个条目至少一项要求，每个 P0 必须有 A12b 独立验收项。A11 项须用 workItemId 绑定实际批准的工作项；A12b 无 workItemId。需要绑定明确的模块自测命令时，可用 command 写字面 argv。",
+    "approvedImplementationItems": [
+      "本轮应用已核对的实施工作项：",
+      "。"
+    ],
+    "evidenceAuditRequirementRule": "每个 A12b 项还要写实际行为 behavior 和绑定来源 source。module-inspection 使用 candidate-file、evidence: [file] 和字面 paths；module-shell 使用 task-command、[command-receipt] 和准确 command；governed-commit 使用 candidate-commit、[git-commit]；approved-build 使用 task-command、[command-receipt, file]、准确 command 和预期产物 paths；external-execution 使用 external-session、[execution-session]。实际执行需求仍照实签发。取证由运营派原已批准角色，A12b 只读审计。\n",
+    "criteriaVerificationExample": "格式示例（替换为本标准的真实条目、行为及文件）：{id: AC-1, stage: A12b, capability: module-inspection, behavior: \"核对交付入口\", source: candidate-file, evidence: [file], paths: [src/main.js]}。",
+    "frozenCriteriaLegacyEvidenceRule": "原冻结标准按原能力与证据类型核对；已退役能力只核对原账本事实。",
+    "criteriaCompletionInstruction": "写完完整标准后提交 completed，evidence 列实际标准文件的裸相对路径，summary 说明要求、可用能力与限制。这里的 completed 只确认标准已编制，实际签发、实操与验收结论由后续各自核对。",
+    "independentAcceptanceCriteriaInstruction": [
+      "\n本次 A12b 独立验收使用冻结标准 ",
+      "，SHA-256 ",
+      "。实际核对 ",
+      "。"
+    ],
+    "independentAcceptanceHandbackInstruction": "请逐条报告当期实际结果，并引用当前候选已登记的实际物证。所有独立条目实际通过时，在正式报告 YAML 前置区以 verifiedCriteria 数组列出全部通过的实际条目 ID。",
+    "decisionEvidenceChanged": "原标准、候选或工作流卡已变化。"
+  },
+  "dispatch": {
+    "a1IntakeSummary": [
+      "\nA1 产品受理摘要：",
+      "\n以上摘要仅供参考。"
+    ],
+    "a1ReadOnlyDuty": "此节点只读。",
+    "a2IntentDraftDuty": [
+      "撰写可提交审批的产品意图草稿，写入 docs/product/",
+      "-intent-vN.md。采用小规模、可调整的默认方案时，把它明确标为待审批假设。只有缺少关键决定以致无法给出草案时，才回报 blocked 并列出具体问题。"
+    ],
+    "directProductBinding": [
+      "",
+      "\n应用已绑定工作流 ",
+      " 和 flowId ",
+      "。",
+      "",
+      ""
+    ],
+    "verifiedDraftInstruction": [
+      "\n应用已核对产品稿 ",
+      "。请阅读该稿，并按该稿在 docs/intents/",
+      ".md 写意图入口，frontmatter 至少包含 intentId: ",
+      "、flowId: ",
+      " 和 goal；保留待客户确认项，再用 request_choice 提交意图确认卡。"
+    ],
+    "submitOriginalCardInstruction": [
+      "工作流 ",
+      "，flowId ",
+      "。请使用原有 ",
+      " 客户卡入口提交当前 ",
+      " 文档，以应用校验的证据等待决定。",
+      ""
+    ],
+    "pathBIntakeInstruction": [
+      "客户请求：",
+      "\n核定客户要求是否是可定位的现有实现变更。仅当有依据时，向运营 ",
+      " 发工作流 ",
+      " 的路径 B B1 advance，并提供 flowId、requestedEvidence（现有模块真实文件）和 reason（对应客户请求的现有行为及改动理由）。"
+    ],
+    "verifyStoppedInstruction": [
+      "核对工作流 ",
+      " 已无在途任务、未确认写入或待核对 Git 作用。仅在确认停稳后使用 submit_report 提交 completed 报告与依据。"
+    ],
+    "legacyPathAAdvanceInstruction": [
+      "请通过 dispatch_task 向运营 ",
+      " 提交路径 A 的 ",
+      " advance。审批或派工由本次实际能力处理。"
+    ],
+    "legacyIntakeInstruction": [
+      "客户请求：",
+      "",
+      "\n工作流 ",
+      "",
+      "。\n",
+      ""
+    ],
+    "legacyOperatorWorkflowBinding": [
+      "\n应用已绑定工作流 ",
+      " 和 flowId ",
+      "。",
+      ""
+    ],
+    "legacyAuthorIntentBinding": [
+      "",
+      "\n工作流 ",
+      "，flowId ",
+      "。\n意图文档使用 docs/product/",
+      "-intent-vN.md。",
+      ""
+    ],
+    "legacyOperationsHandbackInstruction": [
+      "",
+      "\n请核对真实证据后使用 close_created_task。若运营完成实施核验，请用 submit_report 回交实施依据。"
+    ],
+    "evidenceCompromiseReissueInstruction": [
+      "拟调整验收条目 ",
+      "，可核对的候选原件 ",
+      "。经原批准后仍须重新签发标准、取证和审计。"
+    ],
+    "documentRevisionOperatorInstruction": [
+      "本次已有效选择申请修订 ",
+      "（原 SHA-256 ",
+      "）。在原运营任务 #",
+      " 使用 request_document_revision 提交该文件的具体修订理由，再等待当前新版本的实际批准。",
+      ""
+    ],
+    "pauseOperationsTaskForRevision": [
+      "工作流暂停原运营任务 #",
+      "。核对并修订治理文件 ",
+      "。"
+    ],
+    "reviseOriginalGovernanceFileInstruction": [
+      "\n运营报告的问题：",
+      "\n请读取正式文件与同流程关联依据，使用 submit_document_revision 提交本文件的完整候选内容。"
+    ],
+    "isolatedRevisionCandidateInstruction": "\n应用会隔离候选并核对批准条件。当前任务只提交该文件的候选，不直接写入正式文件或改变授权。",
+    "documentRevisionOperationsResumed": [
+      "应用已核对治理文件 ",
+      " 的修订并恢复本次 A11 运营任务 #",
+      "。"
+    ],
+    "verifyNewGovernanceEvidenceInstruction": [
+      "请重新核对当前生效的治理依据和工作项，按已批准写域继续原任务。",
+      ""
+    ],
+    "independentReviewReportSchema": [
+      "\n候选提交：",
+      "。验收报告 YAML frontmatter 必须逐字记录 candidateOid，并以 outcome: accepted、outcome: rework 或 outcome: blocked 表达结论。"
+    ],
+    "preflightEvidenceWritePath": [
+      "\n本次唯一预检通过的证据文件：",
+      ""
+    ],
+    "operationsReviewCommitInstruction": [
+      "",
+      "\n核对本次真实提交 ",
+      " 与实现报告，使用 submit_report 回交核对结论和依据。"
+    ],
+    "restoreAcceptanceDispatchInstruction": [
+      "",
+      "\n核对当前任务依据后，用 dispatch_task 指派一名获批 package.json 属主（",
+      "）。传 roleId、task、稳定 idempotencyKey，可使用 stage=A12b。\n等待属主正式回交后，用 close_created_task 核对原应用回执和本地实物。无合格属主时以 submit_report blocked 报告具体缺项。"
+    ],
+    "restoreAcceptanceOwnerInstruction": [
+      "",
+      "\n本任务只补齐应用已核对的本地依赖。调用无参数 restore_acceptance_environment，等原应用命令审批和实际结果。核对后以 submit_report 正式回交应用回执和结果；安装及核验成功回交 completed，其他情况回交 blocked。保留包清单、锁文件、现有输出和 Git 候选。"
+    ],
+    "restoreAcceptanceOperationsReviewInstruction": [
+      "",
+      "\n核对本次恢复子任务 #",
+      "。使用 close_created_task：实物核验补齐为 accepted，仅明确可重试的环境失败用 rework，其余用 rejected。应用会检查真实回执与当前状态并给出有效处置。"
+    ]
+  },
+  "pathA": {
+    "approvedEvidenceCollectorInstruction": [
+      " 原方案若需验收取证，请核对已批准的 ",
+      " 角色，仅使用 acceptance-evidence 工作项，modules 与 roster 均记 category: evidence，唯一属主为该角色，唯一路径 docs/verification/",
+      "/。由原 A6 批准和 A8 激活。应用把写域收窄至本次工单。生产工作项不包含取证角色，质检只审计已登记证据。"
+    ],
+    "prepareProduct": "只读受理需求，按产品职责给出摘要和关键待确认项，然后提交报告。",
+    "authorProductIntent": [
+      "按产品职责写 docs/product/",
+      "-intent-vN.md，提交报告并给出产物路径。"
+    ],
+    "preparePlan": "只读受理策划任务，给出方案需要处理的关键决策和建议范围，本轮用 submit_report 回交。",
+    "authorProposal": [
+      "按 doc_format 核对格式，写 ",
+      "-proposal-vN.md、",
+      "-modules-vN.md、",
+      "-roster-vN.md 和 docs/contracts/",
+      "-architecture-vN.md。新项目优先选职责清楚的小规模名单。submit_report 的 evidence 逐项填实际裸相对路径。括注、验证说明及结论写在 summary。",
+      ""
+    ],
+    "preparePersonnel": [
+      "读取已批准的 ",
+      "-roster-vN.md，核对人员职责及边界准备事项，本轮用 submit_report 回交。"
+    ],
+    "roleActivationProposalDecision": [
+      "，proposalDecisionId 为 decision-",
+      ""
+    ],
+    "authorPersonnelCards": [
+      "读取已批准的 ",
+      "-roster-vN.md，为每个必需角色写角色卡、boundary.md 和 boundary.yaml。逐个调用 activate_role_documents 完成激活",
+      "。只在全部通过后提交 completed，否则回报 blocked 和具体缺项。",
+      ""
+    ],
+    "registerTeamBaseline": [
+      "按 doc_format 撰写 docs/scheduling/",
+      "-team-vN.md，并调用 complete_team_plan 登记计划和 Git 基线。以工具回执为准。"
+    ],
+    "governedImplementation": "在本任务授予的写集内实施，使用字面路径 git add 和 git commit -m \"提交说明\"（含空格的消息整体加引号）。提交正式报告，列出文件路径、commit OID、改动和静态核对结果。只运行前述受限 Git 命令。",
+    "authorIndependentCriteria": [
+      "按本次需求编制独立验收标准 ",
+      "-criteria-vN.md，正式报告列出标准文件路径。"
+    ],
+    "assessIndependentCandidate": [
+      "对照 ",
+      "-criteria-vN.md 独立检查实际候选，写 ",
+      "-report-vN.md，报告列出该文件路径。通过时 submit_report completed，明确说明实际验证方式和限制。需要返工时在报告的 YAML frontmatter 写 outcome: rework，再提交 blocked。缺证或无法验证时报告 blocked 并说明原因。"
+    ],
+    "observeExistingImplementation": "只读核对现有实现与客户改动要求，报告变更影响、核对依据、涉及文件和边界。以 submit_report 回交。",
+    "defaultWorkInstruction": "按当前任务职责开展工作，以 submit_report 回交结论和证据。",
+    "refreshDependencyRoleFailed": "无法刷新依赖属主和角色边界。",
+    "approvedDependencyOwnerMissing": "当前项目没有该获批依赖属主。",
+    "refreshImplementationOwnerFailed": "无法刷新当前项目的实施归属和角色边界。",
+    "approvedImplementationOwnerNotUnique": "无法唯一核对当前工作项的获批属主。",
+    "collectEvidenceNeedsOperationsParent": "取证派工需要当前实际运营父任务。",
+    "evidenceUsesApprovedScope": "取证采用原批准范围和独立工单。",
+    "approvedEvidenceOrderMissing": "当前候选没有匹配目标角色的已批准取证工单。",
+    "evidenceDispatchRetired": "原取证派工尝试已退役。",
+    "evidenceDispatchRecorded": "已登记当前候选取证派工，请等待实际证据回交。",
+    "operatorEvidenceMissing": [
+      " 缺项 ",
+      "。"
+    ],
+    "evidenceOperatorState": [
+      "\n证据代次 ",
+      "，候选 ",
+      "，状态 ",
+      "。",
+      ""
+    ],
+    "evidenceCollectionClosed": [
+      "",
+      "当前取证已收口，按原节点要求完成运营核验。"
+    ],
+    "awaitFormalEvidenceHandback": [
+      "",
+      "等待原取证任务 #",
+      " 的正式回交。"
+    ],
+    "evidenceTaskReportedMissingItems": [
+      "",
+      "当前取证任务 #",
+      " 仍有具名缺项。使用 submit_report 回交 blocked 并说明实测原因，由应用生成当期可用处置。"
+    ],
+    "closeReportedEvidenceTask": [
+      "",
+      "核对当前取证任务 #",
+      " 的正式报告和本代证据，用 close_created_task accepted 收口。"
+    ],
+    "dispatchApprovedEvidenceCollector": [
+      "",
+      "派原批准取证角色 ",
+      " 使用 dispatch_task，moduleId=acceptance-evidence，stage=",
+      "，sideEffect=read-only，写域以应用工单为准。核对正式回交后用 close_created_task 收口。缺真实来源时正式回交 blocked 并说明原因。"
+    ],
+    "noApprovedEvidenceCollector": [
+      "",
+      "当前没有已批准的取证角色，请回交具体缺项。"
+    ],
+    "dispatchEquivalentEvidenceRoute": [
+      "已批准当前签发标准下的同等取证路线。请在原运营任务 #",
+      " 派发新的取证工单，引用应用已核实的实际来源。",
+      ""
+    ],
+    "evidenceOrderCandidate": [
+      "应用取证工单 #",
+      "，候选 ",
+      "、分支 ",
+      "、证据代次 ",
+      "。"
+    ],
+    "evidenceOrderCriteria": [
+      "签发标准 ",
+      "（SHA-256 ",
+      "），必需条目 ",
+      "。"
+    ],
+    "referenceApprovedEvidenceSource": [
+      "本次批准换路的实际来源，请以原样 JSON 逐项引用：",
+      "。"
+    ],
+    "evidenceOrderNoWriteScope": "本次无证据文件写域",
+    "evidenceOrderWriteScope": [
+      "取证写域 ",
+      "。实际批准的前台命令回执由应用登记。不得修改候选、执行 Git 或签审计结论。"
+    ],
+    "reportEvidenceCollection": "使用 submit_report 正式回交。evidence 逐项填写 JSON {\"requirementId\":\"条目\",\"path\":\"真实相对路径\",\"source\":\"candidate-file\"}。应用命令填 source:\"task-command\" 和工具返回的实际回执号 receiptId。回执无需文件时 path 为\"\"。缺项填写 {\"requirementId\":\"条目\",\"reason\":\"实际缺项\"}。",
+    "reviewEvidenceTaskReport": [
+      "",
+      "\n请核对原取证任务 #",
+      "。"
+    ],
+    "reportedEvidenceTaskState": [
+      "原取证任务 #",
+      " 已登记为 ",
+      "。"
+    ],
+    "implementationRetestUnfinished": "当前工作项的同候选补测或正式收口尚未完成。",
+    "dispatchNeedsCurrentOperationsTurn": "派工需要本次有效的运营父任务回合。",
+    "dispatchOnlyApprovedA11": "当前工作流只受理 A11 的既定实施工作项。",
+    "implementationOrderNotUnique": "无法唯一核对本轮批准工单。请提供当前 workItemId 或该项完整批准写域。",
+    "implementationOrderMismatch": [
+      "当前请求与工作项 ",
+      " 的批准属主 ",
+      " 或写域 ",
+      " 不匹配。"
+    ],
+    "invalidDispatchKey": "派工幂等键格式无效。",
+    "dispatchKeyPayloadConflict": "同一操作键已绑定其他派工内容。",
+    "operationsTurnChanged": "运营父任务回合已经变化。",
+    "approvedWriteScopeUnverified": "当前窗口无法核对实际获批写域。",
+    "operationsTurnChangedDuringPreflight": "核对属主期间，运营父任务回合已经变化。",
+    "actualDispatchRetired": "实际派工尝试已退役。",
+    "assignedImplementationToOwner": [
+      "应用已按批准归属受理工作项 ",
+      "，实际属主 ",
+      ""
+    ],
+    "assignedImplementationItem": [
+      "工作流已受理工作项 ",
+      ""
+    ],
+    "assignmentChildReceipt": [
+      "",
+      "，子任务 #",
+      "。请等待原任务回交。"
+    ],
+    "assignmentKeyReceipt": [
+      "",
+      "（",
+      "）。请等待原任务回交。"
+    ],
+    "activeImplementationOrder": [
+      "应用已绑定 A11 工作项 ",
+      "，工单 SHA-256 ",
+      "。"
+    ],
+    "coordinateEvidenceCollection": [
+      "运营按签发标准派工取证，A12b 审计 ",
+      "。"
+    ],
+    "acceptanceReworkCandidate": [
+      "应用核对的 A12b 返工依据。原候选 ",
+      "，核准修复文件 ",
+      "。"
+    ],
+    "repairImplementationWithinScope": "仅在当前应用工单的字面写域内解决该阻碍，保留原批准的脚本和资源约束，再按工单实际自测和正式回交。",
+    "passingRetestReceipt": [
+      "",
+      "，工具调用 ",
+      "，命令 ",
+      "，退出 0，写入审计通过"
+    ],
+    "resumeSameCandidateRetest": [
+      "应用已为原属主 ",
+      " 打开唯一一次 A11 同候选补测。工作项 ",
+      "，原任务 #",
+      "，候选 ",
+      "。"
+    ],
+    "retestOrderAndCriteria": [
+      "工单 SHA-256 ",
+      "；已签标准 ",
+      "，SHA-256 ",
+      "。"
+    ],
+    "previousSameCandidateRetestReceipts": [
+      "本轮开始前已有的同候选应用自测回执：\n",
+      ""
+    ],
+    "noPreviousSameCandidateRetestReceipts": "本轮开始前未找到匹配的应用自测回执。",
+    "missingRetestRequirements": [
+      "待补要求：\n",
+      ""
+    ],
+    "executeRetestsReadOnly": "在项目根使用原 run_shell 逐项执行适用自测。命令仍需原审批并通过本回合写入审计。只读查看，保留候选、Git 引用、索引及工作区。",
+    "reportActualRetests": "使用 submit_report 正式回交。在 evidence 中列出实际应用回执 ID 或工具调用 ID，在 summary 说明实际测试命令、候选、结果及限制。全部满足时回交 completed，遇到真实阻碍或测试失败时回交 blocked 并给出可核对依据。",
+    "a11IndexReconciled": [
+      "应用已核对工作项 ",
+      " 的索引并恢复原 A11 任务 #",
+      "。现有提交为 ",
+      "。"
+    ],
+    "filesNotStaged": [
+      "附加文件字节仍在原处，当前未暂存：",
+      "。"
+    ],
+    "savedSameCandidateRetestReceipts": [
+      "已保存的同候选应用自测回执：\n",
+      ""
+    ],
+    "retestReceiptUnavailable": "没有可直接引用的应用自测回执，请核对原工单的实际自测要求。",
+    "resubmitImplementationReport": "请在本回合按实际候选与自测回执重新用 submit_report 正式回交。只在原工作项和自测均满足时回交 completed，保留原提交和附加文件。",
+    "authorizedGitCommit": "在批准写域使用字面路径 git add，并用 git commit -m \"提交说明\" 登记实际提交。工单中需要的模块自测继续经原 run_shell 审批与审计。",
+    "implementationWorkWithoutGitPermission": "按当前任务写集实施，回交实际产物与核对结果。若缺少当前任务 Git 写权限，请明确报告。",
+    "governedGitEnabled": "\n应用已开通受治理的 run_shell Git 通道。请按上面的方式暂存和提交。",
+    "approvedProposalDecisions": [
+      "\n当前 A6 已批准定案 ",
+      "，选择摘要 ",
+      "。"
+    ],
+    "implementationBoundPrompt": [
+      "",
+      "",
+      "\n",
+      "\n批准写域：",
+      "\n原提交：",
+      "。",
+      "",
+      ""
+    ],
+    "awaitingDispatch": "待派",
+    "awaitingCommitVerification": "待核验",
+    "operationsWorkItemBinding": [
+      "，任务=",
+      "，提交=",
+      ""
+    ],
+    "operationsWorkItemRow": [
+      "- workItemId=",
+      "，属主=",
+      "，写域=",
+      "，状态=",
+      "",
+      ""
+    ],
+    "dispatchEachApprovedWorkItem": "本次只协调已定工作项。每次使用 dispatch_task 派一项，roleId=属主，moduleId=workItemId，task=具体目标，idempotencyKey=稳定操作键，stage=A11。",
+    "closeReportedImplementation": "等待子任务正式回交后，经 close_created_task 核对并提交 accepted、rework 或 rejected。",
+    "reworkAttemptRequirement": "明确 rework 后才可用 reworkOf=A11 为同项申请纠正尝试。",
+    "completeAllImplementationItems": "完成当前核对后继续派下一项。仅在全部工作项都已接受后才用 submit_report completed 汇总，evidence 逐项包含真实任务 ID 和提交 OID。",
+    "implementationGitAndIntegration": "代码子任务使用当前任务开通的 run_shell 受治理 Git 暂存和提交。集成构建依赖全部模块时，先核对本角色实际交付与提交。",
+    "coordinateModuleSelfTests": "\n角色目标和收口依据来自应用工单。A11 组织模块自测，实际回执由应用记录。收口时若应用已挂起同候选补测，请等待原属主正式回交后再核对收口。真实取证由运营按原批准角色派工，A12b 审计当期登记物证。",
+    "requestRevisionForGovernanceBlock": "\n若内置角色的治理文件有问题以致本节点无法继续，先调用 request_document_revision 提交具体项目相对路径和原因。等待应用回交，再继续原运营任务。其他阻塞用 submit_report blocked 交代缺项。",
+    "reportImplementationBlock": "无法继续时用 submit_report blocked 交代缺项。",
+    "coordinateAcceptancePreparationRework": [
+      "\n本轮是经应用核对的 A12b 准备缺陷返工。原候选 ",
+      "，原因 ",
+      ""
+    ],
+    "assignOriginalReworkOwner": [
+      "仅为原属主 ",
+      " 开原工作项 ",
+      "，原任务 #",
+      "。dispatch_task 使用 reworkOf=A11 和完整字面写域 ",
+      "。"
+    ],
+    "retainAcceptedImplementation": [
+      "原已接受项 ",
+      " 保留 #",
+      " 和提交 ",
+      "，汇总 evidence 列出这一对。"
+    ],
+    "reviewSingleReworkResult": "实际核对唯一返工项的新提交和应用自测，按原收口。汇总另列该返工项的新任务 ID 和新提交。",
+    "verifyEvidenceAfterImplementation": "\n全部生产工作项收口后，应用将核对当前候选的签发取证条件，再完成运营汇总。",
+    "operationsParentPrompt": [
+      "",
+      "\n工作流 ",
+      "，flowId ",
+      "。\n",
+      "\n",
+      "",
+      "",
+      ""
+    ],
+    "resumeAfterPriorWorkItem": [
+      "原任务 #",
+      " 已登记为 ",
+      "。请按当前状态继续。\n",
+      ""
+    ],
+    "retestFailureEvidence": [
+      "\n应用已保存实际测试断言失败的执行依据。工具调用 ",
+      "，证据 SHA-256 ",
+      "。请独立核对候选与断言失败原因。确认代码缺陷且仍有原授权额度时，在 close_created_task 的 note 中列工具调用 ID 和核对依据，再申请返工。"
+    ],
+    "reviewImplementationReport": [
+      "",
+      "\n请核对 #",
+      "。",
+      "\n",
+      ""
+    ],
+    "acceptanceFileMissingOrChanged": "本次独立验收回交缺少对应的验收文件，或文件已变化。",
+    "acceptanceHandbackMismatch": "验收报告结论、候选提交或回交状态不匹配。",
+    "actualRoleReportMissing": "缺少受派角色的实际报告。",
+    "closeFromTrustedHandback": "工作流根据受信回交收口。",
+    "proposalDecisionReceiptUnverified": "无法核对当前提案选项的已保存决定回执。"
+  }
+}

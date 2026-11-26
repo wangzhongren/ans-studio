@@ -5,14 +5,14 @@
 //  · 扫描 `app/renderer/src/**/*.{ts,tsx}`、`app/desktop/**/*.ts`、`src/index.ts`、
 //    `src/interface/cli/**`、`src/common/shared/runtime-settings.ts`；
 //  · 去除注释后，字符串/模板/JSX 文本（以及保守超集：标识符/正则）中的中文必须为 0，
-//    除非文件在 B0 allowlist 中；
+//    除非它们是可解析到仓库内源码的实际静态模块路径，或文件在 B0 allowlist 中；
 //  · allowlist 逐批收紧：条目必须仍在扫描范围且当前仍含中文（陈旧条目直接失败）；
 //  · 合成负例证明「新文件含中文被拒绝」，且只写系统临时目录、不写仓库源码。
 //
 // 守卫只读源码；不修改任何文件。
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -106,6 +106,55 @@ test("合成负例：新文件的中文字符串/模板/JSX 文本被拒绝；�
     assert.ok(allowedPath !== undefined, "allowlist 为空，无法验证放行路径");
     const allowed = evaluateGuard(allowedPath, source, ALLOWLIST);
     assert.equal(allowed.allowed, true, "allowlist 内文件应放行");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("文件守卫只识别实际静态导入和导出的仓库内源码路径", () => {
+  const dir = mkdtempSync(join(os.tmpdir(), "ans-i18n-imports-"));
+  try {
+    const repo = join(dir, "repo");
+    const modules = join(repo, "编排");
+    const external = join(dir, "outside");
+    mkdirSync(join(modules, "目录.ts"), { recursive: true });
+    mkdirSync(external);
+    writeFileSync(join(modules, "entry.ts"), "export const value = 1;", "utf8");
+    writeFileSync(join(external, "外部.ts"), "export const extra = 1;", "utf8");
+
+    const file = join(repo, "view.tsx");
+    const imports = [
+      'const logo = "🏁"; /* 注释 🚦 */ import type { Value } from "./编排/entry.ts";',
+      'import "./编排/entry.ts";',
+      'export { value } from "./编排/entry.ts";',
+      'export * from "./编排/entry.ts";',
+    ];
+    writeFileSync(file, imports.join("\n"), "utf8");
+    assert.deepEqual(evaluateGuardFile(repo, file, ALLOWLIST), { path: "view.tsx", allowed: true, hits: [] });
+
+    const negative = [
+      'const label = "普通文案";',
+      'const filename = "./编排/entry.ts";',
+      'const example = `import A from "./编排/entry.ts";`;',
+      'const view = <span>import A from "./编排/entry.ts"</span>;',
+      'void import("./编排/entry.ts");',
+      'import "./缺失/entry.ts";',
+      'import "./编排/目录.ts";',
+      'import "../outside/外部.ts";',
+      'export { value as 名称 } from "./编排/entry.ts";',
+    ];
+    writeFileSync(file, [...imports, ...negative].join("\n"), "utf8");
+    const result = evaluateGuardFile(repo, file, ALLOWLIST);
+    assert.equal(result.allowed, false);
+    assert.deepEqual(result.hits.map(({ line, text }) => [line, text]), [
+      [5, "普通文案"], [6, "编排"], [7, "编排"], [8, "编排"], [9, "编排"],
+      [10, "缺失"], [11, "编排"], [11, "目录"], [12, "外部"], [13, "名称"],
+    ]);
+
+    writeFileSync(file, [...imports, "export const invalid = ;"].join("\n"), "utf8");
+    const invalid = evaluateGuardFile(repo, file, ALLOWLIST);
+    assert.equal(invalid.allowed, false);
+    assert.deepEqual(invalid.hits.map(({ text }) => text), ["编排", "编排", "编排", "编排"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

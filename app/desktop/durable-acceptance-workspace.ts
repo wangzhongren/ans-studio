@@ -16,6 +16,8 @@ import {
   inspectAcceptanceDependencies, readAcceptanceEnvironmentGit, readAcceptanceWorkspaceCandidate,
   type AcceptanceWorkspaceCandidateFile,
 } from "./workflow-git.ts";
+import { mainT } from "./i18n.ts";
+import roleText from "./durable-workflow-role-text.json" with { type: "json" };
 
 type Store = Awaited<ReturnType<DesktopDurableWorkflow["store"]>>;
 type DirectoryIdentity = DurableAcceptanceWorkspaceBinding["workspaceIdentity"];
@@ -58,12 +60,12 @@ async function signedPreparationBytes(projectRoot: string, evidence: DurableEvid
     const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
     throw preparationProblem(missing ? "material-conflict" : "unavailable", "materials",
       `workspace-${kind}-${missing ? "missing" : "unreadable"}`,
-      `当前签发${kind === "criteria" ? "标准" : "架构"}${missing ? "文件缺失" : "无法核验"}。`,
+      mainT("main.durableWorkflow.workspace.signedMaterialUnavailable", { material: kind === "criteria" ? mainT("main.durableWorkflow.workspace.criteria") : mainT("main.durableWorkflow.workspace.architecture"), issue: missing ? mainT("main.durableWorkflow.workspace.materialMissing") : mainT("main.durableWorkflow.workspace.materialUnverified") }),
       [{ path: evidence.path, state: missing ? "missing" : "unverified" }]);
   }
   const observedSha256 = digest(bytes);
   if (observedSha256 !== evidence.sha256) throw preparationProblem("material-conflict", "materials", `workspace-${kind}-drifted`,
-    `当前签发${kind === "criteria" ? "标准" : "架构"}与原签发摘要不符。`,
+    mainT("main.durableWorkflow.workspace.signedMaterialDigestMismatch", { material: kind === "criteria" ? mainT("main.durableWorkflow.workspace.criteria") : mainT("main.durableWorkflow.workspace.architecture") }),
     [{ path: evidence.path, state: "present" }]);
   return bytes;
 }
@@ -104,13 +106,13 @@ function htmlLine(html: string, offset: number): number {
 function staticEntryRejection(diagnosis: StaticEntryDiagnosis): string {
   const reasons: string[] = [];
   if (diagnosis.nestedNoscriptLine !== undefined) {
-    reasons.push(`index.html 第 ${diagnosis.nestedNoscriptLine} 行的正文 noscript 含子标签。保留纯文本提示，移除其中的子标签。`);
+    reasons.push(mainT("main.durableWorkflow.workspace.nestedNoscript", { line: diagnosis.nestedNoscriptLine }));
   }
   if (diagnosis.rejectedScript) {
-    const location = diagnosis.rejectedScriptLine === undefined ? "index.html" : `index.html 第 ${diagnosis.rejectedScriptLine} 行`;
-    reasons.push(`${location}的脚本未通过当前签发脚本规则。请使用本轮批准的脚本形式和同源路径。`);
+    const location = diagnosis.rejectedScriptLine === undefined ? "index.html" : mainT("main.durableWorkflow.workspace.indexLine", { line: diagnosis.rejectedScriptLine });
+    reasons.push(mainT("main.durableWorkflow.workspace.scriptRejected", { location }));
   }
-  return reasons.length ? reasons.join(" ") : "当前候选的 index.html 无法按签发静态入口安全核验。请核对入口结构、已批准脚本和同源资源。";
+  return reasons.length ? reasons.join(" ") : mainT("main.durableWorkflow.workspace.staticEntryUnverified");
 }
 
 /** Identify explicit, ordinary HTML body context before unmasking the passive noscript exception. */
@@ -317,19 +319,19 @@ function sameIdentity(left: DirectoryIdentity | undefined, right: DirectoryIdent
 
 async function ordinaryBytes(root: string, file: string, limit: number): Promise<Buffer> {
   const relative = path.relative(root, file);
-  if (!relative || path.isAbsolute(relative) || relative.split(path.sep).includes("..") || path.relative(file, await realpath(file))) throw new Error("文件路径不可核验。");
+  if (!relative || path.isAbsolute(relative) || relative.split(path.sep).includes("..") || path.relative(file, await realpath(file))) throw new Error(roleText.workspace.unverifiedFilePath);
   const before = await lstat(file);
-  if (!before.isFile() || before.nlink !== 1 || before.size > limit) throw new Error("文件不是可核验的普通文件。");
+  if (!before.isFile() || before.nlink !== 1 || before.size > limit) throw new Error(roleText.workspace.unverifiedOrdinaryFile);
   const bytes = await readFile(file);
   const after = await lstat(file);
   if (!after.isFile() || after.dev !== before.dev || after.ino !== before.ino || after.size !== bytes.length || after.mtimeMs !== before.mtimeMs
-    || after.ctimeMs !== before.ctimeMs) throw new Error("文件在读取期间发生变化。");
+    || after.ctimeMs !== before.ctimeMs) throw new Error(roleText.workspace.fileChangedDuringRead);
   return bytes;
 }
 
 function readObject(bytes: Buffer): Record<string, unknown> {
   const value: unknown = JSON.parse(bytes.toString("utf8"));
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("无效的 JSON 对象。");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(roleText.workspace.invalidJsonObject);
   return value as Record<string, unknown>;
 }
 
@@ -420,17 +422,17 @@ function choseStaticBrowser(approval: DurableProjection["proposalDecision"]): bo
 
 function authorizesClassicEntry(architecture: string): boolean {
   const clauses = architecture.split(/[。；;\n]|\.(?=\s|$)/);
-  const classic = /(?:普通)?经典脚本|\bclassic\s+(?:JavaScript\s+)?scripts?\b/i;
+  const classic = new RegExp(roleText.workspace.classicScriptPattern, "i");
   if (clauses.some(line => classic.test(line)
-    && /(?:禁止|禁用|不得|不能|不允许|不采用|不使用|不加载)[^，,:：]{0,36}(?:经典脚本)|\b(?:no|disallow(?:s|ed)?|reject(?:s|ed)?|without|avoid)\s+(?:same-origin\s+)?classic\s+(?:JavaScript\s+)?scripts?\b/i.test(line))) return false;
-  const relative = String.raw`(?:(?:本地|同源)\s*相对(?:路径)?(?:的)?\s*(?:(?:JavaScript|JS)\s*)?脚本|\b(?:local|same-origin)\s+relative(?:[\s-]+path)?\s+(?:JavaScript\s+)?scripts?\b)`;
-  const negated = new RegExp(String.raw`(?:禁止|禁用|不得|不能|不允许|不采用|不使用|不加载|不引用|不应|请勿|\b(?:not|no|disallow|avoid|without)\b)[^，,:：]{0,36}${relative}`, "i");
+    && new RegExp(roleText.workspace.disallowedClassicScriptPattern, "i").test(line))) return false;
+  const relative = roleText.workspace.relativeScriptPattern;
+  const negated = new RegExp(`${roleText.workspace.negatedRelativeScriptPrefix[0]}${relative}`, "i");
   if (clauses.some(line => negated.test(line))) return false;
-  if (/(?:加载|采用|使用)\s*(?:同源)?\s*(?:普通)?经典脚本|\b(?:use[sd]?|load[sd]?|serve[sd]?)\s+(?:same-origin\s+)?classic\s+(?:JavaScript\s+)?scripts?\b/i.test(architecture)) return true;
+  if (new RegExp(roleText.workspace.classicScriptUsePattern, "i").test(architecture)) return true;
   const entry = String.raw`^\s*(?:[-*+]\s+)?\x60index\.html\x60(?:\s*[（(][^()（）\x60]{1,80}[）)])?\s*`;
-  const label = String.raw`(?:(?:为|是|作为|\bis\b)\s*[^，,\x60]{0,48}(?:入口|\bentry(?:\s+point)?\b)\s*[，,]\s*|[，,：:]\s*)?`;
-  const loads = new RegExp(String.raw`${entry}${label}(?:引用|加载|使用|采用|\b(?:loads?|references?|uses?)\b)\s*${relative}`, "i");
-  return clauses.some(line => loads.test(line) && !/不是|不作为|已废弃|\b(?:is\s+not|deprecated|obsolete)\b/i.test(line));
+  const label = roleText.workspace.entryLabelPattern;
+  const loads = new RegExp(`${entry}${label}${roleText.workspace.entryLoadsRelativeScript[2]}${relative}`, "i");
+  return clauses.some(line => loads.test(line) && !new RegExp(roleText.workspace.obsoleteEntryPattern, "i").test(line));
 }
 
 async function decideStaticCandidate(
@@ -446,7 +448,7 @@ async function decideStaticCandidate(
   };
   const input = new Map(files.map(file => [file.path, file.bytes]));
   const index = input.get("index.html");
-  if (!view.flowId) return unavailable("当前静态候选缺少可核验的流程地址。", "workspace-flow-unverified", "materials");
+  if (!view.flowId) return unavailable(mainT("main.durableWorkflow.workspace.staticFlowUnverified"), "workspace-flow-unverified", "materials");
   const manifest = input.get("package.json");
   const pkg = manifest ? readObject(manifest) : {};
   const scripts = asObject(pkg.scripts);
@@ -454,7 +456,7 @@ async function decideStaticCandidate(
     || ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies", "bundledDependencies", "bundleDependencies", "workspaces"]
       .some(key => pkg[key] !== undefined && (!pkg[key] || typeof pkg[key] !== "object" || Object.keys(pkg[key]!).length))
     || files.some(file => /(?:^|\/)(?:tsconfig|vite\.config\.|webpack\.config\.|rollup\.config\.|babel\.config\.|postcss\.config\.)/i.test(file.path))) {
-    return unavailable("获批静态候选含构建脚本、依赖或配置，无法按已签发静态架构准备预览。", "workspace-static-configuration-unsupported", "entry");
+    return unavailable(mainT("main.durableWorkflow.workspace.staticConfigurationUnsupported"), "workspace-static-configuration-unsupported", "entry");
   }
   const architecturePath = new RegExp(`^docs/contracts/${view.flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-architecture-v[1-9][0-9]*\\.md$`);
   const rows = store.listCapabilityEvents(view.ref).filter(row => row.receipt.state === "consumed" && row.event.flowId === view.flowId);
@@ -466,24 +468,24 @@ async function decideStaticCandidate(
         && card.card.requestId === decision.requestId && card.card.digest === decision.digest && card.card.generation === decision.generation;
     }));
   const decision = approved?.event.input;
-  if (decision?.kind !== "card-decided") return unavailable("当前静态交付缺少已消费的 A6 批准记录。", "workspace-a6-approval-unverified", "materials");
+  if (decision?.kind !== "card-decided") return unavailable(mainT("main.durableWorkflow.workspace.a6ApprovalUnverified"), "workspace-a6-approval-unverified", "materials");
   const prepared = rows.find(row => row.event.input.kind === "card-prepared" && row.event.input.card.requestId === decision.requestId
     && row.event.input.card.digest === decision.digest && row.event.input.card.generation === decision.generation)?.event.input;
   const architecture = prepared?.kind === "card-prepared" && prepared.card.documents.find(file => architecturePath.test(file.path));
-  if (!architecture) return unavailable("当前静态交付缺少 A6 卡绑定的签发架构。", "workspace-architecture-authority-unverified", "materials");
+  if (!architecture) return unavailable(mainT("main.durableWorkflow.workspace.staticArchitectureUnverified"), "workspace-architecture-authority-unverified", "materials");
   const architectureBytes = await signedPreparationBytes(view.projectRoot, architecture, 256 * 1024, "architecture");
   const architectureText = architectureBytes.toString("utf8");
-  if (!/\b(?:browser|WebGL)\b|浏览器/i.test(architectureText)) return unavailable("签发架构未声明浏览器交付。");
+  if (!new RegExp(roleText.workspace.browserDeliveryPattern, "i").test(architectureText)) return unavailable(mainT("main.durableWorkflow.workspace.browserDeliveryUndeclared"));
   const declaredPaths = [...architectureText.matchAll(/\x60([a-zA-Z0-9_][a-zA-Z0-9_./-]*)\x60/g)].map(match => match[1]);
   if (!index?.length || index.length > 512 * 1024) {
     if (view.acceptanceWorkspace?.preparationGate && declaredPaths.includes("index.html")) {
       throw preparationProblem("candidate-defect", "entry", index ? "static-entry-size-invalid" : "static-entry-missing",
-        index ? "签发静态入口为空或超出预览大小限制。" : "当前候选缺少签发架构指定的 index.html。",
+        index ? mainT("main.durableWorkflow.workspace.staticEntrySizeInvalid") : mainT("main.durableWorkflow.workspace.staticEntryMissing"),
         [{ path: "index.html", state: index ? "present" : "missing" }]);
     }
-    return unavailable("当前静态候选缺少可核验的 index.html 入口或入口超出大小限制。");
+    return unavailable(mainT("main.durableWorkflow.workspace.staticEntryMissingOrOversize"));
   }
-  if (!declaredPaths.includes("index.html")) return unavailable("签发架构未声明 index.html 入口。");
+  if (!declaredPaths.includes("index.html")) return unavailable(mainT("main.durableWorkflow.workspace.staticEntryUndeclared"));
   const selected = files.filter(file => file.path === "index.html" || (
     /\.(?:m?js|css|png|jpe?g|svg|webp|ico|woff2?|wasm|mp3|ogg|wav)$/i.test(file.path)
     && file.path.split("/").every(segment => /^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$/.test(segment)
@@ -493,7 +495,7 @@ async function decideStaticCandidate(
   ));
   const selectedNames = new Set(selected.map(file => file.path));
   if (selected.length > 256 || selected.reduce((total, file) => total + file.bytes.length, 0) > maxOutputBytes) {
-    return unavailable("获批静态资源超出应用验收文件数量或大小限制。");
+    return unavailable(mainT("main.durableWorkflow.workspace.staticAssetLimit"));
   }
   const approvedClassic = staticChosen && selection?.requestId === decision.requestId && selection.digest === decision.digest
     && selection.generation === decision.generation && selection.authority === decision.authority
@@ -501,23 +503,23 @@ async function decideStaticCandidate(
     && prepared.card.documents.some(file => stable(file) === stable(selection.proposal)) && authorizesClassicEntry(architectureText);
   const parsedCriteria = approvedClassic ? parseCriteriaText(criteria, { flowId: view.flowId, fileName: path.basename(criteriaPath) }) : undefined;
   const classicEligible = !!parsedCriteria?.ok && parsedCriteria.doc.status === "final"
-    && /\b(?:browser|playwright|screenshot)\b|浏览器|实操|截图/i.test(criteria);
+    && new RegExp(roleText.workspace.acceptanceBrowserPattern, "i").test(criteria);
   const diagnosis: StaticEntryDiagnosis = {};
   const scriptsVerified = (() => { try { return verifiedHtmlScripts(index, selectedNames, classicEligible, diagnosis); } catch { return undefined; } })();
   if (!scriptsVerified) {
     if (view.acceptanceWorkspace?.preparationGate) throw preparationProblem("candidate-defect", "entry", "static-entry-rejected",
       staticEntryRejection(diagnosis), [{ path: "index.html", state: "present" }]);
-    return unavailable(classicEligible ? "当前静态入口含未获准的脚本路径、启动段或执行属性，无法核验同源预览。"
-      : "当前静态入口无法按原模块合同核验。经典脚本须匹配本次 A6 的静态决定、签发架构和正式浏览器验收标准。");
+    return unavailable(classicEligible ? mainT("main.durableWorkflow.workspace.sameOriginPreviewUnverified")
+      : mainT("main.durableWorkflow.workspace.classicEntryUnverified"));
   }
   const readme = input.get("README.md")?.toString("utf8") ?? "";
   const launch = typeof scripts.start === "string" ? scripts.start.trim() : readme.match(/\bnode [a-zA-Z0-9_./-]+\.m?js\b/)?.[0];
   const deliveryStartup = launch && launch.length <= 120 && !/[\x00-\x1f]/.test(launch) ? launch : undefined;
   const requirements: StaticRequirements = {
     build: view.verificationPlan ? view.verificationPlan.requirements.some(item => item.stage === "A12b" && item.capability === "workspace-build")
-      : /\b(?:npm run|pnpm(?: run)?|yarn(?: run)?)\s+build\b|\b(?:must|required to|run (?:the )?|execute (?:the )?)(?:\s+\w+){0,3}\s+(?:compile|build)(?:\s+(?:command|script))?\b|(?:须|必须|要求|实际|执行|运行)[^。；\n]{0,16}(?:构建|编译)(?:命令|脚本|产物|成功|后|[，。；\n])/im.test(criteria),
-    requireDeliveryStartup: /(?:按|依照|依照上述)[^。；\n]{0,24}(?:交付说明|README|启动说明)[^。；\n]{0,28}(?:启动|执行)|(?:执行|运行|记录|实际)[^。；\n]{0,12}(?:启动命令|交付启动器)|\b(?:run|execute|verify|record)\s+(?:the\s+)?(?:documented|delivery|README|startup|launch)\s+(?:start(?:up)?\s+)?(?:command|launcher|script)\b/i.test(criteria),
-    requireLogicTest: /(?:执行|运行)[^。；\n]{0,18}(?:测试命令|规则测试|逻辑测试)|\b(?:npm test|node --test)\b|\b(?:run|execute)\s+(?:(?:the|delivered|logic|rule|automated)\s+){0,3}tests?\s+command\b/i.test(criteria),
+      : new RegExp(roleText.workspace.buildRequiredPattern, "im").test(criteria),
+    requireDeliveryStartup: new RegExp(roleText.workspace.deliveryStartupRequiredPattern, "i").test(criteria),
+    requireLogicTest: new RegExp(roleText.workspace.logicTestRequiredPattern, "i").test(criteria),
     ...(deliveryStartup ? { deliveryStartup } : {}),
   };
   return { files: selected, requirements, classic: scriptsVerified.classic };
@@ -526,27 +528,27 @@ async function decideStaticCandidate(
 function assertSupported(files: readonly AcceptanceWorkspaceCandidateFile[]): boolean {
   const inputs = new Map(files.map(file => [file.path, file.bytes]));
   const manifest = inputs.get("package.json");
-  if (!manifest) throw new Error("缺少已跟踪的依赖清单。");
+  if (!manifest) throw new Error(mainT("main.durableWorkflow.workspace.trackedManifestMissing"));
   const scripts = asObject(readObject(manifest).scripts);
   const build = typeof scripts.build === "string" ? scripts.build.trim() : "";
   const typescript = /^tsc[ \t]+--noEmit[ \t]+&&[ \t]+vite[ \t]+build$/.test(build);
   if (!typescript && !/^vite[ \t]+build$/.test(build) || scripts.prebuild !== undefined || scripts.postbuild !== undefined
     || !inputs.has("index.html") || [...inputs.keys()].some(file => /(?:^|\/)(?:vite\.config\.|\.env(?:\.|$)|\.npmrc$|postcss\.config\.|\.postcssrc)/i.test(file))) {
-    throw new Error("候选包含应用工作区无法核验的构建脚本、配置或缺失入口。");
+    throw new Error(mainT("main.durableWorkflow.workspace.unsupportedBuildCandidate"));
   }
   if (typescript) {
     const tsconfig = inputs.get("tsconfig.json");
-    if (!tsconfig) throw new Error("缺少已跟踪的 TypeScript 项目配置。");
+    if (!tsconfig) throw new Error(mainT("main.durableWorkflow.workspace.trackedTsconfigMissing"));
     const data = readObject(tsconfig);
     const compiler = asObject(data.compilerOptions);
     if (data.extends !== undefined || data.references !== undefined || ["plugins", "paths", "rootDirs", "rootDir", "typeRoots", "baseUrl", "outFile",
       "outDir", "tsBuildInfoFile", "generateTrace", "generateCpuProfile", "declarationDir"].some(key => Object.hasOwn(compiler, key))) {
-      throw new Error("当前 TypeScript 配置含未支持的外部输入、插件或输出。");
+      throw new Error(mainT("main.durableWorkflow.workspace.unsupportedTsconfig"));
     }
     for (const key of ["include", "exclude", "files"]) {
       const values = data[key];
       if (values !== undefined && (!Array.isArray(values) || values.some(item => typeof item !== "string" || path.isAbsolute(item)
-        || item.split(/[\\/]/).includes("..")))) throw new Error("TypeScript 读取范围无法核验。");
+        || item.split(/[\\/]/).includes("..")))) throw new Error(mainT("main.durableWorkflow.workspace.typescriptReadScopeUnverified"));
     }
   }
   return typescript;
@@ -568,26 +570,26 @@ async function verifyWorkspaceBasis(store: Store, view: DurableProjection, works
   const git = await readAcceptanceEnvironmentGit(view.projectRoot, basis.branch, basis.candidateOid);
   if (!git.ok) throw new Error(git.message);
   const approved = await store.readEvidence(view.projectRoot, basis.criteria.path);
-  if (!approved.ok || approved.value.sha256 !== basis.criteria.sha256) throw new Error("当前独立验收标准已变化。");
+  if (!approved.ok || approved.value.sha256 !== basis.criteria.sha256) throw new Error(mainT("main.durableWorkflow.workspace.criteriaChanged"));
   return git.value;
 }
 
 async function readWorkspaceCriteria(binding: Pick<DurableAcceptanceWorkspaceBinding, "projectRoot" | "basis">): Promise<string> {
   const bytes = await ordinaryBytes(binding.projectRoot, path.join(binding.projectRoot, binding.basis.criteria.path), 256 * 1024);
-  if (digest(bytes) !== binding.basis.criteria.sha256) throw new Error("当前独立验收标准已变化。");
+  if (digest(bytes) !== binding.basis.criteria.sha256) throw new Error(mainT("main.durableWorkflow.workspace.criteriaChanged"));
   return bytes.toString("utf8");
 }
 
 async function readRegistration(binding: DurableAcceptanceWorkspaceBinding): Promise<WorkspaceRegistration> {
   const { workspaceRoot, inputRoot, outputRoot, evidenceRoot, launcherPath } = binding;
-  if (!sameIdentity(directoryIdentity(workspaceRoot), binding.workspaceIdentity)) throw new Error("验收工作区目录标识已变化。");
+  if (!sameIdentity(directoryIdentity(workspaceRoot), binding.workspaceIdentity)) throw new Error(mainT("main.durableWorkflow.workspace.workspaceIdentityChanged"));
   const file = path.join(workspaceRoot, registeredFile);
   const value = JSON.parse((await ordinaryBytes(workspaceRoot, file, 64 * 1024)).toString("utf8")) as WorkspaceRegistration;
   if (stable(value.binding) !== stable(binding) || !sameIdentity(directoryIdentity(inputRoot), value.inputIdentity)
     || !sameIdentity(directoryIdentity(outputRoot), value.outputIdentity) || !sameIdentity(directoryIdentity(evidenceRoot), value.evidenceIdentity)
     || digest(await ordinaryBytes(workspaceRoot, launcherPath, 96 * 1024)) !== binding.launcherSha256
     || (binding.operation !== "static" && (await ordinaryBytes(workspaceRoot, path.join(workspaceRoot, configFile), 2048)).toString("utf8") !== buildConfig)) {
-    throw new Error("验收工作区路径、配置或任务绑定已变化。");
+    throw new Error(mainT("main.durableWorkflow.workspace.workspaceBindingChanged"));
   }
   return value;
 }
@@ -641,7 +643,7 @@ export function evidenceAuditInstructions(view: DurableProjection): string {
   const audit = view.evidenceAudit;
   if (!audit || audit.state !== "ready" || audit.legacy) return "";
   const records = audit.records.map(row => JSON.stringify(row)).join("\n");
-  return `\n按本次签发标准逐条只读审计已登记证据。候选 ${audit.basis.candidateOid}，证据代次 ${audit.basis.generation}。不得执行、取证或写入。使用 submit_report 的 evidence 逐条填写 JSON {"requirementId":"条目","evidenceIds":["账本记录 ID"]}；缺项须在结论中明确。\n${records}\n`;
+  return `${roleText.workspace.auditInstructions[0]}${audit.basis.candidateOid}${roleText.workspace.auditInstructions[1]}${audit.basis.generation}${roleText.workspace.auditInstructions[2]}${records}${roleText.workspace.auditInstructions[3]}`;
 }
 
 export async function refreshDesktopPreparationBlock(durable: DesktopDurableWorkflow, view: DurableProjection, _deps: SessionManagerDeps): Promise<DurableProjection> {
@@ -729,23 +731,23 @@ export async function prepareDesktopAcceptanceWorkspace(
         return { hold: true };
       }
     }
-    return { hold: !current(), text: "\n仅核对原账本已有工作区、取证与关闭回执。\n" };
+    return { hold: !current(), text: roleText.workspace.reconcileExistingReceipts };
   } catch {
     return { hold: true };
   }
 }
 
 async function readBuiltOutput(outputRoot: string): Promise<StaticOutput> {
-  if (!directoryIdentity(outputRoot)) throw new Error("构建输出目录无法核验。");
+  if (!directoryIdentity(outputRoot)) throw new Error(roleText.workspace.buildOutputDirectoryUnverified);
   const files = new Map<string, Buffer>();
   const directories = [""];
   let remaining = maxOutputBytes;
   for (const dir of directories) {
     const location = path.join(outputRoot, dir);
-    if (!directoryIdentity(location)) throw new Error("构建目录含重解析路径。");
+    if (!directoryIdentity(location)) throw new Error(roleText.workspace.redirectedBuildDirectory);
     for (const entry of await readdir(location, { withFileTypes: true })) {
       const name = dir ? `${dir}/${entry.name}` : entry.name;
-      if (directories.length + files.size > 2_000 || /[\\\x00-\x1f:]/.test(name)) throw new Error("构建输出超出预览范围。");
+      if (directories.length + files.size > 2_000 || /[\\\x00-\x1f:]/.test(name)) throw new Error(roleText.workspace.buildOutputPreviewLimit);
       if (entry.isDirectory()) directories.push(name);
       else {
         const bytes = await ordinaryBytes(outputRoot, path.join(outputRoot, name), remaining);
@@ -755,7 +757,7 @@ async function readBuiltOutput(outputRoot: string): Promise<StaticOutput> {
     }
   }
   const index = files.get("index.html");
-  if (!index?.length) throw new Error("构建没有生成可供静态预览的入口。");
+  if (!index?.length) throw new Error(roleText.workspace.buildPreviewEntryMissing);
   const summary = [...files].sort(([left], [right]) => left.localeCompare(right)).map(([name, bytes]) => [name, bytes.length, digest(bytes)]);
   return { files, sha256: digest(JSON.stringify(summary)), entrySha256: digest(index) };
 }
@@ -767,12 +769,12 @@ async function checkStagedInputs(store: Store, view: DurableProjection, binding:
   if (binding.operation === "static") {
     const selected = await decideStaticCandidate(store, view, candidate, await readWorkspaceCriteria(binding), binding.basis.criteria.path);
     if (!selected || selected.requirements.build || stable(selected.requirements) !== stable(binding.staticRequirements)
-      || digest(staticRunner(binding, selected, registration)) !== binding.launcherSha256) throw new Error("静态输入与原批准架构或准备范围不一致。");
+      || digest(staticRunner(binding, selected, registration)) !== binding.launcherSha256) throw new Error(roleText.workspace.staticInputsApprovalMismatch);
     files = selected.files;
     classic = selected.classic;
   } else if ((registration.dependencyProof && registration.dependenciesSha256 !== registration.dependencyProof.sha256)
     || digest(runnerSource(binding, assertSupported(candidate), registration.dependencyProof)) !== binding.launcherSha256) {
-    throw new Error("工作区依赖来源身份与原绑定不一致。");
+    throw new Error(roleText.workspace.dependencySourceBindingMismatch);
   }
   const expected = new Map(files.map(file => [file.path, digest(file.bytes)]));
   const directories = [""];
@@ -786,7 +788,7 @@ async function checkStagedInputs(store: Store, view: DurableProjection, binding:
       else {
         const sha = expected.get(name);
         if (!sha || digest(await ordinaryBytes(binding.inputRoot, absolute, 32 * 1024 * 1024)) !== sha) {
-          throw new Error("验收工作区输入与原候选不一致。");
+          throw new Error(roleText.workspace.workspaceInputCandidateMismatch);
         }
         seen++;
       }
@@ -794,7 +796,7 @@ async function checkStagedInputs(store: Store, view: DurableProjection, binding:
   }
   if (seen !== files.length || (binding.operation !== "static"
     && (await inspectAcceptanceDependencies(binding.inputRoot)) !== registration.dependenciesSha256)) {
-    throw new Error("验收输入或工具链与原绑定不一致。");
+    throw new Error(roleText.workspace.workspaceToolchainBindingMismatch);
   }
   return { classic, files: binding.operation === "static" ? [...expected.keys()].sort().map(name => ({ path: name, sha256: expected.get(name)! })) : [] };
 }
@@ -811,7 +813,7 @@ export async function closeDesktopAcceptanceWorkspace(
   if (!requiredLegacyWorkspace(view) || workspace?.basis.assessmentTask.taskId === taskId && workspace.closeReceipt) {
     return { ok: true, value: true };
   }
-  return failure("close-receipt-missing", "冻结标准所需的原验收工作区关闭回执缺失，等待按原流程处置。");
+  return failure("close-receipt-missing", mainT("main.durableWorkflow.workspace.workspaceCloseReceiptMissing"));
 }
 
 /** Re-read the formal report's real artifacts. Metadata and HTTP alone never supply an artifact. */
@@ -824,7 +826,7 @@ async function publishEvidenceFile(root: string, file: string, content: Buffer, 
     } finally { await handle.close(); }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST"
-      || !(await ordinaryBytes(root, file, content.length)).equals(content)) throw new Error("证据位置已有其他内容，不能覆盖。");
+      || !(await ordinaryBytes(root, file, content.length)).equals(content)) throw new Error(roleText.workspace.evidenceDestinationOccupied);
   }
 }
 
@@ -837,7 +839,7 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
   if (!receipt || !workspace.closeReceipt || receiptOperation(receipt).turnId !== turnId || !receiptOperation(receipt).writeAuditPassed
     || (binding.operation === "static") !== (receipt.kind === "acceptance-workspace-static-run")
     || (receipt.kind === "acceptance-workspace-run" && receipt.build.exitCode !== 0)) {
-    return failure("evidence-unverified", "当前正式报告缺少同一实际回合的工作区操作与预览回执。");
+    return failure("evidence-unverified", roleText.workspace.workspaceOperationReceiptMissing);
   }
   let publication: { key: string; token: string } | undefined;
   try {
@@ -848,13 +850,13 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
       const actualInput = await checkStagedInputs(store, view, binding, registration);
       const actualOutput = staticFiles(output.files);
       if (staticDigest(actualInput.files) !== receipt.stage.inputSha256 || staticDigest(actualOutput) !== receipt.stage.outputSha256
-        || stable(actualOutput) !== stable(receipt.stage.files)) throw new Error("实际验收静态文件已变化。");
-    } else if (output.sha256 !== receipt.build.outputSha256) throw new Error("实际验收产物已变化。");
-    if (output.entrySha256 !== receiptOperation(receipt).entrySha256) throw new Error("实际验收入口已变化。");
+        || stable(actualOutput) !== stable(receipt.stage.files)) throw new Error(roleText.workspace.staticFilesChanged);
+    } else if (output.sha256 !== receipt.build.outputSha256) throw new Error(roleText.workspace.buildArtifactsChanged);
+    if (output.entrySha256 !== receiptOperation(receipt).entrySha256) throw new Error(roleText.workspace.actualEntryChanged);
     if (!binding.requiresBrowserEvidence) return { ok: true, value: [] };
     const text = await ordinaryBytes(view.projectRoot, path.join(view.projectRoot, binding.basis.criteria.path), 256 * 1024);
     const criteria = parseCriteriaText(text.toString("utf8"), { flowId: pending.flowId, fileName: path.basename(binding.basis.criteria.path) });
-    if (!criteria.ok) throw new Error("当前标准的浏览器验收条目无法解析。");
+    if (!criteria.ok) throw new Error(roleText.workspace.browserCriteriaInvalid);
     const browserChecks = configuredBrowserChecks(view);
     const expected = new Set(browserChecks ?? criteria.doc.criteria.filter(item => item.priority === "P0").map(item => item.id));
     const checks = new Set<string>();
@@ -877,17 +879,17 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
           && body.runReceiptId === workspace.runReceiptId && stable(body.binding) === stable(binding)
           && Date.parse(body.startedAt) >= started && Date.parse(body.endedAt) <= ending) captured.push({ id, body });
       }
-      if (!captured.length) throw new Error("当前正式验收缺少应用浏览器产生的实际操作及截图回执。");
+      if (!captured.length) throw new Error(roleText.workspace.actualCaptureReceiptsMissing);
     }
-    if (!expected.size || !names.length || names.length > 16) throw new Error("当前报告缺少实际浏览器取证文件及对应元数据。");
+    if (!expected.size || !names.length || names.length > 16) throw new Error(roleText.workspace.browserEvidenceMetadataMissing);
     for (const artifact of names) {
-      if (artifact.split("/").some(part => !part || part === "." || part === "..") || /[\\:\x00-\x1f]/.test(artifact)) throw new Error("浏览器证据路径不合法。");
+      if (artifact.split("/").some(part => !part || part === "." || part === "..") || /[\\:\x00-\x1f]/.test(artifact)) throw new Error(roleText.workspace.browserEvidencePathInvalid);
       const metaPath = artifact + ".meta.json";
       const inWorkspace = artifact.startsWith(evidenceFolder);
       const actual = await ordinaryBytes(view.projectRoot, path.join(view.projectRoot, artifact), 8 * 1024 * 1024);
       if (binding.browserEvidenceSource === "application-browser"
         && (!inWorkspace || !captured.some(item => item.body.screenshots.some(shot => shot.path === artifact && shot.sha256 === digest(actual))))) {
-        throw new Error("正式报告所列截图缺少本次应用浏览器的真实捕获。");
+        throw new Error(roleText.workspace.reportScreenshotNotCaptured);
       }
       const metaBytes = await ordinaryBytes(view.projectRoot, path.join(view.projectRoot, metaPath), 32 * 1024);
       const parsed = parseEvidenceMeta(metaBytes.toString("utf8"));
@@ -900,9 +902,9 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
         || provenance.turnId !== turnId || generated === false || !Number.isFinite(generated) || generated < started || generated > ending
         || binding.browserEvidenceSource === "application-browser"
           && (provenance.runReceiptId !== workspace.runReceiptId || provenance.proposalDecisionDigest !== binding.proposalDecisionDigest)
-        || parsed.meta.sha256 !== digest(actual) || parsed.meta.bytes !== actual.length) throw new Error("浏览器附件元数据与本任务、候选或预览不匹配。");
+        || parsed.meta.sha256 !== digest(actual) || parsed.meta.bytes !== actual.length) throw new Error(roleText.workspace.browserAttachmentBindingMismatch);
       const ids = (parsed.meta.acIds ?? []).filter(id => expected.has(id));
-      if (!ids.length) throw new Error("浏览器附件未关联当前标准要求实操的验收条目。");
+      if (!ids.length) throw new Error(roleText.workspace.browserAttachmentRequirementMissing);
       if (inWorkspace) {
         const leaf = artifact.slice(evidenceFolder.length);
         const mtime = (await lstat(path.join(view.projectRoot, artifact))).mtime;
@@ -911,7 +913,7 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
         if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$/.test(leaf) || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(pending.flowId)
           || leaf === "build-output.log" || leaf === "static-stage.log" || parsed.meta.lines !== lines
           || mtime.getTime() < started - 1_000 || generated < mtime.getTime() - 1_000) {
-          throw new Error("本任务浏览器附件名称、实际时间或行数无法核对。");
+          throw new Error(roleText.workspace.browserAttachmentMetadataUnverified);
         }
         const published = `docs/verification/${pending.flowId}-${pending.taskId}-${leaf}`;
         const publishedMeta = Buffer.from(JSON.stringify({ ...meta, artifact: published }));
@@ -920,7 +922,7 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
       } else {
         for (const acId of ids) {
           const verified = await checkEvidence({ projectRoot: view.projectRoot, acId, criteria: criteria.doc, artifact, metaPath, scopeRoots: ["docs/verification"] });
-          if (!verified.ok || !verified.valid) throw new Error("浏览器附件的实际内容与证据 metadata 不一致。");
+          if (!verified.ok || !verified.valid) throw new Error(roleText.workspace.browserAttachmentDigestMismatch);
         }
         artifacts.push({ path: artifact, sha256: digest(actual) }, { path: metaPath, sha256: digest(metaBytes) });
       }
@@ -928,17 +930,17 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
       const observation = new Date(generated).toISOString();
       if (observation > observedAt) observedAt = observation;
     }
-    if ([...expected].some(id => !checks.has(id))) throw new Error("当前正式报告缺少部分规定条目的浏览器取证。");
+    if ([...expected].some(id => !checks.has(id))) throw new Error(roleText.workspace.requiredBrowserEvidenceMissing);
     if (captured.length) {
       const timelines = [];
       for (const { id, body } of captured) {
         const log = await ordinaryBytes(view.projectRoot, path.join(view.projectRoot, body.events.path), 64 * 1024);
-        if (digest(log) !== body.events.sha256) throw new Error("实际浏览器输入时间序列已变化。");
+        if (digest(log) !== body.events.sha256) throw new Error(roleText.workspace.browserInputTimelineChanged);
         timelines.push({ captureReceiptId: id, ...body.events, timeline: readObject(log) });
       }
       // Retain the exact application-produced sequence with the formal evidence, without model-written content.
       const timeline = Buffer.from(JSON.stringify({ kind: "acceptance-browser-timeline", runReceiptId: workspace.runReceiptId, timelines }));
-      if (timeline.length > 2 * 1024 * 1024) throw new Error("实际浏览器输入时间序列超出有界证据范围。");
+      if (timeline.length > 2 * 1024 * 1024) throw new Error(roleText.workspace.browserInputTimelineLimit);
       const published = `docs/verification/${pending.flowId}-${pending.taskId}-browser-timeline.json`;
       const generated = new Date(ending).toISOString();
       const timelineSha = digest(timeline);
@@ -946,7 +948,7 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
         bytes: timeline.length, lines: 1, generatedAt: generated, acIds: [...checks].sort(),
         acceptanceWorkspace: { candidateOid: binding.basis.candidateOid, criteriaSha256: binding.basis.criteria.sha256,
           taskId: pending.taskId, previewUrl: receipt.preview.url, turnId, runReceiptId: workspace.runReceiptId, proposalDecisionDigest: binding.proposalDecisionDigest } }));
-      if (artifacts.length > 30) throw new Error("截图与实际浏览器时间序列超出正式证据范围。");
+      if (artifacts.length > 30) throw new Error(roleText.workspace.browserFormalEvidenceLimit);
       staged.push({ artifact: published, metaPath: published + ".meta.json", bytes: timeline, meta, ids: [], mtime: new Date(ending) });
       artifacts.push({ path: published, sha256: timelineSha }, { path: published + ".meta.json", sha256: digest(meta) });
     }
@@ -955,21 +957,21 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
     if (!claimed.ok) return claimed;
     if (!claimed.value.execute) {
       return workspace.browserEvidence && stable(artifacts) === stable(workspace.browserEvidence.artifacts)
-        ? { ok: true, value: artifacts } : failure("evidence-unverified", "原浏览器证据作用需要核对。");
+        ? { ok: true, value: artifacts } : failure("evidence-unverified", roleText.workspace.reconcileBrowserEvidenceEffect);
     }
     publication = { key: effect.key, token: claimed.value.token };
     if (staged.length) {
       const destination = path.join(view.projectRoot, "docs", "verification");
-      if (!directoryIdentity(path.dirname(destination))) throw new Error("项目取证目录的上层路径无法核对。");
+      if (!directoryIdentity(path.dirname(destination))) throw new Error(roleText.workspace.evidenceParentUnverified);
       await mkdir(destination).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error; });
-      if (!directoryIdentity(destination)) throw new Error("项目取证目录无法核对。");
+      if (!directoryIdentity(destination)) throw new Error(roleText.workspace.evidenceDirectoryUnverified);
       for (const item of staged) {
         await publishEvidenceFile(view.projectRoot, path.join(view.projectRoot, item.artifact), item.bytes, item.mtime);
         await publishEvidenceFile(view.projectRoot, path.join(view.projectRoot, item.metaPath), item.meta);
         for (const acId of item.ids) {
           const verified = await checkEvidence({ projectRoot: view.projectRoot, acId, criteria: criteria.doc,
             artifact: item.artifact, metaPath: item.metaPath, scopeRoots: ["docs/verification"] });
-          if (!verified.ok || !verified.valid) throw new Error("已发布浏览器附件未通过原证据合同。");
+          if (!verified.ok || !verified.valid) throw new Error(roleText.workspace.publishedBrowserEvidenceInvalid);
         }
       }
     }
@@ -980,7 +982,7 @@ export async function verifyDesktopAcceptanceWorkspaceEvidence(
     const saved = await recordEffect(store, view, publication, evidence, "Re-read the reported browser artifacts and matching current workspace metadata.");
     return saved.ok ? { ok: true, value: artifacts } : saved;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "当前验收工件无法核对。";
+    const message = error instanceof Error ? error.message : roleText.workspace.acceptanceArtifactsUnverified;
     if (publication) await store.settleEffect(view.ref, { ...publication, outcome: "unknown", evidence: message.slice(0, 240) });
     return failure("evidence-unverified", message);
   }

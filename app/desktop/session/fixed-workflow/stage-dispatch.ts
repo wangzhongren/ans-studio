@@ -16,6 +16,8 @@ import type { LiveSession } from "../contracts/session-types.ts";
 import type { Evidence } from "../evidence.ts";
 import { sessionKey } from "../shared/keys.ts";
 import { shortenText } from "../shared/text.ts";
+import { mainT } from "../../i18n.ts";
+import roleText from "../../durable-workflow-role-text.json" with { type: "json" };
 
 export type DurableTaskMaterialization = {
   taskId: string; sourceRoleId: string; roleId: string; stage: WorkflowStage; details: DurableDispatchDetails;
@@ -91,19 +93,19 @@ export class FixedWorkflowStageDispatch {
       : undefined;
     const intakeEvidence = intake?.report && store.getEvidence(view.ref, intake.report.evidence) as { handback?: TaskHandback } | undefined;
     const intakeSummary = intakeEvidence?.handback?.status === "completed" && intakeEvidence.handback.taskId === intake?.taskId
-      ? `\nA1 产品受理摘要：${shortenText(intakeEvidence.handback.summary, 1500)}\n以上摘要仅供参考。` : "";
+      ? `${roleText.dispatch.a1IntakeSummary[0]}${shortenText(intakeEvidence.handback.summary, 1500)}${roleText.dispatch.a1IntakeSummary[1]}` : "";
     if (isDirectProductCapability(view.action) || direct) {
       if (direct?.state === "pending" && direct.dispatch.actor === "application"
         && direct.dispatch.flowId === view.flowId && direct.roleId === "product"
         && direct.task.roleId === direct.roleId && direct.taskId === direct.task.taskId
         && direct.task.stage === stage && direct.task.parentTaskId === view.ref.instanceId
         && direct.task.stageAttempt === view.attempt) {
-        const duty = stage === "A1" ? "此节点只读。" : `撰写可提交审批的产品意图草稿，写入 docs/product/${direct.flowId}-intent-vN.md。采用小规模、可调整的默认方案时，把它明确标为待审批假设。只有缺少关键决定以致无法给出草案时，才回报 blocked 并列出具体问题。`;
+        const duty = stage === "A1" ? roleText.dispatch.a1ReadOnlyDuty : `${roleText.dispatch.a2IntentDraftDuty[0]}${direct.flowId}${roleText.dispatch.a2IntentDraftDuty[1]}`;
         await this.materializeDurableTask(view, {
           taskId: direct.taskId, sourceRoleId: "application", creator: view.workflowOwnedDispatch ? "convener" : "chief", roleId: direct.roleId,
           stage, binding: direct.task, sideEffect: stage === "A1" ? "read-only" : "docs",
           details: { ...direct.dispatch,
-            text: `${direct.dispatch.text}\n应用已绑定工作流 ${view.ref.instanceId} 和 flowId ${direct.flowId}。${duty}${intakeSummary}` },
+            text: `${direct.dispatch.text}${roleText.dispatch.directProductBinding[1]}${view.ref.instanceId}${roleText.dispatch.directProductBinding[2]}${direct.flowId}${roleText.dispatch.directProductBinding[3]}${duty}${intakeSummary}` },
         });
       }
       return;
@@ -118,7 +120,7 @@ export class FixedWorkflowStageDispatch {
         const checked = await store.prepareDirectIntentGate(view.ref);
         if (!checked.ok) {
           closeDesktopGraphCard(this.deps.durableWorkflow!, view.projectRoot);
-          const summary = `A3 意图审批待幕僚处理。工作流 ${view.ref.instanceId}。${checked.message} 请核对产品稿并协调补正。`;
+          const summary = mainT("main.durableWorkflow.dispatch.a3ApprovalBlocked", { instanceId: view.ref.instanceId, reason: checked.message });
           const notice = await recordWorkflowNotice(view.projectRoot, chief, {
             ref: `intent-gate:${view.ref.instanceId}:${view.attempt}:${durableHash(checked.message).slice(0, 16)}`, summary,
           });
@@ -127,7 +129,7 @@ export class FixedWorkflowStageDispatch {
         }
         if (checked.value) {
           const { path: productDraft, intentId } = checked.value;
-          draft = `\n应用已核对产品稿 ${productDraft}。请阅读该稿，并按该稿在 docs/intents/${intentId}.md 写意图入口，frontmatter 至少包含 intentId: ${intentId}、flowId: ${view.flowId} 和 goal；保留待客户确认项，再用 request_choice 提交意图确认卡。`;
+          draft = `${roleText.dispatch.verifiedDraftInstruction[0]}${productDraft}${roleText.dispatch.verifiedDraftInstruction[1]}${intentId}${roleText.dispatch.verifiedDraftInstruction[2]}${intentId}${roleText.dispatch.verifiedDraftInstruction[3]}${view.flowId}${roleText.dispatch.verifiedDraftInstruction[4]}`;
         }
       }
       const registration = this.deps.getRegisteredProjectLifecycle?.(view.projectRoot);
@@ -138,22 +140,22 @@ export class FixedWorkflowStageDispatch {
       })) {
         if (view.workflowOwnedDispatch && !this.sessions.get(this.sessionKey(view.projectRoot, chief, runtime))?.busy &&
           store.listEffects(view.ref, "model-send").some(effect => effect.intent.key === `model:chief-intake:${view.stepId}:${view.attempt}` && effect.state === "succeeded")) {
-          await this.noteWorkflowException(view, chief, "workflow-card-not-submitted", `确认回合已结束，尚未登记 ${card.stage} 确认卡。请核对本节点的材料和卡片回执。`);
+          await this.noteWorkflowException(view, chief, "workflow-card-not-submitted", mainT("main.durableWorkflow.dispatch.missingConfirmationCard", { stage: card.stage }));
           return;
         }
         await this.queueDurablePrompt(view, chief, "application",
-          `工作流 ${view.ref.instanceId}，flowId ${view.flowId ?? ""}。请使用原有 ${card.kind} 客户卡入口提交当前 ${card.stage} 文档，以应用校验的证据等待决定。${draft}`,
+          `${roleText.dispatch.submitOriginalCardInstruction[0]}${view.ref.instanceId}${roleText.dispatch.submitOriginalCardInstruction[1]}${view.flowId ?? ""}${roleText.dispatch.submitOriginalCardInstruction[2]}${card.kind}${roleText.dispatch.submitOriginalCardInstruction[3]}${card.stage}${roleText.dispatch.submitOriginalCardInstruction[4]}${draft}`,
           runtime, `chief-intake:${view.stepId}:${view.attempt}`);
       }
     }
     if (view.action === "observe-existing" && !view.workflowOwnedDispatch && !currentRequest) {
       await this.queueDurablePrompt(view, chief, "application",
-        `客户请求：${view.metadata.summary ?? ""}\n核定客户要求是否是可定位的现有实现变更。仅当有依据时，向运营 ${convener} 发工作流 ${view.ref.instanceId} 的路径 B B1 advance，并提供 flowId、requestedEvidence（现有模块真实文件）和 reason（对应客户请求的现有行为及改动理由）。`,
+        `${roleText.dispatch.pathBIntakeInstruction[0]}${view.metadata.summary ?? ""}${roleText.dispatch.pathBIntakeInstruction[1]}${convener}${roleText.dispatch.pathBIntakeInstruction[2]}${view.ref.instanceId}${roleText.dispatch.pathBIntakeInstruction[3]}`,
         runtime, `chief-intake:${view.stepId}:${view.attempt}`);
     }
     if (view.action === "verify-stop" && !view.workflowOwnedDispatch) {
       await this.queueDurablePrompt(view, convener, "application",
-        `核对工作流 ${view.ref.instanceId} 已无在途任务、未确认写入或待核对 Git 作用。仅在确认停稳后使用 submit_report 提交 completed 报告与依据。`,
+        `${roleText.dispatch.verifyStoppedInstruction[0]}${view.ref.instanceId}${roleText.dispatch.verifyStoppedInstruction[1]}`,
         runtime, `stop:${view.stepId}:${view.attempt}`, undefined, undefined, undefined, true);
     }
     if (view.workflowOwnedDispatch) {
@@ -164,9 +166,9 @@ export class FixedWorkflowStageDispatch {
     const active = view.pendingTasks?.some(task => task.stepId === view.stepId && task.attempt === view.attempt);
     if (profile && !currentRequest && !active) {
       const instruction = independent ? profile.prompt
-        : `请通过 dispatch_task 向运营 ${convener} 提交路径 A 的 ${profile.stage} advance。审批或派工由本次实际能力处理。`;
+        : `${roleText.dispatch.legacyPathAAdvanceInstruction[0]}${convener}${roleText.dispatch.legacyPathAAdvanceInstruction[1]}${profile.stage}${roleText.dispatch.legacyPathAAdvanceInstruction[2]}`;
       await this.queueDurablePrompt(view, chief, "application",
-        `客户请求：${view.metadata.summary ?? ""}${intakeSummary}\n工作流 ${view.ref.instanceId}${view.flowId ? `，flowId ${view.flowId}` : ""}。\n${instruction}`,
+        `${roleText.dispatch.legacyIntakeInstruction[0]}${view.metadata.summary ?? ""}${intakeSummary}${roleText.dispatch.legacyIntakeInstruction[2]}${view.ref.instanceId}${view.flowId ? `，flowId ${view.flowId}` : ""}${roleText.dispatch.legacyIntakeInstruction[4]}${instruction}`,
         runtime, `chief-intake:${view.stepId}:${view.attempt}`);
     }
     if (profile && currentRequest?.input.kind === "stage-request" && !independent) {
@@ -174,7 +176,7 @@ export class FixedWorkflowStageDispatch {
       await this.materializeDurableTask(view, {
         taskId, sourceRoleId: chief, roleId: convener, stage: profile.stage, stageRequest: true,
         details: { ...currentRequest.input.dispatch, text: `${currentRequest.input.dispatch.text}\n${profile.prompt}` +
-          (intakeSummary ? `\n应用已绑定工作流 ${view.ref.instanceId} 和 flowId ${view.flowId}。${intakeSummary}` : "") },
+          (intakeSummary ? `${roleText.dispatch.legacyOperatorWorkflowBinding[0]}${view.ref.instanceId}${roleText.dispatch.legacyOperatorWorkflowBinding[1]}${view.flowId}${roleText.dispatch.legacyOperatorWorkflowBinding[2]}${intakeSummary}` : "") },
         binding: { stage: profile.stage, stageAttempt: view.attempt, executionAttempt: 1,
           parentTaskId: currentRequest.source.originId, taskId, roleId: convener },
       });
@@ -193,7 +195,7 @@ export class FixedWorkflowStageDispatch {
           taskId: pending.taskId, sourceRoleId: creator, creator,
           roleId: pending.roleId, stage: pending.task.stage, binding: pending.task,
           details: pending.capability === "author-intent" && intakeSummary ? {
-            ...pending.dispatch, text: `${pending.dispatch.text}\n工作流 ${view.ref.instanceId}，flowId ${pending.flowId}。\n意图文档使用 docs/product/${pending.flowId}-intent-vN.md。${intakeSummary}`,
+            ...pending.dispatch, text: `${pending.dispatch.text}${roleText.dispatch.legacyAuthorIntentBinding[1]}${view.ref.instanceId}${roleText.dispatch.legacyAuthorIntentBinding[2]}${pending.flowId}${roleText.dispatch.legacyAuthorIntentBinding[3]}${pending.flowId}${roleText.dispatch.legacyAuthorIntentBinding[4]}${intakeSummary}`,
           } : pending.dispatch,
           modulePaths: pending.modulePaths, sideEffect: pending.task.stage === "A11" ? "code" : "docs",
         });
@@ -206,7 +208,7 @@ export class FixedWorkflowStageDispatch {
           parentTaskId: pending.task.taskId, taskId: pending.task.parentTaskId, roleId: creator,
         };
         await this.queueDurablePrompt(address, creator, pending.roleId,
-          `${renderWorkReportPrompt(report.handback)}\n请核对真实证据后使用 close_created_task。若运营完成实施核验，请用 submit_report 回交实施依据。`,
+          `${renderWorkReportPrompt(report.handback)}${roleText.dispatch.legacyOperationsHandbackInstruction[1]}`,
           runtime, `graph-report:${pending.taskId}:${pending.report.key}`, undefined, reviewerTask,
           creator === convener ? pending.task.parentTaskId : undefined);
       }
@@ -214,7 +216,7 @@ export class FixedWorkflowStageDispatch {
   }
 
   private async noteWorkflowException(view: DurableProjection, chief: string, code: string, reason: string, taskId?: string): Promise<void> {
-    const summary = `工作流 ${view.ref.instanceId} 在 ${view.stepName} 需要幕僚处理。${shortenText(reason, 500)}`;
+    const summary = mainT("main.durableWorkflow.dispatch.workflowNeedsChief", { instanceId: view.ref.instanceId, step: view.stepName, reason: shortenText(reason, 500) });
     const notice = await recordWorkflowNotice(view.projectRoot, chief, {
       ref: `workflow-exception:${view.ref.instanceId}:${view.stepId}:${view.attempt}:${code}`, summary, taskId,
     });
@@ -244,7 +246,7 @@ export class FixedWorkflowStageDispatch {
       const selection = this.deps.getRegisteredProjectLifecycle?.(projectRoot)?.selectionId;
       if (customer) await presentB2EvidenceScopeCard({ durable, view, chief, customer,
         isRegistered: () => !!selection && this.deps.getRegisteredProjectLifecycle?.(projectRoot)?.selectionId === selection });
-      else await this.noteWorkflowException(view, chief, "workflow-b2-evidence-decision-unavailable", "等待在当前主窗口确认 B2 取证范围。");
+      else await this.noteWorkflowException(view, chief, "workflow-b2-evidence-decision-unavailable", mainT("main.durableWorkflow.dispatch.b2ScopeAwaitingMainWindow"));
       return true;
     }
     const scope = view.blockedRouting;
@@ -256,7 +258,7 @@ export class FixedWorkflowStageDispatch {
     if (!scope.decision) {
       if (this.deps.customerInput) await presentBlockedScopeCard({ durable, view, chief, customer: this.deps.customerInput, isRegistered,
         executeDecision: this.port.durableDecisionExecutor(projectRoot, view.metadata.runtime) });
-      else await this.noteWorkflowException(view, chief, "workflow-blocked-scope-card-unavailable", "当前窗口无法展示原项目的范围处置卡。", scope.origin.task.taskId);
+      else await this.noteWorkflowException(view, chief, "workflow-blocked-scope-card-unavailable", mainT("main.durableWorkflow.dispatch.scopeCardUnavailable"), scope.origin.task.taskId);
       return true;
     }
     if (scope.a11DispositionKey || scope.a12bPrepareKey || !isRegistered() || scope.decision.option === "stop") return true;
@@ -284,11 +286,11 @@ export class FixedWorkflowStageDispatch {
     const session = this.sessions.get(this.sessionKey(projectRoot, parent.roleId, runtime));
     if (!session?.busy && !session?.origins.running) {
       if (sent?.state === "succeeded") {
-        await this.noteWorkflowException(view, chief, "workflow-scope-revision-request-missing", "当前运营接续回合已结束，尚未提交选定的原文件修订申请。", parent.taskId);
+        await this.noteWorkflowException(view, chief, "workflow-scope-revision-request-missing", mainT("main.durableWorkflow.dispatch.documentRevisionRequestMissing"), parent.taskId);
       } else if (!sent || sent.state === "not-started") {
         await this.queueDurablePrompt(view, parent.roleId, "application",
-          `本次已有效选择申请修订 ${scope.document.path}（原 SHA-256 ${scope.document.sha256}）。在原运营任务 #${parent.taskId} 使用 request_document_revision 提交该文件的具体修订理由，再等待当前新版本的实际批准。${scope.evidenceCompromise
-            ? `拟调整验收条目 ${scope.evidenceCompromise.requirementIds.join("、")}，可核对的候选原件 ${scope.evidenceCompromise.paths.join("、")}。经原批准后仍须重新签发标准、取证和审计。` : ""}`,
+          `${roleText.dispatch.documentRevisionOperatorInstruction[0]}${scope.document.path}${roleText.dispatch.documentRevisionOperatorInstruction[1]}${scope.document.sha256}${roleText.dispatch.documentRevisionOperatorInstruction[2]}${parent.taskId}${roleText.dispatch.documentRevisionOperatorInstruction[3]}${scope.evidenceCompromise
+            ? `${roleText.dispatch.evidenceCompromiseReissueInstruction[0]}${scope.evidenceCompromise.requirementIds.join("、")}${roleText.dispatch.evidenceCompromiseReissueInstruction[1]}${scope.evidenceCompromise.paths.join("、")}${roleText.dispatch.evidenceCompromiseReissueInstruction[2]}` : ""}`,
           runtime, wake, undefined, parent.task, parent.taskId);
       }
     }
@@ -312,9 +314,9 @@ export class FixedWorkflowStageDispatch {
         await this.materializeDurableTask(view, {
           taskId: revision.task.taskId, sourceRoleId: "application", roleId: revision.roleId,
           stage: revision.task.stage, binding: revision.task, sideEffect: "docs", parentTaskId: parent.taskId,
-          details: { flowId: view.flowId, actor: "application", text: `工作流暂停原运营任务 #${parent.taskId}。核对并修订治理文件 ${revision.path}。` +
-            `\n运营报告的问题：${revision.reason}\n请读取正式文件与同流程关联依据，使用 submit_document_revision 提交本文件的完整候选内容。` +
-            "\n应用会隔离候选并核对批准条件。当前任务只提交该文件的候选，不直接写入正式文件或改变授权。" },
+          details: { flowId: view.flowId, actor: "application", text: `${roleText.dispatch.pauseOperationsTaskForRevision[0]}${parent.taskId}${roleText.dispatch.pauseOperationsTaskForRevision[1]}${revision.path}${roleText.dispatch.pauseOperationsTaskForRevision[2]}` +
+            `${roleText.dispatch.reviseOriginalGovernanceFileInstruction[0]}${revision.reason}${roleText.dispatch.reviseOriginalGovernanceFileInstruction[1]}` +
+            roleText.dispatch.isolatedRevisionCandidateInstruction },
         });
         break;
       }
@@ -323,7 +325,7 @@ export class FixedWorkflowStageDispatch {
         if (this.deps.customerInput) await presentDocumentRevisionCard({ durable, view, revision, chief,
           customer: this.deps.customerInput, executeDecision: this.port.durableDecisionExecutor(view.projectRoot, view.metadata.runtime),
           isRegistered: () => !!registration && this.deps.getRegisteredProjectLifecycle?.(view.projectRoot)?.selectionId === registration.selectionId });
-        else await this.noteWorkflowException(view, chief, `revision-card-unavailable:${revision.id}`, "当前窗口无法呈现本人修订确认卡。", revision.task.taskId);
+        else await this.noteWorkflowException(view, chief, `revision-card-unavailable:${revision.id}`, mainT("main.durableWorkflow.dispatch.documentRevisionCardUnavailable"), revision.task.taskId);
         break;
       }
       case "ready":
@@ -334,15 +336,15 @@ export class FixedWorkflowStageDispatch {
       }
       case "blocked":
         await this.noteWorkflowException(view, chief, `revision-blocked:${revision.id}`,
-          revision.blockedReason ?? `治理文件 ${revision.path} 的修订未能恢复原节点。`, revision.task.taskId);
+          revision.blockedReason ?? mainT("main.durableWorkflow.dispatch.documentRevisionResumeFailed", { path: revision.path }), revision.task.taskId);
         break;
       case "resumed": {
         const key = `a11-revision-resume:${revision.id}`;
         const sent = store.listEffects(view.ref, "model-send").find(effect => effect.intent.key === `model:${key}`);
         if (sent?.state === "succeeded") return false;
         await this.queueDurablePrompt(view, convener, "application",
-          `应用已核对治理文件 ${revision.path} 的修订并恢复本次 A11 运营任务 #${parent.taskId}。` +
-          `请重新核对当前生效的治理依据和工作项，按已批准写域继续原任务。${view.evidenceAudit?.state === "collecting" ? evidenceOperatorInstructions(view) : ""}`, runtime, key, undefined, parent.task, parent.taskId);
+          `${roleText.dispatch.documentRevisionOperationsResumed[0]}${revision.path}${roleText.dispatch.documentRevisionOperationsResumed[1]}${parent.taskId}${roleText.dispatch.documentRevisionOperationsResumed[2]}` +
+          `${roleText.dispatch.verifyNewGovernanceEvidenceInstruction[0]}${view.evidenceAudit?.state === "collecting" ? evidenceOperatorInstructions(view) : ""}`, runtime, key, undefined, parent.task, parent.taskId);
         break;
       }
     }
@@ -355,7 +357,7 @@ export class FixedWorkflowStageDispatch {
       const runtime = this.durableRuntime(view);
       const incomplete = view.blockedRoutingEnabled && operationsTasks(view).children.find(task => task.state === "pending" && !task.workOrder && !task.evidenceWorkOrder);
       if (incomplete) {
-        await this.noteWorkflowException(view, chief, "workflow-implementation-order-missing", "本次 A11 子任务缺少核验过的应用工单，先核对当前职责与依据。", incomplete.taskId);
+        await this.noteWorkflowException(view, chief, "workflow-implementation-order-missing", mainT("main.durableWorkflow.dispatch.a11WorkOrderMissing"), incomplete.taskId);
         return;
       }
       const next = nextOperationsDelivery(await this.deps.durableWorkflow!.store(), view, this.sessions.get(this.sessionKey(view.projectRoot, convener, runtime))?.busy ?? false);
@@ -390,13 +392,13 @@ export class FixedWorkflowStageDispatch {
         row.event.input.requestId === proposalCard.card.requestId)?.event.input : undefined;
       const proposalRequestId = proposal?.kind === "card-decided" ? proposal.requestId : undefined;
       if (stage === "A12b" && typeof candidateOid !== "string") {
-        await this.noteWorkflowException(view, chief, "workflow-assessment-candidate-missing", "本次独立验收无可核验的已接纳候选提交。", pending.taskId);
+        await this.noteWorkflowException(view, chief, "workflow-assessment-candidate-missing", mainT("main.durableWorkflow.dispatch.independentReviewCandidateMissing"), pending.taskId);
         return;
       }
-      const candidate = stage === "A12b" ? `\n候选提交：${candidateOid}。验收报告 YAML frontmatter 必须逐字记录 candidateOid，并以 outcome: accepted、outcome: rework 或 outcome: blocked 表达结论。` : "";
+      const candidate = stage === "A12b" ? `${roleText.dispatch.independentReviewReportSchema[0]}${candidateOid}${roleText.dispatch.independentReviewReportSchema[1]}` : "";
       const verified = pending.verificationCapabilities ?? view.verificationCapabilities;
       if (stage === "A12a" && view.blockedRoutingEnabled && !verified) {
-        await this.noteWorkflowException(view, chief, "workflow-verification-capabilities-missing", "当前独立标准缺少应用实际能力核对，先核对当前角色和运行时。", pending.taskId);
+        await this.noteWorkflowException(view, chief, "workflow-verification-capabilities-missing", mainT("main.durableWorkflow.dispatch.independentReviewCapabilitiesMissing"), pending.taskId);
         return;
       }
       const capability = stage === "A12a" && view.blockedRoutingEnabled ? verificationStandardPrompt(verified, view.implementationItems)
@@ -405,7 +407,7 @@ export class FixedWorkflowStageDispatch {
         taskId: pending.taskId, sourceRoleId: "application", roleId: pending.roleId, stage,
         binding: pending.task, modulePaths: pending.modulePaths,
         sideEffect: stage === "A11" ? "code" : stage === "A4" || stage === "A7" ? "read-only" : "docs",
-        details: { ...pending.dispatch, text: `${pending.dispatch.text}\n${workflowRoleDuty(stage, pending.flowId, proposalRequestId, view.evidenceCollectorRoleId)}${candidate}${capability}${pending.reviewWritePath ? `\n本次唯一预检通过的证据文件：${pending.reviewWritePath}` : ""}` },
+        details: { ...pending.dispatch, text: `${pending.dispatch.text}\n${workflowRoleDuty(stage, pending.flowId, proposalRequestId, view.evidenceCollectorRoleId)}${candidate}${capability}${pending.reviewWritePath ? `${roleText.dispatch.preflightEvidenceWritePath[0]}${pending.reviewWritePath}` : ""}` },
       });
       return;
     }
@@ -448,7 +450,7 @@ export class FixedWorkflowStageDispatch {
     if (stage === "A11" && outcome === "accepted") {
       const evidence = await this.refs.evidence.buildFixedCloseEvidence(view.projectRoot, pending.taskId, undefined);
       if (!evidence.ok || !evidence.evidence?.branchTipOid) {
-        await this.noteWorkflowException(view, chief, "workflow-implementation-evidence-missing", evidence.ok ? "缺少实际提交。" : evidence.message, pending.taskId);
+        await this.noteWorkflowException(view, chief, "workflow-implementation-evidence-missing", evidence.ok ? mainT("main.durableWorkflow.dispatch.implementationCommitMissing") : evidence.message, pending.taskId);
         outcome = "rejected";
       } else {
         tipOid = evidence.evidence.branchTipOid;
@@ -456,14 +458,14 @@ export class FixedWorkflowStageDispatch {
           row.event.attempt === view.attempt && row.event.input.kind === "operator-report" && row.event.input.parentTaskId === pending.task.parentTaskId)?.event.input;
         if (review?.kind !== "operator-report") {
           const task: DurableTaskBinding = { ...pending.task, roleId: convener, taskId: pending.task.parentTaskId, parentTaskId: pending.taskId };
-          const text = `${renderWorkReportPrompt(report)}\n核对本次真实提交 ${tipOid} 与实现报告，使用 submit_report 回交核对结论和依据。`;
+          const text = `${renderWorkReportPrompt(report)}${roleText.dispatch.operationsReviewCommitInstruction[1]}${tipOid}${roleText.dispatch.operationsReviewCommitInstruction[2]}`;
           await this.materializeDurableTask(view, { taskId: task.taskId, sourceRoleId: "application", roleId: convener, stage,
             details: { ...pending.dispatch, text }, binding: task, sideEffect: "read-only", operationKey: `graph-report:${pending.taskId}:${pending.report.key}` });
           return;
         }
         const reviewReport = store.getEvidence(view.ref, review.evidence) as { handback?: TaskHandback } | undefined;
         if (reviewReport?.handback?.status !== "completed") {
-          await this.noteWorkflowException(view, chief, "workflow-implementation-review-blocked", reviewReport?.handback?.summary ?? "运营提交核验未通过。", pending.taskId);
+          await this.noteWorkflowException(view, chief, "workflow-implementation-review-blocked", reviewReport?.handback?.summary ?? mainT("main.durableWorkflow.dispatch.operationsReviewFailed"), pending.taskId);
           outcome = "rejected";
         }
       }
@@ -502,7 +504,7 @@ export class FixedWorkflowStageDispatch {
         && event.input.dispatch.parentTask.taskId === parent.taskId)) return;
       if (!recovery.eligibleRoleIds?.length) {
         await store.settleAcceptanceEnvironment(view.ref, { parentTask: parent,
-          outcome: { kind: "blocked", reason: "当前获批团队中没有可核验的 package.json 责任人。" } }, () =>
+          outcome: { kind: "blocked", reason: mainT("main.durableWorkflow.dispatch.packageOwnerUnverified") } }, () =>
           store.lookup(view.ref)?.acceptanceEnvironment?.parentTask?.taskId === parent.taskId);
         durable.activate();
         return;
@@ -511,18 +513,18 @@ export class FixedWorkflowStageDispatch {
       const session = this.sessions.get(this.sessionKey(view.projectRoot, parent.roleId, runtime));
       if (sent?.state === "succeeded" && !session?.busy && !session?.origins.running) {
         const result = await store.settleAcceptanceEnvironment(view.ref, { parentTask: parent,
-          outcome: { kind: "blocked", reason: "原运营回合已结束，未核定并派发获批属主。" } }, () =>
+          outcome: { kind: "blocked", reason: mainT("main.durableWorkflow.dispatch.packageOwnerDispatchMissing") } }, () =>
           store.lookup(view.ref)?.acceptanceEnvironment?.parentTask?.taskId === parent.taskId
           && !store.lookup(view.ref)?.acceptanceEnvironment?.childTask);
         if (result.ok) durable.activate();
         return;
       }
-      const text = `${operator.dispatch.text}\n核对当前任务依据后，用 dispatch_task 指派一名获批 package.json 属主（${recovery.eligibleRoleIds.join("、")}）。传 roleId、task、稳定 idempotencyKey，可使用 stage=A12b。\n等待属主正式回交后，用 close_created_task 核对原应用回执和本地实物。无合格属主时以 submit_report blocked 报告具体缺项。`;
+      const text = `${operator.dispatch.text}${roleText.dispatch.restoreAcceptanceDispatchInstruction[1]}${recovery.eligibleRoleIds.join("、")}${roleText.dispatch.restoreAcceptanceDispatchInstruction[2]}`;
       return this.materializeDurableTask(view, { taskId: parent.taskId, sourceRoleId: "application", roleId: parent.roleId,
         stage: "A12b", binding: parent, details: { ...operator.dispatch, text }, sideEffect: "read-only" });
     }
     if (child.state === "pending") {
-      const text = `${child.dispatch.text}\n本任务只补齐应用已核对的本地依赖。调用无参数 restore_acceptance_environment，等原应用命令审批和实际结果。核对后以 submit_report 正式回交应用回执和结果；安装及核验成功回交 completed，其他情况回交 blocked。保留包清单、锁文件、现有输出和 Git 候选。`;
+      const text = `${child.dispatch.text}${roleText.dispatch.restoreAcceptanceOwnerInstruction[1]}`;
       return this.materializeDurableTask(view, { taskId: child.taskId, sourceRoleId: parent.roleId, roleId: child.roleId,
         stage: "A12b", binding: child.task, parentTaskId: parent.taskId, details: { ...child.dispatch, text }, sideEffect: "read-only" });
     }
@@ -533,14 +535,14 @@ export class FixedWorkflowStageDispatch {
     const wake = store.listEffects(view.ref, "model-send").find(row => row.intent.key === `model:${key}`);
     if (wake?.state === "succeeded" || wake?.state === "unknown") {
       const result = await store.settleAcceptanceEnvironment(view.ref, { parentTask: parent, childTask: child.task,
-        outcome: { kind: "blocked", reason: "原运营核对回合已结束，未形成有效的正式收口。请核对原应用回执与本地实物。" } }, () =>
+        outcome: { kind: "blocked", reason: mainT("main.durableWorkflow.dispatch.restoreAcceptanceCloseMissing") } }, () =>
         store.lookup(view.ref)?.acceptanceEnvironment?.parentTask?.taskId === parent.taskId &&
         !this.sessions.get(this.sessionKey(view.projectRoot, parent.roleId, runtime))?.busy);
       if (result.ok) durable.activate();
       return;
     }
     await this.queueDurablePrompt(view, parent.roleId, child.roleId,
-      `${renderWorkReportPrompt(snapshot.handback)}\n核对本次恢复子任务 #${child.taskId}。使用 close_created_task：实物核验补齐为 accepted，仅明确可重试的环境失败用 rework，其余用 rejected。应用会检查真实回执与当前状态并给出有效处置。`,
+      `${renderWorkReportPrompt(snapshot.handback)}${roleText.dispatch.restoreAcceptanceOperationsReviewInstruction[1]}${child.taskId}${roleText.dispatch.restoreAcceptanceOperationsReviewInstruction[2]}`,
       runtime, key, undefined, parent, parent.taskId);
   }
 }

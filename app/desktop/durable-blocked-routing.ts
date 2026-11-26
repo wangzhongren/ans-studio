@@ -1,5 +1,6 @@
 import path from "node:path";
 import { stat } from "node:fs/promises";
+import { createTranslator } from "../../src/common/shared/i18n/index.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
 import { DURABLE_EVIDENCE_AUDIT_EXECUTOR } from "../../src/model/durable-workflow.ts";
 import type { DurableA11Disposition, DurableImplementationItem, DurablePendingTask, DurableProjection, DurableResult, DurableVerificationCapabilitySnapshot, DurableVerificationPlan, DurableVerificationPreflightFn } from "../../src/model/durable-workflow.ts";
@@ -14,18 +15,21 @@ import type { LiveSession } from "./session/contracts/session-types.ts";
 import { isRuntimeKind } from "./runtime-config.ts";
 import { observeA11Git, recoverA11Index, sameA11GitSnapshot, type A11IndexExpectation } from "./workflow-git.ts";
 import { prepareDesktopAcceptanceWorkspace } from "./durable-acceptance-workspace.ts";
+import { mainT, type MainTranslate } from "./i18n.ts";
+import roleText from "./durable-workflow-role-text.json" with { type: "json" };
 
-export const A11_STOP_COMMAND = "/停止本次工作流";
+export const A11_STOP_COMMAND = roleText.blocker.stopCommand;
+const workflowDecisionT = createTranslator("zh-CN");
 
 async function unavailableA11RetestCommand(projectRoot: string, candidateOid: string, modulePaths: readonly string[],
   requirements: DurableVerificationPlan["requirements"]): Promise<string | undefined> {
   for (const { id, command } of requirements) {
     if (!command) continue;
     const result = await verifyImplementationRetestInputs(projectRoot, candidateOid, modulePaths, command);
-    if (!result.ok) return `签发要求 ${id}：${result.message}`;
+    if (!result.ok) return `${roleText.blocker.signedRetestRequirement[0]}${id}${roleText.blocker.signedRetestRequirement[1]}${result.message}`;
     const entry = command[0]!;
     if (path.isAbsolute(entry) && !(await stat(entry).catch(() => undefined))?.isFile()) {
-      return `签发要求 ${id} 的执行入口 ${entry} 当前不可用。`;
+      return `${roleText.blocker.retestEntryUnavailable[0]}${id}${roleText.blocker.retestEntryUnavailable[1]}${entry}${roleText.blocker.retestEntryUnavailable[2]}`;
     }
   }
 }
@@ -33,14 +37,14 @@ async function unavailableA11RetestCommand(projectRoot: string, candidateOid: st
 export async function preflightDesktopA11RetestDelivery(store: Awaited<ReturnType<DesktopDurableWorkflow["store"]>>,
   view: DurableProjection, disposition: DurableA11Disposition): Promise<string | undefined> {
   const checked = await store.readEvidence(view.projectRoot, disposition.standard.path);
-  if (!checked.ok || checked.value.sha256 !== disposition.standard.sha256) return "送达前无法重新核验原签发标准的当前字节。";
+  if (!checked.ok || checked.value.sha256 !== disposition.standard.sha256) return roleText.blocker.signedCriteriaBytesUnverified;
   const observation = await observeA11Git(view.projectRoot);
   if (observation.branch !== disposition.branch || observation.head !== disposition.candidateOid || !observation.indexDigest
     || !observation.worktreeDigest || observation.lock || observation.trackedDirty || observation.stagedPaths.length
-    || !observation.untrackedPaths || observation.untrackedPaths.length) return "送达前无法重新核验原候选及干净的实际 Git 索引和工作区。";
+    || !observation.untrackedPaths || observation.untrackedPaths.length) return roleText.blocker.candidateAndIndexUnverified;
   const owner = operationsTasks(view).children.find(child => child.taskId === disposition.childTask.taskId
     && child.roleId === disposition.childTask.roleId && child.workOrder?.digest === disposition.workOrderDigest);
-  if (!owner?.workOrder || !disposition.retest) return "送达前无法核对当前补测工单和原属主。";
+  if (!owner?.workOrder || !disposition.retest) return roleText.blocker.ownerAndOrderUnverified;
   return unavailableA11RetestCommand(view.projectRoot, disposition.candidateOid, owner.workOrder.paths, disposition.retest.missingRequirements);
 }
 
@@ -63,11 +67,11 @@ export async function reconcileDesktopA11Disposition(durable: DesktopDurableWork
     const paths = child?.workOrder?.paths;
     const owner = child && paths && await preflightDesktopImplementationOwner(projectRoot, child.roleId, paths, deps);
     const runtime = view.metadata.runtime;
-    const unavailable = !owner?.ok || !paths ? "当前项目无法核对原工作项的批准属主和写域。"
+    const unavailable = !owner?.ok || !paths ? roleText.blocker.ownerAndWriteSetUnverified
       : prior.retest.pendingReportReview ? undefined
         : !isRuntimeKind(runtime) || runtime === "demo" || !deps.shellGate && (!deps.shellArming || !deps.shellOperatorChannel)
-        ? "当前宿主未装配受治理的真实 Shell 执行及审批。"
-        : !deps.readDurableReports ? "当前宿主未装配可恢复核验的正式角色回交。"
+        ? roleText.blocker.governedShellUnassembled
+        : !deps.readDurableReports ? roleText.blocker.formalHandbackUnassembled
           : await unavailableA11RetestCommand(projectRoot, prior.candidateOid, paths, prior.retest.missingRequirements);
     const observed = await store.observeA11Disposition(ref, prior.key,
       sameA11GitSnapshot(prior.observation, fresh) ? prior.observation : fresh, () => !!parked(), { unavailable });
@@ -139,7 +143,7 @@ export async function reconcileDesktopA11Disposition(durable: DesktopDurableWork
       },
     });
   } else if (current() && !owner?.ok) {
-    actual = { ...actual, reason: "当前项目无法核对原工作项的批准属主和写域。" };
+    actual = { ...actual, reason: roleText.blocker.ownerAndWriteSetUnverified };
   }
   if (!parked()) return;
   await settle(undefined);
@@ -155,7 +159,7 @@ export async function openWorkflowStopConfirmation(durable: DesktopDurableWorkfl
     && (view.blockedRouting?.decision?.option === "wait" || view.a11Disposition?.confirmation === "stop"
       || view.acceptanceWorkspace?.preparation?.confirmation === "stop"));
   if (!isCurrent() || parked.length !== 1) return { ok: false, code: "workflow-stop-unavailable",
-    message: "当前项目必须有一个已选等待的工作流，才能打开停止确认。" };
+    message: mainT("main.durableWorkflow.blocker.stopConfirmationUnavailable") };
   const view = parked[0]!;
   const preparation = view.blockedRouting?.a12bPrepareKey;
   if (preparation) {
@@ -181,24 +185,24 @@ export function desktopVerificationPreflight(deps: SessionManagerDeps, runtime: 
   return async input => {
     const roles = deps.getListing(input.projectRoot)?.roles.filter(role => role.roleId === input.roleId);
     if (roles?.length !== 1) {
-      return { ok: false, code: "workflow-verification-role-unavailable", message: "当前项目无法唯一核对独立验收的实际属主。" };
+      return { ok: false, code: "workflow-verification-role-unavailable", message: mainT("main.durableWorkflow.blocker.independentAcceptanceOwnerUnverified") };
     }
     const realRuntime = runtime !== "demo";
     const shellWired = realRuntime && (!!deps.shellGate || !!deps.shellArming && !!deps.shellOperatorChannel);
     return { ok: true, value: { stage: input.stage, status: [
-      { capability: "module-inspection", status: "available", reason: "仅按实际任务和原角色权限读取与核对模块资料。" },
+      { capability: "module-inspection", status: "available", reason: roleText.blocker.moduleInspectionCapability },
       { capability: "module-shell", status: shellWired ? "available" : "unavailable", reason: shellWired
-        ? "仅工作项自己的自测。每条命令仍经原 Shell 审批、审计与受治理隔离。" : "当前运行时未装配受治理的 Shell 审批。" },
+        ? roleText.blocker.moduleShellCapability : roleText.blocker.governedShellApprovalUnavailable },
       { capability: "governed-commit", status: shellWired ? "available" : "unavailable", reason: shellWired
-        ? "真实工作项开通后按批准写域和 Git 作用核验提交。" : "当前运行时无法通过原受治理 Shell 核对应交付。" },
+        ? roleText.blocker.governedCommitCapability : roleText.blocker.governedShellDeliveryUnavailable },
       ...(input.ref.executor === DURABLE_EVIDENCE_AUDIT_EXECUTOR ? [
-        { capability: "external-execution" as const, status: "unavailable" as const, reason: "当前宿主没有能证明实际运行对象和同一会话来源的外部执行通道。" },
+        { capability: "external-execution" as const, status: "unavailable" as const, reason: roleText.blocker.externalExecutionUnverified },
         { capability: "approved-build" as const, status: "unavailable" as const,
-          reason: "当前工具尚无法将实际批准的构建进程与其产物路径及字节摘要绑定为受信证据。" },
+          reason: roleText.blocker.approvedBuildUnverified },
       ] : [
-        { capability: "workspace-build" as const, status: "unavailable" as const, reason: "升级宿主只承认原账本实际构建回执。" },
-        { capability: "workspace-preview" as const, status: "unavailable" as const, reason: "升级宿主只承认原账本实际预览回执。" },
-        { capability: "workspace-browser" as const, status: "unavailable" as const, reason: "升级宿主只承认原账本实际浏览器证据与关闭回执。" },
+        { capability: "workspace-build" as const, status: "unavailable" as const, reason: roleText.blocker.originalBuildReceiptOnly },
+        { capability: "workspace-preview" as const, status: "unavailable" as const, reason: roleText.blocker.originalPreviewReceiptOnly },
+        { capability: "workspace-browser" as const, status: "unavailable" as const, reason: roleText.blocker.originalBrowserAndCloseReceiptOnly },
       ]),
     ] } };
   };
@@ -219,7 +223,7 @@ export async function holdDesktopUnavailableAssessment(durable: DesktopDurableWo
   if (!isCurrent()) return true;
   if (store.listEffects(view.ref, "model-send").some(effect => workflowTaskEffectMatches(effect, pending))) return false;
   if (!pending.reviewWritePath || !view.baseline) {
-    await notice("workflow-verification-capabilities-missing", "当前独立验收缺实际角色写域或基线核对。");
+    await notice("workflow-verification-capabilities-missing", mainT("main.durableWorkflow.blocker.verificationBaselineOrOwnerUnverified"));
     return true;
   }
   const preflight = desktopVerificationPreflight(deps, runtime);
@@ -234,7 +238,7 @@ export async function holdDesktopUnavailableAssessment(durable: DesktopDurableWo
     && plan.requirements.some(item => item.stage === "A12b" && item.capability === row.capability));
   if (!unavailable) return !isCurrent();
   const prepared = await store.prepareBlockedScopeChange(view.ref, { task: pending.task, document: plan.standard, capability: unavailable.capability,
-    reason: unavailable.reason ?? "当前应用未提供签发标准要求的可核验能力。" }, isCurrent, preflight);
+    reason: unavailable.reason ?? roleText.blocker.issuedVerificationCapabilityUnavailable }, isCurrent, preflight);
   if (prepared.ok) durable.activate();
   else await notice(prepared.code, prepared.message);
   return true;
@@ -245,22 +249,22 @@ export function verificationStandardPrompt(snapshot: DurableVerificationCapabili
   const audit = snapshot.status.some(row => row.capability === "external-execution" || row.capability === "approved-build");
   const status = snapshot.status.map(row => `${row.capability}: ${row.status}${row.reason ? `（${row.reason}）` : ""}`).join("\n");
   const approved = workItems?.map(item => `${item.id}（${item.roleId}，${item.paths.join("、")}）`).join("、");
-  return `\n应用已核对本次正式标准任务的宿主能力。\n${status}\n` +
-    "正式标准保留唯一 final ans-criteria/v1 区块。在同文件 YAML 前置区写 verificationRequirements 数组。每项使用区块里的实际 id、stage（A11 或 A12b）、capability 和 evidence 数组。" +
-    "每个条目至少一项要求，每个 P0 必须有 A12b 独立验收项。A11 项须用 workItemId 绑定实际批准的工作项；A12b 无 workItemId。需要绑定明确的模块自测命令时，可用 command 写字面 argv。" +
-    (approved ? `本轮应用已核对的实施工作项：${approved}。` : "") +
+  return `${roleText.blocker.verificationCapabilityInstruction[0]}${status}${roleText.blocker.verificationCapabilityInstruction[1]}` +
+    roleText.blocker.criteriaVerificationSchema +
+    roleText.blocker.criteriaPerRequirementRule +
+    (approved ? `${roleText.blocker.approvedImplementationItems[0]}${approved}${roleText.blocker.approvedImplementationItems[1]}` : "") +
     (audit
-      ? "每个 A12b 项还要写实际行为 behavior 和绑定来源 source。module-inspection 使用 candidate-file、evidence: [file] 和字面 paths；module-shell 使用 task-command、[command-receipt] 和准确 command；governed-commit 使用 candidate-commit、[git-commit]；approved-build 使用 task-command、[command-receipt, file]、准确 command 和预期产物 paths；external-execution 使用 external-session、[execution-session]。实际执行需求仍照实签发。取证由运营派原已批准角色，A12b 只读审计。\n" +
-        '格式示例（替换为本标准的真实条目、行为及文件）：{id: AC-1, stage: A12b, capability: module-inspection, behavior: "核对交付入口", source: candidate-file, evidence: [file], paths: [src/main.js]}。'
-      : "原冻结标准按原能力与证据类型核对；已退役能力只核对原账本事实。") +
-    "写完完整标准后提交 completed，evidence 列实际标准文件的裸相对路径，summary 说明要求、可用能力与限制。这里的 completed 只确认标准已编制，实际签发、实操与验收结论由后续各自核对。";
+      ? roleText.blocker.evidenceAuditRequirementRule +
+        roleText.blocker.criteriaVerificationExample
+      : roleText.blocker.frozenCriteriaLegacyEvidenceRule) +
+    roleText.blocker.criteriaCompletionInstruction;
 }
 
 export function verificationAssessmentPrompt(plan: DurableVerificationPlan | undefined): string {
   if (!plan) return "";
   const checks = plan.requirements.filter(item => item.stage === "A12b").map(item => `${item.id} ${item.capability}（${item.evidence.join("、")}）`);
-  return `\n本次 A12b 独立验收使用冻结标准 ${plan.standard.path}，SHA-256 ${plan.standard.sha256}。实际核对 ${checks.join("；")}。` +
-    "请逐条报告当期实际结果，并引用当前候选已登记的实际物证。所有独立条目实际通过时，在正式报告 YAML 前置区以 verifiedCriteria 数组列出全部通过的实际条目 ID。";
+  return `${roleText.blocker.independentAcceptanceCriteriaInstruction[0]}${plan.standard.path}${roleText.blocker.independentAcceptanceCriteriaInstruction[1]}${plan.standard.sha256}${roleText.blocker.independentAcceptanceCriteriaInstruction[2]}${checks.join("；")}${roleText.blocker.independentAcceptanceCriteriaInstruction[3]}` +
+    roleText.blocker.independentAcceptanceHandbackInstruction;
 }
 
 export function observeImplementationSelfTest(durable: DesktopDurableWorkflow, session: () => LiveSession | undefined,
@@ -351,7 +355,7 @@ async function observeEvidenceCollectionGit(view: DurableProjection, writePaths:
   if (observed.branch !== actual.branch || observed.head !== actual.head || observed.indexDigest !== actual.indexDigest
     || !observed.files || observed.files.length !== approved.length
     || JSON.stringify(observed.untrackedPaths?.filter(inEvidenceScope)) !== JSON.stringify(approved)) {
-    return { ...observed, trackedDirty: true, reason: "本次批准范围内的现有取证文件无法稳定核验。" };
+    return { ...observed, trackedDirty: true, reason: mainT("main.durableWorkflow.blocker.approvedEvidenceFileUnverified") };
   }
   return { ...observed, untrackedPaths: observed.untrackedPaths?.filter(file => !inEvidenceScope(file)) };
 }
@@ -465,16 +469,16 @@ export async function presentB2EvidenceScopeCard(input: {
     };
     if (!current()) { release(); return; }
     const running = isRuntimeKind(view.metadata.runtime) ? view.metadata.runtime : undefined;
-    const details = requirements.map(item => `${item.requirementId}（${item.reason}${item.paths?.length ? `，原件 ${item.paths.join("、")}` : ""}）`).join("、");
+    const details = requirements.map(item => `${item.requirementId}（${item.reason}${item.paths?.length ? mainT("main.durableWorkflow.blocker.b2Originals", { paths: item.paths.join("、") }) : ""}）`).join("、");
     const candidates = view.scopeDecision?.candidates.join("、");
     void Promise.resolve(customer({
       kind: "choice", cardKind: BLOCKED_SCOPE_CARD_KIND, application: true, sourceRoleId: "application", flowId: view.flowId,
-      title: "确认 B2 的验收取证范围",
-      question: "请选择是否将所列证据范围交给当前已核对的项目取证角色。",
-      preview: `B2 范围 ${scopeId}。${candidates ? `实际实施路径 ${candidates}。` : ""}取证属主 ${roleId}，证据写域 ${writePaths.join("、")}。待取证要求 ${details}。`,
+      title: mainT("main.durableWorkflow.blocker.b2EvidenceScopeTitle"),
+      question: mainT("main.durableWorkflow.blocker.b2EvidenceScopeQuestion"),
+      preview: mainT("main.durableWorkflow.blocker.b2EvidenceScopePreview", { scopeId, candidates: candidates ? mainT("main.durableWorkflow.blocker.b2ImplementationPaths", { paths: candidates }) : "", roleId, paths: writePaths.join("、"), details }),
       options: [
-        { id: "route", label: "批准所列取证范围", description: "允许当前指定角色按该工单收集证据。原实施范围与发布审批继续沿当前流程。" },
-        { id: "wait", label: "暂不批准取证范围", description: "保留原实施流程。缺所需证据时在 B3 等待处置。" },
+        { id: "route", label: mainT("main.durableWorkflow.blocker.approveEvidenceScope"), description: mainT("main.durableWorkflow.blocker.approveEvidenceScopeDescription") },
+        { id: "wait", label: mainT("main.durableWorkflow.blocker.declineEvidenceScope"), description: mainT("main.durableWorkflow.blocker.declineEvidenceScopeDescription") },
       ],
     }, {
       roleId: chief, runtime: running, projectRoot, requestId: binding.requestId, sessionSignal: controller.signal, governanceModel: "trio",
@@ -483,7 +487,7 @@ export async function presentB2EvidenceScopeCard(input: {
         const authorized = () => !delegated && (isMainFrameCurrent?.() === true) && current();
         const selected = answer.kind === "choice" && answer.selected.length === 1 ? answer.selected[0] : undefined;
         const action = selected === "route" ? "approve" : selected === "wait" ? "decline" : undefined;
-        if (!action || !authorized()) return { ok: false, stale: !current(), message: "请由当前项目主窗口选择同一 B2 范围。" };
+        if (!action || !authorized()) return { ok: false, stale: !current(), message: mainT("main.durableWorkflow.blocker.b2CurrentWindowScopeRequired") };
         const result = await store.decideB2EvidenceScope(ref, { ...binding, action, provenance: durableDecisionProvenance(binding.generation) }, authorized);
         if (!result.ok) return { ok: false, stale: !current(), message: result.message };
         durable.activate();
@@ -496,16 +500,21 @@ export async function presentB2EvidenceScopeCard(input: {
   }
 }
 
-function evidenceScopePreview(view: DurableProjection, scope: NonNullable<DurableProjection["blockedRouting"]>): string {
+function evidenceScopePreview(view: DurableProjection, scope: NonNullable<DurableProjection["blockedRouting"]>, t: MainTranslate): string {
   const audit = view.evidenceAudit;
   if (!audit) return "";
   const sources = scope.evidenceRoute?.artifacts.map(item => `${item.requirementId}（${item.path || item.receiptId}）`).join("、");
   const proposed = scope.evidenceCompromise;
   return [
     "",
-    `当前证据代次 ${audit.basis.generation}。缺项 ${audit.missing.map(item => `${item.requirementId}（${item.reason}）`).join("、")}。`,
-    ...(sources ? [`同等取证路线由 ${scope.evidenceRoute?.roleId} 接续，已核实来源 ${sources}。`] : []),
-    ...(proposed ? [`拟申请调整条目 ${proposed.requirementIds.join("、")}，可核对候选原件 ${proposed.paths.join("、")}。须按原流程批准修订，再签发标准并审计。`] : []),
+    t("main.durableWorkflow.blocker.auditEvidenceMissing", {
+      generation: audit.basis.generation,
+      requirements: audit.missing.map(item => `${item.requirementId}（${item.reason}）`).join("、"),
+    }),
+    ...(sources ? [t("main.durableWorkflow.blocker.equivalentEvidenceRoute", { roleId: String(scope.evidenceRoute?.roleId), sources })] : []),
+    ...(proposed ? [t("main.durableWorkflow.blocker.criteriaScopeRevision", {
+      requirements: proposed.requirementIds.join("、"), paths: proposed.paths.join("、"),
+    })] : []),
   ].join("\n");
 }
 
@@ -575,39 +584,60 @@ export async function presentBlockedScopeCard(input: {
       return checked.ok && checked.value.sha256 === scope.document.sha256 && current();
     };
     if (!await materialsCurrent()) { release(); return; }
+    const titleKey = confirmation ? "main.durableWorkflow.blocker.confirmStopTitle" : disposition
+      ? disposition.retest ? "main.durableWorkflow.blocker.a11MissingSelfTestReceiptTitle" : "main.durableWorkflow.blocker.a11GitBlockTitle"
+      : "main.durableWorkflow.blocker.acceptanceBlockTitle";
+    const preview = (t: MainTranslate) => {
+      const basis = t("main.durableWorkflow.blocker.decisionBasis", {
+        step: view.stepName, attempt: view.attempt, path: scope.document.path, sha256: scope.document.sha256,
+      }) + (scope.candidateOid ? t("main.durableWorkflow.blocker.candidateCommit", { candidate: scope.candidateOid }) : "");
+      if (disposition) return basis + [
+        t("main.durableWorkflow.blocker.a11BlockedWorkItem", {
+          workItem: item?.workItemId ?? disposition.childTask.taskId, roleId: disposition.childTask.roleId, branch: disposition.branch,
+        }),
+        ...(visiblePaths.length ? [t("main.durableWorkflow.blocker.a11StagedPaths", { paths: visiblePaths.join("、") })] : []),
+        ...(disposition.retest ? [t("main.durableWorkflow.blocker.a11RemainingRequirements", {
+          requirements: implementationTestRulesText(disposition.retest.missingRequirements),
+        })] : []),
+        t("main.durableWorkflow.blocker.stopWhileWaiting", { command: A11_STOP_COMMAND }),
+      ].join("");
+      if (preparation) {
+        const { rework } = preparation;
+        return basis + t("main.durableWorkflow.blocker.preparationObservation", {
+          generation: preparation.generation, command: A11_STOP_COMMAND,
+          rework: rework ? t("main.durableWorkflow.blocker.candidatePreparationRework", {
+            workItem: rework.workItemId, roleId: rework.ownerTask.roleId, paths: rework.paths.join("、"),
+          }) : "",
+        });
+      }
+      if (evidence) return basis + evidenceScopePreview(view, scope, t);
+      return basis + t(scope.options.some(option => option.id === "revise")
+        ? "main.durableWorkflow.blocker.requestRevisionNextAction" : "main.durableWorkflow.blocker.originalRevisionEntryUnavailable");
+    };
     const request: CustomerInputRequest = { kind: "choice", cardKind: BLOCKED_SCOPE_CARD_KIND, application: true, sourceRoleId: "application",
-      flowId: view.flowId, title: confirmation ? "确认是否停止本次工作流" : disposition
-        ? (disposition.retest ? "处理 A11 工作项缺少的自测回执" : "处理 A11 工作项的 Git 阻塞") : "决定如何处理当前验收阻塞",
-      question: preparation ? workspacePreparationSummary(view) ?? scope.reason : `当前工作流需要决定。${scope.reason}`,
-      preview: `原节点 ${view.stepName}，第 ${view.attempt} 次。当前依据 ${scope.document.path}，SHA-256 ${scope.document.sha256}。` +
-        (scope.candidateOid ? `\n候选提交 ${scope.candidateOid}。` : "") + (disposition
-          ? [`\n工作项 ${item?.workItemId ?? disposition.childTask.taskId}，原属主 ${disposition.childTask.roleId}，批准分支 ${disposition.branch}。`,
-            ...(visiblePaths.length ? [`\n原工单范围内的暂存路径：${visiblePaths.join("、")}。`] : []),
-            ...(disposition.retest ? [`\n待补要求：\n${implementationTestRulesText(disposition.retest.missingRequirements)}`] : []),
-            `\n等待期间，可在本项目幕僚输入框输入 ${A11_STOP_COMMAND} 打开停止确认。`].join("")
-          : preparation ? `\n核对第 ${preparation.generation} 次准备观察。${preparation.rework
-            ? `\n原工作项 ${preparation.rework.workItemId}，原属主 ${preparation.rework.ownerTask.roleId}，核验的返工范围 ${preparation.rework.paths.join("、")}。` : ""}\n等待期间，可在本项目幕僚输入框输入 ${A11_STOP_COMMAND} 打开停止确认。`
-          : evidence ? evidenceScopePreview(view, scope)
-          : scope.options.some(option => option.id === "revise")
-            ? "\n选择申请修订后，具体新版本仍按原批准流程处理。" : "\n当前没有核验到适用的原文件修订入口。"),
+      flowId: view.flowId, title: mainT(titleKey),
+      question: preparation ? workspacePreparationSummary(view) ?? scope.reason : mainT("main.durableWorkflow.blocker.decisionRequired", { reason: scope.reason }),
+      preview: preview(mainT),
       options: scope.options.map(option => ({ id: option.id, label: option.label, description: option.impact })) };
     const runtime = isRuntimeKind(view.metadata.runtime) ? view.metadata.runtime : undefined;
     void Promise.resolve(customer(request, { roleId: chief, runtime, projectRoot, requestId, sessionSignal: controller.signal,
       governanceModel: "trio", durableDecision: { cardKind: BLOCKED_SCOPE_CARD_KIND, generation,
         ...(confirmation ? { customerOnly: true } : {}),
         host: !confirmation && executeDecision ? {
-        execute: executeDecision,
+        execute: (context, ...args) => executeDecision({
+          ...context, request: { ...context.request, question: workflowDecisionT(titleKey) },
+        }, ...args),
         prepare: async () => {
-          if (!await materialsCurrent()) throw new Error("原标准、候选或工作流卡已变化。");
+          if (!await materialsCurrent()) throw new Error(roleText.blocker.decisionEvidenceChanged);
           return { baseDigest: digest, isCurrent: materialsCurrent, evidenceRefs: [{ ...scope.document, snapshotId: digest }],
-            context: JSON.stringify({ reason: scope.reason, origin: scope.origin, preview: request.preview, options: scope.options }) };
+            context: JSON.stringify({ reason: scope.reason, origin: scope.origin, preview: preview(workflowDecisionT), options: scope.options }) };
         },
       } : undefined },
       persistWorkflowDecision: async (answer, delegated, isMainFrameCurrent) => {
         const authorized = () => current() && (delegated ? delegated.isCurrent() : isMainFrameCurrent?.() === true);
         const option = answer.kind === "choice" && answer.selected.length === 1 ? scope.options.find(item => item.id === answer.selected[0])?.id : undefined;
         if (!option || confirmation && delegated || !authorized() || !await materialsCurrent() || !authorized()) {
-          return { ok: false, stale: !current(), message: "请选择当前项目仍有效的处置选项。" };
+          return { ok: false, stale: !current(), message: mainT("main.durableWorkflow.blocker.validProjectOptionRequired") };
         }
         const result = await store.decideBlockedScopeChange(ref, { requestId, digest, generation, option,
           provenance: durableDecisionProvenance(generation, delegated) }, authorized);
