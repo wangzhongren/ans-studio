@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { lstat, mkdir, mkdtemp, readFile, realpath, rmdir, symlink, unlink } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 import { MERGE_MAIN_OPTION_IDS } from "../../../app/desktop/customer-input.ts";
 import { readTaskState } from "../../../src/common/编排/task-state.ts";
@@ -60,10 +62,64 @@ function currentPathBModel(f: Awaited<ReturnType<typeof fixture>>, instanceId: (
 
 type NativeScenario = "manual-frame" | "normal" | "pending-card-restart" | "daprd-loss-during-handback" | "simulated-offline-before-dispatch";
 
-async function runCurrentPathB(t: test.TestContext, mode: NativeScenario) {
-  const f = await fixture({ installLegacyPathB: false, existingIndependentRoster: true });
+async function removeNativeLink(link: string) {
+  assert.ok((await lstat(link)).isSymbolicLink());
+  try {
+    await unlink(link);
+  } catch (error) {
+    if (!["EPERM", "EISDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+    await rmdir(link);
+  }
+}
+
+async function windowsProjectAlias(t: test.TestContext, f: Awaited<ReturnType<typeof fixture>>) {
+  const command = `
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+using System.Text;
+public static class AnsTestNativePath {
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+  public static extern uint GetShortPathName(string root, StringBuilder shortRoot, uint size);
+}
+'@
+$result = [Text.StringBuilder]::new(32768)
+$size = [AnsTestNativePath]::GetShortPathName($env:ANS_TEST_NATIVE_PROJECT, $result, $result.Capacity)
+if ($size -gt 0 -and $size -lt $result.Capacity) { [Console]::Write($result.ToString()) }
+`;
+  const shortRoot = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand",
+    Buffer.from(command, "utf16le").toString("base64")], {
+    encoding: "utf8", env: { ...process.env, ANS_TEST_NATIVE_PROJECT: f.root }, windowsHide: true,
+  }).trim();
+  if (shortRoot.includes("~") && shortRoot.toLowerCase() !== f.root.toLowerCase()) {
+    return { selectedRoot: shortRoot, kind: "windows-8.3" };
+  }
+  const isolated = await mkdtemp(path.join(path.dirname(f.directory), "ans-native-alias-"));
+  const parent = path.join(isolated, "project-parent");
+  await symlink(f.directory, parent, "junction");
+  t.after(async () => {
+    await removeNativeLink(parent);
+    await rmdir(isolated);
+  });
+  t.diagnostic("GetShortPathName did not return a distinct name on this volume. Testing an actual ancestor junction.");
+  return { selectedRoot: path.join(parent, path.basename(f.root)), kind: "windows-ancestor-junction" };
+}
+
+async function runCurrentPathB(t: test.TestContext, mode: NativeScenario, testAlias = false) {
+  const f = await fixture({ installLegacyPathB: false, existingIndependentRoster: true, nativeProjectSelection: true });
   const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
   const project = { projectRoot: f.root };
+  const alias = testAlias ? await windowsProjectAlias(t, f) : undefined;
+  assert.ok(f.selectedRoot);
+  let selectedRoot = alias?.selectedRoot ?? f.selectedRoot;
+  if (alias) {
+    assert.notEqual(path.normalize(alias.selectedRoot).toLowerCase(), f.root.toLowerCase());
+    const [physical, selected] = await Promise.all([lstat(f.root, { bigint: true }), lstat(alias.selectedRoot, { bigint: true })]);
+    assert.ok(selected.isDirectory() && !selected.isSymbolicLink());
+    assert.deepEqual([selected.dev, selected.ino], [physical.dev, physical.ino]);
+    assert.equal(await realpath(alias.selectedRoot), f.root);
+    log("native-project-alias", { ...alias, projectRoot: f.root, sameDirectory: true });
+  }
   let instanceId: string | undefined;
   let interrupted: Awaited<ReturnType<typeof daprdListener>>;
   const model = currentPathBModel(f, () => instanceId, log, {
@@ -82,7 +138,8 @@ async function runCurrentPathB(t: test.TestContext, mode: NativeScenario) {
       log("daprd-force-exit", { ...interrupted, applicationPid: process.pid, beforeHandback });
     },
   });
-  let handle = await app(f, model, log);
+  const open = () => app(f, model, log, { chooseProjectRoot: async () => selectedRoot });
+  let handle = await open();
   t.after(() => handle.close());
   const started = unwrap(await handle.startViaChief({ ...project, definitionId: "path-b", source: "preset",
     requestId: `windows-native-b-${mode}`, summary: `Change the existing threshold in ${target} within its approved work item.` }));
@@ -93,6 +150,16 @@ async function runCurrentPathB(t: test.TestContext, mode: NativeScenario) {
   instanceId = started.instance.instanceId;
   const selector = { ...project, instanceId };
   const projection = async () => unwrap(await handle.desktop.getDurableWorkflowProjection(selector));
+  if (alias) {
+    assert.equal(handle.listing.projectRoot, f.root);
+    assert.equal((await handle.durable.find(f.root, instanceId))?.projectRoot, f.root);
+    const neighbor = path.join(f.directory, "neighbor-project");
+    await mkdir(neighbor);
+    for (const unauthorized of [alias.selectedRoot, neighbor]) {
+      const refused = await handle.desktop.getDurableWorkflowProjection({ projectRoot: unauthorized, instanceId });
+      assert.equal(!refused.ok && refused.code, "workflow-project-unselected");
+    }
+  }
   log("desktop-started", started);
 
   const ready = await until("registered real worker", async () => {
@@ -138,7 +205,7 @@ async function runCurrentPathB(t: test.TestContext, mode: NativeScenario) {
     const replacement = original.replace(/^version: 3$/m, "version: 4");
     assert.notEqual(replacement, original);
     await write(f.root, "docs/workflows/path-b.yaml", replacement);
-    handle = await app(f, model, log);
+    handle = await open();
     const updated = unwrap(await handle.desktop.validateDurableWorkflow({ ...project, definitionId: "path-b", source: "project" }));
     assert.equal(updated.version, 4);
     assert.notEqual(updated.digest, before.instance?.definitionDigest);
@@ -212,6 +279,30 @@ async function runCurrentPathB(t: test.TestContext, mode: NativeScenario) {
   assert.match(String(saved?.[0]?.data), /"source":"customer"/);
   assert.deepEqual(snapshot.effect?.filter(row => String(row.business_key).startsWith("release-merge:")).map(row => row.state), ["succeeded"]);
   log("delivered", { complete, main, parents, turns: model.turns, snapshot });
+  if (alias) {
+    const leaf = path.join(f.directory, "final-project-link");
+    await symlink(f.root, leaf, "junction");
+    t.after(() => removeNativeLink(leaf));
+    assert.ok((await lstat(leaf)).isSymbolicLink());
+    assert.equal(await realpath(leaf), f.root);
+    selectedRoot = leaf;
+    assert.equal(await handle.desktop.pickProject(), null);
+    const afterLink = await handle.desktop.getDurableWorkflowProjection(selector);
+    assert.equal(!afterLink.ok && afterLink.code, "workflow-project-unselected");
+
+    selectedRoot = alias.selectedRoot;
+    assert.equal(await handle.desktop.pickProject(), f.root);
+    await handle.desktop.listProject(project);
+    assert.equal((await projection()).instance?.instanceId, instanceId);
+    selectedRoot = path.join(f.directory, "no-longer-present");
+    await mkdir(selectedRoot);
+    await rmdir(selectedRoot);
+    assert.equal(await handle.desktop.pickProject(), null);
+    const afterMissing = await handle.desktop.getDurableWorkflowProjection(selector);
+    assert.equal(!afterMissing.ok && afterMissing.code, "workflow-project-unselected");
+    assert.equal(git(f.root, "rev-parse", "main"), main);
+    log("native-project-selection-refusals", { leaf, missing: selectedRoot, afterLink, afterMissing });
+  }
 }
 
 test("Native current preset B preserves the trusted manual merge and one Git effect", windowsDapr, async t => {
@@ -224,8 +315,13 @@ for (const mode of ["normal", "pending-card-restart", "daprd-loss-during-handbac
   });
 }
 
+test("Native Windows Desktop Path B resolves the selected physical project and rejects untrusted roots",
+  { ...windowsDapr, skip: process.platform !== "win32" ? "Requires native Windows paths" : windowsDapr.skip }, async t => {
+    await runCurrentPathB(t, "manual-frame", true);
+  });
+
 test("Native Desktop blocks unsupported repo-local Git config before any instance or task", windowsDapr, async t => {
-  const f = await fixture({ installLegacyPathB: false, existingIndependentRoster: true });
+  const f = await fixture({ installLegacyPathB: false, existingIndependentRoster: true, nativeProjectSelection: true });
   const log: Log = (event, value) => t.diagnostic(JSON.stringify({ at: new Date().toISOString(), event, value }));
   git(f.root, "config", "core.autocrlf", "false");
   const model = modelFixture(async () => assert.fail("rejected start must not dispatch a workflow role"), log);

@@ -8,7 +8,7 @@
 // 边界纪律：本文件**不**做任何"路径能不能写"的判断——那永远是门禁引擎 resolveWrite 的事。
 
 import path from "node:path";
-import { lstat, readdir, readFile, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
 
 import type { Acceptance, PinEntry, PinEvidenceFile, PinEvidenceResult } from "../../src/model/boundary.ts";
 import type { ProjectConfig, RoleLocation } from "../../src/model/role.ts";
@@ -28,6 +28,26 @@ import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 import { mainT } from "./i18n.ts";
 
 const docsDiagnostic = createDiagnosticLogger({ component: "desktop.project" });
+
+/** Expand a Windows directory selected by the native picker to the same physical root used by the workflow store. */
+export async function resolveNativeProjectDirectory(selectedRoot: string): Promise<string | null> {
+  if (process.platform !== "win32") return selectedRoot;
+  if (!path.isAbsolute(selectedRoot)) return null;
+  try {
+    const before = await lstat(selectedRoot, { bigint: true });
+    if (!before.isDirectory() || before.isSymbolicLink() || before.dev === 0n || before.ino === 0n) return null;
+    const root = await realpath(selectedRoot);
+    const [physical, current] = await Promise.all([
+      lstat(root, { bigint: true }),
+      lstat(selectedRoot, { bigint: true }),
+    ]);
+    const matchesSelection = (entry: typeof before) => entry.isDirectory() && !entry.isSymbolicLink()
+      && entry.dev === before.dev && entry.ino === before.ino && entry.birthtimeNs === before.birthtimeNs;
+    return matchesSelection(physical) && matchesSelection(current) ? root : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 技能根解析：优先 ANS_SKILL_ROOT，否则默认技能目录 `~/.claude/skills/ans-governed-construction`。

@@ -63,8 +63,18 @@ export function evidenceCollectorRoleFiles(writeDomain: string) {
   };
 }
 
-export async function fixture(options: { installLegacyPathB?: boolean; existingIndependentRoster?: boolean; evidenceCollector?: boolean } = {}) {
-  const { directory, root, userDataRoot } = await emptyFixture();
+export async function fixture(options: {
+  installLegacyPathB?: boolean;
+  existingIndependentRoster?: boolean;
+  evidenceCollector?: boolean;
+  nativeProjectSelection?: boolean;
+} = {}) {
+  const raw = await emptyFixture();
+  const root = options.nativeProjectSelection && process.platform === "win32" ? await fs.realpath(raw.root) : raw.root;
+  const directory = path.dirname(root);
+  const workspace: WorkspaceFixture = options.nativeProjectSelection
+    ? { directory, root, selectedRoot: raw.root, userDataRoot: path.join(directory, "data") }
+    : raw;
   // frozen fixed-path test shape: main, core module and worker. This fixture uses its boundary fallback.
   await write(root, target, "export const SNAKE = 1;\n");
   await write(root, "角色卡/worker/role-card.md", "---\nroleId: worker\ndisplayName: Worker\n---\n# Test module owner\n");
@@ -93,7 +103,7 @@ export async function fixture(options: { installLegacyPathB?: boolean; existingI
   git(root, "add", "-A");
   git(root, "commit", "-m", "Isolated baseline");
   const baselineOid = git(root, "rev-parse", "main");
-  return { directory, root, userDataRoot, baselineOid };
+  return { ...workspace, baselineOid };
 }
 
 async function installExistingRoster(root: string) {
@@ -112,7 +122,9 @@ async function installExistingRoster(root: string) {
 }
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
-type WorkspaceFixture = Awaited<ReturnType<typeof emptyFixture>>;
+type WorkspaceFixture = Awaited<ReturnType<typeof emptyFixture>> & {
+  selectedRoot?: string;
+};
 export type ModelTurn = { roleId: string; text: string; turnId?: string; signal: AbortSignal; toolNames: readonly string[];
   chiefDecisionContext?: ChiefDecisionExecutionContext;
   shellJudgeSystemText?: string;
@@ -261,7 +273,7 @@ export function pathBModel(f: Fixture, instanceId: () => string, log: Log, hooks
 type AppFixtureOptions = {
   pickWorkflowDefinition?: () => Promise<string | null>;
   bundleResources?: string;
-  chooseProjectRoot?: () => Promise<string>;
+  chooseProjectRoot?: () => Promise<string | null>;
   shellOperatorPresenter?: OperatorPresenter;
   emitShellJudgeResult?: (payload: ShellJudgeResultPayload) => void;
   initialJudgeSwitches?: { decision: boolean; approval: boolean };
@@ -297,6 +309,10 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
     pauseA11ParentReduction, modelRuntime = "pi", assessmentReplayRef } = options;
   const presetRoot = bundleResources ? path.join(bundleResources, "app") : sourceAppRoot;
   const moduleUrl = (file: string) => pathToFileURL(path.join(presetRoot, file)).href;
+  const resolveNativeSelection = f.selectedRoot !== undefined
+    ? (await import(moduleUrl("app/desktop/project.ts")) as typeof import("../../../app/desktop/project.ts")).resolveNativeProjectDirectory
+    : undefined;
+  if (f.selectedRoot !== undefined) assert.equal(typeof resolveNativeSelection, "function", "The selected application must supply its native directory resolver");
   const { DesktopDurableWorkflow: Controller } = bundleResources
     ? await import(moduleUrl("app/desktop/durable-workflow.ts")) as typeof import("../../../app/desktop/durable-workflow.ts")
     : { DesktopDurableWorkflow };
@@ -375,7 +391,13 @@ export async function app(f: WorkspaceFixture, model: ReturnType<typeof modelFix
   });
   const desktop = desktopInterface({
     durableWorkflow: durable,
-    pickDirectory: chooseProjectRoot ?? (async () => f.root),
+    pickDirectory: async () => {
+      const selected = chooseProjectRoot ? await chooseProjectRoot() : f.selectedRoot ?? f.root;
+      if (selected === null || !resolveNativeSelection) return selected;
+      const resolved = await resolveNativeSelection(selected);
+      log("native-project-directory", { selected, resolved });
+      return resolved;
+    },
     pickWorkflowDefinition,
     emitEvent: envelope => {
       if (["settled", "handback", "denied"].includes(envelope.event.kind)) log("desktop-event", envelope);

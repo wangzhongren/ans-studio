@@ -19,6 +19,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, shell } from "electron";
 
 import { createDesktopInterface, createShellJudgeSwitch, createDecisionDelegationSwitch, createShellSessionPauseState, isShellJudgeIpcSender, registerPreferencesIpc, type DesktopInterface } from "./desktop/interface.ts";
+import { resolveNativeProjectDirectory } from "./desktop/project.ts";
 // P2（2026-10-30）：网络状态监听——主进程 `net.isOnline` 权威 + powerMonitor 提示；状态经 IPC 推渲染层，
 // 同时经 Interface 传入 SessionManager（离线队列保留）与运行时（请求 deadline 暂停/恢复）。
 // 纯逻辑在 `desktop/network-monitor.ts`（可注入 probe/clock；本文件只接 Electron 事件与 IPC）。
@@ -830,8 +831,8 @@ function registerIpc(win: BrowserWindow): void {
         title: desktopTexts(mainI18n).importProjectDialogTitle,
         properties: ["openDirectory"],
       });
-      if (result.canceled || result.filePaths.length === 0) return null;
-      return result.filePaths[0];
+      const selectedRoot = result.filePaths[0];
+      return result.canceled || !selectedRoot ? null : resolveNativeProjectDirectory(selectedRoot);
     },
     pickWorkflowDefinition: async () => {
       const result = await dialog.showOpenDialog(win, {
